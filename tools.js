@@ -102,6 +102,15 @@
       try{ localStorage.setItem(SAVED_CALC_KEY, JSON.stringify(items)); }catch(e){}
       renderSavedCalcs();
       showToast('계산 결과를 저장했어요', 'success');
+      /* GA4 margin_calculator_use — only reaches here once a save actually
+         happened (the empty-price early-return above already stopped
+         anything else). No cost/price/profit here on purpose — those are
+         business-sensitive figures, not needed just to know the tool got used. */
+      if(typeof gtag === 'function'){
+        gtag('event', 'margin_calculator_use', {
+          tool_name: 'tools_margin_calculator'
+        });
+      }
     });
   }
   renderSavedCalcs();
