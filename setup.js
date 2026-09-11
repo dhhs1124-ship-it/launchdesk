@@ -119,5 +119,20 @@
       if(standardPlan) setupSelectPlan(standardPlan);
       setupShowStep(1);
     });
+
+    var setupMailBtn = document.getElementById('setupMailBtn');
+    if(setupMailBtn) setupMailBtn.addEventListener('click', function(){
+      /* GA4 setup_mail_click — fires alongside the button's own mailto:
+         href (set in the submit handler above), which the browser follows
+         natively right after this — nothing here blocks or delays that.
+         This only means the button was clicked, NOT that the email was
+         actually sent from the mail app that opens. No name/phone/note/
+         email body here on purpose — those are the applicant's personal info. */
+      if(typeof gtag === 'function' && setupSelectedPlan){
+        gtag('event', 'setup_mail_click', {
+          plan_key: setupSelectedPlan.key
+        });
+      }
+    });
   }
 })();
