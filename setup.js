@@ -99,6 +99,17 @@
       if(mailBtn) mailBtn.href = 'mailto:' + encodeURIComponent(CONTACT_EMAIL) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
 
       setupShowStep(3);
+      /* GA4 setup_form_complete — fires once the mailto link above is
+         assembled and step 3 (the completion screen) is shown. This only
+         means the applicant finished filling out the form, NOT that the
+         email was actually sent — that last step happens in the user's own
+         mail client and this page can't observe it. No name/platform/phone
+         /note here on purpose — those are the applicant's personal info. */
+      if(typeof gtag === 'function'){
+        gtag('event', 'setup_form_complete', {
+          plan_key: setupSelectedPlan.key
+        });
+      }
     });
 
     var setupRestart = document.getElementById('setupRestart');
