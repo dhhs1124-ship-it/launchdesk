@@ -230,6 +230,15 @@
       e.target.reset();
       document.getElementById('adlogFormWrap').hidden = true;
       showToast('광고 기록이 저장됐어요', 'success');
+      /* GA4 ad_record_add — fires right after saveAdlogRecords() above
+         actually persisted the record. No date/name/spend/revenue/channel
+         here on purpose — those are the seller's own business numbers,
+         not needed just to know the tool got used. */
+      if(typeof gtag === 'function'){
+        gtag('event', 'ad_record_add', {
+          tool_name: 'ad_log'
+        });
+      }
     });
     renderAdlog();
   }
