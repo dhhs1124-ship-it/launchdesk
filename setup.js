@@ -9,7 +9,7 @@
      사용자가 직접 [보내기]를 눌러야 완성되는 진짜 mailto: 메일로
      연결합니다. CONTACT_EMAIL을 아직 못 정해서 비워뒀어요 — 실제
      수신 이메일이 정해지면 이 한 줄만 채우면 됩니다. */
-  var CONTACT_EMAIL = ''; // TODO: 실제 수신 이메일 주소로 교체
+  var CONTACT_EMAIL = 'dhhs1124@gmail.com';
   var setupView = document.getElementById('view-services-setup');
   if(setupView){
     var setupSelectedPlan = null;
