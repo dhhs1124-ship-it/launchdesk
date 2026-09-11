@@ -1,6 +1,9 @@
 (function(){
   document.getElementById('year').textContent = new Date().getFullYear();
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // last chapter path a GA4 chapter_start fired for — see render() below;
+  // declared here so it survives across every render() call, not just one
+  var lastChapterStartPath = null;
 
   /* Views that actually exist. Add a line here the moment a new
      <section class="view" id="view-XXX"> is built — every #/path
@@ -121,6 +124,28 @@
       gtag('event', 'setup_page_view', {
         page_name: 'services_setup'
       });
+    }
+
+    /* GA4 chapter_start — fires when path lands on one of the 9
+       CHAPTER_PATHS. lastChapterStartPath guards against firing twice in a
+       row for the *same* chapter (e.g. if render() ever re-ran without the
+       hash actually changing) — but is cleared the moment path leaves
+       chapter territory, so navigating to another chapter (or any other
+       view) and then back still counts as a new start, same as page_view
+       already does. path/title are fixed strings from CHAPTER_PATHS/
+       TITLES, no user input. */
+    if(CHAPTER_PATHS.indexOf(path) !== -1){
+      if(path !== lastChapterStartPath){
+        lastChapterStartPath = path;
+        if(typeof gtag === 'function'){
+          gtag('event', 'chapter_start', {
+            chapter_path: path,
+            chapter_title: TITLES[path] || path
+          });
+        }
+      }
+    } else {
+      lastChapterStartPath = null;
     }
   }
 
