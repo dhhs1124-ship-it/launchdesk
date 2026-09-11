@@ -512,6 +512,17 @@
     if(isDone && idx === -1){
       completed.push(path); saveCompleted(completed); recomputeProgress();
       showToast('챕터를 완료했어요 🎉', 'success');
+      /* GA4 chapter_complete — this branch only runs once per chapter
+         (the idx === -1 guard above is the same one the toast already
+         relies on to avoid re-firing while re-evaluating an already-
+         completed worksheet/checklist). No user input — path/title are
+         fixed strings from CHAPTER_PATHS/TITLES. */
+      if(typeof gtag === 'function'){
+        gtag('event', 'chapter_complete', {
+          chapter_path: path,
+          chapter_title: TITLES[path] || path
+        });
+      }
     }
     else if(!isDone && idx !== -1){
       completed.splice(idx, 1); saveCompleted(completed); recomputeProgress();
