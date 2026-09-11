@@ -157,6 +157,30 @@
     };
     simInputs.forEach(function(el){ el.addEventListener('input', computeSimulator); });
     computeSimulator();
+
+    /* GA4 profit_simulator_use — debounced separately from computeSimulator
+       above (that one still fires on every keystroke for the live display;
+       this one waits 1.5s after the last input before firing, once, so
+       typing doesn't spam GA4). Only fires once 판매 수량/판매가 — the two
+       inputs a meaningful result actually depends on — are both filled in.
+       No revenue/cost/ad-spend/profit/margin numbers here on purpose —
+       those are the seller's own business figures, not needed just to know
+       the tool got used. */
+    var simTrackTimer = null;
+    function trackSimulatorUse(){
+      var qty = parseFloat(document.getElementById('simQty').value) || 0;
+      var price = parseFloat(document.getElementById('simPrice').value) || 0;
+      if(qty <= 0 || price <= 0) return;
+      if(typeof gtag === 'function'){
+        gtag('event', 'profit_simulator_use', { tool_name: 'profit_simulator' });
+      }
+    }
+    simInputs.forEach(function(el){
+      el.addEventListener('input', function(){
+        clearTimeout(simTrackTimer);
+        simTrackTimer = setTimeout(trackSimulatorUse, 1500);
+      });
+    });
   }
 
   /* 광고 기록 — real localStorage log the user builds up over time
