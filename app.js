@@ -112,6 +112,16 @@
         page_path: path
       });
     }
+
+    /* GA4 setup_page_view — a dedicated arrival signal for the setup-
+       service page specifically, on top of (not instead of) the page_view
+       above. path is a fixed literal, no user input. Guarded the same way
+       so a blocked/failed GA4 load never breaks navigation. */
+    if(path === '/services/setup' && typeof gtag === 'function'){
+      gtag('event', 'setup_page_view', {
+        page_name: 'services_setup'
+      });
+    }
   }
 
   window.addEventListener('hashchange', render);
