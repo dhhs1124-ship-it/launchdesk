@@ -98,6 +98,20 @@
     setActiveNav(path);
     window.scrollTo(0, 0);
     closeSidebar();
+
+    /* GA4 page_view — hash routes never trigger a real page load, so the
+       automatic page_view (disabled via send_page_view:false in the GA4
+       tag) is replaced by this one manual event per render(), covering
+       both the initial paint and every hashchange. No user input here —
+       path/title are always one of the fixed strings in BUILT/TITLES.
+       Guarded so a blocked/failed GA4 load never breaks navigation. */
+    if(typeof gtag === 'function'){
+      gtag('event', 'page_view', {
+        page_title: TITLES[path] || '준비 중',
+        page_location: location.href,
+        page_path: path
+      });
+    }
   }
 
   window.addEventListener('hashchange', render);
