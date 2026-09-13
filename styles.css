@@ -30,6 +30,12 @@
     --f-mono:'JetBrains Mono','SFMono-Regular',monospace;
   }
   *{box-sizing:border-box;}
+  /* 클래스에 display 값을 지정한 요소(.ws-field 등)는 브라우저 기본
+     [hidden]{display:none} UA 스타일보다 author 스타일이 우선 적용돼
+     hidden 속성이 무시된다 — 항상 hidden이 이기도록 명시적으로 고정한다
+     (로그인/회원가입 모달의 "비밀번호 확인" 필드가 이 문제로 로그인
+     모드에서도 계속 보이던 버그의 원인). */
+  [hidden]{display:none !important;}
   html{scroll-behavior:auto;}
   body{background:var(--bg); color:var(--ink); font-family:var(--f-body); line-height:1.65; -webkit-font-smoothing:antialiased;}
   h1,h2,h3{font-family:var(--f-body); font-weight:800; text-wrap:balance; margin:0; letter-spacing:-.01em; color:var(--ink);}
@@ -62,7 +68,7 @@
   .sidebar .logo{display:flex; align-items:center; gap:.5rem; font-family:var(--f-display); font-weight:700; font-size:1.08rem; letter-spacing:-.01em; padding:.5rem .6rem 1.3rem;}
   .sidebar .logo .dot{width:10px; height:10px; border-radius:3px; background:var(--gradient); flex:0 0 auto;}
 
-  .profile-card{display:flex; align-items:center; gap:.7rem; padding:.5rem .6rem; margin-bottom:.7rem;}
+  .profile-card{display:flex; align-items:center; gap:.7rem; padding:.5rem .6rem; margin-bottom:.7rem; cursor:pointer;}
   .profile-avatar{position:relative; width:36px; height:36px; border-radius:50%; background:var(--gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--f-display); font-weight:700; font-size:.95rem; flex:0 0 auto;}
   .profile-avatar .pulse-dot{position:absolute; right:-1px; bottom:-1px; border:2px solid var(--sidebar-bg);}
   .profile-name{font-size:.88rem; font-weight:700; color:var(--ink);}

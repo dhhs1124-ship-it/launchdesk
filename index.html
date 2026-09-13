@@ -58,22 +58,23 @@
       <div class="modal-head">
         <div class="logo-mini"><span class="dot"></span>LAUNCH<span class="grad-text">DESK</span></div>
         <h2 id="loginModalTitle">로그인</h2>
-        <p>로그인하면 진행 상황이 계정에 저장돼요.</p>
+        <p id="loginModalLead">로그인하면 진행 상황이 계정에 저장돼요.</p>
       </div>
       <form id="loginForm">
         <div class="ws-field"><label for="loginEmail">이메일</label><input id="loginEmail" type="email" placeholder="you@example.com" required></div>
         <div class="ws-field"><label for="loginPw">비밀번호</label><input id="loginPw" type="password" placeholder="••••••••" required></div>
-        <button type="submit" class="btn btn-primary" style="justify-content:center; width:100%;">로그인</button>
+        <div class="ws-field" id="loginPwConfirmField" hidden><label for="loginPwConfirm">비밀번호 확인</label><input id="loginPwConfirm" type="password" placeholder="••••••••"></div>
+        <button type="submit" class="btn btn-primary" id="loginSubmitBtn" style="justify-content:center; width:100%;">로그인</button>
       </form>
       <div class="modal-divider"><span>또는</span></div>
       <div class="modal-social">
         <button type="button" class="btn btn-ghost login-social" style="justify-content:center; width:100%;">카카오로 계속하기</button>
         <button type="button" class="btn btn-ghost login-social" style="justify-content:center; width:100%;">Google로 계속하기</button>
       </div>
-      <p class="modal-foot">아직 계정이 없으신가요? <a href="#" id="loginToSignup">회원가입</a></p>
+      <p class="modal-foot"><span id="loginFootLead">아직 계정이 없으신가요?</span> <a href="#" id="loginToSignup">회원가입</a></p>
     </div>
     <div class="modal-notice" id="loginNotice" hidden>
-      <p>로그인 기능은 아직 준비 중이에요. 조금만 기다려주세요!</p>
+      <p id="loginNoticeText">로그인 기능은 아직 준비 중이에요. 조금만 기다려주세요!</p>
       <button type="button" class="btn btn-ghost" id="loginNoticeClose" style="justify-content:center; width:100%; margin-top:1rem;">닫기</button>
     </div>
   </div>
@@ -84,11 +85,11 @@
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
     <a class="logo" href="#/"><span class="dot"></span>LAUNCH<span class="grad-text">DESK</span></a>
-    <div class="profile-card">
-      <div class="profile-avatar">피<span class="pulse-dot" aria-hidden="true"></span></div>
+    <div class="profile-card" id="profileCard" role="button" tabindex="0">
+      <div class="profile-avatar"><span id="profileAvatarLetter">?</span><span class="pulse-dot" aria-hidden="true"></span></div>
       <div>
-        <div class="profile-name">피터 님</div>
-        <div class="profile-day" id="profileDay">D+0</div>
+        <div class="profile-name" id="profileName">로그인을 해주세요</div>
+        <div class="profile-day" id="profileDay">진행상황을 저장하고 다른 기기에서도 이어볼 수 있어요.</div>
       </div>
     </div>
     <div class="progress-mini">
@@ -130,7 +131,7 @@
         <span class="pulse-dot" aria-hidden="true"></span>
         <span class="crumb" id="crumbLabel">홈</span>
       </div>
-      <a class="btn btn-ghost btn-sm" href="#/login">로그인</a>
+      <a class="btn btn-ghost btn-sm" href="#/login" id="topbarLoginBtn">로그인</a>
     </header>
 
     <main>
@@ -1672,7 +1673,7 @@
                 <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">판매가 확정</span></label>
                 <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">기본 마진 구조 확인</span></label>
               </div>
-              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 6개를 모두 체크하고, 운영 도구의 마진 계산기에서 결과를 한 번 이상 저장하면 이 STEP이 완료로 표시되고 진행률에 반영돼요.</div>
+              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 6개를 모두 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요.</div>
             </div>
 
             <p style="font-size:.84rem;"><a href="#/resources" data-resource-cat="product" style="color:var(--accent-ink); font-weight:600;">상품 · 소싱 · 마진 관련 자료 보기 →</a></p>
@@ -2151,6 +2152,9 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+<script src="supabase-client.js"></script>
+<script src="store.js"></script>
 <script src="app.js"></script>
 <script src="tools.js"></script>
 <script src="setup.js"></script>

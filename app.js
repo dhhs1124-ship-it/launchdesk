@@ -4,10 +4,6 @@
   // last chapter path a GA4 chapter_start fired for — see render() below;
   // declared here so it survives across every render() call, not just one
   var lastChapterStartPath = null;
-  // STEP03's checklist evaluate() (set once its wiring runs, below) — re-run
-  // from render() every time /start/sourcing is entered, since a saved
-  // margin-calculator result made on /tools won't otherwise be noticed
-  var reevaluateSourcing = null;
   // set by a click on any [data-resource-cat] link (STEP02~07 → 자료실
   // links); consumed once by render() the moment /resources is reached,
   // so that STEP's relevant category filter is pre-selected automatically
@@ -110,15 +106,6 @@
     window.scrollTo(0, 0);
     closeSidebar();
 
-    /* STEP03은 /tools에서 마진계산기를 저장한 뒤 돌아왔을 때 완료조건이
-       달라질 수 있으므로, 이 경로로 들어올 때마다 다시 평가한다.
-       reevaluateSourcing은 아래 체크리스트 wiring이 지정하며, 이 경로도
-       결국 setChapterDone()을 타므로 GA4/토스트는 여전히 "진짜로 새로
-       완료되는 순간"에만 정확히 한 번 발생한다. */
-    if(path === '/start/sourcing' && typeof reevaluateSourcing === 'function'){
-      reevaluateSourcing();
-    }
-
     /* STEP02~07의 "OO 관련 자료 보기" 링크가 남겨둔 카테고리를 자료실
        도착 시 한 번만 적용 — 새 라우팅을 추가하지 않고, 자료실 자체의
        필터 탭 클릭 메커니즘을 그대로 재사용한다(아래 filter-tab 클릭
@@ -208,14 +195,53 @@
   });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeLightbox(); });
 
-  /* login modal — every #/login link opens this instead of routing
-     away, so "로그인"/"구독 시작하기" never leaves whatever the user
-     was doing. No real auth yet, so submitting (email form or either
-     social button) just swaps to an honest "still coming" notice. */
+  /* login modal — every #/login link opens this instead of routing away.
+     Supabase Auth(이메일 회원가입/로그인)를 실제로 연결한다. Google/Kakao
+     버튼은 이번 단계 범위 밖이라 그대로 "아직 준비 중" 안내로 남겨둔다.
+     같은 폼(이메일+비밀번호[+비밀번호 확인])을 loginMode에 따라 로그인/
+     회원가입 두 용도로 재사용한다 — 새 페이지나 새 폼을 만들지 않는다. */
   var loginModal = document.getElementById('loginModal');
   var loginFormWrap = document.getElementById('loginFormWrap');
   var loginNotice = document.getElementById('loginNotice');
+  var loginNoticeText = document.getElementById('loginNoticeText');
+  var loginModalTitle = document.getElementById('loginModalTitle');
+  var loginModalLead = document.getElementById('loginModalLead');
+  var loginForm = document.getElementById('loginForm');
+  var loginSubmitBtn = document.getElementById('loginSubmitBtn');
+  var loginFootLead = document.getElementById('loginFootLead');
+  var loginToSignup = document.getElementById('loginToSignup');
+  var loginPwConfirmField = document.getElementById('loginPwConfirmField');
+  var loginPwConfirm = document.getElementById('loginPwConfirm');
+  var loginMode = 'login'; // 'login' | 'signup' — 같은 모달/폼을 토글
+  /* Supabase SDK는 실제 로그인 제출이 아니어도(예: 탭이 다시 포커스를
+     받아 세션을 재검증할 때) 'SIGNED_IN' 이벤트를 다시 쏠 수 있다. 그걸
+     "방금 사용자가 로그인 버튼을 눌렀다"로 착각하면, 레거시/게스트 병합
+     확인창이 매번 다시 뜨고 hydrate()가 반복 실행되어 입력 중인 화면을
+     되돌려버릴 수 있다 — 그래서 이벤트 이름이 아니라, 우리가 직접
+     signInWithPassword()를 호출했는지로 "진짜 로그인"을 판별한다. */
+  var pendingFreshLogin = false;
+
+  function applyLoginModalMode(){
+    if(loginMode === 'signup'){
+      loginModalTitle.textContent = '회원가입';
+      loginModalLead.textContent = '이메일과 비밀번호로 몇 초 만에 시작하세요.';
+      loginSubmitBtn.textContent = '회원가입';
+      loginFootLead.textContent = '이미 계정이 있으신가요?';
+      loginToSignup.textContent = '로그인';
+      if(loginPwConfirmField) loginPwConfirmField.hidden = false;
+    } else {
+      loginModalTitle.textContent = '로그인';
+      loginModalLead.textContent = '로그인하면 진행 상황이 계정에 저장돼요.';
+      loginSubmitBtn.textContent = '로그인';
+      loginFootLead.textContent = '아직 계정이 없으신가요?';
+      loginToSignup.textContent = '회원가입';
+      if(loginPwConfirmField) loginPwConfirmField.hidden = true;
+      if(loginPwConfirm) loginPwConfirm.value = '';
+    }
+  }
   function openLoginModal(){
+    loginMode = 'login';
+    applyLoginModalMode();
     loginFormWrap.hidden = false;
     loginNotice.hidden = true;
     loginModal.classList.add('open');
@@ -223,23 +249,811 @@
   }
   function closeLoginModal(){
     loginModal.classList.remove('open');
-    document.getElementById('loginForm').reset();
+    loginForm.reset();
   }
-  function showLoginNotice(){
+  function showLoginNotice(message){
+    loginNoticeText.textContent = message || '로그인 기능은 아직 준비 중이에요. 조금만 기다려주세요!';
     loginFormWrap.hidden = true;
     loginNotice.hidden = false;
+  }
+  /* Supabase 오류 메시지(영문)를 그대로 보여주지 않고, 자주 나오는 케이스만
+     이해하기 쉬운 한국어 안내로 바꾼다. 나머지는 공통 안내로 뭉뚱그린다. */
+  function getAuthErrorMessage(err){
+    var msg = (err && err.message) || '';
+    if(/invalid login credentials/i.test(msg)) return '이메일 또는 비밀번호가 올바르지 않아요.';
+    if(/email not confirmed/i.test(msg)) return '이메일 인증이 아직 완료되지 않았어요. 받은 편지함을 확인해주세요.';
+    if(/already registered|already exists/i.test(msg)) return '이미 가입된 이메일이에요. 로그인해주세요.';
+    if(/password.*(least|character)/i.test(msg)) return '비밀번호는 8자 이상으로 입력해주세요.';
+    if(/rate limit|too many/i.test(msg)) return '요청이 너무 많아요. 잠시 후 다시 시도해주세요.';
+    if(/network|fetch/i.test(msg)) return '네트워크 연결을 확인해주세요.';
+    return '문제가 발생했어요. 잠시 후 다시 시도해주세요.';
   }
   document.getElementById('loginModalClose').addEventListener('click', closeLoginModal);
   document.getElementById('loginModalBackdrop').addEventListener('click', closeLoginModal);
   document.getElementById('loginNoticeClose').addEventListener('click', closeLoginModal);
-  document.getElementById('loginForm').addEventListener('submit', function(e){ e.preventDefault(); showLoginNotice(); });
-  document.querySelectorAll('.login-social').forEach(function(b){ b.addEventListener('click', showLoginNotice); });
-  document.getElementById('loginToSignup').addEventListener('click', function(e){ e.preventDefault(); showLoginNotice(); });
+  loginForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var sb = window.launchdeskSupabase;
+    if(!sb){ showLoginNotice(); return; }
+    var email = document.getElementById('loginEmail').value.trim();
+    var password = document.getElementById('loginPw').value;
+
+    /* 회원가입 보강: 비밀번호 최소 8자 + 비밀번호 확인 일치를 프론트에서
+       먼저 검사한다 — 조건을 만족하지 않으면 signUp()을 아예 호출하지
+       않는다. 로그인 모드에는 이 검사를 적용하지 않는다(기존 계정 중
+       더 짧은 비밀번호가 있을 수 있어, 로그인 자체를 막지 않기 위함). */
+    if(loginMode === 'signup'){
+      var confirmVal = loginPwConfirm ? loginPwConfirm.value : '';
+      if(password.length < 8){ showToast('비밀번호는 8자 이상으로 입력해주세요.'); return; }
+      if(password !== confirmVal){ showToast('비밀번호가 일치하지 않아요.'); return; }
+    }
+
+    var restoreLabel = loginSubmitBtn.textContent;
+    loginSubmitBtn.disabled = true;
+    loginSubmitBtn.textContent = '처리 중...';
+    function reenable(){ loginSubmitBtn.disabled = false; loginSubmitBtn.textContent = restoreLabel; }
+
+    if(loginMode === 'signup'){
+      sb.auth.signUp({ email: email, password: password }).then(function(res){
+        reenable();
+        if(res.error){ showToast(getAuthErrorMessage(res.error)); return; }
+        // Confirm email이 켜져 있으므로 여기서는 세션이 아직 없다 — 바로
+        // 로그인된 것처럼 처리하지 않고, 이메일 인증부터 안내한다.
+        showLoginNotice('인증 이메일을 보냈습니다. 이메일 인증 후 로그인해주세요.');
+      }).catch(function(err){ reenable(); showToast(getAuthErrorMessage(err)); });
+    } else {
+      pendingFreshLogin = true;
+      sb.auth.signInWithPassword({ email: email, password: password }).then(function(res){
+        reenable();
+        if(res.error){ pendingFreshLogin = false; showToast(getAuthErrorMessage(res.error)); return; }
+        // 모달 닫기 · 토스트 · 사이드바/데이터 갱신은 아래 onAuthStateChange가 전담
+      }).catch(function(err){ pendingFreshLogin = false; reenable(); showToast(getAuthErrorMessage(err)); });
+    }
+  });
+  document.querySelectorAll('.login-social').forEach(function(b){ b.addEventListener('click', function(){ showLoginNotice(); }); });
+  loginToSignup.addEventListener('click', function(e){
+    e.preventDefault();
+    loginMode = (loginMode === 'signup') ? 'login' : 'signup';
+    applyLoginModalMode();
+  });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && loginModal.classList.contains('open')) closeLoginModal(); });
   document.addEventListener('click', function(e){
     var loginLink = e.target.closest('a[href="#/login"]');
-    if(loginLink){ e.preventDefault(); openLoginModal(); }
+    // 로그인 상태에서도 href="#/login" 자체는 그대로 두되(마크업 최소 변경),
+    // 실제 이동은 항상 막고 — 모달은 비로그인일 때만 연다(상단바 "내 계정"
+    // 클릭 시 로그인 모달이 다시 뜨지 않도록).
+    if(loginLink){ e.preventDefault(); if(!isAuthed) openLoginModal(); }
   });
+
+  /* toast — used only for things that genuinely just happened locally
+     (a chapter getting marked complete). Never wired to actions that
+     don't actually do anything yet (subscribe, download, apply) —
+     those still say so honestly via the "coming soon" view / modal. */
+  var toastStack = document.getElementById('toastStack');
+  function showToast(message, type){
+    var el = document.createElement('div');
+    el.className = 'toast' + (type ? ' ' + type : '');
+    el.textContent = message;
+    toastStack.appendChild(el);
+    requestAnimationFrame(function(){ el.classList.add('show'); });
+    setTimeout(function(){
+      el.classList.remove('show');
+      setTimeout(function(){ el.remove(); }, 250);
+    }, 2600);
+  }
+
+  /* ---- STEP01~07 진행상황 저장소 --------------------------------------
+     window.launchdeskStore(store.js, 이 파일보다 먼저 로드)가 회원/비회원
+     저장 방식을 실제로 나눈다 — 비회원은 메모리에만, 회원은 Supabase의
+     user_step_progress/tool_records에도 반영한다. 아래 함수들은 이름과
+     역할을 그대로 유지하면서, 내부 구현만 launchdeskStore를 거치도록
+     바뀌었다(예전엔 여기서 직접 localStorage를 읽고 썼다). */
+  var CHAPTER_PATHS = ['/start/intro','/start/prepare','/start/setup','/start/sourcing','/start/content','/start/marketing-setup','/start/marketing','/start/orders','/start/wrapup'];
+  /* 레거시(로그인 이전 시절) localStorage 키 이름 — 더 이상 쓰지는 않지만,
+     로그인 시 "이 브라우저에 옛 진행상황이 있는지" 확인하고 계정으로
+     옮기는 마이그레이션에서만 참조한다(아래 마이그레이션 섹션). */
+  var COMPLETED_KEY = 'ld-completed-chapters';
+  var STORAGE_KEY_OVERRIDES = {
+    '/start/prepare':         'ld-worksheet-start-prepare-v2',
+    '/start/marketing-setup': 'ld-checklist-start-marketing-setup-v2'
+  };
+  var progressFillEls = document.querySelectorAll('#progressFillSide, #progressFillRow');
+  var progressPctEls = document.querySelectorAll('#progressPct');
+
+  function checklistAllChecked(path){
+    var block = document.querySelector('.checklist-block[data-chapter="' + path + '"]');
+    if(!block) return false;
+    var boxes = block.querySelectorAll('.cl-row input[type="checkbox"]');
+    if(!boxes.length) return false;
+    var saved = launchdeskStore.getStepData(path);
+    if(!Array.isArray(saved)) return false;
+    for(var i = 0; i < boxes.length; i++){ if(saved.indexOf(i) === -1) return false; }
+    return true;
+  }
+  function worksheetAllFilled(path){
+    var ws = document.querySelector('.worksheet[data-chapter="' + path + '"]');
+    if(!ws) return false;
+    var inputs = ws.querySelectorAll('.worksheet-input');
+    if(!inputs.length) return false;
+    var saved = launchdeskStore.getStepData(path) || {};
+    return Array.prototype.every.call(inputs, function(inp, i){ return typeof saved[i] === 'string' && saved[i].trim() !== ''; });
+  }
+  var STEP_EVALUATORS = {
+    '/start/prepare':         function(){ return worksheetAllFilled('/start/prepare'); },
+    '/start/setup':           function(){ return checklistAllChecked('/start/setup'); },
+    '/start/sourcing':        function(){ return checklistAllChecked('/start/sourcing'); },
+    '/start/content':         function(){ return checklistAllChecked('/start/content'); },
+    '/start/orders':          function(){ return checklistAllChecked('/start/orders'); },
+    '/start/marketing-setup': function(){ return checklistAllChecked('/start/marketing-setup'); },
+    '/start/marketing':       function(){ return checklistAllChecked('/start/marketing'); }
+  };
+  function getCompleted(){
+    return launchdeskStore.getCompletedPaths();
+  }
+  /* 옛 구조와의 호환을 위해 이름/역할을 유지한다 — 실제 저장은 각 STEP의
+     evaluate()가 setChapterDone()을 통해 이미 launchdeskStore에 반영했다.
+     여기서는 넘겨받은 완료 목록과 store 상태가 어긋난 항목만 보정한다
+     (정상 흐름에서는 보정할 것이 없다). */
+  function saveCompleted(list){
+    Object.keys(STEP_EVALUATORS).forEach(function(path){
+      var shouldBeDone = list.indexOf(path) !== -1;
+      if(launchdeskStore.isStepCompleted(path) !== shouldBeDone){
+        launchdeskStore.setStepState(path, launchdeskStore.getStepData(path), shouldBeDone);
+      }
+    });
+  }
+  function reconcileCompletedChapters(){
+    var completed = getCompleted();
+    var changed = false;
+    Object.keys(STEP_EVALUATORS).forEach(function(path){
+      var actual = STEP_EVALUATORS[path]();
+      var idx = completed.indexOf(path);
+      if(actual && idx === -1){ completed.push(path); changed = true; }
+      else if(!actual && idx !== -1){ completed.splice(idx, 1); changed = true; }
+    });
+    if(changed) saveCompleted(completed);
+  }
+
+  /* STEP01~07 공용 진행률 계산 — 완료 STEP 수 / 전체 STEP 수(7) / % /
+     다음 미완료 STEP을 한 번에 계산해 사이드바 · 홈 · /start가 모두
+     같은 결과를 나눠 쓰게 한다 (STEP_ROADMAP/GATED_STEPS는 아래 정의). */
+  function computeStepProgress(completed){
+    var total = GATED_STEPS.length;
+    var done = GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) !== -1; }).length;
+    var pct = total ? Math.round(done / total * 100) : 0;
+    var next = null;
+    for(var i = 0; i < GATED_STEPS.length; i++){
+      if(completed.indexOf(GATED_STEPS[i].route) === -1){ next = GATED_STEPS[i]; break; }
+    }
+    return {total: total, done: done, pct: pct, next: next};
+  }
+
+  function recomputeProgress(){
+    var completed = getCompleted();
+    var prog = computeStepProgress(completed);
+    var pct = prog.pct;
+    progressFillEls.forEach(function(el){ el.style.width = pct + '%'; });
+    progressPctEls.forEach(function(el){ el.textContent = pct + '%'; });
+
+    // /start index page extras: stat row, detail bar, per-card checkmarks
+    var ssProgress = document.getElementById('ssProgress');
+    if(ssProgress) ssProgress.textContent = prog.done + '/' + prog.total + ' 완료';
+    var pdPct = document.getElementById('pdPct');
+    if(pdPct) pdPct.textContent = pct + '%';
+    var pdFill = document.getElementById('pdFill');
+    if(pdFill) pdFill.style.width = pct + '%';
+    var pdDone = document.getElementById('pdDone');
+    if(pdDone) pdDone.textContent = prog.done;
+    var pdLeft = document.getElementById('pdLeft');
+    if(pdLeft) pdLeft.textContent = prog.total - prog.done;
+    document.querySelectorAll('.guide-card[data-chapter]').forEach(function(card){
+      var isDone = completed.indexOf(card.getAttribute('data-chapter')) !== -1;
+      var check = card.querySelector('.cc-check');
+      if(check) check.hidden = !isDone;
+      var link = card.querySelector('.gc-link');
+      if(link && isDone && card.getAttribute('data-tier') === 'free'){ link.textContent = '다시 보기 →'; }
+    });
+
+    // home page's compact guide-preview rows (same completed[] source)
+    document.querySelectorAll('.gp-row[data-chapter]').forEach(function(row){
+      var isDone = completed.indexOf(row.getAttribute('data-chapter')) !== -1;
+      row.querySelector('.gp-check').classList.toggle('done', isDone);
+    });
+
+    renderHomeDashboard(completed, prog);
+    renderWrapupState(completed, prog);
+  }
+
+  /* ---- STEP_ROADMAP — single roadmap shared by every progress display --
+     Originally built for the home dashboard only (HOME_STEPS); promoted
+     here to a file-wide list so the sidebar mini-bar, the /start detail
+     bar and the home dashboard all read the exact same order/labels and
+     the exact same computeStepProgress() result — they cannot show
+     different numbers anymore. STEP00/08 are gate-free transition
+     screens (gated:false) and are excluded from every total/percentage;
+     STEP01~07 (gated:true) are the 7 STEPs progress is measured against. */
+  var STEP_ROADMAP = [
+    {num:'00', route:'/start/intro',           label:'오픈 로드맵 확인하기',             gated:false},
+    {num:'01', route:'/start/prepare',         label:'무엇을, 누구에게 팔지 정하기',      gated:true},
+    {num:'02', route:'/start/setup',           label:'사업자 등록하고 쇼핑몰 플랫폼 만들기', gated:true},
+    {num:'03', route:'/start/sourcing',        label:'판매할 상품과 공급처, 가격 확정하기', gated:true},
+    {num:'04', route:'/start/content',         label:'상품 상세페이지 완성하기',          gated:true},
+    {num:'05', route:'/start/orders',          label:'배송·CS 정책 정하고 오픈 준비 마치기', gated:true},
+    {num:'06', route:'/start/marketing-setup', label:'마케팅 인프라 연결하기',            gated:true},
+    {num:'07', route:'/start/marketing',       label:'첫 유입 만들고 반응 테스트하기',     gated:true},
+    {num:'08', route:'/start/wrapup',          label:'오픈 완료, 운영 시작하기',          gated:false}
+  ];
+  var GATED_STEPS = STEP_ROADMAP.filter(function(s){ return s.gated; });
+  var RESUME_RING_CIRC = 175.9;
+  function renderHomeDashboard(completed, prog){
+    var titleEl = document.getElementById('resumeTitle');
+    if(!titleEl) return; // home markup not present on this build
+
+    prog = prog || computeStepProgress(completed);
+    var pct = prog.pct;
+
+    var pctEl = document.getElementById('rbPct');
+    if(pctEl) pctEl.textContent = pct + '%';
+    var arc = document.getElementById('rbRingArc');
+    if(arc) arc.style.strokeDashoffset = (RESUME_RING_CIRC * (1 - pct / 100)).toFixed(1);
+    var barEl = document.getElementById('rbBarFill');
+    if(barEl) barEl.style.width = pct + '%';
+    var subEl = document.getElementById('resumeSub');
+    if(subEl) subEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 완료';
+
+    var linkEl = document.getElementById('resumeLink');
+    if(prog.next){
+      titleEl.textContent = 'STEP ' + prog.next.num + ' · ' + prog.next.label;
+      if(linkEl){ linkEl.href = '#' + prog.next.route; linkEl.textContent = '이어서 하기 →'; }
+    } else {
+      titleEl.textContent = prog.total + '단계를 모두 완료했어요 🎉';
+      if(linkEl){ linkEl.href = '#/start/wrapup'; linkEl.textContent = '오픈 완료 확인하기 →'; }
+    }
+  }
+
+  /* ---- STEP08 운영 전환 화면 — computeStepProgress()의 결과를 그대로
+     읽기만 한다(별도 완료 계산 없음, ld-completed-chapters 직접 참조도
+     없음). 7/7이면 기존 "오픈 완료" 콘텐츠 그대로, 아니면 남은 STEP
+     안내로 바뀐다. STEP08 자체는 gated:false라 이 화면엔 완료 게이트가
+     없고, GA4 이벤트도 새로 추가하지 않는다(기존 page_view만 그대로). */
+  function renderWrapupState(completed, prog){
+    var titleEl = document.getElementById('wrapupTitle');
+    if(!titleEl) return; // wrapup markup not present on this build
+
+    var leadEl = document.getElementById('wrapupLead');
+    var bannerEl = document.getElementById('wrapupStatusBanner');
+    var doneBlock = document.getElementById('wrapupDoneBlock');
+    var incompleteBlock = document.getElementById('wrapupIncompleteBlock');
+
+    if(prog.done >= prog.total){
+      titleEl.textContent = '쇼핑몰 오픈 준비가 끝났습니다';
+      if(leadEl) leadEl.textContent = '오픈은 끝이 아니라 운영의 시작입니다. 이제부터는 상품, 주문, 광고, 고객 반응을 확인하며 조금씩 개선해가면 됩니다.';
+      if(bannerEl) bannerEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 모두 완료했어요 🎉';
+      if(doneBlock) doneBlock.hidden = false;
+      if(incompleteBlock) incompleteBlock.hidden = true;
+      return;
+    }
+
+    titleEl.textContent = '아직 오픈 준비가 남아있습니다';
+    if(leadEl) leadEl.textContent = 'STEP01~07을 마저 완료하면 오픈 완료 화면과 운영도구로 넘어갈 수 있어요.';
+    if(bannerEl) bannerEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 완료 · ' + (prog.total - prog.done) + '단계 남음';
+    if(doneBlock) doneBlock.hidden = true;
+    if(incompleteBlock) incompleteBlock.hidden = false;
+
+    var listEl = document.getElementById('wrapupRemainingList');
+    if(listEl){
+      var remaining = GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) === -1; });
+      listEl.innerHTML = remaining.map(function(s){
+        return '<a class="quick-row" href="#' + s.route + '">' +
+          '<span class="qr-icon tone-b">' + s.num + '</span>' +
+          '<span class="qr-text"><span class="qr-title">STEP ' + s.num + ' · ' + s.label + '</span></span>' +
+          '<svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>' +
+          '</a>';
+      }).join('');
+    }
+
+    var ctaEl = document.getElementById('wrapupResumeCta');
+    if(ctaEl && prog.next){
+      ctaEl.href = '#' + prog.next.route;
+      ctaEl.textContent = 'STEP ' + prog.next.num + ' · ' + prog.next.label + ' → 이어서 하기';
+    }
+  }
+
+  /* single entry point every completion source (checkbox / worksheet)
+     reports through. 항상 launchdeskStore에 최신 data/완료여부를 반영하고
+     (memory + 로그인 시 background DB), "지금 막 완료/미완료로 전환된
+     순간"에만 토스트·GA4·진행률 재계산을 한다(예전과 동일한 조건). */
+  function setChapterDone(path, isDone, data){
+    var completed = getCompleted();
+    var idx = completed.indexOf(path);
+    launchdeskStore.setStepState(path, data, isDone);
+    if(isDone && idx === -1){
+      recomputeProgress();
+      showToast('챕터를 완료했어요 🎉', 'success');
+      /* GA4 chapter_complete — this branch only runs once per chapter
+         (the idx === -1 guard above is the same one the toast already
+         relies on to avoid re-firing while re-evaluating an already-
+         completed worksheet/checklist). No user input — path/title are
+         fixed strings from CHAPTER_PATHS/TITLES. */
+      if(typeof gtag === 'function'){
+        gtag('event', 'chapter_complete', {
+          chapter_path: path,
+          chapter_title: TITLES[path] || path
+        });
+      }
+    }
+    else if(!isDone && idx !== -1){
+      recomputeProgress();
+    }
+  }
+
+  /* ---- STEP01~07 컨트롤러 등록 -----------------------------------------
+     각 워크시트/체크리스트는 restore()(store → 화면)와 evaluate()(화면 →
+     store, 완료여부 재계산)를 갖는다. stepControllers에 모아두고, 로그인
+     (hydrate)/로그아웃(resetToGuest) 직후 launchdeskStore.onChange가
+     한 번에 다시 실행해 화면을 store의 최신 상태와 맞춘다. */
+  var stepControllers = [];
+  function refreshAllStepControllers(){
+    stepControllers.forEach(function(c){ c.restore(); c.evaluate(); });
+    reconcileCompletedChapters();
+    recomputeProgress();
+  }
+
+  /* ch01 워크시트 — STEP01은 5개 필드(타겟고객/판매카테고리·상품군/
+     초기예산/브랜드·쇼핑몰이름/벤치마킹대상)를 쓴다. 저장은 이제
+     launchdeskStore를 통한다: 비회원은 메모리에만, 회원은 Supabase
+     user_step_progress에도 반영된다(백그라운드, 화면은 기다리지 않음). */
+  document.querySelectorAll('.worksheet[data-chapter]').forEach(function(ws){
+    var path = ws.getAttribute('data-chapter');
+    var inputs = ws.querySelectorAll('.worksheet-input');
+    function restore(){
+      var saved = launchdeskStore.getStepData(path);
+      inputs.forEach(function(inp, i){
+        // 지금 사용자가 타이핑 중인 칸은 건드리지 않는다 — 로그인 직후
+        // hydrate()가 store.onChange를 통해 이 restore()를 다시 부를 때,
+        // 입력 중인 값을 되돌려버리지 않기 위한 안전장치.
+        if(document.activeElement === inp) return;
+        inp.value = (saved && typeof saved[i] === 'string') ? saved[i] : '';
+      });
+    }
+    function evaluate(){
+      var allFilled = inputs.length > 0 && Array.prototype.every.call(inputs, function(inp){ return inp.value.trim() !== ''; });
+      var data = {};
+      inputs.forEach(function(inp2, i){ data[i] = inp2.value; });
+      setChapterDone(path, allFilled, data);
+    }
+    inputs.forEach(function(inp){
+      inp.addEventListener('input', evaluate);
+      // 이 칸에서 포커스가 빠지면(다음 칸으로 이동/다른 곳 클릭 등), 미뤄둔
+      // Supabase 저장이 있다면 debounce를 기다리지 않고 바로 반영한다.
+      // DOM을 다시 그리거나 포커스에 영향을 주지 않는다 — 저장 요청만 앞당길 뿐이다.
+      inp.addEventListener('blur', function(){ launchdeskStore.flushStepNow(path); });
+    });
+    restore();
+    evaluate();
+    stepControllers.push({ path: path, restore: restore, evaluate: evaluate });
+  });
+
+  /* STEP02~07의 필수 체크리스트 — 전부 체크하면 그 STEP이 완료된다.
+     STEP03도 다른 STEP과 동일하게 체크리스트 완료 여부만으로 판단한다
+     (마진계산기 사용/저장 여부는 완료 조건과 무관 — 필요하면 쓰는 선택
+     도구일 뿐이다). */
+  document.querySelectorAll('.checklist-block[data-chapter]').forEach(function(block){
+    var path = block.getAttribute('data-chapter');
+    var boxes = block.querySelectorAll('.cl-row input[type="checkbox"]');
+    var countEl = block.querySelector('.count');
+    function restore(){
+      var saved = launchdeskStore.getStepData(path);
+      var arr = Array.isArray(saved) ? saved : [];
+      boxes.forEach(function(b, i){
+        if(document.activeElement === b) return; // 지금 조작 중인 체크박스는 건드리지 않는다
+        b.checked = arr.indexOf(i) !== -1;
+      });
+      if(countEl){
+        var restoredCount = Array.prototype.filter.call(boxes, function(b){ return b.checked; }).length;
+        countEl.textContent = restoredCount + ' / ' + boxes.length;
+      }
+    }
+    function evaluate(){
+      var allChecked = boxes.length > 0 && Array.prototype.every.call(boxes, function(b){ return b.checked; });
+      var checkedIdx = [];
+      boxes.forEach(function(b, i){ if(b.checked) checkedIdx.push(i); });
+      setChapterDone(path, allChecked, checkedIdx);
+    }
+    boxes.forEach(function(b){ b.addEventListener('change', evaluate); });
+    restore();
+    evaluate();
+    stepControllers.push({ path: path, restore: restore, evaluate: evaluate });
+  });
+
+  reconcileCompletedChapters();
+  recomputeProgress();
+
+  /* ---- 레거시(로그인 이전) localStorage → 계정 이전 --------------------
+     비회원 시절 이 브라우저에 남아있던 옛 진행상황을 실제 로그인
+     (SIGNED_IN) 직후 딱 한 번 확인한다 — 세션 복원(이미 로그인된 채로
+     새로고침)에서는 다시 묻지 않는다(매번 새로고침마다 물으면 성가시고,
+     한 번 옮기고 나면 옛 키 자체가 지워져 사라지므로 어차피 다시 뜨지
+     않는다). 자동으로 계정 데이터를 덮어쓰지 않고, 사용자가 확인을 눌러야
+     이전한다. 이전에 실패하면 옛 localStorage는 그대로 남겨둔다.
+     ld-first-visit은 이번 이전 대상이 아니다. */
+  var LEGACY_STEP_KEYS = {
+    '/start/prepare':         { key: STORAGE_KEY_OVERRIDES['/start/prepare'], kind: 'worksheet' },
+    '/start/setup':           { key: 'ld-checklist-start-setup', kind: 'checklist' },
+    '/start/sourcing':        { key: 'ld-checklist-start-sourcing', kind: 'checklist' },
+    '/start/content':         { key: 'ld-checklist-start-content', kind: 'checklist' },
+    '/start/orders':          { key: 'ld-checklist-start-orders', kind: 'checklist' },
+    '/start/marketing-setup': { key: STORAGE_KEY_OVERRIDES['/start/marketing-setup'], kind: 'checklist' },
+    '/start/marketing':       { key: 'ld-checklist-start-marketing', kind: 'checklist' }
+  };
+  var LEGACY_MISC_KEYS = [COMPLETED_KEY, 'ld-tools-calc-history', 'ld-adlog-records'];
+
+  function hasAnyLegacyData(){
+    var allKeys = Object.keys(LEGACY_STEP_KEYS).map(function(p){ return LEGACY_STEP_KEYS[p].key; }).concat(LEGACY_MISC_KEYS);
+    return allKeys.some(function(k){ try{ return localStorage.getItem(k) !== null; }catch(e){ return false; } });
+  }
+  function legacyChecklistDone(path, key){
+    var block = document.querySelector('.checklist-block[data-chapter="' + path + '"]');
+    if(!block) return false;
+    var boxes = block.querySelectorAll('.cl-row input[type="checkbox"]');
+    if(!boxes.length) return false;
+    try{
+      var saved = JSON.parse(localStorage.getItem(key) || '[]');
+      if(!Array.isArray(saved)) return false;
+      for(var i = 0; i < boxes.length; i++){ if(saved.indexOf(i) === -1) return false; }
+      return true;
+    }catch(e){ return false; }
+  }
+  function legacyWorksheetDone(path, key){
+    var ws = document.querySelector('.worksheet[data-chapter="' + path + '"]');
+    if(!ws) return false;
+    var inputs = ws.querySelectorAll('.worksheet-input');
+    if(!inputs.length) return false;
+    try{
+      var saved = JSON.parse(localStorage.getItem(key) || '{}');
+      return Array.prototype.every.call(inputs, function(inp, i){ return typeof saved[i] === 'string' && saved[i].trim() !== ''; });
+    }catch(e){ return false; }
+  }
+  function migrateLegacyToAccount(userId){
+    var sb = window.launchdeskSupabase;
+    if(!sb) return Promise.resolve(false);
+    var writes = [];
+
+    Object.keys(LEGACY_STEP_KEYS).forEach(function(path){
+      var info = LEGACY_STEP_KEYS[path];
+      var raw;
+      try{ raw = localStorage.getItem(info.key); }catch(e){ raw = null; }
+      if(raw == null) return; // 이 STEP은 옛 기록이 없음 — 건너뜀
+      var data;
+      try{ data = JSON.parse(raw); }catch(e){ return; }
+      var isDone = (info.kind === 'worksheet')
+        ? legacyWorksheetDone(path, info.key)
+        : legacyChecklistDone(path, info.key);
+      writes.push(sb.from('user_step_progress').upsert({
+        user_id: userId,
+        step_path: path,
+        data: data,
+        is_completed: isDone,
+        completed_at: isDone ? new Date().toISOString() : null
+      }, { onConflict: 'user_id,step_path' }));
+    });
+
+    var legacyCalc = [];
+    try{ legacyCalc = JSON.parse(localStorage.getItem('ld-tools-calc-history') || '[]'); }catch(e){}
+    legacyCalc.forEach(function(item){
+      writes.push(sb.from('tool_records').insert({ user_id: userId, tool_type: 'margin_calc', data: item }));
+    });
+
+    var legacyAdlog = [];
+    try{ legacyAdlog = JSON.parse(localStorage.getItem('ld-adlog-records') || '[]'); }catch(e){}
+    legacyAdlog.forEach(function(item){
+      writes.push(sb.from('tool_records').insert({ user_id: userId, tool_type: 'ad_log', data: item }));
+    });
+
+    if(!writes.length) return Promise.resolve(true); // 실제로 옮길 데이터가 없었음
+
+    return Promise.all(writes).then(function(results){
+      var failed = results.filter(function(r){ return r && r.error; });
+      if(failed.length){
+        console.warn('[launchdesk] 일부 마이그레이션 저장 실패:', failed.map(function(r){ return r.error.message; }));
+        return false;
+      }
+      return true;
+    }).catch(function(err){
+      console.warn('[launchdesk] 마이그레이션 중 오류:', err && err.message);
+      return false;
+    });
+  }
+  function clearLegacyLocalStorage(){
+    Object.keys(LEGACY_STEP_KEYS).forEach(function(path){
+      try{ localStorage.removeItem(LEGACY_STEP_KEYS[path].key); }catch(e){}
+    });
+    LEGACY_MISC_KEYS.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+    // ld-first-visit은 의도적으로 제외 — 이번 마이그레이션 대상이 아니다.
+  }
+  function maybeMigrateLegacy(userId){
+    if(!hasAnyLegacyData()) return Promise.resolve();
+    var ok = window.confirm('이 브라우저에 저장된 기존 진행상황이 있습니다.\n계정에 저장할까요?');
+    if(!ok) return Promise.resolve();
+    return migrateLegacyToAccount(userId).then(function(success){
+      if(success){
+        clearLegacyLocalStorage();
+        showToast('이전 진행상황을 계정에 저장했어요', 'success');
+        return launchdeskStore.hydrate(userId); // 방금 옮긴 데이터를 반영해 다시 불러옴
+      }
+      showToast('이전 중 문제가 발생해 기존 데이터는 그대로 뒀어요');
+    });
+  }
+
+  /* ---- B. 이번 세션의 "게스트 메모리" → 계정 병합 -----------------------
+     A(레거시 localStorage)와는 완전히 다른 대상이다 — 이건 로그인하기
+     직전, 바로 이 페이지에서 비회원으로 작업한 launchdeskStore의 메모리
+     상태를 말한다. hydrate()가 이 메모리를 서버 값으로 덮어쓰기 전에
+     handleSession()이 launchdeskStore.getSnapshot()으로 미리 떠 둔 것을
+     여기서 넘겨받는다.
+
+     원칙(data와 is_completed의 관계를 절대 깨지 않는다):
+     - data = 원본 상태, is_completed = 그 data를 STEP_EVALUATORS로 평가한
+       결과/캐시. "data는 그대로 두고 완료 여부만 승격" 같은, data와
+       is_completed가 서로 어긋나는 상태를 만들지 않는다.
+     - 워크시트: 필드 단위 병합 — 그 필드의 서버 값이 있으면 유지하고,
+       서버 값이 비어 있고 게스트 값이 있으면 그 필드만 채운다.
+     - 체크리스트: 서버에서 체크된 인덱스 ∪ 게스트에서 체크된 인덱스
+       (합집합, 중복 제거) — 서버 데이터를 버리지 않고 게스트 쪽만 더한다.
+     - 병합된 data를 기준으로 기존 STEP_EVALUATORS[path]()를 실제로 다시
+       실행해 is_completed/completed_at을 계산한다 — OR로 직접 만들지
+       않는다. STEP03도 다른 체크리스트 STEP과 동일하게 이 흐름을 그대로
+       탄다(체크리스트 완료 여부만 본다 — margin_calc와는 무관).
+     - tool_records(마진계산/광고기록)는 게스트가 실제로 남긴 기록만
+       추가로 insert한다 — 이 흐름 자체가 로그인 1회당 정확히 한 번만
+       실행되므로 중복 insert가 생기지 않는다. */
+  function stepEntryHasContent(entry){
+    if(!entry) return false;
+    if(entry.isCompleted) return true;
+    var data = entry.data;
+    if(Array.isArray(data)) return data.length > 0;
+    if(data && typeof data === 'object'){
+      return Object.keys(data).some(function(k){ return typeof data[k] === 'string' && data[k].trim() !== ''; });
+    }
+    return false;
+  }
+  function hasSnapshotData(snapshot){
+    if(!snapshot) return false;
+    var anyStep = Object.keys(snapshot.steps).some(function(p){ return stepEntryHasContent(snapshot.steps[p]); });
+    if(anyStep) return true;
+    if(snapshot.calcHistory.length > 0) return true;
+    if(snapshot.adlogRecords.length > 0) return true;
+    return false;
+  }
+  // 워크시트: 필드 단위 병합 — 서버 값이 있는 필드는 그대로, 서버가
+  // 비어 있고 게스트에 값이 있는 필드만 게스트 값으로 채운다.
+  function mergeWorksheetFields(serverData, guestData){
+    var merged = {};
+    var keys = {};
+    Object.keys(serverData || {}).forEach(function(k){ keys[k] = true; });
+    Object.keys(guestData || {}).forEach(function(k){ keys[k] = true; });
+    Object.keys(keys).forEach(function(k){
+      var serverVal = serverData ? serverData[k] : undefined;
+      var guestVal = guestData ? guestData[k] : undefined;
+      if(typeof serverVal === 'string' && serverVal.trim() !== ''){
+        merged[k] = serverVal;
+      } else if(typeof guestVal === 'string' && guestVal.trim() !== ''){
+        merged[k] = guestVal;
+      } else {
+        merged[k] = serverVal || guestVal || '';
+      }
+    });
+    return merged;
+  }
+  // 체크리스트: 서버 체크 ∪ 게스트 체크(합집합, 중복 제거, 오름차순)
+  function mergeChecklistUnion(serverData, guestData){
+    var set = {};
+    (Array.isArray(serverData) ? serverData : []).forEach(function(i){ set[i] = true; });
+    (Array.isArray(guestData) ? guestData : []).forEach(function(i){ set[i] = true; });
+    return Object.keys(set).map(function(k){ return parseInt(k, 10); }).sort(function(a, b){ return a - b; });
+  }
+  function mergeGuestSnapshotToAccount(userId, snapshot){
+    var sb = window.launchdeskSupabase;
+    if(!sb) return Promise.resolve(false);
+
+    // 1) 병합된 data만 먼저 계산해둔다(아직 아무 것도 쓰지 않음, 완료여부는
+    //    아래 3단계에서 STEP_EVALUATORS로 계산한다).
+    var mergedDataByPath = {};
+    Object.keys(snapshot.steps).forEach(function(path){
+      var guestEntry = snapshot.steps[path];
+      if(!stepEntryHasContent(guestEntry)) return; // 실제 내용이 없는 STEP은 건너뜀
+      var serverData = launchdeskStore.getStepData(path); // hydrate() 이후이므로 "현재 계정 서버값"
+      var kind = LEGACY_STEP_KEYS[path] ? LEGACY_STEP_KEYS[path].kind : 'checklist';
+      mergedDataByPath[path] = (kind === 'worksheet')
+        ? mergeWorksheetFields(serverData, guestEntry.data)
+        : mergeChecklistUnion(serverData, guestEntry.data);
+    });
+
+    // 2) margin_calc/ad_log는 STEP 완료 여부와 무관한 별개의 기록이므로
+    //    그냥 insert만 한다(STEP03 재평가 같은 특수 처리 없음).
+    var toolWrites = [];
+    snapshot.calcHistory.forEach(function(record){
+      toolWrites.push(sb.from('tool_records').insert({ user_id: userId, tool_type: 'margin_calc', data: record }));
+    });
+    snapshot.adlogRecords.forEach(function(record){
+      toolWrites.push(sb.from('tool_records').insert({ user_id: userId, tool_type: 'ad_log', data: record }));
+    });
+
+    return Promise.all(toolWrites).then(function(toolResults){
+      var toolFailed = toolResults.some(function(r){ return r && r.error; });
+      if(toolFailed) console.warn('[launchdesk] 게스트 도구 기록 병합 중 일부 실패');
+
+      // 3) 병합된 data를 store에 임시 반영(DB 쓰기 없음) → 기존
+      //    STEP_EVALUATORS를 실제로 다시 실행해 is_completed를 계산 →
+      //    그 결과로 진짜 upsert를 한 번만 쓴다.
+      var stepWrites = [];
+      Object.keys(mergedDataByPath).forEach(function(path){
+        var mergedData = mergedDataByPath[path];
+        launchdeskStore.pokeStepData(path, mergedData);
+        var isDone = (typeof STEP_EVALUATORS[path] === 'function') ? !!STEP_EVALUATORS[path]() : false;
+        stepWrites.push(sb.from('user_step_progress').upsert({
+          user_id: userId,
+          step_path: path,
+          data: mergedData,
+          is_completed: isDone,
+          completed_at: isDone ? new Date().toISOString() : null
+        }, { onConflict: 'user_id,step_path' }));
+      });
+
+      if(!stepWrites.length) return !toolFailed;
+
+      return Promise.all(stepWrites).then(function(stepResults){
+        var stepFailed = stepResults.some(function(r){ return r && r.error; });
+        if(stepFailed) console.warn('[launchdesk] 게스트 STEP 데이터 병합 중 일부 실패');
+        return !stepFailed && !toolFailed;
+      });
+    }).catch(function(err){
+      console.warn('[launchdesk] 게스트 데이터 병합 중 오류:', err && err.message);
+      return false;
+    });
+  }
+  function maybeMergeGuestSnapshot(userId, snapshot){
+    if(!hasSnapshotData(snapshot)) return Promise.resolve();
+    var ok = window.confirm('로그인 전에 작성한 진행상황이 있습니다.\n이 내용을 계정에 저장할까요?');
+    if(!ok) return Promise.resolve();
+    return mergeGuestSnapshotToAccount(userId, snapshot).then(function(success){
+      if(success){ showToast('로그인 전 작성한 내용을 계정에 저장했어요', 'success'); }
+      else { showToast('일부 내용을 저장하지 못했어요'); }
+      return launchdeskStore.hydrate(userId); // 병합 결과를 서버 기준으로 다시 정리해서 반영
+    });
+  }
+
+  /* ---- 사이드바 프로필 카드 + 상단바 로그인 버튼 ↔ Supabase 인증 상태 ----
+     로그인/로그아웃에 따른 화면 데이터 전환의 핵심: 로그인 시
+     launchdeskStore.hydrate()로 DB에서 불러와 메모리에 반영하고, 로그아웃
+     시 launchdeskStore.resetToGuest()로 메모리를 완전히 비운다. 체크리스트/
+     워크시트/도구 UI 갱신은 store의 onChange 구독(refreshAllStepControllers,
+     tools.js의 refresh)이 전담하므로 여기서 직접 건드리지 않는다. */
+  var profileCard = document.getElementById('profileCard');
+  var profileAvatarLetter = document.getElementById('profileAvatarLetter');
+  var profileName = document.getElementById('profileName');
+  var profileDayEl = document.getElementById('profileDay');
+  var topbarLoginBtn = document.getElementById('topbarLoginBtn');
+  var isAuthed = false;
+
+  function renderAuthUI(session){
+    var user = session && session.user;
+    isAuthed = !!user;
+    if(user){
+      var localPart = (user.email || '').split('@')[0] || '사용자';
+      profileAvatarLetter.textContent = localPart.charAt(0).toUpperCase();
+      profileName.textContent = localPart;
+      profileDayEl.innerHTML = '<a href="#" id="profileLogoutBtn">로그아웃</a>';
+      document.getElementById('profileLogoutBtn').addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        var sb = window.launchdeskSupabase;
+        if(!sb) return;
+        // 로그아웃 직전, 마지막 몇 글자가 아직 debounce 대기 중이거나 저장이
+        // 진행 중일 수 있으므로, 먼저 밀린 저장을 전부 반영한 뒤에 실제
+        // signOut()을 호출한다 — 네트워크가 응답하지 않아도 일정 시간 후엔
+        // 그냥 로그아웃이 진행된다(best-effort, 영원히 막히지 않음).
+        launchdeskStore.flushAllPendingSteps().then(function(){
+          sb.auth.signOut();
+        });
+      });
+      // 상단바: "로그인" 대신 중립적인 "내 계정"만 표시(이메일 노출 안 함).
+      // 로그아웃 진입점은 사이드바에만 두므로 여기는 클릭해도 아무 일도
+      // 일어나지 않는다(위 클릭 핸들러의 !isAuthed 가드가 모달을 막는다).
+      if(topbarLoginBtn) topbarLoginBtn.textContent = '내 계정';
+    } else {
+      profileAvatarLetter.textContent = '?';
+      profileName.textContent = '로그인을 해주세요';
+      profileDayEl.textContent = '진행상황을 저장하고 다른 기기에서도 이어볼 수 있어요.';
+      if(topbarLoginBtn) topbarLoginBtn.textContent = '로그인';
+    }
+  }
+  // profiles 테이블에 현재 사용자 행이 있는지만 참고로 확인(콘솔 로그만,
+  // 화면에는 영향 없음) — display_name 등 프로필 기능은 다음 단계.
+  function checkProfileRow(user){
+    var sb = window.launchdeskSupabase;
+    if(!sb || !user) return;
+    sb.from('profiles').select('id').eq('id', user.id).maybeSingle().then(function(res){
+      if(res.error) console.log('[launchdesk] profiles 조회 결과(테이블 미생성이면 에러가 정상):', res.error.message);
+      else console.log('[launchdesk] profiles 행 존재 여부:', !!res.data);
+    }).catch(function(err){ console.log('[launchdesk] profiles 조회 중 오류:', err && err.message); });
+  }
+  if(profileCard){
+    profileCard.addEventListener('click', function(){ if(!isAuthed) openLoginModal(); });
+    profileCard.addEventListener('keydown', function(e){
+      if((e.key === 'Enter' || e.key === ' ') && !isAuthed){ e.preventDefault(); openLoginModal(); }
+    });
+  }
+  // launchdeskStore가 로그인(hydrate)/로그아웃(resetToGuest)으로 데이터를
+  // 다시 채우거나 비울 때마다, 이 파일이 다루는 화면(체크리스트/워크시트/
+  // 진행률)도 함께 새로 그린다. A 사용자 로그아웃 → B 사용자 로그인처럼
+  // 같은 브라우저에서 계정이 바뀌어도, 매번 이 한 경로로만 화면이
+  // 갱신되므로 이전 사용자의 데이터가 섞여 보일 일이 없다.
+  launchdeskStore.onChange(refreshAllStepControllers);
+  (function(){
+    var sb = window.launchdeskSupabase;
+    if(!sb){ renderAuthUI(null); return; }
+
+    // 같은 사용자에 대해 hydrate()를 반복 호출하지 않기 위한 가드 — 예를
+    // 들어 getSession()과 onAuthStateChange의 최초 발화가 겹치거나,
+    // TOKEN_REFRESHED가 주기적으로 발생해도 이미 그 사용자로 불러온
+    // 상태라면 다시 불러오지 않는다(화면이 매번 깜빡이는 것을 막는다).
+    var lastHydratedUserId = null;
+    function handleSession(session, isFreshSignIn){
+      renderAuthUI(session);
+      var user = session && session.user;
+      if(user){
+        checkProfileRow(user);
+        if(!isFreshSignIn && lastHydratedUserId === user.id) return;
+        // 게스트 메모리 스냅샷은 반드시 hydrate() 호출 전에 떠야 한다 —
+        // hydrate()가 이 메모리를 서버 값으로 덮어쓰기 때문이다. 이미 다른
+        // 계정으로 로그인되어 있던 상태에서 또 SIGNED_IN이 발생한 경우
+        // (예: 로그아웃 없이 다른 계정으로 재로그인)는 지금 메모리에 있는
+        // 게 "게스트가 작업한 것"이 아니라 "이전 계정의 데이터"이므로,
+        // isAuthed()가 이미 true라면 스냅샷을 뜨지 않는다(계정 간 데이터
+        // 유출 방지).
+        var guestSnapshot = (isFreshSignIn && !launchdeskStore.isAuthed()) ? launchdeskStore.getSnapshot() : null;
+        lastHydratedUserId = user.id;
+        var hydration = launchdeskStore.hydrate(user.id);
+        if(isFreshSignIn){
+          // A(과거 legacy localStorage) → B(이번 세션의 게스트 메모리)
+          // 순서로 처리한다. 동시에 처리하지 않고 순서대로 이어야, A에서
+          // 옮겨진 값이 B의 "서버 값" 판단 기준에도 정확히 반영된다.
+          hydration = hydration
+            .then(function(){ return maybeMigrateLegacy(user.id); })
+            .then(function(){ return maybeMergeGuestSnapshot(user.id, guestSnapshot); });
+        }
+      } else {
+        lastHydratedUserId = null;
+        launchdeskStore.resetToGuest();
+      }
+    }
+
+    sb.auth.getSession().then(function(res){
+      var session = res.data && res.data.session;
+      handleSession(session, false);
+    });
+    sb.auth.onAuthStateChange(function(event, session){
+      if(event === 'SIGNED_IN'){
+        // 이 이벤트가 실제로 우리가 방금 로그인 버튼을 눌러서 발생한 것인지
+        // (pendingFreshLogin) 확인한다 — 탭 재포커스 등으로 SDK가 다시 쏘는
+        // SIGNED_IN은 "신선한 로그인"으로 취급하지 않는다(중복 hydrate/
+        // 마이그레이션 확인창 방지 — STEP01 입력이 갑자기 끊기던 원인).
+        var isFreshSignIn = pendingFreshLogin;
+        pendingFreshLogin = false;
+        handleSession(session, isFreshSignIn);
+        if(isFreshSignIn){
+          closeLoginModal();
+          showToast('로그인했어요', 'success');
+        }
+      } else if(event === 'SIGNED_OUT'){
+        handleSession(null, false);
+        showToast('로그아웃했어요');
+      } else {
+        handleSession(session, false);
+      }
+    });
+  })();
 
   /* tab switcher — generic, scoped to the .tabs the clicked button lives in */
   document.addEventListener('click', function(e){
@@ -436,9 +1250,10 @@
   }
 
   /* checklist counters — one independent count per .checklist-block
-     (a page can have more than one). Deliberately NOT persisted (no
-     login yet, so localStorage would leak between different people
-     on the same browser) — resets to 0 on every reload by design. */
+     (a page can have more than one). Deliberately NOT persisted — these
+     are the "선택/참고용" checklists that never counted toward progress
+     (STEP04/05/06/08의 선택 체크, 세팅대행 준비 체크 등), so they still
+     reset to 0 on every reload by design, for both guests and members. */
   document.querySelectorAll('.checklist-block').forEach(function(block){
     var boxes = block.querySelectorAll('.cl-row input[type="checkbox"]');
     var countEl = block.querySelector('.count');
@@ -450,379 +1265,6 @@
     boxes.forEach(function(b){ b.addEventListener('change', update); });
     update();
   });
-
-  /* STEP01~07 진행률 — STEP00/08은 게이트 없는 전환 화면이라 분모에서
-     제외된다(항상 7 기준). ld-completed-chapters는 이제 "영구 원장"이
-     아니라 각 STEP의 실제 완료조건(워크시트/체크리스트/운영도구 저장
-     이력)을 마지막으로 훑은 결과를 담는 캐시로 취급한다 — 진짜 원천은
-     STEP_EVALUATORS가 읽는 개별 localStorage 키들이고,
-     reconcileCompletedChapters()가 로드마다 이 캐시를 그 원천과 다시
-     맞춘다. 사이드바 미니바 · 홈 대시보드 · /start 상세 진행률은 모두
-     이 하나의 캐시 + 하나의 계산(computeStepProgress)만 읽으므로 서로
-     다른 숫자를 보여줄 수 없다. */
-  var CHAPTER_PATHS = ['/start/intro','/start/prepare','/start/setup','/start/sourcing','/start/content','/start/marketing-setup','/start/marketing','/start/orders','/start/wrapup'];
-  var COMPLETED_KEY = 'ld-completed-chapters';
-  /* 저장 구조(필드/체크 항목 구성)의 의미 자체가 바뀐 STEP만 새 키를
-     쓴다. 옛 키(v1)와 그 데이터는 절대 지우지 않고, 그냥 더 이상 읽지
-     않는다 — 그래야 과거 값이 새 필드/체크박스에 잘못 복원되지 않는다. */
-  var STORAGE_KEY_OVERRIDES = {
-    '/start/prepare':         'ld-worksheet-start-prepare-v2',
-    '/start/marketing-setup': 'ld-checklist-start-marketing-setup-v2'
-  };
-  var progressFillEls = document.querySelectorAll('#progressFillSide, #progressFillRow');
-  var progressPctEls = document.querySelectorAll('#progressPct');
-  function getCompleted(){
-    try{ return JSON.parse(localStorage.getItem(COMPLETED_KEY) || '[]'); }catch(e){ return []; }
-  }
-  function saveCompleted(list){
-    try{ localStorage.setItem(COMPLETED_KEY, JSON.stringify(list)); }catch(e){}
-  }
-
-  /* ---- STEP01~07 read-only evaluators ----------------------------------
-     Each answers "is this STEP actually done right now?" straight from
-     localStorage/DOM structure, independent of whatever
-     ld-completed-chapters currently says. Used to reconcile the cache
-     below; the live worksheet/checklist wiring further down still owns
-     day-to-day completion via setChapterDone(). STEP00/08 have no
-     evaluator — no completion gate, excluded from progress entirely. */
-  function hasSavedMarginCalc(){
-    // tools.js's own save history (separate script/IIFE) — read only, never written here
-    try{ return JSON.parse(localStorage.getItem('ld-tools-calc-history') || '[]').length > 0; }catch(e){ return false; }
-  }
-  function checklistAllChecked(path, overrideKey){
-    var block = document.querySelector('.checklist-block[data-chapter="' + path + '"]');
-    if(!block) return false;
-    var boxes = block.querySelectorAll('.cl-row input[type="checkbox"]');
-    if(!boxes.length) return false;
-    try{
-      var key = overrideKey || ('ld-checklist' + path.replace(/\//g, '-'));
-      var saved = JSON.parse(localStorage.getItem(key) || '[]');
-      if(!Array.isArray(saved)) return false;
-      for(var i = 0; i < boxes.length; i++){ if(saved.indexOf(i) === -1) return false; }
-      return true;
-    }catch(e){ return false; }
-  }
-  function worksheetAllFilled(path, overrideKey){
-    var ws = document.querySelector('.worksheet[data-chapter="' + path + '"]');
-    if(!ws) return false;
-    var inputs = ws.querySelectorAll('.worksheet-input');
-    if(!inputs.length) return false;
-    try{
-      var key = overrideKey || ('ld-worksheet' + path.replace(/\//g, '-'));
-      var saved = JSON.parse(localStorage.getItem(key) || '{}');
-      return Array.prototype.every.call(inputs, function(inp, i){ return typeof saved[i] === 'string' && saved[i].trim() !== ''; });
-    }catch(e){ return false; }
-  }
-  var STEP_EVALUATORS = {
-    '/start/prepare':         function(){ return worksheetAllFilled('/start/prepare', STORAGE_KEY_OVERRIDES['/start/prepare']); },
-    '/start/setup':           function(){ return checklistAllChecked('/start/setup'); },
-    '/start/sourcing':        function(){ return checklistAllChecked('/start/sourcing') && hasSavedMarginCalc(); },
-    '/start/content':         function(){ return checklistAllChecked('/start/content'); },
-    '/start/orders':          function(){ return checklistAllChecked('/start/orders'); },
-    '/start/marketing-setup': function(){ return checklistAllChecked('/start/marketing-setup', STORAGE_KEY_OVERRIDES['/start/marketing-setup']); },
-    '/start/marketing':       function(){ return checklistAllChecked('/start/marketing'); }
-  };
-
-  /* ld-completed-chapters를 위 실제 조건과 맞춘다. setChapterDone()을
-     거치지 않고 saveCompleted()로 배열만 직접 고쳐쓰므로 토스트도 GA4
-     chapter_complete도 절대 발화하지 않는다 — "지금 막 완료했다"가
-     아니라 "원래 상태를 다시 확인했다"이기 때문이다. 옛 "다 읽었어요"
-     체크로 남은 STEP03~07의 잔여 기록, 필드 구성이 바뀐 STEP01/06의
-     v1 잔여 기록은 여기서 조건에 안 맞으면 자연히 빠진다. 워크시트/
-     체크리스트 원본 데이터, STEP00/08의 과거 기록은 건드리지 않는다. */
-  function reconcileCompletedChapters(){
-    var completed = getCompleted();
-    var changed = false;
-    Object.keys(STEP_EVALUATORS).forEach(function(path){
-      var actual = STEP_EVALUATORS[path]();
-      var idx = completed.indexOf(path);
-      if(actual && idx === -1){ completed.push(path); changed = true; }
-      else if(!actual && idx !== -1){ completed.splice(idx, 1); changed = true; }
-    });
-    if(changed) saveCompleted(completed);
-  }
-  reconcileCompletedChapters();
-
-  /* STEP01~07 공용 진행률 계산 — 완료 STEP 수 / 전체 STEP 수(7) / % /
-     다음 미완료 STEP을 한 번에 계산해 사이드바 · 홈 · /start가 모두
-     같은 결과를 나눠 쓰게 한다 (STEP_ROADMAP/GATED_STEPS는 아래 정의). */
-  function computeStepProgress(completed){
-    var total = GATED_STEPS.length;
-    var done = GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) !== -1; }).length;
-    var pct = total ? Math.round(done / total * 100) : 0;
-    var next = null;
-    for(var i = 0; i < GATED_STEPS.length; i++){
-      if(completed.indexOf(GATED_STEPS[i].route) === -1){ next = GATED_STEPS[i]; break; }
-    }
-    return {total: total, done: done, pct: pct, next: next};
-  }
-
-  function recomputeProgress(){
-    var completed = getCompleted();
-    var prog = computeStepProgress(completed);
-    var pct = prog.pct;
-    progressFillEls.forEach(function(el){ el.style.width = pct + '%'; });
-    progressPctEls.forEach(function(el){ el.textContent = pct + '%'; });
-
-    // /start index page extras: stat row, detail bar, per-card checkmarks
-    var ssProgress = document.getElementById('ssProgress');
-    if(ssProgress) ssProgress.textContent = prog.done + '/' + prog.total + ' 완료';
-    var pdPct = document.getElementById('pdPct');
-    if(pdPct) pdPct.textContent = pct + '%';
-    var pdFill = document.getElementById('pdFill');
-    if(pdFill) pdFill.style.width = pct + '%';
-    var pdDone = document.getElementById('pdDone');
-    if(pdDone) pdDone.textContent = prog.done;
-    var pdLeft = document.getElementById('pdLeft');
-    if(pdLeft) pdLeft.textContent = prog.total - prog.done;
-    document.querySelectorAll('.guide-card[data-chapter]').forEach(function(card){
-      var isDone = completed.indexOf(card.getAttribute('data-chapter')) !== -1;
-      var check = card.querySelector('.cc-check');
-      if(check) check.hidden = !isDone;
-      var link = card.querySelector('.gc-link');
-      if(link && isDone && card.getAttribute('data-tier') === 'free'){ link.textContent = '다시 보기 →'; }
-    });
-
-    // home page's compact guide-preview rows (same completed[] source)
-    document.querySelectorAll('.gp-row[data-chapter]').forEach(function(row){
-      var isDone = completed.indexOf(row.getAttribute('data-chapter')) !== -1;
-      row.querySelector('.gp-check').classList.toggle('done', isDone);
-    });
-
-    renderHomeDashboard(completed, prog);
-    renderWrapupState(completed, prog);
-  }
-
-  /* ---- STEP_ROADMAP — single roadmap shared by every progress display --
-     Originally built for the home dashboard only (HOME_STEPS); promoted
-     here to a file-wide list so the sidebar mini-bar, the /start detail
-     bar and the home dashboard all read the exact same order/labels and
-     the exact same computeStepProgress() result — they cannot show
-     different numbers anymore. STEP00/08 are gate-free transition
-     screens (gated:false) and are excluded from every total/percentage;
-     STEP01~07 (gated:true) are the 7 STEPs progress is measured against. */
-  var STEP_ROADMAP = [
-    {num:'00', route:'/start/intro',           label:'오픈 로드맵 확인하기',             gated:false},
-    {num:'01', route:'/start/prepare',         label:'무엇을, 누구에게 팔지 정하기',      gated:true},
-    {num:'02', route:'/start/setup',           label:'사업자 등록하고 쇼핑몰 플랫폼 만들기', gated:true},
-    {num:'03', route:'/start/sourcing',        label:'판매할 상품과 공급처, 가격 확정하기', gated:true},
-    {num:'04', route:'/start/content',         label:'상품 상세페이지 완성하기',          gated:true},
-    {num:'05', route:'/start/orders',          label:'배송·CS 정책 정하고 오픈 준비 마치기', gated:true},
-    {num:'06', route:'/start/marketing-setup', label:'마케팅 인프라 연결하기',            gated:true},
-    {num:'07', route:'/start/marketing',       label:'첫 유입 만들고 반응 테스트하기',     gated:true},
-    {num:'08', route:'/start/wrapup',          label:'오픈 완료, 운영 시작하기',          gated:false}
-  ];
-  var GATED_STEPS = STEP_ROADMAP.filter(function(s){ return s.gated; });
-  var RESUME_RING_CIRC = 175.9;
-  function renderHomeDashboard(completed, prog){
-    var titleEl = document.getElementById('resumeTitle');
-    if(!titleEl) return; // home markup not present on this build
-
-    prog = prog || computeStepProgress(completed);
-    var pct = prog.pct;
-
-    var pctEl = document.getElementById('rbPct');
-    if(pctEl) pctEl.textContent = pct + '%';
-    var arc = document.getElementById('rbRingArc');
-    if(arc) arc.style.strokeDashoffset = (RESUME_RING_CIRC * (1 - pct / 100)).toFixed(1);
-    var barEl = document.getElementById('rbBarFill');
-    if(barEl) barEl.style.width = pct + '%';
-    var subEl = document.getElementById('resumeSub');
-    if(subEl) subEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 완료';
-
-    var linkEl = document.getElementById('resumeLink');
-    if(prog.next){
-      titleEl.textContent = 'STEP ' + prog.next.num + ' · ' + prog.next.label;
-      if(linkEl){ linkEl.href = '#' + prog.next.route; linkEl.textContent = '이어서 하기 →'; }
-    } else {
-      titleEl.textContent = prog.total + '단계를 모두 완료했어요 🎉';
-      if(linkEl){ linkEl.href = '#/start/wrapup'; linkEl.textContent = '오픈 완료 확인하기 →'; }
-    }
-  }
-
-  /* ---- STEP08 운영 전환 화면 — computeStepProgress()의 결과를 그대로
-     읽기만 한다(별도 완료 계산 없음, ld-completed-chapters 직접 참조도
-     없음). 7/7이면 기존 "오픈 완료" 콘텐츠 그대로, 아니면 남은 STEP
-     안내로 바뀐다. STEP08 자체는 gated:false라 이 화면엔 완료 게이트가
-     없고, GA4 이벤트도 새로 추가하지 않는다(기존 page_view만 그대로). */
-  function renderWrapupState(completed, prog){
-    var titleEl = document.getElementById('wrapupTitle');
-    if(!titleEl) return; // wrapup markup not present on this build
-
-    var leadEl = document.getElementById('wrapupLead');
-    var bannerEl = document.getElementById('wrapupStatusBanner');
-    var doneBlock = document.getElementById('wrapupDoneBlock');
-    var incompleteBlock = document.getElementById('wrapupIncompleteBlock');
-
-    if(prog.done >= prog.total){
-      titleEl.textContent = '쇼핑몰 오픈 준비가 끝났습니다';
-      if(leadEl) leadEl.textContent = '오픈은 끝이 아니라 운영의 시작입니다. 이제부터는 상품, 주문, 광고, 고객 반응을 확인하며 조금씩 개선해가면 됩니다.';
-      if(bannerEl) bannerEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 모두 완료했어요 🎉';
-      if(doneBlock) doneBlock.hidden = false;
-      if(incompleteBlock) incompleteBlock.hidden = true;
-      return;
-    }
-
-    titleEl.textContent = '아직 오픈 준비가 남아있습니다';
-    if(leadEl) leadEl.textContent = 'STEP01~07을 마저 완료하면 오픈 완료 화면과 운영도구로 넘어갈 수 있어요.';
-    if(bannerEl) bannerEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 완료 · ' + (prog.total - prog.done) + '단계 남음';
-    if(doneBlock) doneBlock.hidden = true;
-    if(incompleteBlock) incompleteBlock.hidden = false;
-
-    var listEl = document.getElementById('wrapupRemainingList');
-    if(listEl){
-      var remaining = GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) === -1; });
-      listEl.innerHTML = remaining.map(function(s){
-        return '<a class="quick-row" href="#' + s.route + '">' +
-          '<span class="qr-icon tone-b">' + s.num + '</span>' +
-          '<span class="qr-text"><span class="qr-title">STEP ' + s.num + ' · ' + s.label + '</span></span>' +
-          '<svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>' +
-          '</a>';
-      }).join('');
-    }
-
-    var ctaEl = document.getElementById('wrapupResumeCta');
-    if(ctaEl && prog.next){
-      ctaEl.href = '#' + prog.next.route;
-      ctaEl.textContent = 'STEP ' + prog.next.num + ' · ' + prog.next.label + ' → 이어서 하기';
-    }
-  }
-  /* toast — used only for things that genuinely just happened locally
-     (a chapter getting marked complete). Never wired to actions that
-     don't actually do anything yet (subscribe, download, apply) —
-     those still say so honestly via the "coming soon" view / modal. */
-  var toastStack = document.getElementById('toastStack');
-  function showToast(message, type){
-    var el = document.createElement('div');
-    el.className = 'toast' + (type ? ' ' + type : '');
-    el.textContent = message;
-    toastStack.appendChild(el);
-    requestAnimationFrame(function(){ el.classList.add('show'); });
-    setTimeout(function(){
-      el.classList.remove('show');
-      setTimeout(function(){ el.remove(); }, 250);
-    }, 2600);
-  }
-
-  /* single entry point every completion source (checkbox / worksheet /
-     checklist) reports through, so they all stay consistent */
-  function setChapterDone(path, isDone){
-    var completed = getCompleted();
-    var idx = completed.indexOf(path);
-    if(isDone && idx === -1){
-      completed.push(path); saveCompleted(completed); recomputeProgress();
-      showToast('챕터를 완료했어요 🎉', 'success');
-      /* GA4 chapter_complete — this branch only runs once per chapter
-         (the idx === -1 guard above is the same one the toast already
-         relies on to avoid re-firing while re-evaluating an already-
-         completed worksheet/checklist). No user input — path/title are
-         fixed strings from CHAPTER_PATHS/TITLES. */
-      if(typeof gtag === 'function'){
-        gtag('event', 'chapter_complete', {
-          chapter_path: path,
-          chapter_title: TITLES[path] || path
-        });
-      }
-    }
-    else if(!isDone && idx !== -1){
-      completed.splice(idx, 1); saveCompleted(completed); recomputeProgress();
-    }
-  }
-
-  /* ch01 worksheet — STEP01은 5개 필드(타겟고객/판매카테고리·상품군/
-     초기예산/브랜드·쇼핑몰이름/벤치마킹대상)를 쓴다. 필드 구성이 이전
-     (6필드, 촬영전략 포함)과 달라져 STORAGE_KEY_OVERRIDES의 v2 키를
-     쓴다 — 옛 키의 값이 의미가 달라진 새 필드에 잘못 복원되는 것을
-     막기 위함(옛 키/데이터는 삭제하지 않고 그냥 더 이상 읽지 않음).
-     5개 모두 채우면 챕터 완료, 하나라도 비우면 완료 해제. 필드별로
-     저장해 새로고침 후에도 유지된다(로그인 전이라 이 브라우저 한정 —
-     필드 아래 안내 참고). */
-  document.querySelectorAll('.worksheet[data-chapter]').forEach(function(ws){
-    var path = ws.getAttribute('data-chapter');
-    var key = STORAGE_KEY_OVERRIDES[path] || ('ld-worksheet' + path.replace(/\//g, '-'));
-    var inputs = ws.querySelectorAll('.worksheet-input');
-    try{
-      var saved = JSON.parse(localStorage.getItem(key) || '{}');
-      inputs.forEach(function(inp, i){ if(saved[i]) inp.value = saved[i]; });
-    }catch(e){}
-    function evaluate(){
-      var allFilled = inputs.length > 0 && Array.prototype.every.call(inputs, function(inp){ return inp.value.trim() !== ''; });
-      setChapterDone(path, allFilled);
-    }
-    inputs.forEach(function(inp){
-      inp.addEventListener('input', function(){
-        try{
-          var data = {};
-          inputs.forEach(function(inp2, i){ data[i] = inp2.value; });
-          localStorage.setItem(key, JSON.stringify(data));
-        }catch(e){}
-        evaluate();
-      });
-    });
-    evaluate();
-  });
-
-  /* STEP02~07의 필수 체크리스트 — 전부 체크하면 그 STEP이 완료된다.
-     체크 상태 자체도 여기서 저장한다(챕터 진행이 여기 달려 있으므로
-     새로고침 후에도 유지). STEP06은 필드 개수가 9→1로 의미가 바뀌어
-     STORAGE_KEY_OVERRIDES의 v2 키를 쓴다. STEP03은 체크리스트 완료에
-     더해 운영도구 마진계산기 저장 이력이 있어야 완료된다(evaluate()의
-     '/start/sourcing' 분기) — tools.js는 전혀 수정하지 않고 그 결과
-     키(ld-tools-calc-history)만 읽는다. */
-  document.querySelectorAll('.checklist-block[data-chapter]').forEach(function(block){
-    var path = block.getAttribute('data-chapter');
-    var key = STORAGE_KEY_OVERRIDES[path] || ('ld-checklist' + path.replace(/\//g, '-'));
-    var boxes = block.querySelectorAll('.cl-row input[type="checkbox"]');
-    try{
-      var saved = JSON.parse(localStorage.getItem(key) || '[]');
-      boxes.forEach(function(b, i){ if(saved.indexOf(i) !== -1) b.checked = true; });
-    }catch(e){}
-    // the generic .checklist-block counter above already ran its one-time
-    // update() before this restored any checked state — refresh its
-    // count text directly so a restored checklist doesn't show "0 / N"
-    var countEl = block.querySelector('.count');
-    if(countEl){
-      var restoredCount = Array.prototype.filter.call(boxes, function(b){ return b.checked; }).length;
-      countEl.textContent = restoredCount + ' / ' + boxes.length;
-    }
-    function evaluate(){
-      var allChecked = boxes.length > 0 && Array.prototype.every.call(boxes, function(b){ return b.checked; });
-      var done = allChecked;
-      if(path === '/start/sourcing'){ done = allChecked && hasSavedMarginCalc(); }
-      setChapterDone(path, done);
-    }
-    boxes.forEach(function(b, i){
-      b.addEventListener('change', function(){
-        try{
-          var checkedIdx = [];
-          boxes.forEach(function(b2, j){ if(b2.checked) checkedIdx.push(j); });
-          localStorage.setItem(key, JSON.stringify(checkedIdx));
-        }catch(e){}
-        evaluate();
-      });
-    });
-    evaluate();
-    // STEP03은 /tools에서 마진계산기 결과를 저장하고 돌아왔을 때도 다시
-    // 평가되어야 하므로, render()가 재호출할 수 있게 참조를 남긴다.
-    if(path === '/start/sourcing'){ reevaluateSourcing = evaluate; }
-  });
-
-  recomputeProgress();
-
-  /* D+ counter — real elapsed days since this browser's first visit,
-     stored in localStorage. Not a real account (no login yet), so it
-     resets if the user clears site data or opens a different browser —
-     same caveat as everything else pre-login in this file. */
-  var dayEl = document.getElementById('profileDay');
-  if(dayEl){
-    try{
-      var FV_KEY = 'ld-first-visit';
-      var first = localStorage.getItem(FV_KEY);
-      if(!first){ first = String(Date.now()); localStorage.setItem(FV_KEY, first); }
-      var days = Math.floor((Date.now() - parseInt(first, 10)) / 86400000);
-      dayEl.textContent = 'D+' + days;
-    }catch(e){ dayEl.textContent = 'D+0'; }
-  }
 
   /* floating subscribe banner — shows fixed at the bottom of the
      viewport while browsing the chapter list, and hides itself the

@@ -64,11 +64,12 @@
   });
   computeToolsCalc();
 
-  /* saved calculations — this browser only, capped at the 5 most
-     recent (no login yet, so nowhere else to put them). */
-  var SAVED_CALC_KEY = 'ld-tools-calc-history';
+  /* saved calculations — 비회원은 launchdeskStore의 메모리에만(새로고침하면
+     사라짐), 회원은 Supabase(tool_records, tool_type='margin_calc')에도
+     반영된다 — 어느 쪽이든 window.launchdeskStore가 알아서 나눠 처리하므로
+     이 파일은 회원/비회원을 직접 구분하지 않는다. 화면엔 항상 최근 5개만. */
   function getSavedCalcs(){
-    try{ return JSON.parse(localStorage.getItem(SAVED_CALC_KEY) || '[]'); }catch(e){ return []; }
+    return window.launchdeskStore ? window.launchdeskStore.getCalcHistory() : [];
   }
   function renderSavedCalcs(){
     var list = document.getElementById('savedCalcList');
@@ -85,7 +86,7 @@
     list.innerHTML = rows + '<button type="button" class="saved-calc-clear" id="savedCalcClear">전체 지우기</button>';
     var clearBtn = document.getElementById('savedCalcClear');
     if(clearBtn) clearBtn.addEventListener('click', function(){
-      try{ localStorage.removeItem(SAVED_CALC_KEY); }catch(e){}
+      if(window.launchdeskStore) window.launchdeskStore.clearCalcHistory();
       renderSavedCalcs();
     });
   }
@@ -94,12 +95,9 @@
     toolsSaveBtn.addEventListener('click', function(){
       var result = computeToolsCalc();
       if(!result){ showToast('판매가를 먼저 입력해주세요'); return; }
-      var items = getSavedCalcs();
       var now = new Date();
       result.date = (now.getMonth() + 1) + '.' + now.getDate() + '. ' + now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
-      items.unshift(result);
-      items = items.slice(0, 5);
-      try{ localStorage.setItem(SAVED_CALC_KEY, JSON.stringify(items)); }catch(e){}
+      if(window.launchdeskStore) window.launchdeskStore.addCalcRecord(result);
       renderSavedCalcs();
       showToast('계산 결과를 저장했어요', 'success');
       /* GA4 margin_calculator_use — only reaches here once a save actually
@@ -183,81 +181,76 @@
     });
   }
 
-  /* 광고 기록 — real localStorage log the user builds up over time
-     (unlike the checklist/setup trackers, there's no "looks like
-     someone else's completed work" concern here — it's just numbers
-     the seller typed in, same category as the saved margin calcs). */
-  var ADLOG_KEY = 'ld-adlog-records';
+  /* 광고 기록 — 비회원은 launchdeskStore 메모리에만(새로고침하면 사라짐),
+     회원은 Supabase(tool_records, tool_type='ad_log')에도 반영된다. 각
+     레코드의 id(Date.now())는 store가 DB에 저장할 때 data 안에 그대로
+     함께 넣어두므로, 삭제도 같은 id로 요청하면 된다(store 내부 구현). */
   var adlogTbody = document.getElementById('adlogTbody');
+  function getAdlogRecords(){
+    return window.launchdeskStore ? window.launchdeskStore.getAdlogRecords() : [];
+  }
+  window.deleteAdlogRecord = function(id){
+    if(window.launchdeskStore) window.launchdeskStore.removeAdlogRecord(id);
+    renderAdlog();
+  };
+  var roasClass = function(roas){
+    if(roas >= 4) return 'roas-good';
+    if(roas >= 2) return 'roas-mid';
+    return 'roas-low';
+  };
+  function renderAdlog(){
+    if(!adlogTbody) return;
+    var list = getAdlogRecords();
+    if(!list.length){
+      adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">아직 기록이 없어요 — "+ 기록 추가"로 첫 광고 성과를 남겨보세요.</div></td></tr>';
+    } else {
+      adlogTbody.innerHTML = list.map(function(r){
+        var roas = r.spend > 0 ? (r.revenue / r.spend) : 0;
+        var chanColor = {메타:'var(--badge-a)', 네이버:'var(--badge-c)', 카카오:'var(--badge-b)', 인스타:'var(--badge-d)'}[r.channel] || 'var(--ink-faint)';
+        return '<tr>' +
+          '<td>' + r.date + '</td>' +
+          '<td><span class="adlog-channel" style="background:' + chanColor + '">' + r.channel + '</span></td>' +
+          '<td>' + r.name + '</td>' +
+          '<td class="num">₩' + Math.round(r.spend).toLocaleString('ko-KR') + '</td>' +
+          '<td class="num">₩' + Math.round(r.revenue).toLocaleString('ko-KR') + '</td>' +
+          '<td class="num ' + roasClass(roas) + '">' + roas.toFixed(1) + 'x</td>' +
+          '<td><button type="button" class="adlog-del" data-id="' + r.id + '">✕</button></td>' +
+        '</tr>';
+      }).join('');
+    }
+    var totalSpend = list.reduce(function(s, r){ return s + r.spend; }, 0);
+    var totalRevenue = list.reduce(function(s, r){ return s + r.revenue; }, 0);
+    var avgRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+    var best = list.slice().sort(function(a, b){
+      var ra = a.spend > 0 ? a.revenue / a.spend : 0;
+      var rb = b.spend > 0 ? b.revenue / b.spend : 0;
+      return rb - ra;
+    })[0];
+    document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(totalSpend).toLocaleString('ko-KR');
+    document.getElementById('adlogSumRoas').textContent = avgRoas.toFixed(1) + 'x';
+    document.getElementById('adlogSumBest').textContent = best ? best.name : '—';
+  }
   if(adlogTbody){
-    var getAdlogRecords = function(){
-      try{ return JSON.parse(localStorage.getItem(ADLOG_KEY) || '[]'); }catch(e){ return []; }
-    };
-    var saveAdlogRecords = function(list){
-      try{ localStorage.setItem(ADLOG_KEY, JSON.stringify(list)); }catch(e){}
-    };
-    var roasClass = function(roas){
-      if(roas >= 4) return 'roas-good';
-      if(roas >= 2) return 'roas-mid';
-      return 'roas-low';
-    };
-    window.deleteAdlogRecord = function(id){
-      var list = getAdlogRecords().filter(function(r){ return String(r.id) !== String(id); });
-      saveAdlogRecords(list);
-      renderAdlog();
-    };
-    var renderAdlog = function(){
-      var list = getAdlogRecords();
-      if(!list.length){
-        adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">아직 기록이 없어요 — "+ 기록 추가"로 첫 광고 성과를 남겨보세요.</div></td></tr>';
-      } else {
-        adlogTbody.innerHTML = list.map(function(r){
-          var roas = r.spend > 0 ? (r.revenue / r.spend) : 0;
-          var chanColor = {메타:'var(--badge-a)', 네이버:'var(--badge-c)', 카카오:'var(--badge-b)', 인스타:'var(--badge-d)'}[r.channel] || 'var(--ink-faint)';
-          return '<tr>' +
-            '<td>' + r.date + '</td>' +
-            '<td><span class="adlog-channel" style="background:' + chanColor + '">' + r.channel + '</span></td>' +
-            '<td>' + r.name + '</td>' +
-            '<td class="num">₩' + Math.round(r.spend).toLocaleString('ko-KR') + '</td>' +
-            '<td class="num">₩' + Math.round(r.revenue).toLocaleString('ko-KR') + '</td>' +
-            '<td class="num ' + roasClass(roas) + '">' + roas.toFixed(1) + 'x</td>' +
-            '<td><button type="button" class="adlog-del" data-id="' + r.id + '">✕</button></td>' +
-          '</tr>';
-        }).join('');
-      }
-      var totalSpend = list.reduce(function(s, r){ return s + r.spend; }, 0);
-      var totalRevenue = list.reduce(function(s, r){ return s + r.revenue; }, 0);
-      var avgRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
-      var best = list.slice().sort(function(a, b){
-        var ra = a.spend > 0 ? a.revenue / a.spend : 0;
-        var rb = b.spend > 0 ? b.revenue / b.spend : 0;
-        return rb - ra;
-      })[0];
-      document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(totalSpend).toLocaleString('ko-KR');
-      document.getElementById('adlogSumRoas').textContent = avgRoas.toFixed(1) + 'x';
-      document.getElementById('adlogSumBest').textContent = best ? best.name : '—';
-    };
     document.getElementById('adlogForm').addEventListener('submit', function(e){
       e.preventDefault();
       var channelBtn = document.querySelector('.adlog-chan-btn.active');
-      var list = getAdlogRecords();
-      list.unshift({
+      var record = {
         id: Date.now(),
         date: document.getElementById('adlogDate').value,
         name: document.getElementById('adlogName').value,
         spend: parseFloat(document.getElementById('adlogSpend').value) || 0,
         revenue: parseFloat(document.getElementById('adlogRevenue').value) || 0,
         channel: channelBtn ? channelBtn.getAttribute('data-channel') : '메타'
-      });
-      saveAdlogRecords(list);
+      };
+      if(window.launchdeskStore) window.launchdeskStore.addAdlogRecord(record);
       renderAdlog();
       e.target.reset();
       document.getElementById('adlogFormWrap').hidden = true;
       showToast('광고 기록이 저장됐어요', 'success');
-      /* GA4 ad_record_add — fires right after saveAdlogRecords() above
-         actually persisted the record. No date/name/spend/revenue/channel
-         here on purpose — those are the seller's own business numbers,
-         not needed just to know the tool got used. */
+      /* GA4 ad_record_add — fires right after the record above actually
+         persisted. No date/name/spend/revenue/channel here on purpose —
+         those are the seller's own business numbers, not needed just to
+         know the tool got used. */
       if(typeof gtag === 'function'){
         gtag('event', 'ad_record_add', {
           tool_name: 'ad_log'
@@ -265,5 +258,16 @@
       }
     });
     renderAdlog();
+  }
+
+  /* launchdeskStore가 로그인/로그아웃으로 데이터를 다시 채우거나 비울 때
+     (hydrate/resetToGuest) 이 페이지도 다시 그린다 — 로그인 직후 계정의
+     저장된 기록으로 바뀌거나, 로그아웃 직후 화면이 즉시 비회원 상태(빈
+     목록)로 초기화되도록. */
+  if(window.launchdeskStore){
+    window.launchdeskStore.onChange(function(){
+      renderSavedCalcs();
+      renderAdlog();
+    });
   }
 })();
