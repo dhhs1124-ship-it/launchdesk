@@ -8,6 +8,10 @@
   // from render() every time /start/sourcing is entered, since a saved
   // margin-calculator result made on /tools won't otherwise be noticed
   var reevaluateSourcing = null;
+  // set by a click on any [data-resource-cat] link (STEP02~07 → 자료실
+  // links); consumed once by render() the moment /resources is reached,
+  // so that STEP's relevant category filter is pre-selected automatically
+  var pendingResourceFilter = null;
 
   /* Views that actually exist. Add a line here the moment a new
      <section class="view" id="view-XXX"> is built — every #/path
@@ -113,6 +117,16 @@
        완료되는 순간"에만 정확히 한 번 발생한다. */
     if(path === '/start/sourcing' && typeof reevaluateSourcing === 'function'){
       reevaluateSourcing();
+    }
+
+    /* STEP02~07의 "OO 관련 자료 보기" 링크가 남겨둔 카테고리를 자료실
+       도착 시 한 번만 적용 — 새 라우팅을 추가하지 않고, 자료실 자체의
+       필터 탭 클릭 메커니즘을 그대로 재사용한다(아래 filter-tab 클릭
+       위임 로직과 동일). */
+    if(path === '/resources' && pendingResourceFilter){
+      var pendingTab = document.querySelector('.filter-tabs[data-scope="resources"] .filter-tab[data-filter="' + pendingResourceFilter + '"]');
+      if(pendingTab) pendingTab.click();
+      pendingResourceFilter = null;
     }
 
     /* GA4 page_view — hash routes never trigger a real page load, so the
@@ -229,6 +243,14 @@
 
   /* tab switcher — generic, scoped to the .tabs the clicked button lives in */
   document.addEventListener('click', function(e){
+    // STEP02~07 → 자료실 deep-link: just remember which category to
+    // pre-select once /resources actually renders (see render() above);
+    // the <a>'s own href="#/resources" navigation is left to run normally.
+    var resourceCatLink = e.target.closest('[data-resource-cat]');
+    if(resourceCatLink){
+      pendingResourceFilter = resourceCatLink.getAttribute('data-resource-cat');
+      return;
+    }
     var tabBtn = e.target.closest('.tab-btn');
     if(tabBtn){
       var tabs = tabBtn.closest('.tabs');
@@ -338,12 +360,16 @@
       if(allResTab) allResTab.click();
       return;
     }
-    var scrollSetup = e.target.closest('#scrollToSetupGuide');
-    if(scrollSetup){
-      var setupFilterTab = document.querySelector('.filter-tabs[data-scope="resources"] .filter-tab[data-filter="setup"]');
-      if(setupFilterTab) setupFilterTab.click(); // reveals the accordion (hidden under other filters)
-      var target = document.getElementById('setupAccordion');
-      if(target) target.scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth', block: 'start'});
+    // generic "N개 가이드 보기" button on a resource-card — reveals the
+    // matching category's accordion (data-filter) and scrolls to it
+    // (data-target). Replaces the old single hardcoded #scrollToSetupGuide
+    // button now that there are two such cards (사업자·플랫폼 / 분석·연동).
+    var guideLink = e.target.closest('.rc-guide-link');
+    if(guideLink){
+      var glFilterTab = document.querySelector('.filter-tabs[data-scope="resources"] .filter-tab[data-filter="' + guideLink.getAttribute('data-filter') + '"]');
+      if(glFilterTab) glFilterTab.click(); // reveals the accordion (hidden under other filters)
+      var glTarget = document.getElementById(guideLink.getAttribute('data-target'));
+      if(glTarget) glTarget.scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth', block: 'start'});
     }
   });
 
