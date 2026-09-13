@@ -472,54 +472,67 @@
       row.querySelector('.gp-check').classList.toggle('done', isDone);
     });
 
-    updateResumeBanner(completed);
+    renderHomeDashboard(completed);
   }
 
-  /* home "이어서 하기" banner — 5 milestones grouped from the same
-     completed[] chapter list (ch02 covers two milestones since our
-     content doesn't split registration/platform-choice into separate
-     chapters). "다음 단계" always points at the first not-yet-completed
-     chapter in CHAPTER_PATHS order — real resume-where-you-left-off,
-     not a fixed link. */
-  var MILESTONES = [
-    {key:'biz',       chapter:'/start/setup'},
-    {key:'platform',  chapter:'/start/setup'},
-    {key:'sourcing',  chapter:'/start/sourcing'},
-    {key:'content',   chapter:'/start/content'},
-    {key:'payment',   chapter:'/start/marketing-setup'}
+  /* ---- HOME dashboard (temporary display layer) -----------------------
+     Maps the redesigned 9-STEP plan onto the existing 9 chapter routes,
+     reading the SAME completed[] data every chapter already writes via
+     setChapterDone() below — this does NOT change how a chapter is
+     judged "done" (still the existing chapter-check / checklist /
+     worksheet logic). It only changes how the HOME view labels and
+     counts that same data:
+       - STEP 00 is an orientation screen and is excluded from the
+         8-step total (gated:false).
+       - STEP 01~08 reuse the other 8 chapter routes, reordered here to
+         match the real launch order agreed in the redesign (delivery/
+         CS policy + launch readiness before the marketing-infra and
+         first-traffic steps).
+     Once each STEP gets its own real completion condition (checklist/
+     worksheet per STEP, not a single "read" checkbox), only the `gated`
+     source needs to change — renderHomeDashboard()'s shape stays the
+     same. */
+  var HOME_STEPS = [
+    {num:'00', route:'/start/intro',           label:'오픈 로드맵 확인하기',             gated:false},
+    {num:'01', route:'/start/prepare',         label:'무엇을, 누구에게 팔지 정하기',      gated:true},
+    {num:'02', route:'/start/setup',           label:'사업자 등록하고 쇼핑몰 플랫폼 만들기', gated:true},
+    {num:'03', route:'/start/sourcing',        label:'판매할 상품과 공급처, 가격 확정하기', gated:true},
+    {num:'04', route:'/start/content',         label:'상품 상세페이지 완성하기',          gated:true},
+    {num:'05', route:'/start/orders',          label:'배송·CS 정책 정하고 오픈 준비 마치기', gated:true},
+    {num:'06', route:'/start/marketing-setup', label:'마케팅 인프라 연결하기',            gated:true},
+    {num:'07', route:'/start/marketing',       label:'첫 유입 만들고 반응 테스트하기',     gated:true},
+    {num:'08', route:'/start/wrapup',          label:'오픈 완료, 운영 시작하기',          gated:true}
   ];
+  var HOME_GATED_STEPS = HOME_STEPS.filter(function(s){ return s.gated; });
   var RESUME_RING_CIRC = 175.9;
-  function updateResumeBanner(completed){
-    var stepsWrap = document.getElementById('rbSteps');
-    if(!stepsWrap) return;
-    var doneCount = 0;
-    MILESTONES.forEach(function(m){
-      var isDone = completed.indexOf(m.chapter) !== -1;
-      if(isDone) doneCount++;
-      var el = stepsWrap.querySelector('[data-milestone="' + m.key + '"]');
-      if(el) el.classList.toggle('done', isDone);
-    });
-    var pct = Math.round(doneCount / MILESTONES.length * 100);
+  function renderHomeDashboard(completed){
+    var titleEl = document.getElementById('resumeTitle');
+    if(!titleEl) return; // home markup not present on this build
+
+    var total = HOME_GATED_STEPS.length;
+    var done = HOME_GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) !== -1; }).length;
+    var pct = total ? Math.round(done / total * 100) : 0;
+
     var pctEl = document.getElementById('rbPct');
     if(pctEl) pctEl.textContent = pct + '%';
     var arc = document.getElementById('rbRingArc');
     if(arc) arc.style.strokeDashoffset = (RESUME_RING_CIRC * (1 - pct / 100)).toFixed(1);
+    var barEl = document.getElementById('rbBarFill');
+    if(barEl) barEl.style.width = pct + '%';
     var subEl = document.getElementById('resumeSub');
-    if(subEl) subEl.textContent = doneCount + '/' + MILESTONES.length + '단계 완료 · 지금 바로 이어가세요';
+    if(subEl) subEl.textContent = total + '단계 중 ' + done + '단계 완료';
 
     var next = null;
-    for(var i = 0; i < CHAPTER_PATHS.length; i++){
-      if(completed.indexOf(CHAPTER_PATHS[i]) === -1){ next = CHAPTER_PATHS[i]; break; }
+    for(var i = 0; i < HOME_GATED_STEPS.length; i++){
+      if(completed.indexOf(HOME_GATED_STEPS[i].route) === -1){ next = HOME_GATED_STEPS[i]; break; }
     }
-    var titleEl = document.getElementById('resumeTitle');
     var linkEl = document.getElementById('resumeLink');
     if(next){
-      var label = (TITLES[next] || next).replace(/^\d+\s*·\s*/, '');
-      if(titleEl) titleEl.textContent = '다음 단계: ' + label;
-      if(linkEl){ linkEl.href = '#' + next; linkEl.textContent = '계속하기 →'; }
+      titleEl.textContent = 'STEP ' + next.num + ' · ' + next.label;
+      if(linkEl){ linkEl.href = '#' + next.route; linkEl.textContent = '이어서 하기 →'; }
     } else {
-      if(titleEl) titleEl.textContent = '9개 챕터를 모두 완료했어요 🎉';
-      if(linkEl){ linkEl.href = '#/start'; linkEl.textContent = '다시 둘러보기 →'; }
+      titleEl.textContent = '8단계를 모두 완료했어요 🎉';
+      if(linkEl){ linkEl.href = '#/start/wrapup'; linkEl.textContent = '오픈 완료 확인하기 →'; }
     }
   }
   /* toast — used only for things that genuinely just happened locally

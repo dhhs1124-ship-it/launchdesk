@@ -136,107 +136,123 @@
 
     <main>
 
-      <!-- ============ VIEW: 홈 ============ -->
+      <!-- ============ VIEW: 홈 — 쇼핑몰 오픈 준비 현황판 ============ -->
       <section class="view" id="view-home" hidden>
         <div class="content">
           <div class="dash-head">
-            <h1>오늘은 무엇을 준비할까요?</h1>
-            <p>쇼핑몰 시작부터 매일의 운영까지, 필요한 서비스를 선택하세요.</p>
+            <h1>쇼핑몰 오픈 준비 현황</h1>
+            <p>지금까지 어디까지 왔는지, 다음에 뭘 해야 하는지 한눈에 확인하세요.</p>
           </div>
 
           <div class="resume-banner">
             <div>
-              <div class="rb-label">이어서 하기</div>
-              <h2 id="resumeTitle">다음 단계: 시작하기 전에</h2>
-              <p class="rb-sub" id="resumeSub">0/5단계 완료 · 지금 바로 이어가세요</p>
-              <div class="rb-steps" id="rbSteps">
-                <span class="rb-step" data-milestone="biz">사업자 등록 완료</span>
-                <span class="rb-step" data-milestone="platform">쇼핑몰 · 플랫폼 선택</span>
-                <span class="rb-step" data-milestone="sourcing">상품 소싱 및 기획</span>
-                <span class="rb-step" data-milestone="content">상세페이지 제작</span>
-                <span class="rb-step" data-milestone="payment">결제 시스템 연동</span>
-              </div>
+              <div class="rb-label">지금 해야 할 STEP</div>
+              <h2 id="resumeTitle">STEP 00 · 오픈 로드맵 확인하기</h2>
+              <p class="rb-sub" id="resumeSub">8단계 중 0단계 완료</p>
+              <div class="rb-bar"><div class="rb-bar-fill" id="rbBarFill"></div></div>
             </div>
             <div class="rb-right">
               <div class="rb-ring">
                 <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="6"/><circle id="rbRingArc" cx="32" cy="32" r="28" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="175.9" style="transition:stroke-dashoffset .4s ease"/></svg>
                 <span id="rbPct">0%</span>
               </div>
-              <a class="btn btn-primary" id="resumeLink" href="#/start/intro">계속하기 →</a>
+              <a class="btn btn-primary" id="resumeLink" href="#/start/intro">이어서 하기 →</a>
             </div>
           </div>
 
           <div class="dash-grid">
             <div class="dash-panel">
-              <div class="dash-panel-head">서비스</div>
-              <a class="service-highlight" href="#/start">
-                <div class="sh-top"><span class="sh-badge">진행 중</span></div>
-                <div class="sh-icon">🛍️</div>
-                <h3>쇼핑몰 시작하기</h3>
-                <p>창업 안내서와 오픈 준비 체크리스트</p>
-                <div class="row-progress"><div class="row-progress-fill" id="progressFillRow"></div></div>
-                <span class="sh-link">이어서 학습하기 →</span>
-              </a>
-              <div class="guide-preview-list" id="homeGuidePreview">
+              <div class="dash-panel-head">오픈 로드맵 · STEP 00~08</div>
+              <div class="guide-preview-list" id="homeRoadmapList">
                 <a class="gp-row" href="#/start/intro" data-chapter="/start/intro">
                   <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">📖</span>
-                  <span class="gp-text"><span class="gp-title">시작하기 전에</span><span class="gp-time">무료</span></span>
+                  <span class="gp-icon">🧭</span>
+                  <span class="gp-text"><span class="gp-title">STEP 00 오픈 로드맵 확인하기</span><span class="gp-time">오리엔테이션</span></span>
                 </a>
                 <a class="gp-row" href="#/start/prepare" data-chapter="/start/prepare">
                   <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">📋</span>
-                  <span class="gp-text"><span class="gp-title">시작 전 준비</span><span class="gp-time">무료</span></span>
+                  <span class="gp-icon">🎯</span>
+                  <span class="gp-text"><span class="gp-title">STEP 01 무엇을, 누구에게 팔지 정하기</span><span class="gp-time">방향 결정</span></span>
                 </a>
                 <a class="gp-row" href="#/start/setup" data-chapter="/start/setup">
                   <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
                   <span class="gp-icon">🏢</span>
-                  <span class="gp-text"><span class="gp-title">사업자 · 플랫폼 기본</span><span class="gp-time">무료</span></span>
+                  <span class="gp-text"><span class="gp-title">STEP 02 사업자 등록하고 쇼핑몰 플랫폼 만들기</span><span class="gp-time">사업자 · 플랫폼</span></span>
                 </a>
                 <a class="gp-row" href="#/start/sourcing" data-chapter="/start/sourcing">
                   <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">💡</span>
-                  <span class="gp-text"><span class="gp-title">상품 기획</span><span class="gp-time">무료</span></span>
+                  <span class="gp-icon">📦</span>
+                  <span class="gp-text"><span class="gp-title">STEP 03 판매할 상품과 공급처, 가격 확정하기</span><span class="gp-time">상품 · 가격</span></span>
+                </a>
+                <a class="gp-row" href="#/start/content" data-chapter="/start/content">
+                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                  <span class="gp-icon">🖼️</span>
+                  <span class="gp-text"><span class="gp-title">STEP 04 상품 상세페이지 완성하기</span><span class="gp-time">상세페이지</span></span>
+                </a>
+                <a class="gp-row" href="#/start/orders" data-chapter="/start/orders">
+                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                  <span class="gp-icon">🚚</span>
+                  <span class="gp-text"><span class="gp-title">STEP 05 배송·CS 정책 정하고 오픈 준비 마치기</span><span class="gp-time">배송 · CS · 오픈</span></span>
+                </a>
+                <a class="gp-row" href="#/start/marketing-setup" data-chapter="/start/marketing-setup">
+                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                  <span class="gp-icon">🔗</span>
+                  <span class="gp-text"><span class="gp-title">STEP 06 마케팅 인프라 연결하기</span><span class="gp-time">결제 · 추적 연동</span></span>
+                </a>
+                <a class="gp-row" href="#/start/marketing" data-chapter="/start/marketing">
+                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                  <span class="gp-icon">📣</span>
+                  <span class="gp-text"><span class="gp-title">STEP 07 첫 유입 만들고 반응 테스트하기</span><span class="gp-time">유입 테스트</span></span>
+                </a>
+                <a class="gp-row" href="#/start/wrapup" data-chapter="/start/wrapup">
+                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                  <span class="gp-icon">🏁</span>
+                  <span class="gp-text"><span class="gp-title">STEP 08 오픈 완료, 운영 시작하기</span><span class="gp-time">운영 전환</span></span>
                 </a>
               </div>
-              <a class="gp-see-all" href="#/start">전체 9개 보기 →</a>
+              <a class="gp-see-all" href="#/start">전체 로드맵 자세히 보기 →</a>
             </div>
 
             <div style="display:flex; flex-direction:column; gap:1rem;">
-              <div class="quick-row-list">
-                <a class="quick-row" href="#/tools">
-                  <span class="qr-icon tone-b">📊</span>
-                  <span class="qr-text"><span class="qr-title">운영 도구</span><span class="qr-sub">바로 사용</span></span>
-                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                </a>
-                <a class="quick-row" href="#/resources">
-                  <span class="qr-icon tone-c">📚</span>
-                  <span class="qr-text"><span class="qr-title">자료실</span><span class="qr-sub">12개 자료</span></span>
-                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                </a>
-                <a class="quick-row" href="#/services/setup">
-                  <span class="qr-icon tone-d">🛠️</span>
-                  <span class="qr-text"><span class="qr-title">세팅 대행</span><span class="qr-sub">문의 가능</span></span>
-                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                </a>
+              <div>
+                <div class="dash-panel-head" style="padding:0 0 .7rem; border:none;">운영 도구</div>
+                <div class="quick-row-list">
+                  <a class="quick-row" href="#/tools">
+                    <span class="qr-icon tone-b">🧮</span>
+                    <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가 · 판매가 · 마진율 계산</span></span>
+                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                  </a>
+                  <a class="quick-row" href="#/tools">
+                    <span class="qr-icon tone-b">📈</span>
+                    <span class="qr-text"><span class="qr-title">수익 시뮬레이터</span><span class="qr-sub">목표 매출 · 손익분기 확인</span></span>
+                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                  </a>
+                  <a class="quick-row" href="#/tools">
+                    <span class="qr-icon tone-b">🎯</span>
+                    <span class="qr-text"><span class="qr-title">광고 기록</span><span class="qr-sub">소재별 성과 기록</span></span>
+                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                  </a>
+                  <a class="quick-row" href="#/resources">
+                    <span class="qr-icon tone-c">📚</span>
+                    <span class="qr-text"><span class="qr-title">자료실</span><span class="qr-sub">설정 가이드 · 공급처 · 앱 모음</span></span>
+                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                  </a>
+                </div>
               </div>
 
               <div class="tip-box">
                 <div class="tb-label">✨ 오늘의 팁</div>
                 <p>상세 페이지에서 구매 결정의 <strong>72%</strong>가 일어납니다. 첫 스크롤 안에 핵심 메시지를 담으세요.</p>
               </div>
-
-              <div class="quick-access">
-                <div class="qa-head">빠른 접근</div>
-                <a class="qa-item" href="#/start/sourcing"><span>🧮</span><span><span class="qa-title">마진 계산하기</span><br><span class="qa-sub">원가 · 판매가 분석</span></span></a>
-                <a class="qa-item" href="#/resources"><span>📥</span><span><span class="qa-title">자료 다운로드</span><br><span class="qa-sub">무료 자료 3개</span></span></a>
-              </div>
             </div>
           </div>
 
-          <div class="sub-banner">
-            <div><div class="sb-title">지금은 9개 챕터 전부 무료로 열려 있어요</div><div class="sb-desc">정식 오픈 후에는 유료로 전환될 수 있어요. 세팅이 직접 하기 어려우시면 대행도 도와드려요.</div></div>
-            <a class="btn btn-primary" href="#/services/setup">세팅 대행 알아보기 →</a>
+          <div class="quick-row-list" style="margin-top:1.3rem;">
+            <a class="quick-row" href="#/services/setup">
+              <span class="qr-icon tone-d">🛠️</span>
+              <span class="qr-text"><span class="qr-title">막히는 설정이 있다면</span><span class="qr-sub">세팅대행을 이용할 수 있어요</span></span>
+              <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+            </a>
           </div>
         </div>
       </section>
