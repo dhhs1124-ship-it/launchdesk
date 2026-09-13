@@ -1,3 +1,8 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H3D0EDRZL5"></script>
 <script>
@@ -34,6 +39,8 @@
   스캔되게 했습니다. 색은 :root 안 --accent 계열 6줄, 배지는 --badge-*
   6쌍만 고치면 전체가 따라갑니다.
 -->
+</head>
+<body>
 
 <div class="scrim" id="scrim"></div>
 <div class="lightbox" id="lightbox">
@@ -117,14 +124,6 @@
   </aside>
 
   <div class="app-main">
-    <div class="promo-banner" id="promoBanner">
-      <div class="promo-left">
-        <span class="promo-fire">🎉</span>
-        <strong>프리뷰 오픈</strong>
-        <span>지금은 9개 챕터 <span class="promo-price">전부 무료</span>로 볼 수 있어요 — 정식 오픈 후 유료로 전환될 수 있어요</span>
-      </div>
-      <a class="btn btn-primary btn-sm promo-cta" href="#/start">가이드 시작하기 →</a>
-    </div>
     <header class="topbar">
       <div class="topbar-left">
         <button class="menu-btn" id="navToggle" aria-label="메뉴 열기" aria-expanded="false"><span></span><span></span><span></span></button>
@@ -148,7 +147,7 @@
             <div>
               <div class="rb-label">지금 해야 할 STEP</div>
               <h2 id="resumeTitle">STEP 00 · 오픈 로드맵 확인하기</h2>
-              <p class="rb-sub" id="resumeSub">8단계 중 0단계 완료</p>
+              <p class="rb-sub" id="resumeSub">7단계 중 0단계 완료</p>
               <div class="rb-bar"><div class="rb-bar-fill" id="rbBarFill"></div></div>
             </div>
             <div class="rb-right">
@@ -242,7 +241,7 @@
 
               <div class="tip-box">
                 <div class="tb-label">✨ 오늘의 팁</div>
-                <p>상세 페이지에서 구매 결정의 <strong>72%</strong>가 일어납니다. 첫 스크롤 안에 핵심 메시지를 담으세요.</p>
+                <p>상세페이지는 고객이 상품을 이해하고 구매 여부를 판단하는 핵심 화면입니다. 첫 스크롤 안에 핵심 메시지를 담으세요.</p>
               </div>
             </div>
           </div>
@@ -260,35 +259,23 @@
       <!-- ============ VIEW: 시작 가이드 목차 ============ -->
       <section class="view" id="view-start" hidden>
         <div class="content">
-          <div style="display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;">
-            <span class="eyebrow" style="margin-bottom:0;">쇼핑몰 시작하기</span>
-            <span class="viewer-badge">🟢 지금 43명이 보고 있어요</span>
-          </div>
+          <span class="eyebrow">쇼핑몰 시작하기</span>
           <div class="page-head">
             <h1>처음부터 차근차근, 쇼핑몰 시작 가이드</h1>
-            <p class="page-lead">혼자 시작해서 실제로 매출을 만든 순서를, 준비 단계부터 오픈까지 그대로 따라오세요.</p>
-          </div>
-          <div class="social-proof">
-            <span class="sp-avatars">
-              <span style="background:var(--badge-a)">이</span>
-              <span style="background:var(--badge-b)">박</span>
-              <span style="background:var(--badge-c)">김</span>
-              <span style="background:var(--badge-d)">최</span>
-            </span>
-            <span class="sp-count"><b>2,341명</b>이 이미 시작했어요</span>
+            <p class="page-lead">준비 단계부터 오픈, 운영 시작까지 STEP 00~08 순서 그대로 따라오세요.</p>
           </div>
           <div class="start-stats">
-            <div><div class="ss-label">총 챕터</div><div class="ss-value">9개</div></div>
-            <div><div class="ss-label">무료 공개</div><div class="ss-value">9개 전체</div></div>
-            <div><div class="ss-label">내 진행률</div><div class="ss-value" id="ssProgress">0/9 완료</div></div>
+            <div><div class="ss-label">전체 구성</div><div class="ss-value">STEP 00~08</div></div>
+            <div><div class="ss-label">이용 방식</div><div class="ss-value">전체 무료</div></div>
+            <div><div class="ss-label">내 진행률</div><div class="ss-value" id="ssProgress">0/7 완료</div></div>
           </div>
 
           <div class="progress-detail">
-            <div class="pd-head"><span>나의 학습 진행률</span><b id="pdPct">0%</b></div>
+            <div class="pd-head"><span>나의 진행률</span><b id="pdPct">0%</b></div>
             <div class="pd-bar"><div class="pd-fill" id="pdFill"></div></div>
             <div class="pd-legend">
               <span><i class="pd-dot done"></i>완료 <b id="pdDone">0</b>개</span>
-              <span><i class="pd-dot left"></i>남은 <b id="pdLeft">9</b>개</span>
+              <span><i class="pd-dot left"></i>남은 <b id="pdLeft">7</b>개</span>
             </div>
           </div>
 
@@ -296,99 +283,99 @@
             <div class="guide-card" data-chapter="/start/intro" data-tier="free">
               <button class="gc-head" type="button">
                 <div class="cc-top"><div class="cc-num">00</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>시작하기 전에</h2><p>완벽한 정답은 없다는 것부터, 실제로 거쳐온 5단계 준비 과정</p>
+                <h2>STEP 00 오픈 로드맵 확인하기</h2><p>상품 · 사업자등록 · 쇼핑몰 중 무엇부터 시작할지 순서를 먼저 정합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>실제 창업 준비 5단계</li><li>"0원 시작"이 거짓말인 이유</li><li>제작자 피터의 진짜 스토리</li></ul>
+                <ul class="cc-points"><li>전체 STEP 흐름 한눈에 보기</li><li>무엇부터 시작할지 판단하는 기준</li><li>이 가이드를 활용하는 방법</li></ul>
                 <a class="gc-link" href="#/start/intro">보기 →</a>
               </div></div>
             </div>
             <div class="guide-card" data-chapter="/start/prepare" data-tier="free">
               <button class="gc-head" type="button">
                 <div class="cc-top"><div class="cc-num">01</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>시작 전 준비</h2><p>타겟, 촬영 전략, 예산부터 모델 섭외까지 먼저 정하기</p>
+                <h2>STEP 01 무엇을, 누구에게 팔지 정하기</h2><p>상품과 타겟 고객의 방향을 먼저 정하면 이후 판단이 훨씬 쉬워집니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>타겟 · 촬영전략 · 예산 정하기</li><li>촬영 방식 4가지 비교</li><li>시작 비용 실제 항목표</li></ul>
+                <ul class="cc-points"><li>판매 상품 방향 정하기</li><li>타겟 고객 정의하기</li><li>이후 단계 판단 기준 세우기</li></ul>
                 <a class="gc-link" href="#/start/prepare">보기 →</a>
               </div></div>
             </div>
             <div class="guide-card" data-chapter="/start/setup" data-tier="free">
               <button class="gc-head" type="button">
                 <div class="cc-top"><div class="cc-num">02</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>사업자 · 플랫폼 기본</h2><p>사업자 등록부터 카페24, 도메인, PG결제까지 순서대로</p>
+                <h2>STEP 02 사업자 등록하고 쇼핑몰 플랫폼 만들기</h2><p>사업자 · 쇼핑몰 · 결제 환경을 실제 거래 가능한 상태로 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>사업자 · 통신판매업 등록</li><li>카페24 vs 스마트스토어</li><li>도메인 · PG 결제 세팅</li></ul>
+                <ul class="cc-points"><li>사업자 · 통신판매업 등록</li><li>쇼핑몰 플랫폼 선택(예시로 비교)</li><li>도메인 · PG 결제 연결</li></ul>
                 <a class="gc-link" href="#/start/setup">보기 →</a>
               </div></div>
             </div>
             <div class="guide-card" data-chapter="/start/sourcing" data-tier="free">
               <button class="gc-head" type="button">
                 <div class="cc-top"><div class="cc-num">03</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>상품 기획</h2><p>실전 사입 노하우, 2배 마진 법칙, 상품 구성 전략까지</p>
+                <h2>STEP 03 판매할 상품과 공급처, 가격 확정하기</h2><p>어디서 공급받고 얼마에 들여와 얼마에 팔지 계산해 판매를 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>동대문 사입 실전 가이드</li><li>2배 마진 법칙</li><li>마진 계산기로 바로 확인</li></ul>
+                <ul class="cc-points"><li>공급처 찾고 비교하기</li><li>원가 · 마진 계산하기</li><li>마진 계산기로 바로 확인</li></ul>
                 <a class="gc-link" href="#/start/sourcing">보기 →</a>
               </div></div>
             </div>
             <div class="guide-card" data-chapter="/start/content" data-tier="free">
               <button class="gc-head" type="button">
                 <div class="cc-top"><div class="cc-num">04</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>촬영 & 상세페이지</h2><p>아이폰 촬영 팁부터 인트로 구성, 세탁 안내까지</p>
+                <h2>STEP 04 상품 상세페이지 완성하기</h2><p>이미지와 설명만으로 상품의 특징과 차이를 이해할 수 있게 만듭니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>촬영 각도별 가이드(탭)</li><li>동영상 촬영 전략</li><li>인트로 · 상세컷 구성</li></ul>
+                <ul class="cc-points"><li>상세페이지 구성 순서</li><li>상품 촬영 기본 원칙</li><li>설명 문구 작성 포인트</li></ul>
                 <a class="gc-link" href="#/start/content">보기 →</a>
+              </div></div>
+            </div>
+            <div class="guide-card" data-chapter="/start/orders" data-tier="free">
+              <button class="gc-head" type="button">
+                <div class="cc-top"><div class="cc-num">05</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <h2>STEP 05 배송·CS 정책 정하고 오픈 준비 마치기</h2><p>주문을 실제로 처리할 수 있는 배송 · CS 체계를 갖춰 오픈을 마무리합니다.</p>
+                <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="gc-body"><div class="gc-body-inner">
+                <ul class="cc-points"><li>배송 정책 정하기</li><li>교환 · 반품 기준 세우기</li><li>오픈 전 최종 점검</li></ul>
+                <a class="gc-link" href="#/start/orders">보기 →</a>
               </div></div>
             </div>
             <div class="guide-card" data-chapter="/start/marketing-setup" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">05</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>마케팅 인프라 세팅</h2><p>네이버페이, 카카오, SNS 계정부터 메타 픽셀 연동까지</p>
+                <div class="cc-top"><div class="cc-num">06</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <h2>STEP 06 마케팅 인프라 연결하기</h2><p>광고를 시작하기 전에 유입과 구매를 추적할 수 있는 환경부터 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>네이버페이 · 카카오 연동</li><li>SNS 계정 · 메타 픽셀</li><li>마케팅 시작 전 체크리스트</li></ul>
+                <ul class="cc-points"><li>결제 · 방문 추적 연동</li><li>SNS · 채널 계정 준비</li><li>마케팅 시작 전 체크리스트</li></ul>
                 <a class="gc-link" href="#/start/marketing-setup">보기 →</a>
               </div></div>
             </div>
             <div class="guide-card" data-chapter="/start/marketing" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">06</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>마케팅 & SNS</h2><p>배송 정책, 인스타그램 운영, 메타 광고, 리뷰 전략까지</p>
-                <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>실전 마케팅 아카이브 반영</li><li>클릭식 광고 진단 도구</li><li>채널별 접근 전략</li></ul>
-                <a class="gc-link" href="#/start/marketing">보기 →</a>
-              </div></div>
-            </div>
-            <div class="guide-card" data-chapter="/start/orders" data-tier="free">
-              <button class="gc-head" type="button">
                 <div class="cc-top"><div class="cc-num">07</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>주문 · CS 관리</h2><p>출고 시간 고정부터 교환·반품 대응 마인드까지</p>
+                <h2>STEP 07 첫 유입 만들고 반응 테스트하기</h2><p>최소 하나의 방법으로 실제 방문자를 만들어보고 반응을 확인합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>하루 운영 타임라인</li><li>CS 응대 마인드</li><li>자동화 시점</li></ul>
-                <a class="gc-link" href="#/start/orders">보기 →</a>
+                <ul class="cc-points"><li>첫 유입 채널 선택하기</li><li>반응 확인하고 기록하기</li><li>광고 기록 도구로 성과 관리</li></ul>
+                <a class="gc-link" href="#/start/marketing">보기 →</a>
               </div></div>
             </div>
             <div class="guide-card" data-chapter="/start/wrapup" data-tier="free">
               <button class="gc-head" type="button">
                 <div class="cc-top"><div class="cc-num">08</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
-                <h2>마무리</h2><p>2년의 운영, 그리고 끝까지 가기 위해 필요한 마음가짐</p>
+                <h2>STEP 08 오픈 완료, 운영 시작하기</h2><p>오픈은 끝이 아니라 운영의 시작입니다. 상품 · 주문 · 광고 · 고객 반응을 확인하며 개선해갑니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>2년 운영 여정 그래프</li><li>번아웃과 매각</li><li>마지막 조언</li></ul>
+                <ul class="cc-points"><li>오픈 완료 체크리스트</li><li>운영 단계에서 할 일</li><li>지속적인 개선 루틴</li></ul>
                 <a class="gc-link" href="#/start/wrapup">보기 →</a>
               </div></div>
             </div>
@@ -396,7 +383,7 @@
 
           <div class="empty-state" id="chapterEmptyState" hidden>
             <div class="es-icon">🔍</div>
-            <p>조건에 맞는 챕터가 없어요.</p>
+            <p>조건에 맞는 STEP이 없어요.</p>
             <button type="button" class="btn btn-ghost" id="chapterEmptyReset">필터 초기화</button>
           </div>
 
@@ -409,7 +396,7 @@
             <a class="btn btn-primary" href="#/services/setup">세팅 대행 알아보기 →</a>
           </div>
 
-          <p style="font-size:.82rem; color:var(--ink-faint); margin-top:1.2rem;">사입처 · 마케팅 도구 · 마진 계산기 같은 참고 자료는 챕터가 아니라 사이드바의 <a href="#/resources" style="color:var(--accent-ink); font-weight:600;">자료실</a>에서 상시로 찾아볼 수 있어요.</p>
+          <p style="font-size:.82rem; color:var(--ink-faint); margin-top:1.2rem;">사입처 · 마케팅 도구 · 마진 계산기 같은 참고 자료는 STEP이 아니라 사이드바의 <a href="#/resources" style="color:var(--accent-ink); font-weight:600;">자료실</a>에서 상시로 찾아볼 수 있어요.</p>
         </div>
       </section>
 
@@ -1685,7 +1672,7 @@
                 <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">판매가 확정</span></label>
                 <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">기본 마진 구조 확인</span></label>
               </div>
-              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 6개를 모두 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요.</div>
+              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 6개를 모두 체크하고, 운영 도구의 마진 계산기에서 결과를 한 번 이상 저장하면 이 STEP이 완료로 표시되고 진행률에 반영돼요.</div>
             </div>
 
             <p style="font-size:.84rem;"><a href="#/resources" data-resource-cat="product" style="color:var(--accent-ink); font-weight:600;">상품 · 소싱 · 마진 관련 자료 보기 →</a></p>
@@ -2167,3 +2154,5 @@
 <script src="app.js"></script>
 <script src="tools.js"></script>
 <script src="setup.js"></script>
+</body>
+</html>

@@ -669,22 +669,6 @@
   .qa-item .qa-title{font-size:.86rem; font-weight:600;}
   .qa-item .qa-sub{font-size:.73rem; color:var(--ink-faint); margin-top:.05rem;}
 
-  /* ---------------- promo banner + social proof (marketing preview only) ---------------- */
-  .promo-banner{display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; background:var(--ink); color:#fff; padding:.7rem 1.4rem; font-size:.84rem;}
-  .promo-left{display:flex; align-items:center; gap:.7rem; flex-wrap:wrap;}
-  .promo-fire{flex:0 0 auto;}
-  .promo-price{color:#ffd27a; font-weight:700;}
-  .promo-cta{flex:0 0 auto;}
-
-  .viewer-badge{display:inline-flex; align-items:center; gap:.4rem; font-size:.78rem; font-weight:600; color:var(--badge-c); background:var(--badge-c-bg); padding:.3rem .7rem; border-radius:99px;}
-
-  .social-proof{display:flex; align-items:center; gap:.7rem; margin-top:1rem;}
-  .sp-avatars{display:flex;}
-  .sp-avatars span{width:26px; height:26px; border-radius:50%; border:2px solid var(--bg); display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:#fff; margin-left:-8px;}
-  .sp-avatars span:first-child{margin-left:0;}
-  .social-proof .sp-count{font-size:.85rem; color:var(--ink-soft);}
-  .social-proof .sp-count b{color:var(--ink);}
-
   /* ---------------- 운영도구: page-level tabs ---------------- */
   .tools-tab-bar{display:flex; gap:.5rem; margin:1.4rem 0 1.6rem; flex-wrap:wrap;}
   .tools-tab-btn{display:inline-flex; align-items:center; gap:.45rem; padding:.6rem 1.1rem; border-radius:99px; border:1px solid var(--border-strong); background:var(--surface); font-family:var(--f-body); font-size:.86rem; font-weight:700; color:var(--ink-soft); cursor:pointer; transition:background .15s, color .15s, border-color .15s;}
