@@ -33,13 +33,12 @@
         key: planEl.getAttribute('data-plan'),
         name: planEl.getAttribute('data-name'),
         price: parseInt(planEl.getAttribute('data-price'), 10),
-        days: planEl.getAttribute('data-days'),
         icon: planEl.querySelector('.sp-icon') ? planEl.querySelector('.sp-icon').textContent : '🛠️'
       };
       var goBtn = document.getElementById('setupGoStep2');
       if(goBtn) goBtn.textContent = setupSelectedPlan.name + ' 신청하기 →';
     }
-    // 기본 선택값(스탠다드)을 실제 상태로도 반영
+    // 기본 선택값(기본 쇼핑몰 세팅)을 실제 상태로도 반영
     var initialPlan = setupView.querySelector('.setup-plan.selected') || setupView.querySelector('.setup-plan');
     if(initialPlan) setupSelectPlan(initialPlan);
 
@@ -55,7 +54,7 @@
       var metaEl = document.getElementById('setupSummaryMeta');
       if(iconEl) iconEl.textContent = setupSelectedPlan.icon;
       if(nameEl) nameEl.textContent = setupSelectedPlan.name;
-      if(metaEl) metaEl.textContent = '₩' + setupSelectedPlan.price.toLocaleString('ko-KR') + '원 · ' + setupSelectedPlan.days;
+      if(metaEl) metaEl.textContent = '₩' + setupSelectedPlan.price.toLocaleString('ko-KR') + '원';
       setupShowStep(2);
     });
 
@@ -85,7 +84,7 @@
 
       var subject = '[런치데스크] ' + setupSelectedPlan.name + ' 세팅 대행 신청 — ' + (name || '이름 미입력');
       var bodyLines = [
-        '■ 신청 플랜: ' + setupSelectedPlan.name + ' (₩' + setupSelectedPlan.price.toLocaleString('ko-KR') + '원, ' + setupSelectedPlan.days + ')',
+        '■ 신청 플랜: ' + setupSelectedPlan.name + ' (₩' + setupSelectedPlan.price.toLocaleString('ko-KR') + '원)',
         '■ 성함: ' + (name || '-'),
         '■ 쇼핑몰 플랫폼: ' + (platform || '-'),
         '■ 연락처: ' + (phone || '-'),
@@ -115,8 +114,8 @@
     var setupRestart = document.getElementById('setupRestart');
     if(setupRestart) setupRestart.addEventListener('click', function(){
       setupForm.reset();
-      var standardPlan = setupView.querySelector('.setup-plan[data-plan="standard"]');
-      if(standardPlan) setupSelectPlan(standardPlan);
+      var defaultPlan = setupView.querySelector('.setup-plan[data-plan="basic"]');
+      if(defaultPlan) setupSelectPlan(defaultPlan);
       setupShowStep(1);
     });
 

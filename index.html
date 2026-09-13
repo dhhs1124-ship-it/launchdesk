@@ -1916,7 +1916,12 @@
       <span class="eyebrow">세팅 대행</span>
       <div class="page-head">
         <h1>세팅 대행</h1>
-        <p class="page-lead">쇼핑몰 초기 설정을 전문가가 대신 해드립니다. 빠르게 오픈하세요.</p>
+        <p class="page-lead">이 가이드를 따라 하면 직접 하실 수 있어요. 시간이 없거나 반복적인 설정 작업이 막힐 때만 이용하세요.</p>
+      </div>
+
+      <div class="callout">
+        <p><strong>🔒 신청 폼에 비밀번호를 입력하지 마세요.</strong></p>
+        <p>작업은 계정 초대 · 필요한 권한 부여 · 임시 접근 권한 · 화면공유 등의 방식으로 진행합니다. 쇼핑몰 · PG · 광고계정 비밀번호를 신청 폼이나 메일로 전달하실 필요는 전혀 없습니다.</p>
       </div>
 
       <div class="setup-steps">
@@ -1930,64 +1935,134 @@
       <!-- STEP 1: 플랜 선택 -->
       <div class="setup-step" data-step="1">
         <div class="setup-plans">
-          <div class="setup-plan" data-plan="basic" data-price="99000" data-name="베이직 세팅" data-days="3~5일">
-            <span class="sp-tag popular">인기</span>
+          <div class="setup-plan selected" data-plan="basic" data-price="69000" data-name="기본 쇼핑몰 세팅">
             <div class="sp-icon">🛠️</div>
-            <h3>베이직 세팅</h3>
-            <div class="sp-price">₩99,000</div>
+            <h3>기본 쇼핑몰 세팅</h3>
+            <div class="sp-price">₩69,000</div>
+            <p style="font-size:.85rem; color:var(--ink-soft); margin:.2rem 0 .9rem;">플랫폼 개설부터 도메인 · SEO까지, 쇼핑몰의 뼈대를 잡아드려요.</p>
             <ul class="sp-features">
-              <li>쇼핑몰 기본 설정</li>
-              <li>결제 시스템 연동</li>
-              <li>배송 정책 세팅</li>
-              <li>이메일 알림 설정</li>
+              <li>쇼핑몰 플랫폼 기본 설정</li>
+              <li>도메인 연결</li>
+              <li>SSL/HTTPS 기본 확인</li>
+              <li>기본 SEO 설정</li>
+              <li>기본 테마 · 환경 설정</li>
             </ul>
-            <div class="sp-duration">작업 기간: 3~5일</div>
             <div class="sp-picked">✓ 선택됨</div>
           </div>
-          <div class="setup-plan selected" data-plan="standard" data-price="199000" data-name="스탠다드 세팅" data-days="5~7일">
-            <span class="sp-tag rec">추천</span>
-            <div class="sp-icon">🚀</div>
-            <h3>스탠다드 세팅</h3>
+          <div class="setup-plan" data-plan="integration" data-price="129000" data-name="연동·추적 세팅">
+            <div class="sp-icon">🔗</div>
+            <h3>연동·추적 세팅</h3>
+            <div class="sp-price">₩129,000</div>
+            <p style="font-size:.85rem; color:var(--ink-soft); margin:.2rem 0 .9rem;">결제 연동 과정을 안내하고, 방문 · 전환을 확인할 수 있는 환경을 연결해드려요.</p>
+            <ul class="sp-features">
+              <li>PG 신청 과정 안내 및 승인 후 연동 지원</li>
+              <li>네이버 · 카카오 등 필요한 외부 채널 연동 지원</li>
+              <li>GA4 등 기본 분석 환경 연결</li>
+              <li>Meta 픽셀 등 필요한 경우 전환 추적 설정</li>
+            </ul>
+            <div class="sp-picked">✓ 선택됨</div>
+          </div>
+          <div class="setup-plan" data-plan="full" data-price="199000" data-name="전체 초기 세팅">
+            <span class="sp-tag full">전체</span>
+            <div class="sp-icon">📦</div>
+            <h3>전체 초기 세팅</h3>
             <div class="sp-price">₩199,000</div>
+            <p style="font-size:.85rem; color:var(--ink-soft); margin:.2rem 0 .9rem;">위 두 가지를 한 번에 — 오픈 전 기술 설정을 통째로 맡기고 싶을 때.</p>
             <ul class="sp-features">
-              <li>베이직 전체 포함</li>
-              <li>SNS 계정 연동</li>
-              <li>메타 픽셀 설치</li>
-              <li>카카오 채널 연결</li>
-              <li>상품 등록 10개</li>
+              <li>기본 쇼핑몰 세팅 전체</li>
+              <li>연동 · 추적 세팅 전체</li>
             </ul>
-            <div class="sp-duration">작업 기간: 5~7일</div>
-            <div class="sp-picked">✓ 선택됨</div>
-          </div>
-          <div class="setup-plan" data-plan="premium" data-price="349000" data-name="프리미엄 세팅" data-days="7~10일">
-            <span class="sp-tag full">올패키지</span>
-            <div class="sp-icon">✨</div>
-            <h3>프리미엄 세팅</h3>
-            <div class="sp-price">₩349,000</div>
-            <ul class="sp-features">
-              <li>스탠다드 전체 포함</li>
-              <li>광고 계정 세팅</li>
-              <li>리뷰 시스템 구축</li>
-              <li>상품 등록 30개</li>
-              <li>1:1 운영 컨설팅 1회</li>
-            </ul>
-            <div class="sp-duration">작업 기간: 7~10일</div>
             <div class="sp-picked">✓ 선택됨</div>
           </div>
         </div>
 
+        <!-- 실제 신청 이력이 아직 없어 넣은 정직한 문구입니다. 실제 신청
+             사례가 쌓이면 이 문장은 지우고, 필요하다면 그때 실제 후기/
+             사례로 교체하세요 — 가짜 신청자 수나 후기로 대체하지 마세요. -->
         <p style="font-size:.82rem; color:var(--ink-faint); text-align:center; margin-top:1.2rem;">아직 실제로 신청을 받아본 적은 없어요 — 지금 신청하시면 가장 먼저 도와드릴게요.</p>
 
-        <button type="button" class="btn btn-primary setup-cta-bar" id="setupGoStep2">스탠다드 세팅 신청하기 →</button>
+        <button type="button" class="btn btn-primary setup-cta-bar" id="setupGoStep2">기본 쇼핑몰 세팅 신청하기 →</button>
+
+        <h2 class="section-h" style="margin-top:2.4rem;">LaunchDesk가 하는 일 · 사용자가 해야 하는 일</h2>
+        <p>세팅대행은 본인 확인 · 계약처럼 반드시 본인이 진행해야 하는 절차까지 대신하지 않습니다. 아래처럼 역할을 나눠 진행합니다.</p>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>항목</th><th>LaunchDesk가 하는 일</th><th>사용자가 해야 하는 일</th></tr></thead>
+          <tbody>
+            <tr><td><strong>PG(결제)</strong></td><td>신청 과정 안내, 승인 후 연동 지원</td><td>신청서 제출, 사업자 본인확인, 계약</td></tr>
+            <tr><td><strong>네이버페이 · 카카오</strong></td><td>연동 설정 지원</td><td>사업자 명의 신청 및 필요한 심사</td></tr>
+            <tr><td><strong>GA4</strong></td><td>기본 분석 환경 연결</td><td>-</td></tr>
+            <tr><td><strong>Meta 픽셀 · 광고계정</strong></td><td>사용자 소유 계정에서 필요한 설정 · 연결 지원</td><td>계정 생성, 필요한 본인 인증</td></tr>
+          </tbody>
+        </table></div>
+
+        <h2 class="section-h">포함하지 않는 범위</h2>
+        <p>아래 항목은 모든 서비스에 기본 포함되지 않습니다.</p>
+        <ul class="cc-points">
+          <li>상품 등록 대행</li>
+          <li>상세페이지 제작</li>
+          <li>광고 운영</li>
+          <li>리뷰 운영</li>
+          <li>1:1 운영 컨설팅</li>
+        </ul>
+        <p style="font-size:.86rem; color:var(--ink-faint); margin-top:.8rem;">필요한 추가 작업이 있다면 신청 폼의 요청사항에 남겨주세요. 기본 포함 범위를 벗어나는 추가 작업은 신청 후 별도로 안내드립니다.</p>
+
+        <h2 class="section-h">진행 과정</h2>
+        <div class="timeline">
+          <div class="t-item"><h3>1 · 서비스 선택</h3></div>
+          <div class="t-item"><h3>2 · 최소 정보 입력</h3></div>
+          <div class="t-item"><h3>3 · 신청 내용 확인</h3></div>
+          <div class="t-item"><h3>4 · 연락 후 범위 · 권한 확인</h3></div>
+          <div class="t-item"><h3>5 · 필요한 권한만 전달</h3></div>
+          <div class="t-item"><h3>6 · 작업 및 완료 확인</h3></div>
+        </div>
+
+        <h2 class="section-h">신청 전 준비하면 좋은 것</h2>
+        <div class="checklist-block">
+          <div class="cl-head"><span class="title">준비 체크리스트</span><span class="count">0 / 3</span></div>
+          <div class="cl-group">
+            <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">사용 중이거나 사용할 쇼핑몰 플랫폼 확인</span></label>
+            <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">사업자등록 진행 여부 확인</span></label>
+            <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">이미 완료한 설정과 막힌 부분 정리</span></label>
+          </div>
+          <div class="cl-note">체크는 참고용이에요 — 진행률에는 반영되지 않아요.</div>
+        </div>
+
+        <h2 class="section-h">자주 묻는 질문</h2>
+        <div class="accordion">
+          <div class="acc-item">
+            <button class="acc-head" type="button"><div><div class="at">비밀번호를 알려줘야 하나요?</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+            <div class="acc-body"><div class="acc-body-inner">
+              <p>아니요. 신청 폼에는 비밀번호를 적지 않습니다. 실제 작업 시에는 계정 초대 · 필요한 권한 부여 · 임시 접근 권한 · 화면공유 중 가능한 방식으로 진행합니다.</p>
+            </div></div>
+          </div>
+          <div class="acc-item">
+            <button class="acc-head" type="button"><div><div class="at">이미 일부 설정을 했는데 나머지만 맡길 수 있나요?</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+            <div class="acc-body"><div class="acc-body-inner">
+              <p>네. 신청 폼의 요청사항에 이미 완료한 부분과 남은 부분을 적어주시면 그 범위만 진행합니다.</p>
+            </div></div>
+          </div>
+          <div class="acc-item">
+            <button class="acc-head" type="button"><div><div class="at">PG 심사까지 대신 해주나요?</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+            <div class="acc-body"><div class="acc-body-inner">
+              <p>PG 신청 자체(신청서 제출, 사업자 본인확인, 계약)는 사용자가 직접 진행해야 합니다. LaunchDesk는 신청 과정을 안내하고, 승인 이후 연동을 지원합니다.</p>
+            </div></div>
+          </div>
+          <div class="acc-item">
+            <button class="acc-head" type="button"><div><div class="at">추가 작업도 요청할 수 있나요?</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+            <div class="acc-body"><div class="acc-body-inner">
+              <p>상품 등록 · 상세페이지 제작 · 광고 운영 · 리뷰 운영 · 1:1 컨설팅은 기본 포함 범위가 아니지만, 신청 폼 요청사항에 남겨주시면 신청 후 별도로 안내드립니다.</p>
+            </div></div>
+          </div>
+        </div>
       </div>
 
       <!-- STEP 2: 정보 입력 -->
       <div class="setup-step" data-step="2" hidden>
         <div class="setup-summary">
-          <div class="setup-summary-icon" id="setupSummaryIcon">🚀</div>
+          <div class="setup-summary-icon" id="setupSummaryIcon">🛠️</div>
           <div class="setup-summary-text">
-            <div class="setup-summary-name" id="setupSummaryName">스탠다드 세팅</div>
-            <div class="setup-summary-meta" id="setupSummaryMeta">₩199,000원 · 5~7일</div>
+            <div class="setup-summary-name" id="setupSummaryName">기본 쇼핑몰 세팅</div>
+            <div class="setup-summary-meta" id="setupSummaryMeta">₩69,000원</div>
           </div>
           <button type="button" class="setup-summary-change" id="setupChangePlan">변경</button>
         </div>
@@ -1995,9 +2070,16 @@
         <form id="setupForm">
           <div class="setup-form-title">신청 정보 입력</div>
           <div class="ws-field" style="margin-bottom:1rem;"><label for="setupName">성함</label><input id="setupName" type="text" placeholder="홍길동" required></div>
-          <div class="ws-field" style="margin-bottom:1rem;"><label for="setupPlatform">쇼핑몰 플랫폼</label><input id="setupPlatform" type="text" placeholder="카페24, 스마트스토어 등"></div>
+          <div class="ws-field" style="margin-bottom:1rem;"><label for="setupPlatform">쇼핑몰 플랫폼</label>
+            <select id="setupPlatform" style="border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink); width:100%;">
+              <option value="">선택해주세요</option>
+              <option value="카페24">카페24</option>
+              <option value="스마트스토어">스마트스토어</option>
+              <option value="기타">기타 (요청사항에 적어주세요)</option>
+            </select>
+          </div>
           <div class="ws-field" style="margin-bottom:1rem;"><label for="setupPhone">연락처</label><input id="setupPhone" type="tel" placeholder="010-0000-0000" required></div>
-          <div class="ws-field" style="margin-bottom:1.3rem;"><label for="setupNote">세팅 요청 사항</label><textarea id="setupNote" rows="4" placeholder="원하시는 세팅 내용이나 추가 요청사항을 입력해 주세요." style="resize:vertical; border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink); width:100%;"></textarea></div>
+          <div class="ws-field" style="margin-bottom:1.3rem;"><label for="setupNote">세팅 요청 사항</label><textarea id="setupNote" rows="4" placeholder="원하시는 세팅 내용이나 추가 요청사항을 입력해 주세요. (예: 플랫폼이 '기타'라면 플랫폼명도 함께 적어주세요)" style="resize:vertical; border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink); width:100%;"></textarea></div>
           <div class="setup-form-actions">
             <button type="button" class="btn btn-ghost" id="setupBackTo1">이전으로</button>
             <button type="submit" class="btn btn-primary">신청 완료하기 →</button>
