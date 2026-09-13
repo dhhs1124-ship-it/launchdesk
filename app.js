@@ -4,6 +4,10 @@
   // last chapter path a GA4 chapter_start fired for — see render() below;
   // declared here so it survives across every render() call, not just one
   var lastChapterStartPath = null;
+  // STEP03's checklist evaluate() (set once its wiring runs, below) — re-run
+  // from render() every time /start/sourcing is entered, since a saved
+  // margin-calculator result made on /tools won't otherwise be noticed
+  var reevaluateSourcing = null;
 
   /* Views that actually exist. Add a line here the moment a new
      <section class="view" id="view-XXX"> is built — every #/path
@@ -101,6 +105,15 @@
     setActiveNav(path);
     window.scrollTo(0, 0);
     closeSidebar();
+
+    /* STEP03은 /tools에서 마진계산기를 저장한 뒤 돌아왔을 때 완료조건이
+       달라질 수 있으므로, 이 경로로 들어올 때마다 다시 평가한다.
+       reevaluateSourcing은 아래 체크리스트 wiring이 지정하며, 이 경로도
+       결국 setChapterDone()을 타므로 GA4/토스트는 여전히 "진짜로 새로
+       완료되는 순간"에만 정확히 한 번 발생한다. */
+    if(path === '/start/sourcing' && typeof reevaluateSourcing === 'function'){
+      reevaluateSourcing();
+    }
 
     /* GA4 page_view — hash routes never trigger a real page load, so the
        automatic page_view (disabled via send_page_view:false in the GA4
@@ -412,18 +425,24 @@
     update();
   });
 
-  /* "창업 준비" progress — driven ONLY by the explicit "이 챕터, 다
-     확인했어요" checkbox at the end of each of the 9 guide chapters
-     (00~08), never by merely opening the page. The checkbox is the
-     single source of truth; the sidebar mini-bar, the home dashboard
-     row-bar, the /start detail bar, and each guide-card's checkmark
-     all just read it back. Checking/unchecking any one of the 9
-     updates every one of those displays immediately.
-     The 16-item setup checklists (ch02/05) stay separate, deliberately
-     non-persisted setup-task trackers (see the checklist-counter code
-     above) — NOT part of this percentage. */
+  /* STEP01~07 진행률 — STEP00/08은 게이트 없는 전환 화면이라 분모에서
+     제외된다(항상 7 기준). ld-completed-chapters는 이제 "영구 원장"이
+     아니라 각 STEP의 실제 완료조건(워크시트/체크리스트/운영도구 저장
+     이력)을 마지막으로 훑은 결과를 담는 캐시로 취급한다 — 진짜 원천은
+     STEP_EVALUATORS가 읽는 개별 localStorage 키들이고,
+     reconcileCompletedChapters()가 로드마다 이 캐시를 그 원천과 다시
+     맞춘다. 사이드바 미니바 · 홈 대시보드 · /start 상세 진행률은 모두
+     이 하나의 캐시 + 하나의 계산(computeStepProgress)만 읽으므로 서로
+     다른 숫자를 보여줄 수 없다. */
   var CHAPTER_PATHS = ['/start/intro','/start/prepare','/start/setup','/start/sourcing','/start/content','/start/marketing-setup','/start/marketing','/start/orders','/start/wrapup'];
   var COMPLETED_KEY = 'ld-completed-chapters';
+  /* 저장 구조(필드/체크 항목 구성)의 의미 자체가 바뀐 STEP만 새 키를
+     쓴다. 옛 키(v1)와 그 데이터는 절대 지우지 않고, 그냥 더 이상 읽지
+     않는다 — 그래야 과거 값이 새 필드/체크박스에 잘못 복원되지 않는다. */
+  var STORAGE_KEY_OVERRIDES = {
+    '/start/prepare':         'ld-worksheet-start-prepare-v2',
+    '/start/marketing-setup': 'ld-checklist-start-marketing-setup-v2'
+  };
   var progressFillEls = document.querySelectorAll('#progressFillSide, #progressFillRow');
   var progressPctEls = document.querySelectorAll('#progressPct');
   function getCompleted(){
@@ -432,25 +451,104 @@
   function saveCompleted(list){
     try{ localStorage.setItem(COMPLETED_KEY, JSON.stringify(list)); }catch(e){}
   }
+
+  /* ---- STEP01~07 read-only evaluators ----------------------------------
+     Each answers "is this STEP actually done right now?" straight from
+     localStorage/DOM structure, independent of whatever
+     ld-completed-chapters currently says. Used to reconcile the cache
+     below; the live worksheet/checklist wiring further down still owns
+     day-to-day completion via setChapterDone(). STEP00/08 have no
+     evaluator — no completion gate, excluded from progress entirely. */
+  function hasSavedMarginCalc(){
+    // tools.js's own save history (separate script/IIFE) — read only, never written here
+    try{ return JSON.parse(localStorage.getItem('ld-tools-calc-history') || '[]').length > 0; }catch(e){ return false; }
+  }
+  function checklistAllChecked(path, overrideKey){
+    var block = document.querySelector('.checklist-block[data-chapter="' + path + '"]');
+    if(!block) return false;
+    var boxes = block.querySelectorAll('.cl-row input[type="checkbox"]');
+    if(!boxes.length) return false;
+    try{
+      var key = overrideKey || ('ld-checklist' + path.replace(/\//g, '-'));
+      var saved = JSON.parse(localStorage.getItem(key) || '[]');
+      if(!Array.isArray(saved)) return false;
+      for(var i = 0; i < boxes.length; i++){ if(saved.indexOf(i) === -1) return false; }
+      return true;
+    }catch(e){ return false; }
+  }
+  function worksheetAllFilled(path, overrideKey){
+    var ws = document.querySelector('.worksheet[data-chapter="' + path + '"]');
+    if(!ws) return false;
+    var inputs = ws.querySelectorAll('.worksheet-input');
+    if(!inputs.length) return false;
+    try{
+      var key = overrideKey || ('ld-worksheet' + path.replace(/\//g, '-'));
+      var saved = JSON.parse(localStorage.getItem(key) || '{}');
+      return Array.prototype.every.call(inputs, function(inp, i){ return typeof saved[i] === 'string' && saved[i].trim() !== ''; });
+    }catch(e){ return false; }
+  }
+  var STEP_EVALUATORS = {
+    '/start/prepare':         function(){ return worksheetAllFilled('/start/prepare', STORAGE_KEY_OVERRIDES['/start/prepare']); },
+    '/start/setup':           function(){ return checklistAllChecked('/start/setup'); },
+    '/start/sourcing':        function(){ return checklistAllChecked('/start/sourcing') && hasSavedMarginCalc(); },
+    '/start/content':         function(){ return checklistAllChecked('/start/content'); },
+    '/start/orders':          function(){ return checklistAllChecked('/start/orders'); },
+    '/start/marketing-setup': function(){ return checklistAllChecked('/start/marketing-setup', STORAGE_KEY_OVERRIDES['/start/marketing-setup']); },
+    '/start/marketing':       function(){ return checklistAllChecked('/start/marketing'); }
+  };
+
+  /* ld-completed-chapters를 위 실제 조건과 맞춘다. setChapterDone()을
+     거치지 않고 saveCompleted()로 배열만 직접 고쳐쓰므로 토스트도 GA4
+     chapter_complete도 절대 발화하지 않는다 — "지금 막 완료했다"가
+     아니라 "원래 상태를 다시 확인했다"이기 때문이다. 옛 "다 읽었어요"
+     체크로 남은 STEP03~07의 잔여 기록, 필드 구성이 바뀐 STEP01/06의
+     v1 잔여 기록은 여기서 조건에 안 맞으면 자연히 빠진다. 워크시트/
+     체크리스트 원본 데이터, STEP00/08의 과거 기록은 건드리지 않는다. */
+  function reconcileCompletedChapters(){
+    var completed = getCompleted();
+    var changed = false;
+    Object.keys(STEP_EVALUATORS).forEach(function(path){
+      var actual = STEP_EVALUATORS[path]();
+      var idx = completed.indexOf(path);
+      if(actual && idx === -1){ completed.push(path); changed = true; }
+      else if(!actual && idx !== -1){ completed.splice(idx, 1); changed = true; }
+    });
+    if(changed) saveCompleted(completed);
+  }
+  reconcileCompletedChapters();
+
+  /* STEP01~07 공용 진행률 계산 — 완료 STEP 수 / 전체 STEP 수(7) / % /
+     다음 미완료 STEP을 한 번에 계산해 사이드바 · 홈 · /start가 모두
+     같은 결과를 나눠 쓰게 한다 (STEP_ROADMAP/GATED_STEPS는 아래 정의). */
+  function computeStepProgress(completed){
+    var total = GATED_STEPS.length;
+    var done = GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) !== -1; }).length;
+    var pct = total ? Math.round(done / total * 100) : 0;
+    var next = null;
+    for(var i = 0; i < GATED_STEPS.length; i++){
+      if(completed.indexOf(GATED_STEPS[i].route) === -1){ next = GATED_STEPS[i]; break; }
+    }
+    return {total: total, done: done, pct: pct, next: next};
+  }
+
   function recomputeProgress(){
     var completed = getCompleted();
-    var total = CHAPTER_PATHS.length;
-    var done = completed.length;
-    var pct = Math.round(done / total * 100);
+    var prog = computeStepProgress(completed);
+    var pct = prog.pct;
     progressFillEls.forEach(function(el){ el.style.width = pct + '%'; });
     progressPctEls.forEach(function(el){ el.textContent = pct + '%'; });
 
     // /start index page extras: stat row, detail bar, per-card checkmarks
     var ssProgress = document.getElementById('ssProgress');
-    if(ssProgress) ssProgress.textContent = done + '/' + total + ' 완료';
+    if(ssProgress) ssProgress.textContent = prog.done + '/' + prog.total + ' 완료';
     var pdPct = document.getElementById('pdPct');
     if(pdPct) pdPct.textContent = pct + '%';
     var pdFill = document.getElementById('pdFill');
     if(pdFill) pdFill.style.width = pct + '%';
     var pdDone = document.getElementById('pdDone');
-    if(pdDone) pdDone.textContent = done;
+    if(pdDone) pdDone.textContent = prog.done;
     var pdLeft = document.getElementById('pdLeft');
-    if(pdLeft) pdLeft.textContent = total - done;
+    if(pdLeft) pdLeft.textContent = prog.total - prog.done;
     document.querySelectorAll('.guide-card[data-chapter]').forEach(function(card){
       var isDone = completed.indexOf(card.getAttribute('data-chapter')) !== -1;
       var check = card.querySelector('.cc-check');
@@ -459,40 +557,24 @@
       if(link && isDone && card.getAttribute('data-tier') === 'free'){ link.textContent = '다시 보기 →'; }
     });
 
-    // keep every chapter's own checkbox in sync with the saved state
-    // (setting .checked here doesn't fire 'change', so this can't loop)
-    document.querySelectorAll('.chapter-check-input').forEach(function(input){
-      var row = input.closest('[data-chapter]');
-      if(row) input.checked = completed.indexOf(row.getAttribute('data-chapter')) !== -1;
-    });
-
     // home page's compact guide-preview rows (same completed[] source)
     document.querySelectorAll('.gp-row[data-chapter]').forEach(function(row){
       var isDone = completed.indexOf(row.getAttribute('data-chapter')) !== -1;
       row.querySelector('.gp-check').classList.toggle('done', isDone);
     });
 
-    renderHomeDashboard(completed);
+    renderHomeDashboard(completed, prog);
   }
 
-  /* ---- HOME dashboard (temporary display layer) -----------------------
-     Maps the redesigned 9-STEP plan onto the existing 9 chapter routes,
-     reading the SAME completed[] data every chapter already writes via
-     setChapterDone() below — this does NOT change how a chapter is
-     judged "done" (still the existing chapter-check / checklist /
-     worksheet logic). It only changes how the HOME view labels and
-     counts that same data:
-       - STEP 00 is an orientation screen and is excluded from the
-         8-step total (gated:false).
-       - STEP 01~08 reuse the other 8 chapter routes, reordered here to
-         match the real launch order agreed in the redesign (delivery/
-         CS policy + launch readiness before the marketing-infra and
-         first-traffic steps).
-     Once each STEP gets its own real completion condition (checklist/
-     worksheet per STEP, not a single "read" checkbox), only the `gated`
-     source needs to change — renderHomeDashboard()'s shape stays the
-     same. */
-  var HOME_STEPS = [
+  /* ---- STEP_ROADMAP — single roadmap shared by every progress display --
+     Originally built for the home dashboard only (HOME_STEPS); promoted
+     here to a file-wide list so the sidebar mini-bar, the /start detail
+     bar and the home dashboard all read the exact same order/labels and
+     the exact same computeStepProgress() result — they cannot show
+     different numbers anymore. STEP00/08 are gate-free transition
+     screens (gated:false) and are excluded from every total/percentage;
+     STEP01~07 (gated:true) are the 7 STEPs progress is measured against. */
+  var STEP_ROADMAP = [
     {num:'00', route:'/start/intro',           label:'오픈 로드맵 확인하기',             gated:false},
     {num:'01', route:'/start/prepare',         label:'무엇을, 누구에게 팔지 정하기',      gated:true},
     {num:'02', route:'/start/setup',           label:'사업자 등록하고 쇼핑몰 플랫폼 만들기', gated:true},
@@ -501,17 +583,16 @@
     {num:'05', route:'/start/orders',          label:'배송·CS 정책 정하고 오픈 준비 마치기', gated:true},
     {num:'06', route:'/start/marketing-setup', label:'마케팅 인프라 연결하기',            gated:true},
     {num:'07', route:'/start/marketing',       label:'첫 유입 만들고 반응 테스트하기',     gated:true},
-    {num:'08', route:'/start/wrapup',          label:'오픈 완료, 운영 시작하기',          gated:true}
+    {num:'08', route:'/start/wrapup',          label:'오픈 완료, 운영 시작하기',          gated:false}
   ];
-  var HOME_GATED_STEPS = HOME_STEPS.filter(function(s){ return s.gated; });
+  var GATED_STEPS = STEP_ROADMAP.filter(function(s){ return s.gated; });
   var RESUME_RING_CIRC = 175.9;
-  function renderHomeDashboard(completed){
+  function renderHomeDashboard(completed, prog){
     var titleEl = document.getElementById('resumeTitle');
     if(!titleEl) return; // home markup not present on this build
 
-    var total = HOME_GATED_STEPS.length;
-    var done = HOME_GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) !== -1; }).length;
-    var pct = total ? Math.round(done / total * 100) : 0;
+    prog = prog || computeStepProgress(completed);
+    var pct = prog.pct;
 
     var pctEl = document.getElementById('rbPct');
     if(pctEl) pctEl.textContent = pct + '%';
@@ -520,18 +601,14 @@
     var barEl = document.getElementById('rbBarFill');
     if(barEl) barEl.style.width = pct + '%';
     var subEl = document.getElementById('resumeSub');
-    if(subEl) subEl.textContent = total + '단계 중 ' + done + '단계 완료';
+    if(subEl) subEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 완료';
 
-    var next = null;
-    for(var i = 0; i < HOME_GATED_STEPS.length; i++){
-      if(completed.indexOf(HOME_GATED_STEPS[i].route) === -1){ next = HOME_GATED_STEPS[i]; break; }
-    }
     var linkEl = document.getElementById('resumeLink');
-    if(next){
-      titleEl.textContent = 'STEP ' + next.num + ' · ' + next.label;
-      if(linkEl){ linkEl.href = '#' + next.route; linkEl.textContent = '이어서 하기 →'; }
+    if(prog.next){
+      titleEl.textContent = 'STEP ' + prog.next.num + ' · ' + prog.next.label;
+      if(linkEl){ linkEl.href = '#' + prog.next.route; linkEl.textContent = '이어서 하기 →'; }
     } else {
-      titleEl.textContent = '8단계를 모두 완료했어요 🎉';
+      titleEl.textContent = prog.total + '단계를 모두 완료했어요 🎉';
       if(linkEl){ linkEl.href = '#/start/wrapup'; linkEl.textContent = '오픈 완료 확인하기 →'; }
     }
   }
@@ -576,21 +653,18 @@
       completed.splice(idx, 1); saveCompleted(completed); recomputeProgress();
     }
   }
-  document.addEventListener('change', function(e){
-    var input = e.target.closest('.chapter-check-input');
-    if(!input) return;
-    var row = input.closest('[data-chapter]');
-    if(row) setChapterDone(row.getAttribute('data-chapter'), input.checked);
-  });
 
-  /* ch01 worksheet — 6 free-text fields (target, shooting strategy,
-     budget, naming, slogan, benchmarks). Filling in all 6 marks the
-     chapter complete; clearing any one un-marks it. Saved per-field so
-     it survives a reload, same as everything else here (no login yet,
-     so it's this browser only — see the note under the fields). */
+  /* ch01 worksheet — STEP01은 5개 필드(타겟고객/판매카테고리·상품군/
+     초기예산/브랜드·쇼핑몰이름/벤치마킹대상)를 쓴다. 필드 구성이 이전
+     (6필드, 촬영전략 포함)과 달라져 STORAGE_KEY_OVERRIDES의 v2 키를
+     쓴다 — 옛 키의 값이 의미가 달라진 새 필드에 잘못 복원되는 것을
+     막기 위함(옛 키/데이터는 삭제하지 않고 그냥 더 이상 읽지 않음).
+     5개 모두 채우면 챕터 완료, 하나라도 비우면 완료 해제. 필드별로
+     저장해 새로고침 후에도 유지된다(로그인 전이라 이 브라우저 한정 —
+     필드 아래 안내 참고). */
   document.querySelectorAll('.worksheet[data-chapter]').forEach(function(ws){
     var path = ws.getAttribute('data-chapter');
-    var key = 'ld-worksheet' + path.replace(/\//g, '-');
+    var key = STORAGE_KEY_OVERRIDES[path] || ('ld-worksheet' + path.replace(/\//g, '-'));
     var inputs = ws.querySelectorAll('.worksheet-input');
     try{
       var saved = JSON.parse(localStorage.getItem(key) || '{}');
@@ -613,16 +687,16 @@
     evaluate();
   });
 
-  /* ch02 / ch05 setup checklists — these double as that chapter's
-     completion signal: check every item and the chapter itself is
-     marked done. Unlike a plain "mark complete" checkbox, the check
-     states themselves are saved here too (this is the one place in
-     the file where that used to say "resets on reload" — now that a
-     chapter's progress depends on it, it needs to persist same as
-     everything else). */
+  /* STEP02~07의 필수 체크리스트 — 전부 체크하면 그 STEP이 완료된다.
+     체크 상태 자체도 여기서 저장한다(챕터 진행이 여기 달려 있으므로
+     새로고침 후에도 유지). STEP06은 필드 개수가 9→1로 의미가 바뀌어
+     STORAGE_KEY_OVERRIDES의 v2 키를 쓴다. STEP03은 체크리스트 완료에
+     더해 운영도구 마진계산기 저장 이력이 있어야 완료된다(evaluate()의
+     '/start/sourcing' 분기) — tools.js는 전혀 수정하지 않고 그 결과
+     키(ld-tools-calc-history)만 읽는다. */
   document.querySelectorAll('.checklist-block[data-chapter]').forEach(function(block){
     var path = block.getAttribute('data-chapter');
-    var key = 'ld-checklist' + path.replace(/\//g, '-');
+    var key = STORAGE_KEY_OVERRIDES[path] || ('ld-checklist' + path.replace(/\//g, '-'));
     var boxes = block.querySelectorAll('.cl-row input[type="checkbox"]');
     try{
       var saved = JSON.parse(localStorage.getItem(key) || '[]');
@@ -638,7 +712,9 @@
     }
     function evaluate(){
       var allChecked = boxes.length > 0 && Array.prototype.every.call(boxes, function(b){ return b.checked; });
-      setChapterDone(path, allChecked);
+      var done = allChecked;
+      if(path === '/start/sourcing'){ done = allChecked && hasSavedMarginCalc(); }
+      setChapterDone(path, done);
     }
     boxes.forEach(function(b, i){
       b.addEventListener('change', function(){
@@ -651,6 +727,9 @@
       });
     });
     evaluate();
+    // STEP03은 /tools에서 마진계산기 결과를 저장하고 돌아왔을 때도 다시
+    // 평가되어야 하므로, render()가 재호출할 수 있게 참조를 남긴다.
+    if(path === '/start/sourcing'){ reevaluateSourcing = evaluate; }
   });
 
   recomputeProgress();
