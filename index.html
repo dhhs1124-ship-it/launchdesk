@@ -1245,64 +1245,81 @@
           <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 08</span></div>
           <span class="eyebrow">STEP 08 · 운영 전환</span>
           <div class="page-head">
-            <h1>쇼핑몰 오픈 준비가 끝났습니다</h1>
-            <p class="page-lead">오픈은 끝이 아니라 운영의 시작입니다. 이제부터는 상품, 주문, 광고, 고객 반응을 확인하며 조금씩 개선해가면 됩니다.</p>
+            <h1 id="wrapupTitle">쇼핑몰 오픈 준비가 끝났습니다</h1>
+            <p class="page-lead" id="wrapupLead">오픈은 끝이 아니라 운영의 시작입니다. 이제부터는 상품, 주문, 광고, 고객 반응을 확인하며 조금씩 개선해가면 됩니다.</p>
           </div>
           <div class="chapter-body">
-            <h2 class="section-h">오픈 후 바로 확인할 것</h2>
-            <p>업종과 관계없이, 오픈 직후엔 아래 다섯 가지부터 확인하세요.</p>
-            <div class="checklist-block">
-              <div class="cl-head"><span class="title">오픈 직후 점검 목록</span><span class="count">0 / 5</span></div>
-              <div class="cl-group">
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">실제 주문이 정상적으로 들어오는지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">결제 · 배송 흐름에 문제가 없는지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">고객 문의에 대응할 채널이 준비되어 있는지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">어떤 상품 · 콘텐츠 · 유입 채널에서 반응이 발생하는지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">비용과 마진을 지속적으로 확인하고 있는지</span></label>
+            <div class="callout"><p id="wrapupStatusBanner">7단계 중 7단계 모두 완료했어요 🎉</p></div>
+
+            <!-- STEP01~07이 아직 7/7이 아닐 때만 보이는 안내 (진행률 시스템 v2:
+                 STEP_ROADMAP/GATED_STEPS/computeStepProgress()를 그대로 재사용해
+                 app.js의 renderWrapupState()가 채운다) -->
+            <div id="wrapupIncompleteBlock" hidden>
+              <h2 class="section-h">아직 완료하지 않은 STEP</h2>
+              <p>아래 STEP을 마저 완료하면 이 화면이 운영 전환 화면으로 바뀌어요.</p>
+              <div class="quick-row-list" id="wrapupRemainingList"></div>
+              <div style="margin:1.2rem 0 .2rem;">
+                <a class="btn btn-primary" id="wrapupResumeCta" href="#/start/prepare">STEP 01 · 무엇을, 누구에게 팔지 정하기 → 이어서 하기</a>
               </div>
-              <div class="cl-note">체크는 지금 화면에서만 표시돼요 · 진행률에는 반영되지 않아요</div>
             </div>
 
-            <h2 class="section-h">운영도구로 이동</h2>
-            <p>마진 · 매출 · 광고 반응은 감이 아니라 도구로 확인하세요.</p>
-            <div style="margin:.2rem 0 1.2rem;">
-              <a class="btn btn-primary" href="#/tools">운영도구로 이동 →</a>
-            </div>
-            <div class="quick-row-list">
-              <a class="quick-row" href="#/tools">
-                <span class="qr-icon tone-b">🧮</span>
-                <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가 · 판매가 · 마진율 계산</span></span>
-                <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-              </a>
-              <a class="quick-row" href="#/tools">
-                <span class="qr-icon tone-b">📈</span>
-                <span class="qr-text"><span class="qr-title">수익 시뮬레이터</span><span class="qr-sub">목표 매출 · 손익분기 확인</span></span>
-                <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-              </a>
-              <a class="quick-row" href="#/tools">
-                <span class="qr-icon tone-b">🎯</span>
-                <span class="qr-text"><span class="qr-title">광고 기록</span><span class="qr-sub">소재별 성과 기록</span></span>
-                <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-              </a>
-            </div>
+            <!-- STEP01~07이 7/7 완료됐을 때만 보이는 기존 운영 전환 콘텐츠 -->
+            <div id="wrapupDoneBlock">
+              <h2 class="section-h">오픈 후 바로 확인할 것</h2>
+              <p>업종과 관계없이, 오픈 직후엔 아래 다섯 가지부터 확인하세요.</p>
+              <div class="checklist-block">
+                <div class="cl-head"><span class="title">오픈 직후 점검 목록</span><span class="count">0 / 5</span></div>
+                <div class="cl-group">
+                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">실제 주문이 정상적으로 들어오는지</span></label>
+                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">결제 · 배송 흐름에 문제가 없는지</span></label>
+                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">고객 문의에 대응할 채널이 준비되어 있는지</span></label>
+                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">어떤 상품 · 콘텐츠 · 유입 채널에서 반응이 발생하는지</span></label>
+                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">비용과 마진을 지속적으로 확인하고 있는지</span></label>
+                </div>
+                <div class="cl-note">체크는 지금 화면에서만 표시돼요 · 진행률에는 반영되지 않아요</div>
+              </div>
 
-            <h2 class="section-h">다음 운영 루틴</h2>
-            <p>특정 광고 플랫폼이나 업종을 전제하지 않는, 오픈 이후 반복하면 좋은 기본 흐름입니다.</p>
-            <div class="timeline">
-              <div class="t-item"><h3>1 · 유입 확인</h3><p>어디서 방문자가 들어오는지 확인합니다.</p></div>
-              <div class="t-item"><h3>2 · 주문 · 전환 확인</h3><p>들어온 방문자가 실제 주문으로 이어지는지 확인합니다.</p></div>
-              <div class="t-item"><h3>3 · 비용 · 마진 확인</h3><p>광고비 · 원가 대비 남는 게 있는지 확인합니다.</p></div>
-              <div class="t-item"><h3>4 · 고객 반응 확인</h3><p>문의 · 리뷰 · 재구매로 실제 반응을 확인합니다.</p></div>
-              <div class="t-item"><h3>5 · 개선</h3><p>확인된 문제부터 하나씩 고칩니다.</p></div>
-              <div class="t-item"><h3>6 · 다시 테스트</h3><p>바꾼 것의 효과를 다시 확인하고, 1번부터 반복합니다.</p></div>
-            </div>
+              <h2 class="section-h">운영도구로 이동</h2>
+              <p>마진 · 매출 · 광고 반응은 감이 아니라 도구로 확인하세요.</p>
+              <div style="margin:.2rem 0 1.2rem;">
+                <a class="btn btn-primary" href="#/tools">운영도구로 이동 →</a>
+              </div>
+              <div class="quick-row-list">
+                <a class="quick-row" href="#/tools">
+                  <span class="qr-icon tone-b">🧮</span>
+                  <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가 · 판매가 · 마진율 계산</span></span>
+                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                </a>
+                <a class="quick-row" href="#/tools">
+                  <span class="qr-icon tone-b">📈</span>
+                  <span class="qr-text"><span class="qr-title">수익 시뮬레이터</span><span class="qr-sub">목표 매출 · 손익분기 확인</span></span>
+                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                </a>
+                <a class="quick-row" href="#/tools">
+                  <span class="qr-icon tone-b">🎯</span>
+                  <span class="qr-text"><span class="qr-title">광고 기록</span><span class="qr-sub">소재별 성과 기록</span></span>
+                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                </a>
+              </div>
 
-            <div class="quick-row-list" style="margin-top:1.6rem;">
-              <a class="quick-row" href="#/services/setup">
-                <span class="qr-icon tone-d">🛠️</span>
-                <span class="qr-text"><span class="qr-title">아직 마무리하지 못한 설정이 있다면</span><span class="qr-sub">세팅대행을 이용할 수 있어요</span></span>
-                <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-              </a>
+              <h2 class="section-h">다음 운영 루틴</h2>
+              <p>특정 광고 플랫폼이나 업종을 전제하지 않는, 오픈 이후 반복하면 좋은 기본 흐름입니다.</p>
+              <div class="timeline">
+                <div class="t-item"><h3>1 · 유입 확인</h3><p>어디서 방문자가 들어오는지 확인합니다.</p></div>
+                <div class="t-item"><h3>2 · 주문 · 전환 확인</h3><p>들어온 방문자가 실제 주문으로 이어지는지 확인합니다.</p></div>
+                <div class="t-item"><h3>3 · 비용 · 마진 확인</h3><p>광고비 · 원가 대비 남는 게 있는지 확인합니다.</p></div>
+                <div class="t-item"><h3>4 · 고객 반응 확인</h3><p>문의 · 리뷰 · 재구매로 실제 반응을 확인합니다.</p></div>
+                <div class="t-item"><h3>5 · 개선</h3><p>확인된 문제부터 하나씩 고칩니다.</p></div>
+                <div class="t-item"><h3>6 · 다시 테스트</h3><p>바꾼 것의 효과를 다시 확인하고, 1번부터 반복합니다.</p></div>
+              </div>
+
+              <div class="quick-row-list" style="margin-top:1.6rem;">
+                <a class="quick-row" href="#/services/setup">
+                  <span class="qr-icon tone-d">🛠️</span>
+                  <span class="qr-text"><span class="qr-title">아직 마무리하지 못한 설정이 있다면</span><span class="qr-sub">세팅대행을 이용할 수 있어요</span></span>
+                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                </a>
+              </div>
             </div>
 
             <div class="chapter-nav">
