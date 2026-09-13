@@ -664,46 +664,64 @@
         </div>
       </section>
 
-      <!-- ============ VIEW: 챕터 05 · 마케팅 인프라 세팅 ============ -->
+      <!-- ============ VIEW: STEP 06 · 마케팅 인프라 연결하기 ============ -->
       <section class="view" id="view-start-marketing-setup" hidden>
         <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>챕터 05</span></div>
-          <span class="eyebrow">Chapter 05</span>
+          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 06</span></div>
+          <span class="eyebrow">STEP 06 · 추적 · 채널 연결</span>
           <div class="page-head">
-            <h1>마케팅 인프라 세팅</h1>
-            <p class="page-lead">네이버페이 · 카카오 · SNS 계정부터 메타 픽셀 연동까지 — 상품과 상세페이지가 준비된 지금, 마케팅을 실행하기 직전에 마쳐야 하는 인프라입니다.</p>
+            <h1>마케팅 인프라 연결하기</h1>
+            <p class="page-lead">광고를 시작하기 전에 먼저, 사람이 어디서 들어왔고 구매가 일어났는지 확인할 수 있는 환경을 준비해야 합니다.</p>
           </div>
           <div class="chapter-body">
             <div class="callout">
-              <p><strong>이 인프라는 등록 직후가 아니라, 지금(상품·상세페이지가 준비된 시점) 하는 게 맞습니다.</strong></p>
-              <p>네이버페이는 심사 시 사업자정보 · 고객센터가 사이트에 있어야 승인되고, 메타 픽셀은 실제로 광고를 돌리기 직전에 필요합니다. 너무 일찍 깔아두면 관리할 게 늘어나기만 합니다.</p>
+              <p><strong>이 STEP에서 반드시 필요한 건, 기본적인 방문 · 전환 확인 수단 최소 1개뿐입니다.</strong></p>
+              <p>네이버페이 · 카카오 · Meta 픽셀 · SNS 같은 채널은 필요한 사용자만 선택적으로 연결하면 됩니다. 특정 광고 플랫폼이나 채널을 반드시 써야 하는 건 아닙니다.</p>
             </div>
 
-            <h2 class="section-h">네이버페이 · 카카오 연동</h2>
-            <div class="info-grid cols-2">
-              <div class="info-card"><h4>네이버페이</h4><p>신청 → 승인(1~3일) → 네이버 공통 인증키 · 페이센터 ID · 가맹점 ID · 버튼 인증키 4가지를 연동합니다. 결제 버튼 하나로 전환율이 눈에 띄게 오릅니다.</p></div>
-              <div class="info-card"><h4>카카오 싱크 · 톡체크아웃</h4><p>카카오톡 채널 개설 후 카페24와 연동하면 카카오페이 바로결제(톡체크아웃)가 가능해져, 결제 허들이 낮아집니다.</p></div>
+            <h2 class="section-h">필수 — 기본 추적 환경 <span class="tag">1개만 있으면 완료</span></h2>
+            <p>방문자와 구매가 발생했을 때, 최소한 그 결과를 확인할 수 있어야 합니다. 아래 중 이미 쓰고 있는 게 있다면 그것으로 충분합니다.</p>
+            <div class="info-grid">
+              <div class="info-card"><h4>GA4</h4><p>방문 · 페이지 이동 · 주요 행동을 확인할 수 있습니다. 유일한 정답은 아닙니다.</p></div>
+              <div class="info-card"><h4>쇼핑몰 플랫폼 기본 통계</h4><p>카페24 등 플랫폼 자체 통계만으로도 충분히 시작할 수 있습니다.</p></div>
+              <div class="info-card"><h4>주문 · 유입 분석 기능</h4><p>판매 채널 · 오픈마켓이 기본 제공하는 유입 · 주문 통계도 해당합니다.</p></div>
+              <div class="info-card"><h4>기타 분석 도구</h4><p>이미 쓰고 있는 다른 분석 도구가 있다면 그것으로도 충분합니다.</p></div>
             </div>
-            <p>네이버 쇼핑은 의도적으로 입점하지 않는 경우도 많습니다 — 브랜딩보다 최저가 비교가 중심인 구조인 데다, CPC(클릭당 과금) 방식이라 매출이 낮은데 클릭만 많으면 오히려 손해가 나기 때문입니다.</p>
+
+            <div class="checklist-block" data-chapter="/start/marketing-setup">
+              <div class="cl-head"><span class="title">필수 체크</span><span class="count" id="clCount2">0 / 1</span></div>
+              <div class="cl-group">
+                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">기본 방문 · 전환 확인 수단을 최소 1개 연결했다 (GA4 · 플랫폼 기본 통계 · 기타 분석 도구 등)</span></label>
+              </div>
+              <div class="cl-note">이 항목 하나만 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요. 아래 선택 항목은 체크하지 않아도 완료에 영향이 없어요.</div>
+            </div>
+
+            <h2 class="section-h">선택 — 채널별 마케팅 인프라 <span class="tag">필요한 사용자만</span></h2>
+            <p>아래는 광고를 집행하거나 특정 채널을 쓰기로 한 경우에만 연결하면 됩니다. 하나도 연결하지 않아도 STEP06을 완료하는 데는 영향이 없습니다. 연결한다면, 상품 · 상세페이지가 준비된 지금 시점이 적당합니다 — 네이버페이는 심사 시 사업자정보 · 고객센터가 사이트에 있어야 승인되고, 메타 픽셀은 실제로 광고를 돌리기 직전에 필요하기 때문입니다.</p>
+
+            <h3 style="font-size:1rem; margin:1.2rem 0 .6rem;">네이버페이 · 카카오 연동 <span class="tag">선택</span></h3>
+            <div class="info-grid cols-2">
+              <div class="info-card"><h4>네이버페이</h4><p>신청 → 승인(1~3일) → 네이버 공통 인증키 · 페이센터 ID · 가맹점 ID · 버튼 인증키 4가지를 연동합니다. 결제 버튼 하나로 전환율이 오르는 경우가 많습니다.</p></div>
+              <div class="info-card"><h4>카카오 싱크 · 톡체크아웃</h4><p>카카오톡 채널 개설 후 쇼핑몰 플랫폼과 연동하면 카카오페이 바로결제(톡체크아웃)가 가능해져, 결제 허들이 낮아집니다.</p></div>
+            </div>
             <p style="font-size:.84rem;"><a href="#/resources" style="color:var(--accent-ink); font-weight:600;">자료실에서 네이버페이 · 카카오 연동 클릭 단위 스텝 보기 →</a></p>
 
-            <h2 class="section-h">SNS & 메타 픽셀</h2>
+            <h3 style="font-size:1rem; margin:1.6rem 0 .6rem;">SNS & 전환 추적(Meta Pixel 등) <span class="tag">선택</span></h3>
+            <p>광고를 사용할 계획이라면 아래 인프라를 연결하면 도움이 됩니다. 광고를 하지 않는다면 연결하지 않아도 됩니다.</p>
             <div class="tbl-wrap"><table>
               <thead><tr><th>플랫폼</th><th>목적</th><th>비고</th></tr></thead>
               <tbody>
                 <tr><td><strong>인스타그램</strong></td><td>감성 이미지, 릴스 중심</td><td>브랜드 감도 · 이미지 전달</td></tr>
-                <tr><td><strong>페이스북 페이지</strong></td><td>광고 계정 · 픽셀 연동용</td><td>인스타와 연동 필수</td></tr>
+                <tr><td><strong>페이스북 페이지</strong></td><td>광고 계정 · 픽셀 연동용</td><td>Meta 광고를 쓸 경우 인스타와 연동 필요</td></tr>
                 <tr><td>틱톡 <span class="tag">선택</span></td><td>바이럴 콘텐츠 확장</td><td>브랜드 톤에 따라 선택</td></tr>
-                <tr><td>유튜브 <span class="tag">선택</span></td><td>추후 유튜브 쇼핑 입점</td><td>현재는 필수 요소로 보는 추세</td></tr>
+                <tr><td>유튜브 <span class="tag">선택</span></td><td>추후 유튜브 쇼핑 입점</td><td>필요할 때 고려</td></tr>
               </tbody>
             </table></div>
-            <div class="pull-quote"><p>초기 1개월은 인스타그램 프로필에 링크를 걸지 않습니다. 링크가 걸리는 순간 릴스 노출이 급격히 줄고, '광고 유입' 위주로만 노출되기 때문입니다.</p></div>
-            <p>메타 픽셀 연결은 <strong>광고 계정 생성 → 픽셀 생성 → 카페24 ↔ Meta 채널 연동</strong> 3단계로 진행합니다. 완료되면 카페24 자체몰에서도 픽셀 데이터 기반 광고를 돌릴 수 있고, 인스타그램 쇼핑 태그도 활성화됩니다.</p>
+            <p>Meta 픽셀 연결은 <strong>광고 계정 생성 → 픽셀 생성 → 쇼핑몰 플랫폼 ↔ Meta 채널 연동</strong> 3단계로 진행합니다. 광고를 사용하는 경우에만 해당하며, 완료되면 픽셀 데이터 기반으로 전환을 추적할 수 있고 인스타그램 쇼핑 태그도 활성화됩니다.</p>
             <p style="font-size:.84rem;"><a href="#/resources" style="color:var(--accent-ink); font-weight:600;">자료실에서 메타 픽셀 연동 클릭 단위 스텝 보기 →</a></p>
 
-            <h2 class="section-h">마케팅 인프라 체크리스트</h2>
-            <div class="checklist-block" data-chapter="/start/marketing-setup">
-              <div class="cl-head"><span class="title">마케팅 시작 전 인프라 체크리스트</span><span class="count" id="clCount2">0 / 9</span></div>
+            <div class="checklist-block">
+              <div class="cl-head"><span class="title">선택 설정 체크리스트</span><span class="count">0 / 9</span></div>
               <div class="cl-group">
                 <div class="g-label">🟩 네이버 · 카카오</div>
                 <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">네이버페이 신청 · 승인</span></label>
@@ -717,14 +735,24 @@
                 <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">인스타그램 브랜드 계정 생성</span></label>
                 <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">페이스북 페이지 생성</span></label>
                 <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">메타 광고 계정 · 픽셀 생성</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">카페24 ↔ Meta 채널 연동</span></label>
+                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">쇼핑몰 플랫폼 ↔ Meta 채널 연동</span></label>
               </div>
-              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 9개를 모두 체크하면 이 챕터가 완료로 표시되고 진행률에 반영돼요.</div>
+              <div class="cl-note">체크는 참고용이에요 — 진행률에는 반영되지 않아요. 필요한 항목만 골라 진행하세요.</div>
             </div>
 
+            <div class="quick-row-list" style="margin-top:1.3rem;">
+              <a class="quick-row" href="#/services/setup">
+                <span class="qr-icon tone-d">🛠️</span>
+                <span class="qr-text"><span class="qr-title">픽셀 · 카카오 · 외부 서비스 연결이 어렵다면</span><span class="qr-sub">세팅대행을 이용할 수 있어요</span></span>
+                <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+              </a>
+            </div>
+
+            <p style="font-size:.86rem; color:var(--ink-faint); margin-top:1.2rem;">다음 STEP에서는 실제 방문자를 만들고 어떤 반응이 나오는지 확인합니다.</p>
+
             <div class="chapter-nav">
-              <a href="#/start/content"><span class="cn-label">← 이전 챕터</span><span class="cn-title">04 · 촬영 & 상세페이지</span></a>
-              <a class="next" href="#/start/marketing"><span class="cn-label">다음 챕터 →</span><span class="cn-title">06 · 마케팅 & SNS</span></a>
+              <a href="#/start/orders"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기</span></a>
+              <a class="next" href="#/start/marketing"><span class="cn-label">다음 STEP →</span><span class="cn-title">STEP 07 · 첫 유입 만들고 반응 테스트하기</span></a>
             </div>
           </div>
         </div>
