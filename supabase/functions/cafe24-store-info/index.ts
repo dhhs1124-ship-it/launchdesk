@@ -1,5 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
+import {
+  getValidCafe24AccessToken,
+  cafe24TokenErrorStatus,
+} from "../_shared/cafe24-token.ts";
 
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
@@ -60,33 +64,18 @@ export default {
         );
       }
 
-      // 3. 서버 전용 테이블에서 Access Token 조회
-      const { data: credential, error: credentialError } =
-        await ctx.supabaseAdmin
-          .from("integration_credentials")
-          .select("access_token, access_token_expires_at")
-          .eq("connected_account_id", account.id)
-          .single();
+      // 3. Access Token 확보 — 유효하면 그대로, 만료/임박이면 여기서 자동
+      //    refresh까지 처리하고 새 토큰을 DB에 즉시 저장한 뒤 반환한다.
+      const tokenResult = await getValidCafe24AccessToken(
+        ctx.supabaseAdmin,
+        account.id,
+        mallId
+      );
 
-      if (credentialError || !credential) {
-        console.error("Credential lookup failed:", credentialError);
-
+      if (!tokenResult.ok) {
         return Response.json(
-          { error: "Cafe24 인증정보를 찾을 수 없습니다." },
-          { status: 500 }
-        );
-      }
-
-      // 아직 자동 refresh는 다음 단계에서 구현
-      if (
-        new Date(credential.access_token_expires_at).getTime() <= Date.now()
-      ) {
-        return Response.json(
-          {
-            error: "Cafe24 Access Token이 만료되었습니다.",
-            code: "TOKEN_EXPIRED",
-          },
-          { status: 401 }
+          { error: tokenResult.message, code: tokenResult.code },
+          { status: cafe24TokenErrorStatus(tokenResult.code) }
         );
       }
 
@@ -96,7 +85,7 @@ export default {
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${credential.access_token}`,
+            Authorization: `Bearer ${tokenResult.accessToken}`,
             "Content-Type": "application/json",
             "X-Cafe24-Api-Version": "2026-09-01",
           },
