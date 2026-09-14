@@ -740,5 +740,6 @@
   .store-status::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--ink-faint);}
   .store-status.connected{color:var(--badge-c);}
   .store-status.connected::before{background:var(--badge-c);}
-  .store-card-actions{display:flex; gap:.5rem; flex:0 0 auto;}
+  .store-sync-meta{margin-top:.3rem; font-size:.72rem; color:var(--ink-faint);}
+  .store-card-actions{display:flex; gap:.5rem; flex:0 0 auto; flex-wrap:wrap;}
   @media (max-width:640px){ .store-card-actions{justify-content:flex-end;} }

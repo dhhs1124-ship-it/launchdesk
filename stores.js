@@ -74,6 +74,22 @@
   var PLATFORM_LABELS = { cafe24: 'Cafe24', smartstore: '스마트스토어', other: '기타' };
   function platformLabel(value){ return PLATFORM_LABELS[value] || value; }
 
+  // connected_accounts.last_synced_at(UTC 타임스탬프)을 "2026. 09. 14. 14:30"
+  // 형태로 — 사용자에게는 항상 한국 시간(Asia/Seoul) 기준으로 보여준다.
+  function formatSyncTime(isoString){
+    if(!isoString) return null;
+    var d = new Date(isoString);
+    if(isNaN(d.getTime())) return null;
+    var parts = {};
+    new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(d).forEach(function(p){ parts[p.type] = p.value; });
+    var hour = parts.hour === '24' ? '00' : parts.hour; // 일부 브라우저는 자정을 "24"로 줌
+    return parts.year + '. ' + parts.month + '. ' + parts.day + '. ' + hour + ':' + parts.minute;
+  }
+
   function escapeHtml(str){
     return String(str == null ? '' : str).replace(/[&<>"']/g, function(ch){
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
@@ -104,6 +120,12 @@
   // provider='cafe24' && status='connected'인 connected_accounts 행의
   // store_id 모음 — Set(store.id) 형태로, 카드 상태 문구 판단에만 쓴다.
   var connectedCafe24StoreIds = {};
+  // 같은 connected_accounts 조회에서 함께 받아온 last_synced_at — store_id별
+  // "최근 동기화" 문구 표시에만 쓴다(null이면 "아직 없음").
+  var cafe24LastSyncedAtByStoreId = {};
+  // 지금 주문 동기화 요청이 나가 있는 store.id 모음 — 쇼핑몰별로 버튼을
+  // 따로 잠그기 위함(A 동기화 중이라고 B 버튼까지 잠기면 안 됨).
+  var cafe24SyncInFlightStoreIds = {};
   // hydrateFromSession()이 울릴 때마다 증가 — 응답이 늦게 와서 순서가
   // 뒤바뀌어도(예: A 로그아웃 직후 바로 B 로그인) 가장 마지막 요청의
   // 결과만 반영하기 위한 가드.
@@ -156,9 +178,21 @@
       var isConnected = isCafe24 && !!connectedCafe24StoreIds[String(s.id)];
       var statusHtml = '<div class="store-status' + (isConnected ? ' connected' : '') + '">' +
         (isConnected ? 'Cafe24 연결됨' : 'API 연결 전') + '</div>';
-      var cafe24BtnHtml = isCafe24
+      // "Cafe24 연결" 버튼은 아직 연결 전인 쇼핑몰에만 — 연결 해제/재연결은
+      // 이번 작업 범위 밖이라, 이미 연결된 카드에는 다시 보여주지 않는다.
+      var cafe24BtnHtml = (isCafe24 && !isConnected)
         ? '<button type="button" class="btn btn-ghost btn-sm store-cafe24-connect-btn" data-id="' + escapeHtml(s.id) + '">Cafe24 연결</button>'
         : '';
+      // "최근 동기화" 표시 + "주문 동기화" 버튼은 연결된 쇼핑몰에만.
+      var lastSyncedHtml = '';
+      var syncBtnHtml = '';
+      if(isConnected){
+        var lastSyncedText = formatSyncTime(cafe24LastSyncedAtByStoreId[String(s.id)]) || '아직 없음';
+        lastSyncedHtml = '<div class="store-sync-meta">최근 동기화: ' + escapeHtml(lastSyncedText) + '</div>';
+        var isSyncing = !!cafe24SyncInFlightStoreIds[String(s.id)];
+        syncBtnHtml = '<button type="button" class="btn btn-ghost btn-sm store-cafe24-sync-btn" data-id="' + escapeHtml(s.id) + '"' +
+          (isSyncing ? ' disabled' : '') + '>' + (isSyncing ? '동기화 중...' : '주문 동기화') + '</button>';
+      }
       return (
         '<div class="store-card" data-id="' + escapeHtml(s.id) + '">' +
           '<div class="store-card-main">' +
@@ -168,9 +202,11 @@
             '</div>' +
             urlHtml +
             statusHtml +
+            lastSyncedHtml +
           '</div>' +
           '<div class="store-card-actions">' +
             cafe24BtnHtml +
+            syncBtnHtml +
             '<button type="button" class="btn btn-ghost btn-sm store-edit-btn" data-id="' + escapeHtml(s.id) + '">수정</button>' +
             '<button type="button" class="btn btn-ghost btn-sm store-del-btn" data-id="' + escapeHtml(s.id) + '">삭제</button>' +
           '</div>' +
@@ -213,7 +249,7 @@
     var sb = client();
     if(!sb) return;
     sb.from('connected_accounts')
-      .select('store_id, provider, status')
+      .select('store_id, provider, status, last_synced_at')
       .eq('provider', 'cafe24')
       .eq('status', 'connected')
       .then(function(res){
@@ -223,8 +259,13 @@
           return;
         }
         var ids = {};
-        (res.data || []).forEach(function(row){ ids[String(row.store_id)] = true; });
+        var lastSyncedAt = {};
+        (res.data || []).forEach(function(row){
+          ids[String(row.store_id)] = true;
+          lastSyncedAt[String(row.store_id)] = row.last_synced_at;
+        });
         connectedCafe24StoreIds = ids;
+        cafe24LastSyncedAtByStoreId = lastSyncedAt;
         render();
       })
       .catch(function(err){
@@ -244,6 +285,8 @@
       currentUserId = null;
       stores = [];
       connectedCafe24StoreIds = {};
+      cafe24LastSyncedAtByStoreId = {};
+      cafe24SyncInFlightStoreIds = {};
       render();
       return;
     }
@@ -255,6 +298,8 @@
         currentUserId = user.id;
         stores = []; // 새 사용자 몫을 불러오는 동안 이전 목록이 잠깐이라도 보이지 않게
         connectedCafe24StoreIds = {};
+        cafe24LastSyncedAtByStoreId = {};
+        cafe24SyncInFlightStoreIds = {}; // 이전 사용자 몫으로 걸려있던 "동기화 중" 잠금도 함께 정리
         render();
         fetchStores(user.id, seq);
         fetchConnectedAccounts(seq);
@@ -262,6 +307,8 @@
         currentUserId = null;
         stores = [];
         connectedCafe24StoreIds = {};
+        cafe24LastSyncedAtByStoreId = {};
+        cafe24SyncInFlightStoreIds = {};
         render();
       }
     });
@@ -340,8 +387,98 @@
     if(cafe24Btn){
       var cafe24Row = stores.filter(function(s){ return String(s.id) === cafe24Btn.getAttribute('data-id'); })[0];
       if(cafe24Row) openCafe24Modal(cafe24Row);
+      return;
+    }
+    var syncBtn = e.target.closest('.store-cafe24-sync-btn');
+    if(syncBtn && !syncBtn.disabled){
+      syncCafe24Orders(syncBtn.getAttribute('data-id'));
     }
   });
+
+  // ---------------------------------------------------------- 주문 동기화
+  // start_date/end_date는 프론트에서 보내지 않는다 — Edge Function이
+  // connected_accounts.last_synced_at을 기준으로 "최초 90일 / 이후 14일
+  // overlap"을 알아서 판단한다(이미 구현된 cafe24-orders-sync 그대로).
+
+  // supabase-js는 Edge Function이 2xx가 아닌 응답(400/401/502/500 등)을
+  // 주면 res.data를 채우지 않고 res.error(FunctionsHttpError)만 채운다 —
+  // 우리 함수가 실제로 반환한 JSON 바디({ error, code })는 그 원본
+  // Response인 error.context에 남아있다. code==='RECONNECT_REQUIRED' 안내를
+  // 놓치지 않으려면(401로 오므로) 이 바디까지 읽어야 한다. 못 읽으면(구조가
+  // 다르거나 이미 소비됨) null로 취급해 일반 오류 메시지로 폴백한다.
+  function readInvokeErrorBody(error){
+    if(error && error.context && typeof error.context.json === 'function'){
+      return error.context.json().catch(function(){ return null; });
+    }
+    return Promise.resolve(null);
+  }
+  function showSyncFailureToast(body, fallbackMessage){
+    if(body && body.code === 'RECONNECT_REQUIRED'){
+      // access_token/refresh_token은 이 응답에 애초에 담겨오지 않는다
+      // (Edge Function이 절대 반환하지 않음) — 화면/로그 어디에도 노출할
+      // 게 없다. 이번 단계에서는 재연결 모달을 자동으로 열지 않는다.
+      showToast('Cafe24 인증이 만료되었습니다. 다시 연결해주세요.', 'error');
+      return;
+    }
+    showToast((body && body.error) || fallbackMessage || '주문 동기화에 실패했어요', 'error');
+  }
+
+  function syncCafe24Orders(storeId){
+    if(!storeId || cafe24SyncInFlightStoreIds[storeId]) return; // 이미 진행 중이면 무시(방어적 가드 — 버튼 자체도 disabled됨)
+    var sb = client();
+    if(!sb || !currentUserId) return;
+
+    // 응답이 왔을 때 "그 사이 로그아웃했거나 다른 계정으로 바뀌지 않았는지"
+    // 재확인하는 기준 — launchdeskStore.onChange가 로그인/로그아웃마다
+    // requestSeq를 올려주므로, 응답 처리 직전에 이 값이 그대로인지만
+    // 확인하면 A 계정의 늦은 응답이 B 계정 화면에 반영되는 사고를 막는다.
+    var seqAtStart = requestSeq;
+
+    cafe24SyncInFlightStoreIds[storeId] = true;
+    render();
+
+    sb.functions.invoke('cafe24-orders-sync', {
+      body: { store_id: storeId }
+    }).then(function(res){
+      if(seqAtStart !== requestSeq) return; // 그 사이 계정이 바뀜 — 이 응답은 버린다
+      delete cafe24SyncInFlightStoreIds[storeId];
+
+      if(res.error){
+        return readInvokeErrorBody(res.error).then(function(body){
+          if(seqAtStart !== requestSeq) return; // context.json() 대기 중에도 계정이 바뀌었을 수 있음
+          render();
+          showSyncFailureToast(body, res.error.message);
+        });
+      }
+
+      var data = res.data;
+      if(!data || data.ok !== true){
+        render();
+        showSyncFailureToast(data, null);
+        return;
+      }
+
+      render(); // 버튼부터 즉시 다시 활성화
+      var fetched = typeof data.fetched === 'number' ? data.fetched : null;
+      showToast(
+        fetched !== null
+          ? '주문 동기화가 완료되었습니다. ' + fetched + '건을 확인했습니다.'
+          : '주문 동기화가 완료되었습니다.',
+        'success'
+      );
+
+      // last_synced_at을 화면에 최신으로 반영 — 전체 새로고침 없이
+      // connected_accounts만 다시 조회한다(기존 fetchConnectedAccounts를
+      // 그대로 재사용, 같은 seq 가드가 여기서도 그대로 적용된다).
+      fetchConnectedAccounts(seqAtStart);
+    }).catch(function(err){
+      if(seqAtStart !== requestSeq) return;
+      delete cafe24SyncInFlightStoreIds[storeId];
+      render();
+      showToast('주문 동기화 중 오류가 발생했어요', 'error');
+      console.warn('[launchdesk] cafe24-orders-sync 호출 중 오류:', err && err.message);
+    });
+  }
 
   if(cafe24Form) cafe24Form.addEventListener('submit', function(e){
     e.preventDefault();
