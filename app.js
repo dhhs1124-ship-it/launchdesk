@@ -273,6 +273,9 @@
   document.getElementById('loginModalClose').addEventListener('click', closeLoginModal);
   document.getElementById('loginModalBackdrop').addEventListener('click', closeLoginModal);
   document.getElementById('loginNoticeClose').addEventListener('click', closeLoginModal);
+  // 카카오/Google 로그인은 아직 미구현이라, 실제 동작하지 않는 버튼이 화면에
+  // 남아있지 않도록 index.html에서 완전히 제거했다(UI polish pass) — 그
+  // 버튼에 연결하던 리스너도 함께 정리한다.
   loginForm.addEventListener('submit', function(e){
     e.preventDefault();
     var sb = window.launchdeskSupabase;
@@ -312,7 +315,6 @@
       }).catch(function(err){ pendingFreshLogin = false; reenable(); showToast(getAuthErrorMessage(err)); });
     }
   });
-  document.querySelectorAll('.login-social').forEach(function(b){ b.addEventListener('click', function(){ showLoginNotice(); }); });
   loginToSignup.addEventListener('click', function(e){
     e.preventDefault();
     loginMode = (loginMode === 'signup') ? 'login' : 'signup';
@@ -1286,29 +1288,9 @@
     update();
   });
 
-  /* floating subscribe banner — shows fixed at the bottom of the
-     viewport while browsing the chapter list, and hides itself the
-     moment the real banner (at its natural end-of-page position)
-     scrolls into view, so it "docks" instead of floating over the
-     content below it. Only active while /start is the visible view. */
-  var subBanner = document.getElementById('subBanner');
-  var subBannerFloat = document.getElementById('subBannerFloat');
-  if(subBanner && subBannerFloat && 'IntersectionObserver' in window){
-    var subBannerObserver = new IntersectionObserver(function(entries){
-      var entry = entries[0];
-      var onStartView = !document.getElementById('view-start').hidden;
-      subBannerFloat.classList.toggle('show', onStartView && !entry.isIntersecting);
-    }, {threshold: 0});
-    subBannerObserver.observe(subBanner);
-    window.addEventListener('hashchange', function(){
-      // right after navigating, scrollTo(0,0) has just run — if we're
-      // on /start the real banner (near page bottom) can't be visible
-      // yet, so show the float immediately rather than waiting on the
-      // observer's next callback; leaving /start always hides it.
-      var onStartView = !document.getElementById('view-start').hidden;
-      subBannerFloat.classList.toggle('show', onStartView);
-    });
-  }
+  // 스크롤 시 뜨던 플로팅 "세팅 대행" 배너(subBannerFloat)는 제거했다
+  // (UI polish pass — 정적 배너와 중복 CTA였음). 정적 배너(subBanner)는
+  // 그대로 유지, 다른 플로팅 UI(토스트/모달/라이트박스)는 영향 없음.
 
   render(); // initial paint
 })();

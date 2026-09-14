@@ -70,7 +70,6 @@
 
   .profile-card{display:flex; align-items:center; gap:.7rem; padding:.5rem .6rem; margin-bottom:.7rem; cursor:pointer;}
   .profile-avatar{position:relative; width:36px; height:36px; border-radius:50%; background:var(--gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--f-display); font-weight:700; font-size:.95rem; flex:0 0 auto;}
-  .profile-avatar .pulse-dot{position:absolute; right:-1px; bottom:-1px; border:2px solid var(--sidebar-bg);}
   .profile-name{font-size:.88rem; font-weight:700; color:var(--ink);}
   .profile-day{font-family:var(--f-mono); font-size:.68rem; color:var(--ink-faint); margin-top:.1rem;}
   .progress-mini{padding:0 .6rem 1.1rem; border-bottom:1px solid var(--border); margin-bottom:.7rem;}
@@ -122,12 +121,6 @@
   .stagger-in{animation:staggerIn .3s cubic-bezier(.22,.61,.36,1) both; animation-delay:calc(var(--stagger-i,0) * 50ms);}
   @keyframes staggerIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;} }
   @media (prefers-reduced-motion:reduce){ .stagger-in{animation:none;} }
-
-  /* ---------------- online/live pulse dot ---------------- */
-  .pulse-dot{position:relative; width:8px; height:8px; border-radius:50%; background:var(--badge-c); flex:0 0 auto;}
-  .pulse-dot::after{content:""; position:absolute; inset:-4px; border-radius:50%; background:var(--badge-c); opacity:.4; animation:pulseDot 1.8s ease-out infinite;}
-  @keyframes pulseDot{ 0%{transform:scale(.6); opacity:.5;} 100%{transform:scale(1.9); opacity:0;} }
-  @media (prefers-reduced-motion:reduce){ .pulse-dot::after{animation:none; display:none;} }
 
   /* ---------------- empty state ---------------- */
   .empty-state{text-align:center; padding:3.2rem 1rem; color:var(--ink-faint);}
@@ -228,10 +221,6 @@
   .sub-banner .sb-desc{font-size:.85rem; color:rgba(255,255,255,.7);}
   .sub-banner .btn-primary{flex:0 0 auto;}
 
-  .sub-banner-float{position:fixed; left:calc(var(--sidebar-w) + 1.6rem); right:1.6rem; bottom:1.1rem; z-index:55; max-width:1032px; margin:0 auto; box-shadow:0 18px 40px -12px rgba(28,26,22,.45); opacity:0; transform:translateY(10px); pointer-events:none; transition:opacity .2s ease, transform .2s ease;}
-  .sub-banner-float.show{opacity:1; transform:none; pointer-events:auto;}
-  @media (max-width:960px){ .sub-banner-float{left:1rem; right:1rem;} }
-  @media (max-width:640px){ .sub-banner-float{flex-direction:column; align-items:stretch; text-align:center;} .sub-banner-float .btn-primary{width:100%; justify-content:center;} }
 
   /* ---------------- chapter body ---------------- */
   .breadcrumb{display:flex; align-items:center; gap:.5rem; font-family:var(--f-mono); font-size:.75rem; color:var(--ink-faint); margin-bottom:1.1rem;}
@@ -284,9 +273,6 @@
   .modal-head h2{font-size:1.2rem;}
   .modal-head p{font-size:.85rem; margin-top:.4rem;}
   #loginForm{display:flex; flex-direction:column; gap:1rem;}
-  .modal-divider{display:flex; align-items:center; gap:.8rem; margin:1.3rem 0; font-size:.76rem; color:var(--ink-faint);}
-  .modal-divider::before, .modal-divider::after{content:""; flex:1; height:1px; background:var(--border);}
-  .modal-social{display:flex; flex-direction:column; gap:.7rem;}
   .modal-foot{text-align:center; font-size:.82rem; color:var(--ink-soft); margin-top:1.4rem;}
   .modal-foot a{color:var(--accent-ink); font-weight:600;}
   .modal-notice{text-align:center;}
@@ -492,7 +478,6 @@
   .resource-card:hover{transform:translateY(-2px); border-color:var(--border-strong); box-shadow:0 14px 28px -20px var(--accent-shadow);}
   .resource-card.soon{opacity:.7;}
   .rc-top{display:flex; align-items:center; justify-content:space-between;}
-  .rc-icon{font-size:1.3rem;}
   .resource-card h3{font-size:.98rem; font-weight:700;}
   .resource-card p{font-size:.83rem; margin:0;}
   .rc-action{margin-top:auto; font-size:.84rem; font-weight:700; color:var(--accent-ink); align-self:flex-start; background:none; border:none; cursor:pointer; font-family:var(--f-body); padding:0;}
