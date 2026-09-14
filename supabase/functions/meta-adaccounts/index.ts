@@ -3,10 +3,8 @@ import { withSupabase } from "jsr:@supabase/server@^1";
 import {
   getValidMetaAccessToken,
   metaTokenErrorStatus,
+  fetchAllMetaAdAccounts,
 } from "../_shared/meta-token.ts";
-
-const GRAPH_API_VERSION = "v21.0";
-const FIELDS = "id,name,account_status,currency,timezone_name";
 
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
@@ -52,47 +50,24 @@ export default {
         );
       }
 
-      // Meta 실제 API 호출 — 이 사용자가 접근 가능한 광고계정 목록.
+      // Meta 실제 API 호출 — 이 사용자가 접근 가능한 광고계정 전체 목록을
+      // 페이지 끝까지 순회한다(첫 페이지만 보면 일부를 놓칠 수 있음).
       // access_token은 쿼리 파라미터가 아니라 Authorization 헤더로 보내
-      // (서버↔Meta 간 호출이라도) 어떤 로그에도 남지 않게 한다.
-      const adAccountsUrl = new URL(
-        `https://graph.facebook.com/${GRAPH_API_VERSION}/me/adaccounts`
-      );
-      adAccountsUrl.searchParams.set("fields", FIELDS);
+      // (서버↔Meta 간 호출이라도) 어떤 로그에도 남지 않게 한다 — 이 규칙은
+      // fetchAllMetaAdAccounts 내부에서 지킨다.
+      const result = await fetchAllMetaAdAccounts(tokenResult.accessToken);
 
-      const metaResponse = await fetch(adAccountsUrl.toString(), {
-        headers: {
-          Authorization: `Bearer ${tokenResult.accessToken}`,
-        },
-      });
-
-      const metaData = await metaResponse.json();
-
-      if (!metaResponse.ok) {
-        console.error(
-          "Meta adaccounts API failed:",
-          metaResponse.status,
-          metaData?.error?.message
-        );
-
+      if (!result.ok) {
+        // access_token/내부 정보는 절대 포함하지 않고, message와(있다면)
+        // code(예: META_ADACCOUNTS_PAGE_LIMIT)만 안전하게 프론트에 전달한다.
         return Response.json(
-          { error: "Meta 광고계정 목록을 가져오지 못했습니다." },
-          { status: 502 }
+          { error: result.message, code: result.code },
+          { status: result.status }
         );
       }
 
-      const rawAccounts = Array.isArray(metaData?.data) ? metaData.data : [];
-
-      // 안전한 메타데이터만 추려서 반환 — access_token은 절대 포함하지 않음.
-      const adAccounts = rawAccounts.map((a: any) => ({
-        id: a.id,
-        name: a.name ?? a.id,
-        account_status: a.account_status ?? null,
-        currency: a.currency ?? null,
-        timezone_name: a.timezone_name ?? null,
-      }));
-
-      return Response.json({ ok: true, ad_accounts: adAccounts });
+      // 안전한 메타데이터만 반환 — access_token은 절대 포함하지 않음.
+      return Response.json({ ok: true, ad_accounts: result.accounts });
     } catch (error) {
       console.error(
         "Meta adaccounts error:",

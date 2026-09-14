@@ -3,10 +3,8 @@ import { withSupabase } from "jsr:@supabase/server@^1";
 import {
   getValidMetaAccessToken,
   metaTokenErrorStatus,
+  findMetaAdAccount,
 } from "../_shared/meta-token.ts";
-
-const GRAPH_API_VERSION = "v21.0";
-const FIELDS = "id,name,account_status,currency,timezone_name";
 
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
@@ -60,39 +58,26 @@ export default {
       }
 
       // 2. 클라이언트가 보낸 ad_account_id를 그대로 믿지 않고, Meta API로
-      //    이 사용자가 실제로 접근 가능한 광고계정 목록을 다시 조회해
-      //    그 안에 포함돼 있는지 재검증한다 — 이래야 다른 사람의
-      //    광고계정 ID를 임의로 넣어 연결하는 걸 막을 수 있다.
-      const adAccountsUrl = new URL(
-        `https://graph.facebook.com/${GRAPH_API_VERSION}/me/adaccounts`
+      //    이 사용자가 실제로 이 광고계정에 접근 가능한지 재검증한다 — 이래야
+      //    다른 사람의 광고계정 ID를 임의로 넣어 연결하는 걸 막을 수 있다.
+      //    findMetaAdAccount는 페이지를 넘기다가 이 ad_account_id를 찾는
+      //    즉시 멈춘다 — 전체 목록을 무조건 다 모을 필요는 없고(목록 화면과
+      //    달리 여기선 이 하나만 확인하면 된다), 못 찾은 채로 페이지 상한에
+      //    걸리면(뒤 페이지에 있을 수도 있어 "권한 없음"이라 단정 못 함)
+      //    fetchAllMetaAdAccounts와 동일하게 명시적 오류를 낸다.
+      const result = await findMetaAdAccount(
+        tokenResult.accessToken,
+        String(ad_account_id)
       );
-      adAccountsUrl.searchParams.set("fields", FIELDS);
 
-      const metaResponse = await fetch(adAccountsUrl.toString(), {
-        headers: {
-          Authorization: `Bearer ${tokenResult.accessToken}`,
-        },
-      });
-
-      const metaData = await metaResponse.json();
-
-      if (!metaResponse.ok) {
-        console.error(
-          "Meta adaccounts API failed:",
-          metaResponse.status,
-          metaData?.error?.message
-        );
-
+      if (!result.ok) {
         return Response.json(
-          { error: "Meta 광고계정 목록을 확인하지 못했습니다." },
-          { status: 502 }
+          { error: result.message, code: result.code },
+          { status: result.status }
         );
       }
 
-      const rawAccounts = Array.isArray(metaData?.data) ? metaData.data : [];
-      const match = rawAccounts.find(
-        (a: any) => a.id === ad_account_id
-      );
+      const match = result.account;
 
       if (!match) {
         return Response.json(

@@ -145,6 +145,17 @@
   var metaAccountsByStoreId = {};
   var metaModalConnectedAccountId = null; // 지금 광고계정 선택 모달이 대상으로 하는 connected_accounts.id
   var metaAdAccountsCache = []; // 모달이 마지막으로 조회한 광고계정 목록(선택 변경 시 통화/시간대 갱신용)
+  // Meta 광고계정 모달 전용 세대(generation) — 전역 requestSeq와 별도로 둔다.
+  // 모달을 열 때마다(openMetaModal) +1, 닫을 때(closeMetaModal)도 +1 해서
+  // 그 시점까지 나가 있던 목록 조회/제출 요청의 응답을 전부 무효화한다.
+  // "A 매장 모달을 열고 요청이 나간 사이 모달을 닫고 B 매장 모달을 열면,
+  // A의 늦은 응답이 B 모달을 덮어쓸 수 있다"는 문제를 막기 위함 — 응답을
+  // 적용하기 직전에 그 요청을 시작할 때 캡처해둔 세대가 지금 세대와 같은지,
+  // 그리고 그 요청이 겨냥했던 connected_account_id가 지금 모달의 대상과
+  // 같은지 둘 다 확인한다. hydrateFromSession()의 세션 변경 처리도
+  // closeMetaModal()을 호출해 같은 방식으로 무효화한다(로그아웃/계정 전환 시
+  // 이전 사용자의 광고계정 목록이 한 프레임도 보이지 않도록).
+  var metaModalGeneration = 0;
   // 지금 해제 요청이 나가 있는 connected_accounts.id(Meta) 모음 — 카드별로
   // [연결 해제] 버튼을 따로 잠그고 중복 클릭을 막기 위함.
   var metaDisconnectInFlightIds = {};
@@ -394,6 +405,7 @@
       cafe24SyncInFlightStoreIds = {};
       metaAccountsByStoreId = {};
       metaDisconnectInFlightIds = {};
+      closeMetaModal(); // 열려 있던 Meta 모달/대상/캐시/제출 상태까지 전부 정리(요구사항 3)
       render();
       return;
     }
@@ -409,6 +421,7 @@
         cafe24SyncInFlightStoreIds = {}; // 이전 사용자 몫으로 걸려있던 "동기화 중" 잠금도 함께 정리
         metaAccountsByStoreId = {};
         metaDisconnectInFlightIds = {};
+        closeMetaModal(); // A 사용자의 열린 모달/광고계정 목록이 B 사용자에게 한 프레임도 보이지 않게
         render();
         fetchStores(user.id, seq);
         fetchConnectedAccounts(seq);
@@ -421,6 +434,7 @@
         cafe24SyncInFlightStoreIds = {};
         metaAccountsByStoreId = {};
         metaDisconnectInFlightIds = {};
+        closeMetaModal(); // 로그아웃 시에도 동일하게 정리
         render();
       }
     });
@@ -706,6 +720,8 @@
 
   function openMetaModal(connectedAccountId){
     if(!connectedAccountId) return;
+    metaModalGeneration += 1; // 새 세대 발급 — 이전에 열려 있던(또는 닫힌) 모달의 응답은 이제부터 전부 무효
+    var myGeneration = metaModalGeneration;
     metaModalConnectedAccountId = connectedAccountId;
     metaAdAccountsCache = [];
     metaSelect.innerHTML = '';
@@ -714,16 +730,25 @@
 
     var sb = client();
     if(!sb) return;
-    var seqAtOpen = requestSeq; // 목록 조회 중 계정이 바뀌면 결과를 버리기 위한 가드
+
+    // 응답을 반영하기 직전에 세대와 대상 connected_account_id를 둘 다
+    // 확인한다 — 그 사이 모달이 닫히거나(세대 증가) 다른 매장으로 다시
+    // 열렸으면(세대가 같아 보여도 대상이 다를 수 있는 극단적 경우까지 방어)
+    // 이 응답은 버린다. A 매장의 늦은 응답이 B 매장 모달을 덮어쓰는 것과,
+    // 세션이 바뀐 뒤(closeMetaModal이 세대를 올림) 이전 사용자의 응답이
+    // 새 사용자 화면에 반영되는 것을 둘 다 막는다.
+    function isStale(){
+      return myGeneration !== metaModalGeneration || connectedAccountId !== metaModalConnectedAccountId;
+    }
 
     sb.functions.invoke('meta-adaccounts', {
       body: { connected_account_id: connectedAccountId }
     }).then(function(res){
-      if(seqAtOpen !== requestSeq) return;
+      if(isStale()) return;
 
       if(res.error){
         return readInvokeErrorBody(res.error).then(function(body){
-          if(seqAtOpen !== requestSeq) return;
+          if(isStale()) return;
           closeMetaModal();
           showMetaFailureToast(body, res.error.message);
         });
@@ -753,15 +778,18 @@
       updateMetaAccountDetail();
       setMetaModalStep('form');
     }).catch(function(err){
-      if(seqAtOpen !== requestSeq) return;
+      if(isStale()) return;
       closeMetaModal();
       showToast('Meta 광고계정 조회 중 오류가 발생했어요', 'error');
       console.warn('[launchdesk] meta-adaccounts 호출 중 오류:', err && err.message);
     });
   }
   function closeMetaModal(){
+    metaModalGeneration += 1; // 지금까지 나가 있던 목록 조회/제출 응답을 전부 무효화
     metaModal.classList.remove('open');
     metaForm.reset();
+    metaSelect.innerHTML = ''; // reset()은 <select>의 동적 옵션 자체는 지우지 않음 — 선택값 잔재 제거
+    metaSubmitBtn.disabled = false; // 다음에 모달을 열 때 항상 정상 상태로 시작
     metaModalConnectedAccountId = null;
     metaAdAccountsCache = [];
   }
@@ -777,18 +805,26 @@
     var sb = client();
     if(!sb) return;
 
-    var seqAtStart = requestSeq;
+    // 목록 조회와 동일하게 모달 세대 + 대상 connected_account_id로 가드
+    // 한다(요구사항 2, 3) — 제출 중에 모달이 닫히거나(세대 증가) 세션이
+    // 바뀌면(closeMetaModal이 세대를 올림) 이 응답을 무시한다.
+    var myGeneration = metaModalGeneration;
+    var targetConnectedAccountId = metaModalConnectedAccountId;
+    function isStale(){
+      return myGeneration !== metaModalGeneration || targetConnectedAccountId !== metaModalConnectedAccountId;
+    }
+
     metaSubmitBtn.disabled = true;
 
     sb.functions.invoke('meta-account-select', {
-      body: { connected_account_id: metaModalConnectedAccountId, ad_account_id: adAccountId }
+      body: { connected_account_id: targetConnectedAccountId, ad_account_id: adAccountId }
     }).then(function(res){
-      if(seqAtStart !== requestSeq) return;
+      if(isStale()) return;
       metaSubmitBtn.disabled = false;
 
       if(res.error){
         return readInvokeErrorBody(res.error).then(function(body){
-          if(seqAtStart !== requestSeq) return;
+          if(isStale()) return;
           showMetaFailureToast(body, res.error.message);
         });
       }
@@ -803,9 +839,11 @@
       showToast('Meta 광고계정이 연결되었습니다.', 'success');
       // 카드의 "Meta 광고" 표시를 최신 상태로 반영 — 전체 새로고침 없이
       // connected_accounts만 다시 조회한다(기존 fetchMetaAccounts 재사용).
-      fetchMetaAccounts(seqAtStart);
+      // 여기 도달했다는 것 자체가 세션이 안 바뀌었다는 뜻이므로(바뀌었다면
+      // isStale()이 위에서 이미 걸렀다) 지금 시점의 requestSeq를 그대로 쓴다.
+      fetchMetaAccounts(requestSeq);
     }).catch(function(err){
-      if(seqAtStart !== requestSeq) return;
+      if(isStale()) return;
       metaSubmitBtn.disabled = false;
       showToast('광고계정 연결 중 오류가 발생했어요', 'error');
       console.warn('[launchdesk] meta-account-select 호출 중 오류:', err && err.message);

@@ -15,6 +15,31 @@ function goBack(status: string) {
   );
 }
 
+// integration_credentials에 Meta access token을 upsert — "재연결(기존 행
+// 있음)"과 "최초 연결(새 행)" 두 분기가 동일하게 쓴다(코드리뷰 지적 5).
+// deno-lint-ignore no-explicit-any
+async function saveMetaCredential(
+  supabaseAdmin: any,
+  connectedAccountId: number,
+  accessToken: string,
+  accessTokenExpiresAt: string | null
+) {
+  // Meta는 refresh_token 개념이 없으므로 그 컬럼들은 NULL로 남긴다(Cafe24와의
+  // 스키마 공유 지점 — integration_credentials.refresh_token이 NOT NULL이면
+  // 이 upsert가 실패한다. 첫 번째 완료 보고의 DB 확인 사항 참고).
+  return await supabaseAdmin.from("integration_credentials").upsert(
+    {
+      connected_account_id: connectedAccountId,
+      access_token: accessToken,
+      refresh_token: null,
+      access_token_expires_at: accessTokenExpiresAt,
+      refresh_token_expires_at: null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "connected_account_id" }
+  );
+}
+
 export default {
   // 외부(Meta)가 직접 호출하는 callback이라 Cafe24 callback과 동일한
   // 이유로 JWT Verify를 꺼야 한다(로그인 사용자의 브라우저 세션이 아니라
@@ -38,36 +63,52 @@ export default {
         });
       }
 
-      // 1. LaunchDesk가 발급한 OAuth state인지 확인(Cafe24와 동일한
-      //    oauth_states 테이블, provider만 'meta')
-      const { data: oauthState, error: stateError } =
+      // 1. LaunchDesk가 발급한 OAuth state를 원자적으로 "claim"한다(코드리뷰
+      //    지적 1). 예전처럼 SELECT로 조회해 조건을 확인한 뒤 나중에
+      //    UPDATE로 used_at을 찍는 방식은, 같은 state로 콜백이 동시에 두 번
+      //    들어오면(중복 탭, 재전송 등) 둘 다 "아직 사용 안 됨" 상태를 보고
+      //    검증을 통과해버릴 수 있다(TOCTOU race). 대신 UPDATE ... WHERE
+      //    provider='meta' AND used_at IS NULL AND expires_at > now() ...
+      //    RETURNING을 한 번에 실행해, 조건을 만족하는 행을 "찾는 것"과
+      //    "사용 처리하는 것"을 하나의 원자적 연산으로 합친다. 같은 state에
+      //    대해 두 요청이 동시에 이 UPDATE를 실행해도 Postgres가 행 잠금으로
+      //    둘을 직렬화하므로, 먼저 커밋된 요청만 실제로 행을 갱신해 결과를
+      //    돌려받고(=이 요청만 claim 성공), 나중 요청은 그 시점엔 이미
+      //    used_at이 채워져 있어 조건에 안 걸려 0행(= null)을 받는다 — 두
+      //    요청이 동시에 통과할 수 없다.
+      const nowIso = new Date().toISOString();
+
+      const { data: oauthState, error: claimError } =
         await ctx.supabaseAdmin
           .from("oauth_states")
-          .select("state,user_id,store_id,provider,expires_at,used_at")
+          .update({ used_at: nowIso })
           .eq("state", state)
           .eq("provider", "meta")
+          .is("used_at", null)
+          .gt("expires_at", nowIso)
+          .select("store_id")
           .maybeSingle();
 
-      if (stateError || !oauthState) {
-        return new Response("Invalid OAuth state.", {
-          status: 400,
-        });
+      if (claimError) {
+        console.error("Meta OAuth state claim error:", claimError.message);
+        return goBack("server_error");
       }
 
-      if (oauthState.used_at) {
-        return new Response("OAuth state already used.", {
-          status: 400,
-        });
+      if (!oauthState) {
+        // state가 없거나, 이미 사용됐거나, 만료됐거나, provider가 다름 —
+        // 원자적 claim이라 어느 사유인지 별도로 다시 조회해 구분하지 않는다
+        // (그러려면 이 판단 이후에 다시 SELECT해야 하는데, 그 사이 다른
+        // 요청이 먼저 claim해갈 수 있어 의미가 없다). 이 응답은 정상 사용자
+        // 흐름에서는 나오지 않고, 위조/재전송/만료된 리다이렉트에서만 보인다.
+        return new Response(
+          "Invalid, expired, or already-used OAuth state.",
+          { status: 400 }
+        );
       }
 
-      if (
-        new Date(oauthState.expires_at).getTime() <= Date.now()
-      ) {
-        return new Response("OAuth state expired.", {
-          status: 400,
-        });
-      }
-
+      // claim에 성공한 이 요청만 아래로 진행한다. 이후 token exchange가
+      // 실패해도 state를 다시 쓸 수 있게 되돌리지 않는다 — 사용자는 [Meta
+      // 광고 연결]부터 처음부터 다시 시작하면 된다(요구사항 1).
       const appId = Deno.env.get("META_APP_ID");
       const appSecret = Deno.env.get("META_APP_SECRET");
 
@@ -130,11 +171,7 @@ export default {
         ? new Date(Date.now() + expiresInSec * 1000).toISOString()
         : null;
 
-      // 4. 기존 Meta 연결이 있는지 확인 — 있으면 재인증으로 취급해
-      //    'pending'으로 되돌린다(이전에 고른 광고계정이 이번 로그인
-      //    권한 범위에도 여전히 포함되는지 보장할 수 없으므로, 다시
-      //    선택하게 한다). external_account_id/display_name도 함께
-      //    비운다.
+      // 4. 기존 Meta 연결이 있는지 확인.
       const { data: existingAccounts, error: existingError } =
         await ctx.supabaseAdmin
           .from("connected_accounts")
@@ -150,8 +187,32 @@ export default {
       let connectedAccountId: number;
 
       if (existingAccounts && existingAccounts.length > 0) {
+        // 재연결 — 기존에 정상 동작하던 연결(status='connected',
+        // external_account_id/display_name)이 있을 수 있다. 새 token
+        // 저장을 먼저 성공시킨 뒤에만 그 행을 pending으로 전환한다
+        // (코드리뷰 지적 5). 순서를 반대로 하면(먼저 pending으로 바꾸고
+        // 나중에 credential을 저장) credential 저장이 실패했을 때 이미 잘
+        // 동작하던 기존 연결까지 함께 망가진다 — connected_account_id는
+        // 이미 알고 있으므로(기존 행) FK 문제 없이 이 순서로 저장 가능.
         connectedAccountId = existingAccounts[0].id;
 
+        const { error: credentialError } = await saveMetaCredential(
+          ctx.supabaseAdmin,
+          connectedAccountId,
+          accessToken,
+          accessTokenExpiresAt
+        );
+
+        if (credentialError) {
+          // 새 token 저장에 실패했다 — 기존 connected_accounts 행은 전혀
+          // 건드리지 않았으므로, 기존 연결은 그대로 살아있다.
+          throw credentialError;
+        }
+
+        // token 저장이 성공한 뒤에만 'pending'으로 전환한다(이전에 고른
+        // 광고계정이 이번 로그인 권한 범위에도 여전히 포함되는지 보장할 수
+        // 없으므로, 다시 선택하게 한다). external_account_id/display_name도
+        // 함께 비운다.
         const { error } = await ctx.supabaseAdmin
           .from("connected_accounts")
           .update({
@@ -164,6 +225,9 @@ export default {
 
         if (error) throw error;
       } else {
+        // 최초 연결 — 보호할 기존 상태가 없으므로 순서가 안전에 영향을
+        // 주지 않는다. integration_credentials.connected_account_id는 FK라
+        // connected_accounts 행을 먼저 만들어 id를 확보해야 한다.
         const { data, error } = await ctx.supabaseAdmin
           .from("connected_accounts")
           .insert({
@@ -179,48 +243,23 @@ export default {
         }
 
         connectedAccountId = data.id;
-      }
 
-      // 5. Access Token을 서버 전용 테이블에 저장. Meta는 refresh_token
-      //    개념이 없으므로 그 컬럼들은 NULL로 남긴다(Cafe24와의 스키마
-      //    공유 지점 — integration_credentials.refresh_token이 NOT NULL
-      //    이면 이 upsert가 실패한다. 완료 보고의 DB 확인 사항 참고).
-      const { error: credentialError } =
-        await ctx.supabaseAdmin
-          .from("integration_credentials")
-          .upsert(
-            {
-              connected_account_id: connectedAccountId,
-              access_token: accessToken,
-              refresh_token: null,
-              access_token_expires_at: accessTokenExpiresAt,
-              refresh_token_expires_at: null,
-              updated_at: new Date().toISOString(),
-            },
-            {
-              onConflict: "connected_account_id",
-            }
-          );
+        const { error: credentialError } = await saveMetaCredential(
+          ctx.supabaseAdmin,
+          connectedAccountId,
+          accessToken,
+          accessTokenExpiresAt
+        );
 
-      if (credentialError) {
-        throw credentialError;
-      }
-
-      // 6. state 재사용 방지
-      const { error: usedError } = await ctx.supabaseAdmin
-        .from("oauth_states")
-        .update({
-          used_at: new Date().toISOString(),
-        })
-        .eq("state", state);
-
-      if (usedError) {
-        throw usedError;
+        if (credentialError) {
+          throw credentialError;
+        }
       }
 
       // 광고계정은 아직 선택되지 않았다(status='pending') — 실제 선택은
       // LaunchDesk 화면에서 meta-adaccounts/meta-account-select를 통해
-      // 이어서 진행된다. 토큰은 절대 브라우저로 반환하지 않음.
+      // 이어서 진행된다. 토큰은 절대 브라우저로 반환하지 않음. state는 위
+      // 1번 claim 시점에 이미 used 처리됐으므로 여기서 다시 건드리지 않는다.
       return goBack("connected");
     } catch (error) {
       console.error(
