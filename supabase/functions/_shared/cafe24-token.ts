@@ -66,6 +66,49 @@ export type Cafe24TokenResult =
       message: string;
     };
 
+// Cafe24 토큰 응답의 만료 시각(access_token_expires_at, refresh_token_expires_at)은
+// 타임존 오프셋 없이 "YYYY-MM-DD HH:mm:ss"(또는 T 구분자) 형태로 온다 — 이 값은
+// UTC가 아니라 Cafe24 기준 KST(Asia/Seoul, UTC+9)다. 오프셋 없는 문자열을 그대로
+// timestamptz 컬럼에 넣으면 Postgres가 UTC로 해석해 실제보다 9시간 늦게(미래로)
+// 저장되고, 그 사이 이미 만료된 access_token을 isStillValid()가 "아직 유효"로
+// 오판해 Cafe24 API가 401(access_token time expired)을 반환한다 — 실제로 발생한
+// 버그. cafe24-orders-sync의 normalizeCafe24Date()(주문일자용)와 같은 이유의
+// 보정을 여기서도 저장 직전에 적용한다.
+//
+// - 이미 오프셋(+09:00 등)이나 'Z'가 붙어 있으면 그대로 파싱만 한다(중복으로
+//   -9시간 보정하지 않기 위함 — Cafe24가 나중에 포맷을 바꿔도 안전).
+// - 오프셋이 없으면 KST로 해석해 정확한 UTC 순간의 ISO 문자열로 변환한다.
+// - 숫자(초 단위 TTL, 예: expires_in)면 "지금부터 N초 후"로 계산한다(기존 의미 유지
+//   — 이 필드는 애초에 타임존과 무관한 상대값이라 보정 대상이 아니다).
+export function normalizeCafe24ExpiresAt(
+  value: string | number | null | undefined
+): string | null {
+  if (value === null || value === undefined || value === "") return null;
+
+  if (typeof value === "number") {
+    return Number.isFinite(value)
+      ? new Date(Date.now() + value * 1000).toISOString()
+      : null;
+  }
+
+  // 오프셋(Z 또는 +hh:mm/-hh:mm)이 이미 있으면 그대로 파싱만 한다.
+  if (/(Z|[+-]\d{2}:?\d{2})$/.test(value)) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
+  // "YYYY-MM-DD HH:mm:ss" 또는 "YYYY-MM-DDTHH:mm:ss"(밀리초 optional) — 오프셋
+  // 없음 → Cafe24 기준 KST로 해석.
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value)) {
+    const d = new Date(value.replace(" ", "T") + "+09:00");
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
+  // 알 수 없는 형식 — 무리하게 보정하지 않고 있는 그대로 파싱만 시도한다.
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 function isStillValid(expiresAt: string | null): boolean {
   if (!expiresAt) return false;
   const expiresAtMs = new Date(expiresAt).getTime();
@@ -212,8 +255,10 @@ export async function getValidCafe24AccessToken(
     .update({
       access_token: newTokens.access_token,
       refresh_token: newTokens.refresh_token,
-      access_token_expires_at: newTokens.expires_at,
-      refresh_token_expires_at: newTokens.refresh_token_expires_at,
+      access_token_expires_at: normalizeCafe24ExpiresAt(newTokens.expires_at),
+      refresh_token_expires_at: normalizeCafe24ExpiresAt(
+        newTokens.refresh_token_expires_at
+      ),
       updated_at: new Date().toISOString(),
     })
     .eq("connected_account_id", connectedAccountId);

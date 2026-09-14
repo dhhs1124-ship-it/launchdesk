@@ -54,6 +54,17 @@
   var cafe24MallIdInput = document.getElementById('cafe24MallId');
   var cafe24SubmitBtn = document.getElementById('cafe24ConnectSubmit');
 
+  var metaModal = document.getElementById('metaAdAccountModal');
+  var metaBackdrop = document.getElementById('metaAdAccountBackdrop');
+  var metaClose = document.getElementById('metaAdAccountClose');
+  var metaLoading = document.getElementById('metaAdAccountLoading');
+  var metaEmpty = document.getElementById('metaAdAccountEmpty');
+  var metaForm = document.getElementById('metaAdAccountForm');
+  var metaSelect = document.getElementById('metaAdAccountSelect');
+  var metaCurrencyEl = document.getElementById('metaAdAccountCurrency');
+  var metaTimezoneEl = document.getElementById('metaAdAccountTimezone');
+  var metaSubmitBtn = document.getElementById('metaAdAccountSubmit');
+
   // showToast: app.js/tools.js와 동일한 방식으로 이 파일 안에서 따로
   // 둔다(각자 다른 최상위 IIFE라 함수를 공유할 수 없음 — tools.js의 같은
   // 주석 참고).
@@ -126,29 +137,59 @@
   // 지금 주문 동기화 요청이 나가 있는 store.id 모음 — 쇼핑몰별로 버튼을
   // 따로 잠그기 위함(A 동기화 중이라고 B 버튼까지 잠기면 안 됨).
   var cafe24SyncInFlightStoreIds = {};
+  // provider='meta'인 connected_accounts 행을 store_id별로 — { id,
+  // status('pending'|'connected'), external_account_id, display_name }.
+  // Cafe24와 달리 status가 'connected'가 아닌 값(pending)도 화면에서
+  // 의미가 있으므로(광고계정 선택 UI를 보여줘야 함) status로 필터링하지
+  // 않고 store_id별 최신 행 전체를 들고 있는다.
+  var metaAccountsByStoreId = {};
+  var metaModalConnectedAccountId = null; // 지금 광고계정 선택 모달이 대상으로 하는 connected_accounts.id
+  var metaAdAccountsCache = []; // 모달이 마지막으로 조회한 광고계정 목록(선택 변경 시 통화/시간대 갱신용)
+  // 지금 해제 요청이 나가 있는 connected_accounts.id(Meta) 모음 — 카드별로
+  // [연결 해제] 버튼을 따로 잠그고 중복 클릭을 막기 위함.
+  var metaDisconnectInFlightIds = {};
   // hydrateFromSession()이 울릴 때마다 증가 — 응답이 늦게 와서 순서가
   // 뒤바뀌어도(예: A 로그아웃 직후 바로 B 로그인) 가장 마지막 요청의
   // 결과만 반영하기 위한 가드.
   var requestSeq = 0;
 
-  // ---- Cafe24 OAuth 콜백 후 돌아왔을 때 안내 토스트 ------------------------
-  // 서버가 성공/실패와 무관하게 항상 https://.../?cafe24=<상태>#/account 로
-  // 돌려보낸다. 페이지 로드 시 한 번만 확인하고, 새로고침해도 토스트가
-  // 반복되지 않도록 쿼리 파라미터를 즉시 지운다(해시 라우팅 경로는 그대로
-  // 둔다 — #/account 자체는 라우터가 정상 처리).
-  (function handleCafe24OAuthReturn(){
+  // ---- OAuth 콜백 후 돌아왔을 때 안내 토스트(Cafe24/Meta 공통) ------------
+  // 두 서버 콜백 모두 성공/실패와 무관하게 항상
+  // https://.../?cafe24=<상태>#/account 또는 ?meta=<상태>#/account 로
+  // 돌려보낸다(둘이 동시에 붙을 일은 없지만, 혹시를 대비해 각각 확인).
+  // 페이지 로드 시 한 번만 확인하고, 새로고침해도 토스트가 반복되지
+  // 않도록 확인한 쿼리 파라미터만 지운다(해시 라우팅 경로는 그대로 둔다
+  // — #/account 자체는 라우터가 정상 처리).
+  (function handleOAuthReturn(){
     var params = new URLSearchParams(window.location.search);
-    var status = params.get('cafe24');
-    if(!status) return;
-    var MESSAGES = {
+    var cafe24Status = params.get('cafe24');
+    var metaStatus = params.get('meta');
+    if(!cafe24Status && !metaStatus) return;
+
+    var CAFE24_MESSAGES = {
       connected:   ['Cafe24 연결이 완료되었습니다.', 'success'],
       denied:      ['Cafe24 연결이 취소되었습니다.', null],
       token_error: ['Cafe24 인증 처리에 실패했습니다.', 'error'],
       server_error:['Cafe24 연결 중 오류가 발생했습니다.', 'error']
     };
-    var m = MESSAGES[status];
-    if(m) showToast(m[0], m[1]);
-    params.delete('cafe24');
+    var META_MESSAGES = {
+      connected:   ['Meta 계정 연동에 성공했습니다. 아래에서 광고계정을 선택해주세요.', 'success'],
+      denied:      ['Meta 연동이 취소되었습니다.', null],
+      token_error: ['Meta 인증 처리에 실패했습니다.', 'error'],
+      server_error:['Meta 연동 중 오류가 발생했습니다.', 'error']
+    };
+
+    if(cafe24Status){
+      var cm = CAFE24_MESSAGES[cafe24Status];
+      if(cm) showToast(cm[0], cm[1]);
+      params.delete('cafe24');
+    }
+    if(metaStatus){
+      var mm = META_MESSAGES[metaStatus];
+      if(mm) showToast(mm[0], mm[1]);
+      params.delete('meta');
+    }
+
     var qs = params.toString();
     var cleanedUrl = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
     window.history.replaceState(null, '', cleanedUrl);
@@ -193,6 +234,44 @@
         syncBtnHtml = '<button type="button" class="btn btn-ghost btn-sm store-cafe24-sync-btn" data-id="' + escapeHtml(s.id) + '"' +
           (isSyncing ? ' disabled' : '') + '>' + (isSyncing ? '동기화 중...' : '주문 동기화') + '</button>';
       }
+      // Meta 광고 연결 — Cafe24 쇼핑몰 카드에만 붙인다(요구사항 그대로).
+      // 아직 연결 안 됨 → 버튼 하나. 연결 시작했지만 광고계정 미선택
+      // (status='pending') → "광고계정 선택 대기 중" + 선택하기/해제. 선택
+      // 완료(status='connected') → 광고계정 이름 + "연결됨" + 해제.
+      var metaHtml = '';
+      if(isCafe24){
+        var metaRow = metaAccountsByStoreId[String(s.id)];
+        if(!metaRow){
+          metaHtml = '<div class="store-meta-block">' +
+            '<div class="store-meta-label">Meta 광고</div>' +
+            '<button type="button" class="btn btn-ghost btn-sm store-meta-connect-btn" data-id="' + escapeHtml(s.id) + '">Meta 광고 연결</button>' +
+          '</div>';
+        } else {
+          var isMetaDisconnecting = !!metaDisconnectInFlightIds[String(metaRow.id)];
+          var metaDisconnectBtnHtml = '<button type="button" class="btn btn-ghost btn-sm store-meta-disconnect-btn" data-connected-account-id="' + escapeHtml(metaRow.id) + '"' +
+            (isMetaDisconnecting ? ' disabled' : '') + '>' + (isMetaDisconnecting ? '해제 중...' : '연결 해제') + '</button>';
+
+          if(metaRow.status === 'connected'){
+            metaHtml = '<div class="store-meta-block">' +
+              '<div class="store-meta-label">Meta 광고</div>' +
+              '<div class="store-name" style="font-size:.88rem;">' + escapeHtml(metaRow.display_name || '연결된 광고계정') + '</div>' +
+              '<div class="store-status connected">연결됨</div>' +
+              '<div class="store-card-actions" style="margin-top:.5rem;">' + metaDisconnectBtnHtml + '</div>' +
+            '</div>';
+          } else {
+            // pending — OAuth는 끝났지만 광고계정을 아직 선택하지 않음. 잘못
+            // 연결했을 수도 있으므로 선택 전에도 해제할 수 있게 한다(요구사항 1).
+            metaHtml = '<div class="store-meta-block">' +
+              '<div class="store-meta-label">Meta 광고</div>' +
+              '<div class="store-name" style="font-size:.88rem;">광고계정 선택 대기 중</div>' +
+              '<div class="store-card-actions" style="margin-top:.5rem;">' +
+                '<button type="button" class="btn btn-primary btn-sm store-meta-select-btn" data-id="' + escapeHtml(s.id) + '" data-connected-account-id="' + escapeHtml(metaRow.id) + '">광고계정 선택하기</button>' +
+                metaDisconnectBtnHtml +
+              '</div>' +
+            '</div>';
+          }
+        }
+      }
       return (
         '<div class="store-card" data-id="' + escapeHtml(s.id) + '">' +
           '<div class="store-card-main">' +
@@ -203,6 +282,7 @@
             urlHtml +
             statusHtml +
             lastSyncedHtml +
+            metaHtml +
           '</div>' +
           '<div class="store-card-actions">' +
             cafe24BtnHtml +
@@ -274,6 +354,31 @@
       });
   }
 
+  // provider='meta'인 connected_accounts 전부(상태 무관 — 'pending'도
+  // 화면에 필요) — 이것도 RLS로 이미 본인 store 몫만 돌아온다.
+  function fetchMetaAccounts(seq){
+    var sb = client();
+    if(!sb) return;
+    sb.from('connected_accounts')
+      .select('id, store_id, provider, status, external_account_id, display_name')
+      .eq('provider', 'meta')
+      .then(function(res){
+        if(seq !== requestSeq) return;
+        if(res.error){
+          console.warn('[launchdesk] meta connected_accounts 조회 실패:', res.error.message);
+          return;
+        }
+        var map = {};
+        (res.data || []).forEach(function(row){ map[String(row.store_id)] = row; });
+        metaAccountsByStoreId = map;
+        render();
+      })
+      .catch(function(err){
+        if(seq !== requestSeq) return;
+        console.warn('[launchdesk] meta connected_accounts 조회 중 오류:', err && err.message);
+      });
+  }
+
   // launchdeskStore.onChange가 로그인/로그아웃 확정 시점에 울려주는 이벤트에
   // 편승해, 그 시점의 실제 Supabase 세션을 다시 확인한다 — 화면 입력이나
   // 다른 전역 변수가 아니라 세션 그 자체를 user_id의 유일한 출처로 쓴다.
@@ -287,6 +392,8 @@
       connectedCafe24StoreIds = {};
       cafe24LastSyncedAtByStoreId = {};
       cafe24SyncInFlightStoreIds = {};
+      metaAccountsByStoreId = {};
+      metaDisconnectInFlightIds = {};
       render();
       return;
     }
@@ -300,15 +407,20 @@
         connectedCafe24StoreIds = {};
         cafe24LastSyncedAtByStoreId = {};
         cafe24SyncInFlightStoreIds = {}; // 이전 사용자 몫으로 걸려있던 "동기화 중" 잠금도 함께 정리
+        metaAccountsByStoreId = {};
+        metaDisconnectInFlightIds = {};
         render();
         fetchStores(user.id, seq);
         fetchConnectedAccounts(seq);
+        fetchMetaAccounts(seq);
       } else {
         currentUserId = null;
         stores = [];
         connectedCafe24StoreIds = {};
         cafe24LastSyncedAtByStoreId = {};
         cafe24SyncInFlightStoreIds = {};
+        metaAccountsByStoreId = {};
+        metaDisconnectInFlightIds = {};
         render();
       }
     });
@@ -345,6 +457,7 @@
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && modal.classList.contains('open')) closeModal();
     if(e.key === 'Escape' && cafe24Modal && cafe24Modal.classList.contains('open')) closeCafe24Modal();
+    if(e.key === 'Escape' && metaModal && metaModal.classList.contains('open')) closeMetaModal();
   });
 
   // ---------------------------------------------------- Cafe24 연결 모달 제어
@@ -392,6 +505,21 @@
     var syncBtn = e.target.closest('.store-cafe24-sync-btn');
     if(syncBtn && !syncBtn.disabled){
       syncCafe24Orders(syncBtn.getAttribute('data-id'));
+      return;
+    }
+    var metaConnectBtn = e.target.closest('.store-meta-connect-btn');
+    if(metaConnectBtn){
+      connectMeta(metaConnectBtn.getAttribute('data-id'));
+      return;
+    }
+    var metaSelectBtn = e.target.closest('.store-meta-select-btn');
+    if(metaSelectBtn){
+      openMetaModal(metaSelectBtn.getAttribute('data-connected-account-id'));
+      return;
+    }
+    var metaDisconnectBtn = e.target.closest('.store-meta-disconnect-btn');
+    if(metaDisconnectBtn && !metaDisconnectBtn.disabled){
+      disconnectMeta(metaDisconnectBtn.getAttribute('data-connected-account-id'));
     }
   });
 
@@ -519,6 +647,219 @@
       console.warn('[launchdesk] cafe24-oauth-start 호출 중 오류:', err && err.message);
     });
   });
+
+  // ------------------------------------------------------------ Meta 광고 연결
+  // Cafe24와 달리 연결 시작 전에 사용자에게 물어볼 입력값이 없으므로(그냥
+  // 자기 Meta 계정으로 로그인하는 것뿐), 별도 모달 없이 버튼을 누르면
+  // 바로 meta-oauth-start를 호출해 Meta 로그인 화면으로 이동한다.
+  function connectMeta(storeId){
+    if(!storeId || !currentUserId) return;
+    var sb = client();
+    if(!sb) return;
+
+    sb.functions.invoke('meta-oauth-start', {
+      body: { store_id: storeId }
+    }).then(function(res){
+      if(res.error){
+        showToast('Meta 광고 연결을 시작하지 못했어요: ' + res.error.message, 'error');
+        return;
+      }
+      var authorizationUrl = res.data && res.data.authorization_url;
+      if(!authorizationUrl){
+        showToast('Meta 인증 주소를 받지 못했어요', 'error');
+        return;
+      }
+      // 이 페이지를 완전히 떠나 Meta 로그인 화면으로 이동한다 — 성공/실패와
+      // 무관하게 서버가 다시 #/account로 돌려보내고, 위 콜백 안내 토스트
+      // 로직이 결과를 보여준다. 이후 상태가 'pending'으로 바뀌면 카드에
+      // "광고계정 선택하기" 버튼이 나타난다.
+      window.location.assign(authorizationUrl);
+    }).catch(function(err){
+      showToast('Meta 연결 중 오류가 발생했어요', 'error');
+      console.warn('[launchdesk] meta-oauth-start 호출 중 오류:', err && err.message);
+    });
+  }
+
+  // ---------------------------------------------------- Meta 광고계정 선택 모달
+  function showMetaFailureToast(body, fallbackMessage){
+    if(body && body.code === 'RECONNECT_REQUIRED'){
+      // Meta는 Cafe24와 달리 만료된 토큰을 자동 갱신할 방법이 없다 —
+      // 다시 [Meta 광고 연결]부터 눌러야 한다. access_token은 이 응답에
+      // 애초에 담겨오지 않는다.
+      showToast('Meta 인증이 만료되었습니다. 다시 연결해주세요.', 'error');
+      return;
+    }
+    showToast((body && body.error) || fallbackMessage || '광고계정 정보를 가져오지 못했어요', 'error');
+  }
+
+  function setMetaModalStep(step){ // 'loading' | 'empty' | 'form'
+    metaLoading.hidden = step !== 'loading';
+    metaEmpty.hidden = step !== 'empty';
+    metaForm.hidden = step !== 'form';
+  }
+
+  function updateMetaAccountDetail(){
+    var match = metaAdAccountsCache.filter(function(a){ return String(a.id) === metaSelect.value; })[0];
+    metaCurrencyEl.textContent = (match && match.currency) || '-';
+    metaTimezoneEl.textContent = (match && match.timezone_name) || '-';
+  }
+
+  function openMetaModal(connectedAccountId){
+    if(!connectedAccountId) return;
+    metaModalConnectedAccountId = connectedAccountId;
+    metaAdAccountsCache = [];
+    metaSelect.innerHTML = '';
+    setMetaModalStep('loading');
+    metaModal.classList.add('open');
+
+    var sb = client();
+    if(!sb) return;
+    var seqAtOpen = requestSeq; // 목록 조회 중 계정이 바뀌면 결과를 버리기 위한 가드
+
+    sb.functions.invoke('meta-adaccounts', {
+      body: { connected_account_id: connectedAccountId }
+    }).then(function(res){
+      if(seqAtOpen !== requestSeq) return;
+
+      if(res.error){
+        return readInvokeErrorBody(res.error).then(function(body){
+          if(seqAtOpen !== requestSeq) return;
+          closeMetaModal();
+          showMetaFailureToast(body, res.error.message);
+        });
+      }
+
+      var data = res.data;
+      if(!data || data.ok !== true){
+        closeMetaModal();
+        showMetaFailureToast(data, null);
+        return;
+      }
+
+      var adAccounts = Array.isArray(data.ad_accounts) ? data.ad_accounts : [];
+      if(!adAccounts.length){
+        setMetaModalStep('empty');
+        return;
+      }
+
+      metaAdAccountsCache = adAccounts;
+      metaSelect.innerHTML = '';
+      adAccounts.forEach(function(a){
+        var opt = document.createElement('option');
+        opt.value = String(a.id);
+        opt.textContent = a.name || a.id;
+        metaSelect.appendChild(opt);
+      });
+      updateMetaAccountDetail();
+      setMetaModalStep('form');
+    }).catch(function(err){
+      if(seqAtOpen !== requestSeq) return;
+      closeMetaModal();
+      showToast('Meta 광고계정 조회 중 오류가 발생했어요', 'error');
+      console.warn('[launchdesk] meta-adaccounts 호출 중 오류:', err && err.message);
+    });
+  }
+  function closeMetaModal(){
+    metaModal.classList.remove('open');
+    metaForm.reset();
+    metaModalConnectedAccountId = null;
+    metaAdAccountsCache = [];
+  }
+  if(metaClose) metaClose.addEventListener('click', closeMetaModal);
+  if(metaBackdrop) metaBackdrop.addEventListener('click', closeMetaModal);
+  if(metaSelect) metaSelect.addEventListener('change', updateMetaAccountDetail);
+
+  if(metaForm) metaForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    if(!metaModalConnectedAccountId || !currentUserId) return;
+    var adAccountId = metaSelect.value;
+    if(!adAccountId) return;
+    var sb = client();
+    if(!sb) return;
+
+    var seqAtStart = requestSeq;
+    metaSubmitBtn.disabled = true;
+
+    sb.functions.invoke('meta-account-select', {
+      body: { connected_account_id: metaModalConnectedAccountId, ad_account_id: adAccountId }
+    }).then(function(res){
+      if(seqAtStart !== requestSeq) return;
+      metaSubmitBtn.disabled = false;
+
+      if(res.error){
+        return readInvokeErrorBody(res.error).then(function(body){
+          if(seqAtStart !== requestSeq) return;
+          showMetaFailureToast(body, res.error.message);
+        });
+      }
+
+      var data = res.data;
+      if(!data || data.ok !== true){
+        showMetaFailureToast(data, null);
+        return;
+      }
+
+      closeMetaModal();
+      showToast('Meta 광고계정이 연결되었습니다.', 'success');
+      // 카드의 "Meta 광고" 표시를 최신 상태로 반영 — 전체 새로고침 없이
+      // connected_accounts만 다시 조회한다(기존 fetchMetaAccounts 재사용).
+      fetchMetaAccounts(seqAtStart);
+    }).catch(function(err){
+      if(seqAtStart !== requestSeq) return;
+      metaSubmitBtn.disabled = false;
+      showToast('광고계정 연결 중 오류가 발생했어요', 'error');
+      console.warn('[launchdesk] meta-account-select 호출 중 오류:', err && err.message);
+    });
+  });
+
+  // ------------------------------------------------------------ Meta 연결 해제
+  // LaunchDesk 내부에 저장된 Meta 연결/토큰만 지운다(Meta 서버 측 앱 권한
+  // revoke는 이번 범위 밖). pending/connected 둘 다 해제 가능 — 서버가
+  // status를 가리지 않고 provider='meta' 소유권만 확인한다.
+  function disconnectMeta(connectedAccountId){
+    if(!connectedAccountId || !currentUserId) return;
+    if(metaDisconnectInFlightIds[connectedAccountId]) return; // 중복 클릭 방지(버튼도 disabled되지만 한 번 더 방어)
+    if(!window.confirm('Meta 광고 연결을 해제할까요?\n저장된 Meta 인증 정보가 삭제됩니다.')) return;
+
+    var sb = client();
+    if(!sb) return;
+
+    var seqAtStart = requestSeq;
+    metaDisconnectInFlightIds[connectedAccountId] = true;
+    render();
+
+    sb.functions.invoke('meta-disconnect', {
+      body: { connected_account_id: connectedAccountId }
+    }).then(function(res){
+      if(seqAtStart !== requestSeq) return;
+      delete metaDisconnectInFlightIds[connectedAccountId];
+      render(); // 버튼부터 즉시 원래 상태로
+
+      if(res.error){
+        return readInvokeErrorBody(res.error).then(function(body){
+          if(seqAtStart !== requestSeq) return;
+          showToast((body && body.error) || res.error.message || 'Meta 연결 해제에 실패했어요', 'error');
+        });
+      }
+
+      var data = res.data;
+      if(!data || data.ok !== true){
+        showToast((data && data.error) || 'Meta 연결 해제에 실패했어요', 'error');
+        return;
+      }
+
+      showToast('Meta 광고 연결이 해제되었습니다.', 'success');
+      // 카드를 즉시 "Meta 광고 연결" 상태로 되돌리기 — 전체 새로고침 없이
+      // connected_accounts만 다시 조회한다(기존 fetchMetaAccounts 재사용).
+      fetchMetaAccounts(seqAtStart);
+    }).catch(function(err){
+      if(seqAtStart !== requestSeq) return;
+      delete metaDisconnectInFlightIds[connectedAccountId];
+      render();
+      showToast('Meta 연결 해제 중 오류가 발생했어요', 'error');
+      console.warn('[launchdesk] meta-disconnect 호출 중 오류:', err && err.message);
+    });
+  }
 
   function deleteStore(id){
     var sb = client();

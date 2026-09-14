@@ -123,6 +123,36 @@
   </div>
 </div>
 
+<!-- Meta 광고계정 선택 모달 — access token은 화면에 전혀 오지 않는다.
+     이 모달은 meta-adaccounts(목록 조회)/meta-account-select(확정)
+     Edge Function만 호출하고, 둘 다 안전한 메타데이터만 주고받는다. -->
+<div class="modal" id="metaAdAccountModal" role="dialog" aria-modal="true" aria-labelledby="metaAdAccountTitle">
+  <div class="modal-backdrop" id="metaAdAccountBackdrop"></div>
+  <div class="modal-panel">
+    <button class="modal-close" type="button" id="metaAdAccountClose" aria-label="닫기">✕</button>
+    <div class="modal-head">
+      <h2 id="metaAdAccountTitle">Meta 광고 연결</h2>
+      <p>광고계정을 선택해주세요.</p>
+    </div>
+    <div class="empty-state" id="metaAdAccountLoading" style="padding:1.6rem 1rem;">
+      <p>불러오는 중…</p>
+    </div>
+    <div class="empty-state" id="metaAdAccountEmpty" style="padding:1.6rem 1rem;" hidden>
+      <div class="es-icon">📭</div>
+      <p>접근 가능한 Meta 광고계정을 찾지 못했습니다.</p>
+    </div>
+    <form id="metaAdAccountForm" hidden>
+      <div class="ws-field" style="margin-bottom:1rem;"><label for="metaAdAccountSelect">광고계정</label>
+        <select id="metaAdAccountSelect" required style="border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink); width:100%;"></select>
+      </div>
+      <div style="font-size:.82rem; color:var(--ink-soft); margin-bottom:1.3rem;">
+        통화: <b id="metaAdAccountCurrency">-</b> · 시간대: <b id="metaAdAccountTimezone">-</b>
+      </div>
+      <button type="submit" class="btn btn-primary" id="metaAdAccountSubmit" style="justify-content:center; width:100%;">이 광고계정 연결</button>
+    </form>
+  </div>
+</div>
+
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
 <div class="app-shell">

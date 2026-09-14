@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
+import { normalizeCafe24ExpiresAt } from "../_shared/cafe24-token.ts";
 
 const REDIRECT_URI =
   "https://zzhvckikonnalqnyatgn.supabase.co/functions/v1/cafe24-oauth-callback";
@@ -177,9 +178,12 @@ export default {
               connected_account_id: connectedAccountId,
               access_token: tokenData.access_token,
               refresh_token: tokenData.refresh_token,
-              access_token_expires_at: tokenData.expires_at,
-              refresh_token_expires_at:
-                tokenData.refresh_token_expires_at,
+              access_token_expires_at: normalizeCafe24ExpiresAt(
+                tokenData.expires_at
+              ),
+              refresh_token_expires_at: normalizeCafe24ExpiresAt(
+                tokenData.refresh_token_expires_at
+              ),
               updated_at: new Date().toISOString(),
             },
             {

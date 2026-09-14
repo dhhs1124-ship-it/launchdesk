@@ -370,6 +370,25 @@ authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
 
+# Meta OAuth 연결 플로우 — meta-oauth-start/meta-adaccounts/meta-account-select는
+# LaunchDesk에 로그인한 사용자만 호출해야 하므로 verify_jwt = true(기본값과
+# 동일하지만 명시). meta-oauth-callback은 Cafe24의 cafe24-oauth-callback과
+# 같은 이유로 Meta 서버가 직접 리다이렉트로 호출하므로 verify_jwt = false.
+[functions.meta-oauth-start]
+verify_jwt = true
+
+[functions.meta-oauth-callback]
+verify_jwt = false
+
+[functions.meta-adaccounts]
+verify_jwt = true
+
+[functions.meta-account-select]
+verify_jwt = true
+
+[functions.meta-disconnect]
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
