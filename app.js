@@ -1208,9 +1208,11 @@
   /* count-up (shared "useCountUp"-equivalent) — animates any
      [data-count] number once, the first time it scrolls into view.
      Works for elements starting inside a hidden view or a hidden tab
-     pane (e.g. the /tools dashboard pane): once the layout makes them
-     visible, the observer's next check picks them up, no manual
-     re-trigger needed. */
+     pane: once the layout makes them visible, the observer's next check
+     picks them up, no manual re-trigger needed. (The /tools dashboard
+     pane's own [data-count] KPIs — its only other former user — were
+     removed along with the rest of that pane's example data; .stat-strip
+     is the only place left that actually uses this.) */
   function runCountUp(el){
     var raw = el.getAttribute('data-count') || '0';
     var target = parseFloat(raw) || 0;
@@ -1232,7 +1234,7 @@
     }
     requestAnimationFrame(step);
   }
-  var countUpEls = document.querySelectorAll('.stat-strip .v[data-count], .kpi-value[data-count]');
+  var countUpEls = document.querySelectorAll('.stat-strip .v[data-count]');
   if(countUpEls.length){
     var countUpObserver = new IntersectionObserver(function(entries){
       entries.forEach(function(entry){

@@ -1776,6 +1776,42 @@
         <p><strong>마진 계산기 · 수익 시뮬레이터 · 광고 기록은 지금 바로 실제로 계산 · 저장됩니다.</strong></p>
       </div>
 
+      <!-- 쇼핑몰 운영 현황 — 연결된 Cafe24 쇼핑몰의 실제 orders 데이터.
+           아래 KPI 카드 · 차트는 여전히 예시지만, 이 패널만은 실제 값이다. -->
+      <div class="dash-panel" id="opsOverviewPanel" style="margin-bottom:1.3rem;">
+        <div class="dash-panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.6rem;">
+          <span>쇼핑몰 운영 현황</span>
+          <select id="opsStoreSelect" hidden style="border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.4rem .7rem; font-family:var(--f-body); font-size:.84rem; color:var(--ink);"></select>
+        </div>
+        <div style="padding:1.2rem 1.3rem;">
+          <div class="empty-state" id="opsGuestNotice" style="padding:1.6rem 1rem;" hidden>
+            <div class="es-icon">🔒</div>
+            <p>로그인하면 연결된 쇼핑몰의 운영 현황을 확인할 수 있어요.</p>
+          </div>
+          <div class="empty-state" id="opsNoStoreNotice" style="padding:1.6rem 1rem;" hidden>
+            <div class="es-icon">🏬</div>
+            <p>Cafe24 쇼핑몰을 연결하면<br>주문 현황을 여기에서 확인할 수 있어요.</p>
+            <a class="btn btn-ghost btn-sm" href="#/account">내 쇼핑몰 관리로 이동</a>
+          </div>
+          <div id="opsDataWrap" hidden>
+            <div style="font-size:.82rem; font-weight:700; color:var(--ink-soft); margin-bottom:.5rem;">오늘</div>
+            <div class="adlog-summary" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
+              <div class="adlog-sum-card"><div class="al-label">결제금액</div><div class="al-value" id="opsTodayPayment">0원</div></div>
+              <div class="adlog-sum-card"><div class="al-label">주문수</div><div class="al-value" id="opsTodayCount">0건</div></div>
+            </div>
+            <div style="font-size:.82rem; font-weight:700; color:var(--ink-soft); margin:1.1rem 0 .5rem;">이번 달</div>
+            <div class="adlog-summary" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
+              <div class="adlog-sum-card"><div class="al-label">누적 결제금액</div><div class="al-value" id="opsMonthPayment">0원</div></div>
+              <div class="adlog-sum-card"><div class="al-label">누적 주문수</div><div class="al-value" id="opsMonthCount">0건</div></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4rem; margin-top:1.1rem; font-size:.78rem; color:var(--ink-faint);">
+              <span>최근 동기화: <b id="opsLastSynced" style="color:var(--ink-soft);">아직 없음</b></span>
+              <span>주문 동기화는 <a href="#/account" style="color:var(--accent-ink); font-weight:600;">내 쇼핑몰 관리</a>에서 할 수 있어요.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="tools-tab-bar" id="toolsTabBar">
         <button class="tools-tab-btn active" type="button" data-tools-tab="dashboard">🖥️ 대시보드</button>
         <button class="tools-tab-btn" type="button" data-tools-tab="simulator">🧮 수익 시뮬레이터</button>
@@ -1783,109 +1819,18 @@
       </div>
 
       <div class="tools-pane active" data-tools-tab="dashboard">
-      <div class="kpi-grid">
-        <div class="kpi-card">
-          <div class="kpi-head"><span>이번 달 매출</span><span>💰</span></div>
-          <div class="kpi-value" data-count="1240000" data-prefix="₩">₩0</div>
-          <div class="kpi-delta up">▲ 전월 대비 +11%</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-head"><span>평균 마진율</span><span>📈</span></div>
-          <div class="kpi-value" data-count="34" data-suffix="%">0%</div>
-          <div class="kpi-delta up">▲ 목표 35%에 근접</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-head"><span>총 주문 수</span><span>📦</span></div>
-          <div class="kpi-value" data-count="87" data-suffix="건">0건</div>
-          <div class="kpi-delta down">▼ 미처리 7건</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-head"><span>광고 ROAS</span><span>🎯</span></div>
-          <div class="kpi-value" data-count="3.2" data-suffix="x">0x</div>
-          <div class="kpi-delta down">▼ 목표 4x 미달</div>
-        </div>
-      </div>
-
       <div class="tools-grid">
         <div class="tools-main">
 
+          <!-- 분석 대시보드 — 판매/광고 채널 연동이 더 갖춰지면 확장할
+               자리. 위 "쇼핑몰 운영 현황"과 달리 아직 실제 데이터가 없으므로
+               가짜 숫자/차트 대신 이 안내만 둔다(혼동 방지). -->
           <div class="dash-panel">
-            <div class="dash-panel-head" style="display:flex; justify-content:space-between; align-items:center;">
-              <span>월별 매출 추이</span>
-              <span class="cc-badge free">+11% ▲</span>
-            </div>
-            <div class="areachart-wrap">
-              <div class="areachart-yaxis"><span>1,400</span><span>1,050</span><span>700</span><span>350</span><span>0</span></div>
-              <div class="areachart-plot">
-                <svg viewBox="0 0 600 190" preserveAspectRatio="none" role="img" aria-label="월별 매출 추이 예시 그래프, 단위 만원">
-                  <defs>
-                    <linearGradient id="salesFade" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" style="stop-color:var(--accent); stop-opacity:.22"/>
-                      <stop offset="100%" style="stop-color:var(--accent); stop-opacity:0"/>
-                    </linearGradient>
-                  </defs>
-                  <line x1="20" y1="170" x2="580" y2="170" style="stroke:var(--border-strong)"/>
-                  <line x1="20" y1="132.5" x2="580" y2="132.5" style="stroke:var(--border)" stroke-dasharray="2 4"/>
-                  <line x1="20" y1="95" x2="580" y2="95" style="stroke:var(--border)" stroke-dasharray="2 4"/>
-                  <line x1="20" y1="57.5" x2="580" y2="57.5" style="stroke:var(--border)" stroke-dasharray="2 4"/>
-                  <line x1="20" y1="20" x2="580" y2="20" style="stroke:var(--border)" stroke-dasharray="2 4"/>
-                  <path d="M20,86 C64,83 96,79 132,76 C170,73 208,45 244,29 C278,14 322,55 356,68 C388,79 434,66 468,63 C506,60 546,58 580,56 L580,170 L20,170 Z" style="fill:url(#salesFade)"/>
-                  <path d="M20,86 C64,83 96,79 132,76 C170,73 208,45 244,29 C278,14 322,55 356,68 C388,79 434,66 468,63 C506,60 546,58 580,56" fill="none" style="stroke:var(--accent)" stroke-width="3" stroke-linecap="round"/>
-                  <circle cx="20" cy="86" r="3.5" style="fill:var(--accent)"/>
-                  <circle cx="132" cy="76" r="3.5" style="fill:var(--accent)"/>
-                  <circle cx="244" cy="29" r="4" style="fill:var(--badge-b)"/>
-                  <circle cx="356" cy="68" r="3.5" style="fill:var(--accent)"/>
-                  <circle cx="468" cy="63" r="3.5" style="fill:var(--accent)"/>
-                  <circle cx="580" cy="56" r="4" style="fill:var(--accent)"/>
-                </svg>
-                <div class="areachart-months"><span>10월</span><span>11월</span><span>12월</span><span>1월</span><span>2월</span><span>3월</span></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="tools-row2">
-            <div class="dash-panel">
-              <div class="dash-panel-head">채널별 광고비</div>
-              <div class="donut-wrap">
-                <svg viewBox="0 0 120 120" role="img" aria-label="채널별 광고비 비중 예시 도넛 차트">
-                  <g transform="rotate(-90 60 60)">
-                    <circle cx="60" cy="60" r="45" fill="none" style="stroke:var(--border)" stroke-width="16"/>
-                    <circle cx="60" cy="60" r="45" fill="none" style="stroke:var(--badge-a)" stroke-width="16" stroke-dasharray="118.75 163.99" stroke-dashoffset="0"/>
-                    <circle cx="60" cy="60" r="45" fill="none" style="stroke:var(--badge-c)" stroke-width="16" stroke-dasharray="79.17 203.57" stroke-dashoffset="-118.75"/>
-                    <circle cx="60" cy="60" r="45" fill="none" style="stroke:var(--badge-b)" stroke-width="16" stroke-dasharray="42.41 240.33" stroke-dashoffset="-197.92"/>
-                    <circle cx="60" cy="60" r="45" fill="none" style="stroke:var(--badge-d)" stroke-width="16" stroke-dasharray="42.41 240.33" stroke-dashoffset="-240.33"/>
-                  </g>
-                </svg>
-                <ul class="donut-legend">
-                  <li><span class="dot" style="background:var(--badge-a)"></span>메타 광고 <b>42%</b></li>
-                  <li><span class="dot" style="background:var(--badge-c)"></span>네이버 쇼핑 <b>28%</b></li>
-                  <li><span class="dot" style="background:var(--badge-b)"></span>카카오 <b>15%</b></li>
-                  <li><span class="dot" style="background:var(--badge-d)"></span>직접 유입 <b>15%</b></li>
-                </ul>
-              </div>
-            </div>
-            <div class="dash-panel">
-              <div class="dash-panel-head">채널별 광고 ROAS</div>
-              <div class="roas-list">
-                <div class="roas-row"><span class="rr-label">메타 광고</span><div class="rr-bar"><div class="rr-fill" style="width:64%; background:var(--badge-b);"></div></div><span class="rr-value">3.2x</span></div>
-                <div class="roas-row"><span class="rr-label">네이버 쇼핑</span><div class="rr-bar"><div class="rr-fill" style="width:96%; background:var(--badge-c);"></div></div><span class="rr-value">4.8x</span></div>
-                <div class="roas-row"><span class="rr-label">카카오</span><div class="rr-bar"><div class="rr-fill" style="width:42%; background:var(--badge-b);"></div></div><span class="rr-value">2.1x</span></div>
-                <div class="roas-row"><span class="rr-label">구글</span><div class="rr-bar"><div class="rr-fill" style="width:28%; background:var(--badge-a);"></div></div><span class="rr-value">1.4x</span></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="dash-panel">
-            <div class="dash-panel-head" style="display:flex; justify-content:space-between; align-items:center;">
-              <span>최근 주문</span>
-              <span class="cc-badge paid">미처리 7건</span>
-            </div>
-            <div class="order-list">
-              <div class="order-row"><div class="row-text"><div class="order-name">린넨 크롭 자켓</div><div class="order-meta">#2041 · 03.12</div></div><div class="order-price">₩89,000</div><span class="order-status shipping">배송중</span></div>
-              <div class="order-row"><div class="row-text"><div class="order-name">와이드 슬랙스</div><div class="order-meta">#2040 · 03.12</div></div><div class="order-price">₩62,000</div><span class="order-status done">처리완료</span></div>
-              <div class="order-row"><div class="row-text"><div class="order-name">오버핏 셔츠</div><div class="order-meta">#2039 · 03.11</div></div><div class="order-price">₩45,000</div><span class="order-status pending">미처리</span></div>
-              <div class="order-row"><div class="row-text"><div class="order-name">슬림 드레스</div><div class="order-meta">#2038 · 03.11</div></div><div class="order-price">₩78,000</div><span class="order-status pending">미처리</span></div>
-              <div class="order-row"><div class="row-text"><div class="order-name">니트 가디건</div><div class="order-meta">#2037 · 03.10</div></div><div class="order-price">₩55,000</div><span class="order-status done">처리완료</span></div>
+            <div class="dash-panel-head">분석 대시보드</div>
+            <div class="empty-state" style="padding:2.6rem 1.3rem;">
+              <div class="es-icon">📊</div>
+              <p>판매 채널과 광고 채널 연결이 완료되면<br>매출 추이, 광고 효율, 채널별 성과를 한곳에서 확인할 수 있어요.</p>
+              <span style="display:inline-flex; align-items:center; font-size:.76rem; font-weight:700; padding:.3rem .8rem; border-radius:99px; background:var(--surface-hover); color:var(--ink-faint);">준비 중</span>
             </div>
           </div>
 
@@ -2233,5 +2178,6 @@
 <script src="tools.js"></script>
 <script src="setup.js"></script>
 <script src="stores.js"></script>
+<script src="ops-overview.js"></script>
 </body>
 </html>
