@@ -724,3 +724,19 @@
   .adlog-chan-btn{padding:.5rem .9rem; border-radius:99px; border:1px solid var(--border-strong); background:var(--surface); font-family:var(--f-body); font-size:.82rem; font-weight:600; color:var(--ink-soft); cursor:pointer;}
   .adlog-chan-btn.active{background:var(--ink); color:#fff; border-color:var(--ink);}
   .adlog-form-actions{grid-column:1/-1; display:flex; gap:.6rem;}
+
+  /* ---------------- 내 쇼핑몰(stores) ---------------- */
+  .stores-toolbar{display:flex; justify-content:flex-end; margin-bottom:1.2rem;}
+  .store-list{display:flex; flex-direction:column; gap:.9rem;}
+  .store-card{display:flex; align-items:center; justify-content:space-between; gap:1rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem 1.3rem;}
+  @media (max-width:640px){ .store-card{flex-direction:column; align-items:stretch;} }
+  .store-card-main{min-width:0; flex:1;}
+  .store-card-head{display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; margin-bottom:.35rem;}
+  .store-name{font-size:1rem; font-weight:700; color:var(--ink);}
+  .store-platform-badge{font-family:var(--f-mono); font-size:.68rem; font-weight:700; padding:.15rem .55rem; border-radius:99px; background:var(--accent-soft); color:var(--accent-ink);}
+  .store-url{display:block; font-size:.82rem; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .store-url:hover{color:var(--accent-ink);}
+  .store-status{display:inline-flex; align-items:center; gap:.35rem; margin-top:.5rem; font-size:.76rem; font-weight:600; color:var(--ink-faint);}
+  .store-status::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--ink-faint);}
+  .store-card-actions{display:flex; gap:.5rem; flex:0 0 auto;}
+  @media (max-width:640px){ .store-card-actions{justify-content:flex-end;} }

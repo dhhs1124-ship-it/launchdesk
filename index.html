@@ -80,6 +80,32 @@
   </div>
 </div>
 
+<!-- 쇼핑몰 추가 · 수정 모달(같은 폼을 editingId 유무로 재사용) — loginModal과
+     마찬가지로 app-shell 밖(최상위)에 둬서, #/account가 아닌 다른 화면으로
+     이동해도 열려있던 상태가 숨겨진 view 안에 갇히지 않게 한다. -->
+<div class="modal" id="storeFormModal" role="dialog" aria-modal="true" aria-labelledby="storeFormTitle">
+  <div class="modal-backdrop" id="storeFormBackdrop"></div>
+  <div class="modal-panel">
+    <button class="modal-close" type="button" id="storeFormClose" aria-label="닫기">✕</button>
+    <div class="modal-head">
+      <h2 id="storeFormTitle">쇼핑몰 추가</h2>
+      <p>external_store_id 연결은 다음 단계(API 연동)에서 진행돼요.</p>
+    </div>
+    <form id="storeForm">
+      <div class="ws-field" style="margin-bottom:1rem;"><label for="storeName">쇼핑몰 이름</label><input id="storeName" type="text" placeholder="예: 우리동네 편집샵" required maxlength="80"></div>
+      <div class="ws-field" style="margin-bottom:1rem;"><label for="storePlatform">플랫폼</label>
+        <select id="storePlatform" required style="border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink); width:100%;">
+          <option value="cafe24">Cafe24</option>
+          <option value="smartstore">스마트스토어</option>
+          <option value="other">기타</option>
+        </select>
+      </div>
+      <div class="ws-field" style="margin-bottom:1.3rem;"><label for="storeUrl">쇼핑몰 URL</label><input id="storeUrl" type="url" placeholder="https://" required></div>
+      <button type="submit" class="btn btn-primary" id="storeFormSubmit" style="justify-content:center; width:100%;">추가하기</button>
+    </form>
+  </div>
+</div>
+
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
 <div class="app-shell">
@@ -253,6 +279,37 @@
               <span class="qr-text"><span class="qr-title">쇼핑몰 설정이 막혔다면</span><span class="qr-sub">필요한 부분만 세팅대행에 맡길 수 있어요</span></span>
               <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
             </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: 내 쇼핑몰 (stores 테이블 CRUD) ============ -->
+      <section class="view" id="view-account" hidden>
+        <div class="content">
+          <div class="dash-head">
+            <h1>내 쇼핑몰</h1>
+            <p>운영 중인 쇼핑몰을 등록해두면, 이후 플랫폼 연동 시 이 목록을 그대로 사용해요.</p>
+          </div>
+
+          <!-- 비회원: DB 조회 자체를 하지 않고 안내만 표시 -->
+          <div class="empty-state" id="storesGuestNotice" hidden>
+            <div class="es-icon">🔒</div>
+            <p>로그인하면 내 쇼핑몰을 등록하고 관리할 수 있어요.</p>
+            <a class="btn btn-primary" href="#/login">로그인</a>
+          </div>
+
+          <!-- 회원: 자신의 stores만 RLS로 걸러져 조회됨 -->
+          <div id="storesPanel" hidden>
+            <div class="stores-toolbar">
+              <button type="button" class="btn btn-primary" id="storeAddBtn">+ 쇼핑몰 추가</button>
+            </div>
+
+            <div class="empty-state" id="storesEmpty" hidden>
+              <div class="es-icon">🏬</div>
+              <p>아직 등록한 쇼핑몰이 없어요. 첫 쇼핑몰을 등록해보세요.</p>
+            </div>
+
+            <div class="store-list" id="storesList"></div>
           </div>
         </div>
       </section>
@@ -2158,5 +2215,6 @@
 <script src="app.js"></script>
 <script src="tools.js"></script>
 <script src="setup.js"></script>
+<script src="stores.js"></script>
 </body>
 </html>

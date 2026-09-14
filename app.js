@@ -26,7 +26,8 @@
     '/start/orders':  'view-start-orders',
     '/start/wrapup':  'view-start-wrapup',
     '/resources':     'view-resources',
-    '/services/setup': 'view-services-setup'
+    '/services/setup': 'view-services-setup',
+    '/account':       'view-account'
   };
 
   /* Display name shown in the topbar crumb, and (for paths not in
@@ -51,7 +52,8 @@
     '/start/marketing-setup': '05 · 마케팅 인프라 세팅',
     '/start/marketing':  '06 · 마케팅 & SNS',
     '/start/orders':     '07 · 주문 · CS 관리',
-    '/start/wrapup':     '08 · 마무리'
+    '/start/wrapup':     '08 · 마무리',
+    '/account':          '내 쇼핑몰'
   };
 
   function currentPath(){
@@ -958,14 +960,21 @@
         });
       });
       // 상단바: "로그인" 대신 중립적인 "내 계정"만 표시(이메일 노출 안 함).
-      // 로그아웃 진입점은 사이드바에만 두므로 여기는 클릭해도 아무 일도
-      // 일어나지 않는다(위 클릭 핸들러의 !isAuthed 가드가 모달을 막는다).
-      if(topbarLoginBtn) topbarLoginBtn.textContent = '내 계정';
+      // href도 #/account로 바꿔, 클릭 시 로그인 모달 대신 실제 "내 쇼핑몰"
+      // 화면으로 이동한다(아래 전역 클릭 위임은 href="#/login"인 링크만
+      // 가로채므로, href가 바뀐 이 버튼은 평범한 해시 이동으로 처리된다).
+      if(topbarLoginBtn){
+        topbarLoginBtn.textContent = '내 계정';
+        topbarLoginBtn.setAttribute('href', '#/account');
+      }
     } else {
       profileAvatarLetter.textContent = '?';
       profileName.textContent = '로그인을 해주세요';
       profileDayEl.textContent = '진행상황을 저장하고 다른 기기에서도 이어볼 수 있어요.';
-      if(topbarLoginBtn) topbarLoginBtn.textContent = '로그인';
+      if(topbarLoginBtn){
+        topbarLoginBtn.textContent = '로그인';
+        topbarLoginBtn.setAttribute('href', '#/login');
+      }
     }
   }
   // profiles 테이블에 현재 사용자 행이 있는지만 참고로 확인(콘솔 로그만,
@@ -978,10 +987,19 @@
       else console.log('[launchdesk] profiles 행 존재 여부:', !!res.data);
     }).catch(function(err){ console.log('[launchdesk] profiles 조회 중 오류:', err && err.message); });
   }
+  // 로그인 상태: 카드를 누르면 "내 쇼핑몰"(#/account)로 이동한다. 카드 안의
+  // 로그아웃 링크는 자체 클릭 핸들러에서 stopPropagation()하므로 이 핸들러와
+  // 충돌하지 않는다.
   if(profileCard){
-    profileCard.addEventListener('click', function(){ if(!isAuthed) openLoginModal(); });
+    profileCard.addEventListener('click', function(){
+      if(!isAuthed) openLoginModal();
+      else location.hash = '#/account';
+    });
     profileCard.addEventListener('keydown', function(e){
-      if((e.key === 'Enter' || e.key === ' ') && !isAuthed){ e.preventDefault(); openLoginModal(); }
+      if(e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      if(!isAuthed) openLoginModal();
+      else location.hash = '#/account';
     });
   }
   // launchdeskStore가 로그인(hydrate)/로그아웃(resetToGuest)으로 데이터를
