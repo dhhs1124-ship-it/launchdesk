@@ -106,6 +106,23 @@
   </div>
 </div>
 
+<!-- Cafe24 연결 모달 — mall_id만 입력받는다(Client ID/Secret/토큰은 전부
+     서버(Edge Function)가 다루며 이 화면에는 존재하지 않는다). -->
+<div class="modal" id="cafe24ConnectModal" role="dialog" aria-modal="true" aria-labelledby="cafe24ConnectTitle">
+  <div class="modal-backdrop" id="cafe24ConnectBackdrop"></div>
+  <div class="modal-panel">
+    <button class="modal-close" type="button" id="cafe24ConnectClose" aria-label="닫기">✕</button>
+    <div class="modal-head">
+      <h2 id="cafe24ConnectTitle">Cafe24 연결</h2>
+      <p>쇼핑몰 관리자 주소가 myshop.cafe24.com이라면 mall_id는 myshop이에요.</p>
+    </div>
+    <form id="cafe24ConnectForm">
+      <div class="ws-field" style="margin-bottom:1.3rem;"><label for="cafe24MallId">Cafe24 쇼핑몰 ID (mall_id)</label><input id="cafe24MallId" type="text" placeholder="myshop" required></div>
+      <button type="submit" class="btn btn-primary" id="cafe24ConnectSubmit" style="justify-content:center; width:100%;">연결하기</button>
+    </form>
+  </div>
+</div>
+
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
 <div class="app-shell">

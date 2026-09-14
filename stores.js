@@ -1,9 +1,15 @@
-/* /account — "내 쇼핑몰" (Supabase stores 테이블 CRUD).
+/* /account — "내 쇼핑몰" (Supabase stores 테이블 CRUD + Cafe24 OAuth 연결 시작).
 
-   이번 단계는 stores 테이블과 화면을 연결하는 것까지만 한다 — Cafe24/
-   스마트스토어 등 실제 플랫폼 API 연동은 하지 않는다. 그래서 목록의
-   "연결 상태"는 항상 고정 문구("API 연결 전")이고, connected_accounts는
-   조회도 생성도 하지 않는다.
+   stores CRUD 외에, platform === 'cafe24'인 카드에서 "Cafe24 연결"을 누르면
+   Edge Function(cafe24-oauth-start)을 호출해 Cafe24 인증 화면으로
+   이동시키는 것까지만 한다 — 실제 토큰 발급/갱신/저장은 전부 서버(Edge
+   Function)가 처리하고, 이 파일은 Client ID/Secret/access_token/
+   refresh_token을 절대 다루지 않는다. 연결 해제·토큰 갱신·실제 주문 API
+   호출은 다음 단계.
+
+   connected_accounts는 (provider='cafe24', status='connected') 여부만
+   조회해서 카드 상태 문구를 바꾸는 데 쓴다 — 여기서 새로 만들거나 지우지
+   않는다(그건 Edge Function의 콜백 몫).
 
    이 파일은 launchdeskStore(store.js)의 STEP/도구 기록과는 완전히 별도로
    동작한다 — stores는 그 파일의 관심사가 아니고, debounce가 필요한
@@ -41,6 +47,13 @@
   var platformSelect = document.getElementById('storePlatform');
   var urlInput = document.getElementById('storeUrl');
 
+  var cafe24Modal = document.getElementById('cafe24ConnectModal');
+  var cafe24Backdrop = document.getElementById('cafe24ConnectBackdrop');
+  var cafe24Close = document.getElementById('cafe24ConnectClose');
+  var cafe24Form = document.getElementById('cafe24ConnectForm');
+  var cafe24MallIdInput = document.getElementById('cafe24MallId');
+  var cafe24SubmitBtn = document.getElementById('cafe24ConnectSubmit');
+
   // showToast: app.js/tools.js와 동일한 방식으로 이 파일 안에서 따로
   // 둔다(각자 다른 최상위 IIFE라 함수를 공유할 수 없음 — tools.js의 같은
   // 주석 참고).
@@ -72,6 +85,14 @@
   function safeHref(url){
     return /^https?:\/\//i.test(url || '') ? url : null;
   }
+  // store_url이 정확히 "*.cafe24.com" 서브도메인일 때만 mall_id를 뽑아
+  // 기본값으로 제안한다 — 커스텀 도메인(예: www.myshop.com)일 수 있으므로,
+  // 확실하지 않으면 빈 값을 반환해 사용자가 직접 입력하게 한다(자동으로
+  // 추정해서 바로 연결하지 않는다).
+  function suggestMallId(storeUrl){
+    var m = /^https?:\/\/([a-z0-9-]+)\.cafe24\.com(?:[/:?#]|$)/i.exec(storeUrl || '');
+    return m ? m[1] : '';
+  }
 
   function client(){ return window.launchdeskSupabase || null; }
 
@@ -79,10 +100,37 @@
   var currentUserId = null;
   var stores = [];
   var editingId = null; // null = 추가 모드, 아니면 그 store id를 수정 중
+  var cafe24ConnectStoreId = null; // 지금 연결 모달이 대상으로 하는 store id
+  // provider='cafe24' && status='connected'인 connected_accounts 행의
+  // store_id 모음 — Set(store.id) 형태로, 카드 상태 문구 판단에만 쓴다.
+  var connectedCafe24StoreIds = {};
   // hydrateFromSession()이 울릴 때마다 증가 — 응답이 늦게 와서 순서가
   // 뒤바뀌어도(예: A 로그아웃 직후 바로 B 로그인) 가장 마지막 요청의
   // 결과만 반영하기 위한 가드.
   var requestSeq = 0;
+
+  // ---- Cafe24 OAuth 콜백 후 돌아왔을 때 안내 토스트 ------------------------
+  // 서버가 성공/실패와 무관하게 항상 https://.../?cafe24=<상태>#/account 로
+  // 돌려보낸다. 페이지 로드 시 한 번만 확인하고, 새로고침해도 토스트가
+  // 반복되지 않도록 쿼리 파라미터를 즉시 지운다(해시 라우팅 경로는 그대로
+  // 둔다 — #/account 자체는 라우터가 정상 처리).
+  (function handleCafe24OAuthReturn(){
+    var params = new URLSearchParams(window.location.search);
+    var status = params.get('cafe24');
+    if(!status) return;
+    var MESSAGES = {
+      connected:   ['Cafe24 연결이 완료되었습니다.', 'success'],
+      denied:      ['Cafe24 연결이 취소되었습니다.', null],
+      token_error: ['Cafe24 인증 처리에 실패했습니다.', 'error'],
+      server_error:['Cafe24 연결 중 오류가 발생했습니다.', 'error']
+    };
+    var m = MESSAGES[status];
+    if(m) showToast(m[0], m[1]);
+    params.delete('cafe24');
+    var qs = params.toString();
+    var cleanedUrl = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+    window.history.replaceState(null, '', cleanedUrl);
+  })();
 
   function render(){
     var authed = !!currentUserId;
@@ -104,6 +152,13 @@
       var urlHtml = href
         ? '<a class="store-url" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(s.store_url) + '</a>'
         : '<span class="store-url">' + escapeHtml(s.store_url) + '</span>';
+      var isCafe24 = s.platform === 'cafe24';
+      var isConnected = isCafe24 && !!connectedCafe24StoreIds[String(s.id)];
+      var statusHtml = '<div class="store-status' + (isConnected ? ' connected' : '') + '">' +
+        (isConnected ? 'Cafe24 연결됨' : 'API 연결 전') + '</div>';
+      var cafe24BtnHtml = isCafe24
+        ? '<button type="button" class="btn btn-ghost btn-sm store-cafe24-connect-btn" data-id="' + escapeHtml(s.id) + '">Cafe24 연결</button>'
+        : '';
       return (
         '<div class="store-card" data-id="' + escapeHtml(s.id) + '">' +
           '<div class="store-card-main">' +
@@ -112,9 +167,10 @@
               '<span class="store-platform-badge">' + escapeHtml(platformLabel(s.platform)) + '</span>' +
             '</div>' +
             urlHtml +
-            '<div class="store-status">API 연결 전</div>' +
+            statusHtml +
           '</div>' +
           '<div class="store-card-actions">' +
+            cafe24BtnHtml +
             '<button type="button" class="btn btn-ghost btn-sm store-edit-btn" data-id="' + escapeHtml(s.id) + '">수정</button>' +
             '<button type="button" class="btn btn-ghost btn-sm store-del-btn" data-id="' + escapeHtml(s.id) + '">삭제</button>' +
           '</div>' +
@@ -148,6 +204,35 @@
       });
   }
 
+  // provider='cafe24' && status='connected'인 connected_accounts만 확인한다
+  // (요청사항 그대로) — RLS가 이미 로그인한 사용자 본인 몫만 돌려주므로
+  // 여기서 user_id로 추가 필터링하지 않는다. 테이블이 아직 비어있거나
+  // (이번 단계 목표) 스키마가 다르면 에러를 콘솔에만 남기고 화면은 항상
+  // "API 연결 전"으로 안전하게 폴백한다.
+  function fetchConnectedAccounts(seq){
+    var sb = client();
+    if(!sb) return;
+    sb.from('connected_accounts')
+      .select('store_id, provider, status')
+      .eq('provider', 'cafe24')
+      .eq('status', 'connected')
+      .then(function(res){
+        if(seq !== requestSeq) return;
+        if(res.error){
+          console.warn('[launchdesk] connected_accounts 조회 실패:', res.error.message);
+          return;
+        }
+        var ids = {};
+        (res.data || []).forEach(function(row){ ids[String(row.store_id)] = true; });
+        connectedCafe24StoreIds = ids;
+        render();
+      })
+      .catch(function(err){
+        if(seq !== requestSeq) return;
+        console.warn('[launchdesk] connected_accounts 조회 중 오류:', err && err.message);
+      });
+  }
+
   // launchdeskStore.onChange가 로그인/로그아웃 확정 시점에 울려주는 이벤트에
   // 편승해, 그 시점의 실제 Supabase 세션을 다시 확인한다 — 화면 입력이나
   // 다른 전역 변수가 아니라 세션 그 자체를 user_id의 유일한 출처로 쓴다.
@@ -158,6 +243,7 @@
     if(!sb){
       currentUserId = null;
       stores = [];
+      connectedCafe24StoreIds = {};
       render();
       return;
     }
@@ -168,11 +254,14 @@
       if(user){
         currentUserId = user.id;
         stores = []; // 새 사용자 몫을 불러오는 동안 이전 목록이 잠깐이라도 보이지 않게
+        connectedCafe24StoreIds = {};
         render();
         fetchStores(user.id, seq);
+        fetchConnectedAccounts(seq);
       } else {
         currentUserId = null;
         stores = [];
+        connectedCafe24StoreIds = {};
         render();
       }
     });
@@ -208,10 +297,29 @@
   if(modalBackdrop) modalBackdrop.addEventListener('click', closeModal);
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    if(e.key === 'Escape' && cafe24Modal && cafe24Modal.classList.contains('open')) closeCafe24Modal();
   });
 
-  // 목록의 수정/삭제 버튼 — 이벤트 위임(목록이 매번 innerHTML로 새로
-  // 그려지므로, 각 버튼에 매번 리스너를 다는 대신 listEl 하나에만 건다).
+  // ---------------------------------------------------- Cafe24 연결 모달 제어
+  // mall_id는 store_url에서 확실히 뽑히는 경우에만 "제안값"으로 채워둘 뿐,
+  // 사용자가 직접 확인/수정하고 눌러야만 연결이 시작된다(자동 추정 후
+  // 즉시 연결 금지).
+  function openCafe24Modal(storeRow){
+    cafe24ConnectStoreId = storeRow.id;
+    cafe24MallIdInput.value = suggestMallId(storeRow.store_url);
+    cafe24Modal.classList.add('open');
+    cafe24MallIdInput.focus();
+  }
+  function closeCafe24Modal(){
+    cafe24Modal.classList.remove('open');
+    cafe24Form.reset();
+    cafe24ConnectStoreId = null;
+  }
+  if(cafe24Close) cafe24Close.addEventListener('click', closeCafe24Modal);
+  if(cafe24Backdrop) cafe24Backdrop.addEventListener('click', closeCafe24Modal);
+
+  // 목록의 수정/삭제/Cafe24 연결 버튼 — 이벤트 위임(목록이 매번 innerHTML로
+  // 새로 그려지므로, 각 버튼에 매번 리스너를 다는 대신 listEl 하나에만 건다).
   listEl.addEventListener('click', function(e){
     var editBtn = e.target.closest('.store-edit-btn');
     if(editBtn){
@@ -226,7 +334,53 @@
       var label = target ? target.name : '이 쇼핑몰';
       if(!window.confirm('"' + label + '"을(를) 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) return;
       deleteStore(id);
+      return;
     }
+    var cafe24Btn = e.target.closest('.store-cafe24-connect-btn');
+    if(cafe24Btn){
+      var cafe24Row = stores.filter(function(s){ return String(s.id) === cafe24Btn.getAttribute('data-id'); })[0];
+      if(cafe24Row) openCafe24Modal(cafe24Row);
+    }
+  });
+
+  if(cafe24Form) cafe24Form.addEventListener('submit', function(e){
+    e.preventDefault();
+    if(!cafe24ConnectStoreId || !currentUserId){ closeCafe24Modal(); return; }
+    var sb = client();
+    if(!sb) return;
+
+    var mallId = cafe24MallIdInput.value.trim();
+    // Cafe24 mall_id는 영문 소문자/숫자/하이픈 조합의 서브도메인 한 조각 —
+    // 형식만 가볍게 확인한다(실제 존재 여부는 Edge Function/Cafe24가 판단).
+    if(!mallId || !/^[a-z0-9-]+$/i.test(mallId)){
+      showToast('mall_id 형식을 확인해주세요 (예: myshop)', 'error');
+      return;
+    }
+
+    cafe24SubmitBtn.disabled = true;
+    sb.functions.invoke('cafe24-oauth-start', {
+      body: { store_id: cafe24ConnectStoreId, mall_id: mallId }
+    }).then(function(res){
+      if(res.error){
+        cafe24SubmitBtn.disabled = false;
+        showToast('Cafe24 연결을 시작하지 못했어요: ' + res.error.message, 'error');
+        return;
+      }
+      var authorizationUrl = res.data && res.data.authorization_url;
+      if(!authorizationUrl){
+        cafe24SubmitBtn.disabled = false;
+        showToast('Cafe24 인증 주소를 받지 못했어요', 'error');
+        return;
+      }
+      // 이 페이지를 완전히 떠나 Cafe24 인증 화면으로 이동한다 — 성공/실패와
+      // 무관하게 서버가 다시 #/account로 돌려보내고, 그때 위 콜백 안내
+      // 토스트 로직이 결과를 보여준다.
+      window.location.assign(authorizationUrl);
+    }).catch(function(err){
+      cafe24SubmitBtn.disabled = false;
+      showToast('Cafe24 연결 중 오류가 발생했어요', 'error');
+      console.warn('[launchdesk] cafe24-oauth-start 호출 중 오류:', err && err.message);
+    });
   });
 
   function deleteStore(id){
