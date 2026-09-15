@@ -28,7 +28,8 @@
     '/resources':     'view-resources',
     '/wholesale':     'view-wholesale',
     '/services/setup': 'view-services-setup',
-    '/account':       'view-account'
+    '/account':       'view-account',
+    '/admin':         'view-admin'
   };
 
   /* Display name shown in the topbar crumb, and (for paths not in
@@ -55,7 +56,8 @@
     '/start/marketing':  '06 · 마케팅 & SNS',
     '/start/orders':     '07 · 주문 · CS 관리',
     '/start/wrapup':     '08 · 마무리',
-    '/account':          '내 쇼핑몰'
+    '/account':          '내 쇼핑몰',
+    '/admin':            'LaunchDesk Admin'
   };
 
   function currentPath(){
