@@ -1,0 +1,395 @@
+/* 운영 대시보드 리뉴얼(#view-home, home-dashboard.js) — LaunchDesk 메인
+   사용자 대시보드를 "현황 → 해석 → 해야 할 일" 구조로 재구성한 화면.
+
+   이 파일은 새 데이터 조회/집계 로직을 만들지 않는다. 전부 이미 존재하는
+   안전한 소스를 그대로 재사용한다:
+   - Cafe24 주문 요약 · Meta 광고 성과 · 연결 상태 → ops-overview.js가 이미
+     계산해 window.launchdeskOpsSnapshot으로 구독 가능하게 내보낸 값(이
+     파일이 두 번째로 같은 조회/계산을 하지 않는다 — subscribe()만 한다).
+   - 도매처 목록 → wholesalers.js의 fetchPublishedWholesalers()(RLS가
+     published만 돌려주므로 로그인 여부와 무관하게 안전).
+   - 세팅 대행 문의 → 사용자 본인 조회용 안전한 RPC/뷰가 아직 없다
+     (20260915200000_setup_inquiries.sql 주석에 명시된 대로, admin_note
+     노출 위험 때문에 authenticated 본인-행 SELECT 정책을 의도적으로 만들지
+     않았다). 그래서 이 화면은 "문의하기" CTA + "내 문의 확인 준비중" 안내만
+     보여주고, admin SELECT 권한은 절대 열지 않는다.
+   - 로드맵 진행 배너/체크리스트(resume-banner 등)는 이 파일이 전혀
+     건드리지 않는다 — app.js의 renderHomeDashboard()가 계속 그대로
+     담당한다.
+
+   index.html에서 store.js/app.js/ops-overview.js/wholesalers.js보다 뒤에
+   로드해야 한다(이 파일이 그 전역들을 구독/호출하기 때문). */
+(function(){
+  var root = document.getElementById('opsdashRoot');
+  if(!root) return;
+
+  var subtitleEl = document.getElementById('opsdashSubtitle');
+  var refreshBtn = document.getElementById('opsdashRefreshBtn');
+  var kpiOrdersEl = document.getElementById('opsdashKpiOrders');
+  var kpiPaymentEl = document.getElementById('opsdashKpiPayment');
+  var kpiSpendEl = document.getElementById('opsdashKpiSpend');
+  var kpiRoasEl = document.getElementById('opsdashKpiRoas');
+  var kpiRoasNoteEl = document.getElementById('opsdashKpiRoasNote');
+  var briefListEl = document.getElementById('opsdashBriefList');
+  var adStateEl = document.getElementById('opsdashAdState');
+  var monthSummaryEl = document.getElementById('opsdashMonthSummary');
+  var wholesalersEl = document.getElementById('opsdashWholesalers');
+  var setupInquiryEl = document.getElementById('opsdashSetupInquiry');
+  var connectionEl = document.getElementById('opsdashConnectionStatus');
+  var nextActionEl = document.getElementById('opsdashNextAction');
+
+  function escapeHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  // ---------------------------------------------------------------- 포맷
+  function formatWon(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '원'; }
+  function formatCount(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '건'; }
+  function formatMetaMoney(amount, currency){
+    var n = Number(amount) || 0;
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 2 }).format(n);
+    } catch(e){
+      return (currency ? currency + ' ' : '') + n.toLocaleString('en-US');
+    }
+  }
+  // ops-overview.js의 ROAS 표시 규칙과 동일하게 유지한다(같은 원본 ratio를
+  // 같은 공식으로 표시만 다시 하는 것 — 데이터/계산 로직 중복이 아니라
+  // 각 화면이 자기 표시 형식을 갖는 이 프로젝트의 기존 관례를 그대로
+  // 따른 것이다, admin.js의 독립 formatBetaPercent()와 같은 이유).
+  function formatRoasPercent(x){ return (x === null || x === undefined) ? '—' : (Math.round(Number(x) * 100).toLocaleString('ko-KR') + '%'); }
+  function formatRoasNote(x, currency){
+    if(x === null || x === undefined) return '';
+    var perUnit = (function(){
+      try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(1); }
+      catch(e){ return (currency || 'USD') + ' 1'; }
+    })();
+    return '광고비 ' + perUnit + '당 약 ' + formatMetaMoney(x, currency) + '의 Meta 광고매출';
+  }
+
+  // ---------------------------------------------------------------- 헤더
+  function renderHeader(snapshot){
+    if(!subtitleEl) return;
+    var storeName = snapshot.cafe24.storeName;
+    subtitleEl.textContent = storeName
+      ? (storeName + ' · 오늘 쇼핑몰과 광고 상태를 한눈에 확인하세요.')
+      : '오늘 쇼핑몰과 광고 상태를 한눈에 확인하세요.';
+  }
+
+  // ------------------------------------------------------------ KPI 4개
+  function renderKpis(snapshot){
+    var cafe24 = snapshot.cafe24;
+    var meta = snapshot.meta;
+
+    if(kpiOrdersEl) kpiOrdersEl.textContent = (cafe24.state === 'data' && cafe24.today) ? formatCount(cafe24.today.count) : '-';
+    if(kpiPaymentEl) kpiPaymentEl.textContent = (cafe24.state === 'data' && cafe24.today) ? formatWon(cafe24.today.payment) : '-';
+
+    var metaReady = cafe24.state === 'data' && meta.state === 'data' && meta.today;
+    if(kpiSpendEl) kpiSpendEl.textContent = metaReady ? formatMetaMoney(meta.today.spend, meta.currency) : '-';
+    if(kpiRoasEl) kpiRoasEl.textContent = metaReady ? formatRoasPercent(meta.today.roas) : '-';
+    if(kpiRoasNoteEl) kpiRoasNoteEl.textContent = metaReady ? formatRoasNote(meta.today.roas, meta.currency) : '';
+  }
+
+  // -------------------------------------------------------- 오늘의 운영 브리핑
+  // 전부 실제 데이터로 판단 가능한 문장만 — "성과가 좋습니다" 같은 근거
+  // 없는 평가는 만들지 않는다(요구사항 7).
+  function buildBriefLines(snapshot){
+    var cafe24 = snapshot.cafe24;
+    var meta = snapshot.meta;
+    var lines = [];
+
+    if(cafe24.state === 'data' && cafe24.today){
+      lines.push(cafe24.today.count > 0
+        ? ('오늘 주문 ' + cafe24.today.count + '건, 결제금액 ' + formatWon(cafe24.today.payment) + '이 발생했습니다.')
+        : '오늘 접수된 주문이 아직 없습니다.');
+    }
+
+    if(cafe24.state === 'data' && meta.state === 'data' && meta.today){
+      var t = meta.today, m = meta.month;
+      if(t.spend > 0 || t.purchase_value > 0){
+        lines.push('광고비 ' + formatMetaMoney(t.spend, meta.currency) + '로 Meta 광고매출 ' + formatMetaMoney(t.purchase_value, meta.currency) + '이 집계되었습니다.');
+      }
+      if(t.roas !== null && m && m.roas !== null && t.roas !== m.roas){
+        lines.push(t.roas > m.roas
+          ? '오늘 Meta 광고 효율이 이번 달 평균보다 높습니다.'
+          : '오늘 Meta 광고 효율이 이번 달 평균보다 낮습니다.');
+      }
+    }
+
+    if(lines.length){
+      lines.push('주문과 광고 데이터를 함께 확인해보세요.');
+    }
+
+    return lines.slice(0, 3); // 최대 3문장
+  }
+
+  function renderBrief(snapshot){
+    if(!briefListEl) return;
+    var lines = buildBriefLines(snapshot);
+    if(!lines.length){
+      // 데이터 없음/미연결을 큰 중앙정렬 빈 박스가 아니라 작은 muted
+      // 안내 한 줄로 — 카드 높이가 empty state 때문에 커지지 않게 한다
+      // (요구사항 18).
+      briefListEl.innerHTML = '<p class="opsdash-empty-note">쇼핑몰을 연결하면 오늘의 운영 브리핑을 확인할 수 있습니다.</p>';
+      return;
+    }
+    briefListEl.innerHTML = lines.map(function(line){
+      return '<div class="opsdash-brief-item">' + escapeHtml(line) + '</div>';
+    }).join('');
+  }
+
+  // -------------------------------------------------------------- 광고 상태
+  var META_STATE_EMPTY_MESSAGES = {
+    'not-connected': 'Meta 광고 계정을 연결해주세요.',
+    'not-selected': '분석할 광고계정을 선택해주세요.',
+    'loading': '광고 데이터를 불러오는 중...',
+    'error': null // errorMessage를 그대로 사용
+  };
+
+  function renderAdState(snapshot){
+    if(!adStateEl) return;
+    var cafe24 = snapshot.cafe24;
+    var meta = snapshot.meta;
+
+    if(cafe24.state !== 'data'){
+      adStateEl.innerHTML = '<p class="opsdash-empty-note">쇼핑몰을 연결하면 광고 상태를 확인할 수 있어요.</p>';
+      return;
+    }
+    if(meta.state !== 'data'){
+      var msg = meta.state === 'error' ? (meta.errorMessage || '광고 데이터를 불러오지 못했습니다.') : (META_STATE_EMPTY_MESSAGES[meta.state] || '광고 데이터가 없습니다.');
+      adStateEl.innerHTML = '<p class="opsdash-empty-note">' + escapeHtml(msg) + ' <a href="#/account" style="color:var(--op-accent-ink); font-weight:600;">내 쇼핑몰 관리로 이동</a></p>';
+      return;
+    }
+
+    var t = meta.today, m = meta.month;
+    // note와 상태 배지(tone)를 함께 판단한다 — good/warn만 근거가 명확한
+    // 경우에만 쓰고(요구사항 17), 그 외는 neutral(색 없음).
+    var note, tone;
+    if(t.spend === 0){
+      note = '오늘 광고비가 아직 사용되지 않았습니다.';
+      tone = 'neutral';
+    } else if(t.purchase_count === 0){
+      note = '광고비가 사용되고 있지만 오늘 구매가 없습니다.';
+      tone = 'warn';
+    } else if(t.roas !== null && m.roas !== null){
+      if(t.roas > m.roas){ note = '오늘 광고 효율이 이번 달 평균보다 높습니다.'; tone = 'good'; }
+      else if(t.roas < m.roas){ note = '오늘 광고 효율이 이번 달 평균보다 낮습니다.'; tone = 'neutral'; }
+      else { note = '오늘 광고 효율이 이번 달 평균과 비슷합니다.'; tone = 'neutral'; }
+    } else {
+      note = null;
+      tone = null;
+    }
+    var pillText = tone === 'good' ? '양호' : tone === 'warn' ? '주의' : tone === 'neutral' ? '참고' : null;
+
+    adStateEl.innerHTML =
+      '<div class="opsdash-adstate-row"><span class="opsdash-adstate-label">오늘 ROAS</span><span class="opsdash-adstate-value">' + formatRoasPercent(t.roas) + '</span></div>' +
+      '<div class="opsdash-adstate-row"><span class="opsdash-adstate-label">이번 달 ROAS</span><span class="opsdash-adstate-value">' + formatRoasPercent(m.roas) + '</span></div>' +
+      (note ? ('<div class="opsdash-adstate-note">' + (pillText ? '<span class="opsdash-pill ' + tone + '">' + pillText + '</span>' : '') + '<span>' + escapeHtml(note) + '</span></div>') : '');
+  }
+
+  // --------------------------------------------------------- 이번 달 운영 현황
+  // 세로로 두 그룹을 쌓지 않고, 한 줄(flex) 안에 "쇼핑몰"과 "광고"를 구분선
+  // 하나로 나눠 가로로 배치한다 — Cafe24/Meta 구분은 그룹 라벨 + 구분선으로
+  // 시각적으로 유지하되(요구사항 10), 세로 높이는 크게 줄인다.
+  function stat(label, value){
+    return '<div class="opsdash-stat"><span class="opsdash-stat-label">' + escapeHtml(label) + '</span><span class="opsdash-stat-value">' + value + '</span></div>';
+  }
+
+  function renderMonthSummary(snapshot){
+    if(!monthSummaryEl) return;
+    var cafe24 = snapshot.cafe24;
+    var meta = snapshot.meta;
+    var html = '';
+
+    html += '<div class="opsdash-summary-group"><div class="opsdash-summary-group-label">쇼핑몰</div>';
+    if(cafe24.state === 'data' && cafe24.month){
+      html += '<div class="opsdash-summary-stats">' +
+        stat('주문', formatCount(cafe24.month.count)) +
+        stat('결제금액', formatWon(cafe24.month.payment)) +
+        '</div>';
+    } else {
+      html += '<p class="opsdash-empty-note" style="padding:0;">Cafe24 연결 시 확인 가능</p>';
+    }
+    html += '</div>';
+
+    html += '<div class="opsdash-summary-divider"></div>';
+
+    html += '<div class="opsdash-summary-group"><div class="opsdash-summary-group-label">광고(Meta)</div>';
+    if(cafe24.state === 'data' && meta.state === 'data' && meta.month){
+      var m = meta.month;
+      html += '<div class="opsdash-summary-stats">' +
+        stat('광고비', formatMetaMoney(m.spend, meta.currency)) +
+        stat('광고매출', formatMetaMoney(m.purchase_value, meta.currency)) +
+        stat('구매', formatCount(m.purchase_count)) +
+        stat('ROAS', formatRoasPercent(m.roas)) +
+        '</div>';
+    } else {
+      html += '<p class="opsdash-empty-note" style="padding:0;">Meta 연결 시 확인 가능</p>';
+    }
+    html += '</div>';
+
+    // Cafe24 결제금액과 Meta 광고매출을 같은 "매출"로 오해하지 않도록 —
+    // 광고 그룹에 실제 데이터가 있을 때만 한 줄로 안내(flex-wrap으로 다음
+    // 줄 전체 폭을 차지).
+    if(cafe24.state === 'data' && meta.state === 'data' && meta.month){
+      html += '<p style="flex-basis:100%; margin:.4rem 0 0; font-size:.75rem; color:var(--ink-faint);">Meta 광고매출은 Meta 자체 귀속 기준이며, Cafe24 실제 결제금액과 다를 수 있습니다.</p>';
+    }
+
+    monthSummaryEl.innerHTML = html;
+  }
+
+  // -------------------------------------------------------------- 연결 상태
+  // 이모지 대신 이 파일 안에서 그린 24x24 line icon만 쓴다(요구사항 7) —
+  // 새 아이콘 라이브러리를 설치하지 않고 기존 sidebar 아이콘과 같은
+  // stroke 스타일로 통일했다.
+  var ICON_STORE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="M4 7l8 4 8-4"/><path d="M12 11v10"/></svg>';
+  var ICON_MEGAPHONE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg>';
+  var ICON_SYNC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8 8 0 1 0 19 15"/><polyline points="20 4 20 11 13 11"/></svg>';
+  var ICON_TAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3h6a2 2 0 0 1 2 2v6L11 20l-8-8z"/><circle cx="15" cy="8" r="1.3" fill="currentColor" stroke="none"/></svg>';
+
+  function connectionRow(icon, label, value, connected){
+    return '<div class="opsdash-connection-row">' +
+      '<span class="opsdash-connection-label">' + icon + '<span>' + label + '</span></span>' +
+      '<span class="store-status' + (connected ? ' connected' : '') + '">' + escapeHtml(value) + '</span></div>';
+  }
+
+  function renderConnectionStatus(snapshot){
+    if(!connectionEl) return;
+    var cafe24 = snapshot.cafe24;
+    var meta = snapshot.meta;
+
+    var cafe24Connected = cafe24.state === 'data';
+    var cafe24Row = connectionRow(ICON_STORE, 'Cafe24', cafe24Connected ? '연결됨' : '연결 안 됨', cafe24Connected);
+
+    var metaConnected = cafe24Connected && meta.state === 'data';
+    var metaLabel = metaConnected ? '연결됨' : (meta.state === 'not-selected' ? '광고계정 미선택' : '연결 안 됨');
+    var metaRow = connectionRow(ICON_MEGAPHONE, 'Meta', metaLabel, metaConnected);
+
+    var metaAccountRow = (metaConnected && meta.accountName)
+      ? '<div class="opsdash-connection-row"><span class="opsdash-connection-label">' + ICON_TAG + '<span>광고계정</span></span><span>' + escapeHtml(meta.accountName) + '</span></div>'
+      : '';
+
+    var syncOk = cafe24Connected && cafe24.lastSyncedAt;
+    var syncRow = connectionRow(ICON_SYNC, '주문 동기화', syncOk ? '정상' : '아직 없음', syncOk);
+
+    connectionEl.innerHTML = cafe24Row + metaRow + metaAccountRow + syncRow;
+  }
+
+  // -------------------------------------------------------------- 다음 할 일
+  function buildNextActions(snapshot){
+    var cafe24 = snapshot.cafe24;
+    var meta = snapshot.meta;
+    var actions = [];
+
+    if(cafe24.state === 'guest'){
+      actions.push({ title: '로그인하고 시작하기', sub: '로그인하면 쇼핑몰 운영 현황을 확인할 수 있어요', href: '#/login' });
+    } else if(cafe24.state !== 'data'){
+      actions.push({ title: 'Cafe24 쇼핑몰 연결하기', sub: '쇼핑몰을 연결하면 실제 주문 현황을 볼 수 있어요', href: '#/account' });
+    } else if(meta.state === 'not-connected'){
+      actions.push({ title: 'Meta 광고 계정 연결하기', sub: '광고 성과를 함께 확인해보세요', href: '#/account' });
+    } else if(meta.state === 'not-selected'){
+      actions.push({ title: '분석할 광고계정 선택하기', sub: 'Meta 광고계정을 선택하면 성과가 표시돼요', href: '#/account' });
+    } else if(meta.state === 'data'){
+      actions.push({ title: '오늘 운영 데이터 확인하기', sub: '운영 도구에서 더 자세한 현황을 볼 수 있어요', href: '#/tools' });
+    }
+
+    return actions.slice(0, 3);
+  }
+
+  // "다음 할 일"은 이제 별도 카드가 아니라 연결 상태 패널 맨 아래 강조
+  // 행 하나로 합쳐 보여준다(요구사항 13) — rule 로직(buildNextActions)은
+  // 그대로 두고 표시 형식만 compact 1줄로 바꿨다. 후보가 여럿이어도 가장
+  // 우선순위 높은 것 하나만 노출한다.
+  function renderNextAction(snapshot){
+    if(!nextActionEl) return;
+    var actions = buildNextActions(snapshot);
+    if(!actions.length){ nextActionEl.innerHTML = ''; return; }
+    var a = actions[0];
+    // 라벨("다음 할 일")과 실제 액션 제목을 같은 줄에 붙이지 않고 위/아래로
+    // 분리한다(제목/설명이 옆에 붙어 보이는 문제 수정).
+    nextActionEl.innerHTML = '<a class="opsdash-next-action" href="' + a.href + '">' +
+      '<span class="opsdash-next-action-text">' +
+        '<span class="opsdash-next-action-label">다음 할 일</span>' +
+        '<span class="opsdash-next-action-title">' + escapeHtml(a.title) + '</span>' +
+      '</span>' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>' +
+      '</a>';
+  }
+
+  // ---------------------------------------------------------------- 도매처
+  // fetchPublishedWholesalers()는 RLS가 published 행만 돌려주므로 로그인
+  // 여부와 무관하게 호출 가능하다(wholesalers.js 기존 구현 그대로 재사용).
+  var wholesalersLoaded = false;
+  function loadWholesalers(){
+    if(!wholesalersEl) return;
+    // index.html의 script 순서상 wholesalers.js가 이 파일보다 먼저 로드돼
+    // 항상 존재해야 하지만(정상 배포 시 도달하지 않는 분기), 순서가 어떤
+    // 이유로든 깨지는 극단적 경우까지 대비해 함수 존재를 다시 한번
+    // 확인한다 — 가짜 데이터로 채우지 않고 명확한 오류 상태만 보여준다.
+    if(!window.launchdeskWholesalers){
+      wholesalersEl.innerHTML = '<p class="opsdash-empty-note">도매처를 불러오지 못했습니다.</p>';
+      return;
+    }
+    wholesalersEl.innerHTML = '<p class="opsdash-empty-note">불러오는 중…</p>';
+    window.launchdeskWholesalers.fetchPublishedWholesalers().then(function(res){
+      wholesalersLoaded = true;
+      if(!res.ok || !res.data || !res.data.length){
+        wholesalersEl.innerHTML = '<p class="opsdash-empty-note">아직 등록된 도매처가 없습니다. <a href="#/wholesale" style="color:var(--op-accent-ink); font-weight:600;">도매처 둘러보기</a></p>';
+        return;
+      }
+      var top = res.data.slice(0, 3);
+      var categoryLabel = window.launchdeskWholesalers.categoryLabel || function(c){ return c; };
+      var rowsHtml = top.map(function(w){
+        return '<div class="opsdash-wholesaler-row">' +
+          '<div><div class="opsdash-wholesaler-name">' + escapeHtml(w.name) + '</div>' +
+          '<div class="opsdash-wholesaler-meta">' + escapeHtml(categoryLabel(w.category) || w.category || '') + '</div></div>' +
+          '</div>';
+      }).join('');
+      wholesalersEl.innerHTML = rowsHtml + '<a class="opsdash-see-all" href="#/wholesale">도매처 전체보기 →</a>';
+    }).catch(function(err){
+      wholesalersLoaded = true;
+      console.warn('[launchdesk] 홈 대시보드: 도매처 조회 중 오류:', err && err.message);
+      wholesalersEl.innerHTML = '<p class="opsdash-empty-note">도매처를 불러오지 못했습니다.</p>';
+    });
+  }
+
+  // ------------------------------------------------------------ 세팅 대행 문의
+  // 사용자 본인 문의 조회용 안전한 RPC/뷰가 아직 없어(admin_note 노출
+  // 위험 — 20260915200000_setup_inquiries.sql 주석 참고), 데이터 조회 없이
+  // 정적으로만 구성한다. admin SELECT 권한은 열지 않는다.
+  function renderSetupInquiry(){
+    if(!setupInquiryEl) return;
+    setupInquiryEl.innerHTML =
+      '<p>쇼핑몰 세팅이 필요하신가요?</p>' +
+      '<a href="#/services/setup" style="font-size:.83rem; font-weight:700; color:var(--op-accent-ink);">문의하기 →</a>' +
+      '<span class="opsdash-inquiry-note">내 문의 확인 준비중</span>';
+  }
+
+  // -------------------------------------------------------------- 렌더 총괄
+  function renderAll(snapshot){
+    if(!snapshot) return;
+    renderHeader(snapshot);
+    renderKpis(snapshot);
+    renderBrief(snapshot);
+    renderAdState(snapshot);
+    renderMonthSummary(snapshot);
+    renderConnectionStatus(snapshot);
+    renderNextAction(snapshot);
+  }
+
+  if(window.launchdeskOpsSnapshot){
+    window.launchdeskOpsSnapshot.subscribe(renderAll);
+  }
+
+  renderSetupInquiry();
+  loadWholesalers();
+
+  if(refreshBtn){
+    refreshBtn.addEventListener('click', function(){
+      if(window.launchdeskOpsSnapshot) window.launchdeskOpsSnapshot.refresh();
+      loadWholesalers();
+    });
+  }
+})();

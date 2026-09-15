@@ -160,16 +160,53 @@
     return Promise.resolve(null);
   }
 
+  // 이 파일 밖(신규 home-dashboard.js)에서 같은 Cafe24/Meta 데이터를 다시
+  // 계산하지 않고 재사용할 수 있도록, 이미 계산된 값만 구독 가능하게
+  // 내보낸다 — 조회/집계 로직 자체는 이 파일에 그대로 남고 단 한 곳도
+  // 바뀌지 않는다(재사용하는 쪽이 새 네트워크 요청이나 새 계산식을 만들지
+  // 않게 하기 위함). 파일 맨 아래 window.launchdeskOpsSnapshot 참고.
+  var currentTopState = 'guest'; // showState()가 매번 갱신
+  var currentMetaState = 'not-connected'; // showMetaState()가 매번 갱신
+  var lastOrderSummary = null; // renderOrderSummary()가 매번 갱신
+  var lastMetaPayload = null; // renderMetaData()가 매번 갱신(payload 원본)
+  var opsSnapshotListeners = [];
+  var latestOpsSnapshot = null;
+
+  function publishOpsSnapshot(){
+    var store = eligibleStores.filter(function(s){ return String(s.id) === String(selectedStoreId); })[0] || null;
+    latestOpsSnapshot = {
+      cafe24: {
+        state: currentTopState, // 'guest'|'no-store'|'loading'|'data'
+        storeName: store ? store.name : null,
+        lastSyncedAt: store ? store.last_synced_at : null,
+        today: lastOrderSummary ? { payment: lastOrderSummary.todayPayment, count: lastOrderSummary.todayCount } : null,
+        month: lastOrderSummary ? { payment: lastOrderSummary.monthPayment, count: lastOrderSummary.monthCount } : null
+      },
+      meta: {
+        state: currentMetaState, // 'not-connected'|'not-selected'|'loading'|'error'|'data'(cafe24 state!=='data'면 의미 없음)
+        currency: (lastMetaPayload && lastMetaPayload.account) ? lastMetaPayload.account.currency : null,
+        accountName: (lastMetaPayload && lastMetaPayload.account) ? lastMetaPayload.account.name : null,
+        today: lastMetaPayload ? lastMetaPayload.today : null,
+        month: lastMetaPayload ? lastMetaPayload.month : null,
+        errorMessage: (currentMetaState === 'error' && metaOpsErrorMsg) ? metaOpsErrorMsg.textContent : null
+      }
+    };
+    opsSnapshotListeners.forEach(function(cb){ try{ cb(latestOpsSnapshot); }catch(e){ console.warn('[launchdesk] ops snapshot 구독자 오류:', e && e.message); } });
+  }
+
   function showMetaState(state){ // 'not-connected'|'not-selected'|'loading'|'error'|'data'
-    if(!metaPanel) return;
+    currentMetaState = state;
+    if(!metaPanel){ publishOpsSnapshot(); return; }
     if(metaOpsNotConnected) metaOpsNotConnected.hidden = state !== 'not-connected';
     if(metaOpsNotSelected) metaOpsNotSelected.hidden = state !== 'not-selected';
     if(metaOpsLoading) metaOpsLoading.hidden = state !== 'loading';
     if(metaOpsError) metaOpsError.hidden = state !== 'error';
     if(metaOpsDataWrap) metaOpsDataWrap.hidden = state !== 'data';
+    publishOpsSnapshot();
   }
 
   function renderMetaData(payload){
+    lastMetaPayload = payload;
     var currency = payload.account && payload.account.currency;
     var today = payload.today || {};
     var month = payload.month || {};
@@ -302,6 +339,7 @@
   // 헤더만 남음 — 로그인/로그아웃 직후 새 데이터가 오기 전까지 이전
   // 사용자의 흔적이 잠깐이라도 보이지 않게 하는 중간 상태)
   function showState(state){
+    currentTopState = state;
     guestNotice.hidden = state !== 'guest';
     noStoreNotice.hidden = state !== 'no-store';
     dataWrap.hidden = state !== 'data';
@@ -311,6 +349,7 @@
     // 통째로 숨긴다(요구사항 13과 별개로, "쇼핑몰이 없는데 Meta 상태만
     // 보이는" 혼란을 막기 위함).
     if(metaPanel) metaPanel.hidden = state !== 'data';
+    publishOpsSnapshot();
   }
 
   function populateSelect(){
@@ -330,10 +369,12 @@
   }
 
   function renderOrderSummary(summary){
+    lastOrderSummary = summary;
     todayPaymentEl.textContent = formatWon(summary.todayPayment);
     todayCountEl.textContent = summary.todayCount + '건';
     monthPaymentEl.textContent = formatWon(summary.monthPayment);
     monthCountEl.textContent = summary.monthCount + '건';
+    publishOpsSnapshot();
   }
   var EMPTY_SUMMARY = { todayPayment: 0, todayCount: 0, monthPayment: 0, monthCount: 0 };
 
@@ -533,4 +574,31 @@
     seq += 1;
     loadEligibleCafe24Stores(currentUserId, seq);
   });
+
+  // 다른 화면(홈 대시보드 리뉴얼, home-dashboard.js)이 이미 계산된 Cafe24/
+  // Meta 값을 재조회·재계산 없이 재사용하기 위한 읽기 전용 구독 API.
+  // subscribe(cb)는 즉시 현재 값으로 한 번 호출되고, 이후 상태가 바뀔
+  // 때마다(showState/showMetaState/renderOrderSummary/renderMetaData 내부의
+  // publishOpsSnapshot() 호출 지점) 다시 호출된다. 이 파일의 조회/집계
+  // 로직은 이 export 때문에 단 한 줄도 바뀌지 않았다 — 이미 계산된 값만
+  // 내보낸다.
+  window.launchdeskOpsSnapshot = {
+    subscribe: function(cb){
+      if(typeof cb !== 'function') return function(){};
+      opsSnapshotListeners.push(cb);
+      if(latestOpsSnapshot) cb(latestOpsSnapshot);
+      return function unsubscribe(){
+        var i = opsSnapshotListeners.indexOf(cb);
+        if(i > -1) opsSnapshotListeners.splice(i, 1);
+      };
+    },
+    getLatest: function(){ return latestOpsSnapshot; },
+    // 홈 대시보드의 "새로고침" 버튼 전용 — 이 파일이 이미 갖고 있는 재조회
+    // 함수를 그대로 다시 호출할 뿐, 별도 조회 로직을 새로 만들지 않는다.
+    refresh: function(){
+      if(!currentUserId) return;
+      seq += 1;
+      loadEligibleCafe24Stores(currentUserId, seq);
+    }
+  };
 })();

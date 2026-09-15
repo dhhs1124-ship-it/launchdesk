@@ -71,25 +71,53 @@
     return h || '/';
   }
 
-  /* GA4로 보낼 page_location을 안전하게 만든다(2026-09-15 감사 반영). 왜
-     필요한가: 이메일 인증 확인/매직링크 등 Supabase 인증 콜백이 이 페이지로
-     돌아올 때 URL 해시에 access_token/refresh_token 등 자격증명이 실려
-     온다(예: '#access_token=...&refresh_token=...&type=signup'). Supabase
-     SDK가 detectSessionInUrl로 그 해시를 세션에 반영하고 정리하지만, 그
-     처리는 비동기이고 이 스크립트는 파일 하단에서 render()를 동기로 1회
-     호출한다(초기 진입) — SDK 정리가 끝나기 전에 이 render()가 먼저 실행돼
+  /* GA4로 보낼 page_location을 안전하게 만든다(2026-09-15 감사 반영,
+     Google/Kakao 로그인 추가로 쿼리스트링 보호 항목 추가). 왜 필요한가:
+     이메일 인증 확인/매직링크 등 Supabase 인증 콜백이 이 페이지로 돌아올
+     때 URL 해시에 access_token/refresh_token 등 자격증명이 실려 온다(예:
+     '#access_token=...&refresh_token=...&type=signup'). Supabase SDK가
+     detectSessionInUrl로 그 해시를 세션에 반영하고 정리하지만, 그 처리는
+     비동기이고 이 스크립트는 파일 하단에서 render()를 동기로 1회 호출한다
+     (초기 진입) — SDK 정리가 끝나기 전에 이 render()가 먼저 실행돼
      location.href를 그대로 읽어갈 수 있다. 이 앱의 정상 해시 라우트는
      전부 '#/'로 시작하므로(BUILT/TITLES 전부 '/'로 시작하는 경로,
      currentPath() 참고) 해시가 그 형태일 때만 포함하고, 그 외에는(위
      access_token 케이스 포함, 형태를 알 수 없는 무엇이든) 해시를 통째로
-     잘라낸다 — page_path/page_title은 이 함수와 무관하게 그대로 정확한
-     값을 계속 보내므로 정상 SPA 분석에는 영향이 없다. Supabase 인증 흐름
-     자체는 전혀 건드리지 않는다(그 정리 로직은 그대로 자기 타이밍에
-     실행된다 — 여기서는 GA4로 나가는 문자열만 방어적으로 다시 만든다). */
+     잘라낸다.
+
+     Google/Kakao 로그인 추가로 같은 문제가 쿼리스트링에도 생긴다 —
+     Supabase의 기본 OAuth 플로우(PKCE)는 콜백 URL에 '?code=...'(1회용
+     인가 코드)를 실어 돌려주고, provider가 오류를 반환하면
+     '?error=...&error_description=...'가 실린다. Supabase SDK가 이것도
+     내부적으로 처리 후 정리하지만 이 역시 비동기라 같은 타이밍 문제가
+     있다 — code/error 자체는 access_token만큼 민감하지는 않지만(code는
+     1회성이고 서버 간 교환 없이는 무용지물), 그래도 GA4 같은 제3자
+     analytics로 보낼 이유가 전혀 없어 쿼리스트링에서도 이 값들만 제거한다.
+     utm_source 등 나머지 쿼리 파라미터는 그대로 남긴다(UTM 회귀 방지 —
+     GA4는 UTM을 그대로 봐야 한다).
+
+     Supabase 인증 흐름 자체는 전혀 건드리지 않는다(그 정리 로직은 그대로
+     자기 타이밍에 실행된다 — 여기서는 GA4로 나가는 문자열만 방어적으로
+     다시 만든다). */
+  var OAUTH_CALLBACK_PARAM_NAMES = ['code', 'error', 'error_code', 'error_description', 'state'];
   function safePageLocation(){
     var hash = location.hash;
     var safeHash = (hash.indexOf('#/') === 0) ? hash : '';
-    return location.origin + location.pathname + location.search + safeHash;
+    var safeSearch = location.search;
+    if(safeSearch){
+      try{
+        var params = new URLSearchParams(safeSearch);
+        var hadOauthParam = false;
+        OAUTH_CALLBACK_PARAM_NAMES.forEach(function(name){
+          if(params.has(name)){ params.delete(name); hadOauthParam = true; }
+        });
+        if(hadOauthParam){
+          var remaining = params.toString();
+          safeSearch = remaining ? '?' + remaining : '';
+        }
+      }catch(e){ /* URLSearchParams 미지원 등 — 원본 쿼리스트링 그대로 사용 */ }
+    }
+    return location.origin + location.pathname + safeSearch + safeHash;
   }
 
   function setActiveNav(path){
@@ -347,12 +375,110 @@
     if(/network|fetch/i.test(msg)) return '네트워크 연결을 확인해주세요.';
     return '문제가 발생했어요. 잠시 후 다시 시도해주세요.';
   }
+
+  // ---------------------------------------------------------------------
+  // Google/Kakao 로그인 — Supabase Auth의 공식 signInWithOAuth()만 사용한다
+  // (직접 OAuth token exchange 구현 없음, client secret은 프론트에 없음 —
+  // Google/Kakao Console/Supabase Dashboard에서만 관리).
+  //
+  // OAuth는 전체 페이지 리다이렉트를 거친다 — 이 IIFE의 메모리(변수
+  // pendingFreshLogin 등)는 리다이렉트 후 완전히 새로 초기화되므로, 이메일
+  // 로그인과 똑같은 "방금 로그인했다"(isFreshSignIn) 판정을 OAuth에도
+  // 적용하려면 페이지를 넘어 살아남는 저장소가 필요하다. sessionStorage에
+  // 최소 마커 하나만 남기고(탭을 닫으면 자동 소멸, access_token 등 세션
+  // 자체는 전혀 담지 않음 — 그건 Supabase SDK가 자체 관리한다), 복귀 후
+  // SIGNED_IN 이벤트에서 한 번만 소비한다. 이렇게 해야 OAuth로 처음
+  // 로그인한 사용자도 기존 이메일 로그인과 동일하게 게스트 스냅샷 병합·
+  // 레거시 마이그레이션·"로그인했어요" 토스트가 그대로 적용된다(요구사항
+  // 3 — 새 별도 아키텍처가 아니라 기존 canonical flow에 합류).
+  var OAUTH_FRESH_LOGIN_KEY = 'ld-oauth-pending-fresh-login';
+  function markOAuthFreshLoginPending(){
+    try{ sessionStorage.setItem(OAUTH_FRESH_LOGIN_KEY, '1'); }catch(e){}
+  }
+  function consumeOAuthFreshLoginPending(){
+    try{
+      if(sessionStorage.getItem(OAUTH_FRESH_LOGIN_KEY)){
+        sessionStorage.removeItem(OAUTH_FRESH_LOGIN_KEY);
+        return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  function clearOAuthFreshLoginPending(){
+    try{ sessionStorage.removeItem(OAUTH_FRESH_LOGIN_KEY); }catch(e){}
+  }
+
+  var googleLoginBtn = document.getElementById('googleLoginBtn');
+  var kakaoLoginBtn = document.getElementById('kakaoLoginBtn');
+  var oauthInFlight = false; // 두 버튼 중 하나라도 진행 중이면 나머지도 잠근다(중복 클릭 방지)
+
+  function setOAuthButtonsBusy(busy){
+    [googleLoginBtn, kakaoLoginBtn].forEach(function(btn){
+      if(!btn) return;
+      btn.disabled = busy;
+    });
+  }
+
+  function startOAuthLogin(provider){
+    if(oauthInFlight) return;
+    var sb = window.launchdeskSupabase;
+    if(!sb){ showLoginNotice(); return; }
+    oauthInFlight = true;
+    setOAuthButtonsBusy(true);
+    markOAuthFreshLoginPending();
+    // redirectTo는 현재 접속한 origin 그대로 사용한다(하드코딩된 프로덕션
+    // 도메인이 아님) — 실제로 어디로 돌아올 수 있는지는 Supabase Auth URL
+    // Configuration의 allow list가 최종적으로 결정하므로, 여기서 다른
+    // 도메인을 강제한다고 보안이 더 세지지 않는다. 해시 라우트는 포함하지
+    // 않는다(로그인 전 있던 경로로 돌아갈 필요가 없고, OAuth 콜백 파라미터가
+    // 기존 hash router와 섞이지 않게 하기 위함).
+    sb.auth.signInWithOAuth({
+      provider: provider,
+      options: { redirectTo: window.location.origin + '/' }
+    }).then(function(res){
+      if(res.error){
+        // 리다이렉트가 시작되지 못한 경우(설정 오류 등)만 여기 도달한다 —
+        // 성공하면 브라우저가 곧바로 provider 페이지로 이동해 이 콜백 자체가
+        // 사실상 의미 없어진다.
+        clearOAuthFreshLoginPending();
+        oauthInFlight = false;
+        setOAuthButtonsBusy(false);
+        console.warn('[launchdesk] OAuth(' + provider + ') 시작 실패:', res.error.message);
+        showToast('로그인에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+      }
+    }).catch(function(err){
+      clearOAuthFreshLoginPending();
+      oauthInFlight = false;
+      setOAuthButtonsBusy(false);
+      console.warn('[launchdesk] OAuth(' + provider + ') 호출 중 오류:', err && err.message);
+      showToast('로그인에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+    });
+  }
+  if(googleLoginBtn) googleLoginBtn.addEventListener('click', function(){ startOAuthLogin('google'); });
+  if(kakaoLoginBtn) kakaoLoginBtn.addEventListener('click', function(){ startOAuthLogin('kakao'); });
+
+  // OAuth 실패(사용자 취소/provider 오류 등)는 Supabase가 이 페이지의
+  // redirectTo로 ?error=...&error_description=... 쿼리스트링을 그대로
+  // 붙여 돌려보낸다 — raw 오류 문구를 사용자에게 노출하지 않고 정해진
+  // 안내만 보여준 뒤, 새로고침해도 같은 토스트가 다시 뜨지 않도록 그
+  // 쿼리 파라미터만 제거한다(해시 라우트/UTM 쿼리 파라미터는 건드리지
+  // 않는다 — UTM 회귀 방지, 요구사항 12·13).
+  (function handleOAuthRedirectError(){
+    try{
+      var params = new URLSearchParams(location.search);
+      if(!params.has('error') && !params.has('error_description')) return;
+      params.delete('error');
+      params.delete('error_code');
+      params.delete('error_description');
+      var newSearch = params.toString();
+      history.replaceState(null, '', location.pathname + (newSearch ? '?' + newSearch : '') + location.hash);
+      showToast('로그인에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+    }catch(e){}
+  })();
+
   document.getElementById('loginModalClose').addEventListener('click', closeLoginModal);
   document.getElementById('loginModalBackdrop').addEventListener('click', closeLoginModal);
   document.getElementById('loginNoticeClose').addEventListener('click', closeLoginModal);
-  // 카카오/Google 로그인은 아직 미구현이라, 실제 동작하지 않는 버튼이 화면에
-  // 남아있지 않도록 index.html에서 완전히 제거했다(UI polish pass) — 그
-  // 버튼에 연결하던 리스너도 함께 정리한다.
   loginForm.addEventListener('submit', function(e){
     e.preventDefault();
     var sb = window.launchdeskSupabase;
@@ -1158,7 +1284,10 @@
         // (pendingFreshLogin) 확인한다 — 탭 재포커스 등으로 SDK가 다시 쏘는
         // SIGNED_IN은 "신선한 로그인"으로 취급하지 않는다(중복 hydrate/
         // 마이그레이션 확인창 방지 — STEP01 입력이 갑자기 끊기던 원인).
-        var isFreshSignIn = pendingFreshLogin;
+        // OAuth는 전체 페이지 리다이렉트를 거치므로 pendingFreshLogin(메모리
+        // 변수)가 리다이렉트 후 초기화돼 사라진다 — 대신 sessionStorage
+        // 마커(consumeOAuthFreshLoginPending)로 같은 판정을 이어받는다.
+        var isFreshSignIn = pendingFreshLogin || consumeOAuthFreshLoginPending();
         pendingFreshLogin = false;
         handleSession(session, isFreshSignIn);
         if(isFreshSignIn){

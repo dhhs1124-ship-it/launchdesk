@@ -62,31 +62,44 @@
   .scrim{position:fixed; inset:0; background:rgba(28,26,22,.32); z-index:75; opacity:0; pointer-events:none; transition:opacity .2s ease;}
   .scrim.show{opacity:1; pointer-events:auto;}
 
-  .sidebar{width:var(--sidebar-w); flex:0 0 auto; background:var(--sidebar-bg); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:1.3rem .9rem 1.4rem; position:sticky; top:0; align-self:flex-start; height:100vh; height:100dvh; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border-strong) transparent;}
+  /* 사이드바 전용 green 토큰 + white 배경 — 전역 --accent(벽돌색)/--gradient/
+     --sidebar-bg(다른 화면의 테이블 헤더·워크시트 헤더 등에서 계속 쓰임)는
+     그대로 두고, .sidebar 요소 자체의 background만 흰색으로 직접
+     지정한다(변수를 바꾸지 않고 규칙 안에서 리터럴로 덮어씀 — 다른 화면은
+     전혀 영향받지 않는다). 로고 점/프로필 아바타/진행바/메뉴 선택 상태는
+     새 스코프 변수로 moss green 언어에 맞춘다. --badge-c는 기존에 이미
+     있던 값(자료실 배지)을 재사용한 것뿐 새 색이 아니다. */
+  .sidebar{
+    --sidebar-accent: var(--badge-c);
+    --sidebar-accent-soft: var(--badge-c-bg);
+    --sidebar-accent-ink: #33502f;
+    --sidebar-gradient: linear-gradient(135deg, #4c6b49 0%, #6d8c63 100%);
+    width:var(--sidebar-w); flex:0 0 auto; background:#fff; border-right:1px solid var(--border); display:flex; flex-direction:column; padding:1.3rem .9rem 1.4rem; position:sticky; top:0; align-self:flex-start; height:100vh; height:100dvh; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border-strong) transparent;
+  }
   .sidebar::-webkit-scrollbar{width:3px;}
   .sidebar::-webkit-scrollbar-thumb{background:var(--border-strong); border-radius:99px;}
-  .sidebar .logo{display:flex; align-items:center; gap:.5rem; font-family:var(--f-display); font-weight:700; font-size:1.08rem; letter-spacing:-.01em; padding:.5rem .6rem 1.3rem;}
-  .sidebar .logo .dot{width:10px; height:10px; border-radius:3px; background:var(--gradient); flex:0 0 auto;}
+  .sidebar .logo{display:flex; align-items:center; gap:.5rem; font-family:var(--f-display); font-weight:700; font-size:1.08rem; letter-spacing:-.01em; padding:.5rem .6rem 1.2rem;}
+  .sidebar .logo .dot{width:10px; height:10px; border-radius:3px; background:var(--sidebar-gradient); flex:0 0 auto;}
 
-  .profile-card{display:flex; align-items:center; gap:.7rem; padding:.5rem .6rem; margin-bottom:.7rem; cursor:pointer;}
-  .profile-avatar{position:relative; width:36px; height:36px; border-radius:50%; background:var(--gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--f-display); font-weight:700; font-size:.95rem; flex:0 0 auto;}
+  .profile-card{display:flex; align-items:center; gap:.7rem; padding:.5rem .6rem; margin-bottom:.6rem; cursor:pointer;}
+  .profile-avatar{position:relative; width:36px; height:36px; border-radius:50%; background:var(--sidebar-gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--f-display); font-weight:700; font-size:.95rem; flex:0 0 auto;}
   .profile-name{font-size:.88rem; font-weight:700; color:var(--ink);}
   .profile-day{font-family:var(--f-mono); font-size:.68rem; color:var(--ink-faint); margin-top:.1rem;}
-  .progress-mini{padding:0 .6rem 1.1rem; border-bottom:1px solid var(--border); margin-bottom:.7rem;}
+  .progress-mini{padding:0 .6rem 1rem; border-bottom:1px solid var(--border); margin-bottom:.6rem;}
   .pm-head{display:flex; justify-content:space-between; font-size:.74rem; color:var(--ink-soft); margin-bottom:.4rem;}
-  .pm-head b{font-weight:700; color:var(--accent);}
+  .pm-head b{font-weight:700; color:var(--sidebar-accent);}
   .pm-bar{height:6px; border-radius:99px; background:var(--border); overflow:hidden;}
-  .pm-fill{height:100%; width:0%; background:var(--gradient); border-radius:99px; transition:width .35s ease;}
+  .pm-fill{height:100%; width:0%; background:var(--sidebar-gradient); border-radius:99px; transition:width .35s ease;}
 
-  .side-nav{display:flex; flex-direction:column; gap:.15rem;}
-  .side-nav a{position:relative; display:flex; align-items:center; gap:.7rem; padding:.6rem .7rem; border-radius:var(--radius-sm); font-size:.9rem; font-weight:600; color:var(--ink-soft); transition:background .15s, color .15s;}
-  .side-nav a svg{width:18px; height:18px; flex:0 0 auto;}
+  .side-nav{display:flex; flex-direction:column; gap:.1rem;}
+  .side-nav a{position:relative; display:flex; align-items:center; gap:.7rem; padding:.52rem .7rem; border-radius:var(--radius-sm); font-size:.88rem; font-weight:600; color:var(--ink-soft); transition:background .15s, color .15s;}
+  .side-nav a svg{width:17px; height:17px; flex:0 0 auto;}
   .side-nav a:hover{background:var(--surface-hover); color:var(--ink);}
-  .side-nav a.nav-current{background:var(--accent-soft); color:var(--accent-ink);}
-  .side-nav a.nav-current::before{content:""; position:absolute; left:-.9rem; top:.5rem; bottom:.5rem; width:3px; border-radius:0 3px 3px 0; background:var(--accent);}
+  .side-nav a.nav-current{background:var(--sidebar-accent-soft); color:var(--sidebar-accent-ink);}
+  .side-nav a.nav-current::before{content:""; position:absolute; left:-.9rem; top:.5rem; bottom:.5rem; width:3px; border-radius:0 3px 3px 0; background:var(--sidebar-accent);}
 
-  .side-nav-foot{margin-top:auto; padding-top:.9rem; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:.1rem;}
-  .side-nav-foot a{font-size:.8rem; color:var(--ink-faint); padding:.5rem .7rem; border-radius:var(--radius-sm); transition:background .15s, color .15s;}
+  .side-nav-foot{margin-top:auto; padding-top:.8rem; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:.1rem;}
+  .side-nav-foot a{font-size:.79rem; color:var(--ink-faint); padding:.45rem .7rem; border-radius:var(--radius-sm); transition:background .15s, color .15s;}
   .side-nav-foot a:hover{color:var(--ink-soft); background:var(--surface-hover);}
 
   @media (max-width:960px){
@@ -277,6 +290,20 @@
   .modal-foot a{color:var(--accent-ink); font-weight:600;}
   .modal-notice{text-align:center;}
   .modal-notice p{font-size:.9rem; color:var(--ink);}
+
+  /* Google/Kakao 로그인 버튼 — 대형 로그인 페이지 리디자인이 아니라 기존
+     이메일 로그인 모달에 자연스럽게 얹는 정도로 제한한다. */
+  .oauth-buttons{display:flex; flex-direction:column; gap:.6rem; margin-bottom:1.3rem;}
+  .oauth-btn{display:flex; align-items:center; justify-content:center; gap:.6rem; width:100%; padding:.68rem 1rem; border-radius:8px; border:1px solid var(--border-strong); background:var(--surface); font-family:var(--f-body); font-weight:600; font-size:.88rem; color:var(--ink); cursor:pointer; transition:background .15s ease, opacity .15s ease;}
+  .oauth-btn svg{width:18px; height:18px; flex:0 0 auto;}
+  .oauth-btn:hover:not(:disabled){background:var(--surface-hover);}
+  .oauth-btn:disabled{opacity:.6; cursor:default;}
+  /* Kakao 공식 버튼 색(#FEE500, 검정 텍스트) — 전체 톤을 깨지 않는 선에서
+     Kakao 고유 브랜드 색만 유지한다. */
+  .oauth-btn.oauth-kakao{background:#FEE500; border-color:#FEE500; color:#191919;}
+  .oauth-btn.oauth-kakao:hover:not(:disabled){background:#f5da00;}
+  .oauth-divider{display:flex; align-items:center; gap:.8rem; margin:0 0 1.2rem; font-size:.76rem; color:var(--ink-faint);}
+  .oauth-divider::before, .oauth-divider::after{content:""; flex:1; height:1px; background:var(--border);}
 
   .info-card h4{font-size:.92rem; font-weight:700; margin-bottom:.5rem; display:flex; align-items:center; gap:.45rem; flex-wrap:wrap;}
   .info-card .tag{font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .45rem; border-radius:4px; letter-spacing:.02em;}
@@ -650,9 +677,13 @@
   .quick-row:last-child{border-bottom:none;}
   .quick-row:hover{background:var(--surface-hover);}
   .quick-row .qr-icon{width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; font-size:1rem;}
-  .quick-row .qr-text{flex:1; min-width:0;}
-  .quick-row .qr-title{font-size:.88rem; font-weight:700;}
-  .quick-row .qr-sub{font-size:.75rem; color:var(--ink-faint); margin-top:.05rem;}
+  .quick-row .qr-icon svg{width:17px; height:17px;}
+  .quick-row .qr-text{flex:1; min-width:0; display:flex; flex-direction:column;}
+  /* 제목/설명이 span(inline)이라 display를 명시하지 않으면 같은 줄에
+     붙어버린다 — 반드시 각자 줄로 분리하고 간격을 분명하게 둔다(전
+     화면 quick-row 공통 버그 수정, 홈 대시보드 리뉴얼에서 발견). */
+  .quick-row .qr-title{display:block; font-size:.88rem; font-weight:700;}
+  .quick-row .qr-sub{display:block; font-size:.75rem; color:var(--ink-faint); margin-top:.2rem; line-height:1.4;}
   .quick-row .qr-chev{color:var(--ink-faint); flex:0 0 auto;}
 
   .tip-box{background:var(--ink); color:#fff; border-radius:var(--radius); padding:1.1rem 1.2rem;}
@@ -761,3 +792,162 @@
   .admin-filter-tab{padding:.5rem 1.05rem; border-radius:99px; border:1px solid var(--border-strong); background:var(--surface); font-family:var(--f-body); font-size:.84rem; font-weight:600; color:var(--ink-soft); cursor:pointer; transition:background .15s, color .15s, border-color .15s;}
   .admin-filter-tab.active{background:var(--accent); color:#fff; border-color:var(--accent);}
   .admin-filter-tab:not(.active):hover{background:var(--surface-hover);}
+
+  /* =========================================================================
+     운영 대시보드 리뉴얼(#view-home, home-dashboard.js) 2차 패스 — 화면
+     밀도/타이포/color 완성도 개선. 새 토큰은 .opsdash 스코프 안에서만
+     유효하다. 전역 --accent(벽돌색)는 그대로 두고, 다른 화면(버튼/배지 등)은
+     이번 리뉴얼로 전혀 바뀌지 않는다. --op-accent는 이미 있던 --badge-c
+     (자료실 배지의 모스그린, #4c6b49)를 그대로 재사용한 것뿐이라 새 색을
+     추가한 게 아니다.
+
+     밀도 개선 원칙: .dash-panel/.dash-panel-head 자체(전역 클래스 — /tools,
+     admin 등 다른 화면에서도 그대로 쓰임)는 손대지 않고, `.opsdash
+     .dash-panel-head`처럼 이 화면 스코프 안에서만 padding/font-size를
+     좁히는 후손 선택자로 덮어쓴다 — 다른 화면의 패널 헤더 크기는 전혀
+     바뀌지 않는다.
+     ========================================================================= */
+  .opsdash{ --op-accent:var(--badge-c); --op-accent-soft:var(--badge-c-bg); --op-accent-ink:#33502f; margin-bottom:1.5rem; }
+  /* 타이포 hierarchy(요구사항 16) — page title 28~32px, section title
+     15~18px, KPI 숫자 24~30px, body 13~15px, muted 12~14px 범위를
+     지키면서 padding/margin/레이아웃 재구성으로 밀도를 올린다(폰트를
+     과하게 줄여 hierarchy를 해치지 않는다). */
+  .opsdash .dash-panel-head, .opsdash-roadmap-panel > .dash-panel-head{padding:.8rem 1.1rem; font-size:.94rem;}
+
+  .opsdash-header{display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:.9rem;}
+  .opsdash-header h1{font-size:1.85rem;}
+  .opsdash-header p{margin:.3rem 0 0; font-size:.86rem; color:var(--ink-soft);}
+
+  .opsdash-kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:.85rem; margin-bottom:.9rem;}
+  @media (max-width:900px){ .opsdash-kpis{grid-template-columns:repeat(2,1fr);} }
+  .opsdash-kpi{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:.85rem 1.05rem; display:flex; align-items:flex-start; justify-content:space-between; gap:.6rem;}
+  .opsdash-kpi-main{min-width:0;}
+  .opsdash-kpi-label{font-size:.75rem; color:var(--ink-faint);}
+  .opsdash-kpi-value{font-family:var(--f-display); font-weight:700; font-size:1.5rem; color:var(--ink); font-variant-numeric:tabular-nums; word-break:break-word; margin-top:.3rem;}
+  .opsdash-kpi-note{font-size:.75rem; color:var(--ink-faint); margin-top:.3rem; line-height:1.4;}
+  .opsdash-kpi-icon{flex:0 0 auto; width:34px; height:34px; border-radius:9px; background:var(--op-accent-soft); color:var(--op-accent-ink); display:flex; align-items:center; justify-content:center;}
+  .opsdash-kpi-icon svg{width:17px; height:17px;}
+
+  .opsdash-row{display:grid; grid-template-columns:2fr 1fr; gap:.9rem; margin-bottom:.9rem; align-items:stretch;}
+  .opsdash-row.even{grid-template-columns:1fr 1fr;}
+  .opsdash-row.triple{grid-template-columns:1fr 1fr 1.2fr;}
+  @media (max-width:1000px){ .opsdash-row.triple{grid-template-columns:1fr;} }
+  @media (max-width:860px){ .opsdash-row, .opsdash-row.even{grid-template-columns:1fr;} }
+
+  .opsdash-brief-list{display:flex; flex-direction:column; gap:.4rem; padding:.85rem 1.1rem;}
+  .opsdash-brief-item{display:flex; gap:.55rem; font-size:.85rem; color:var(--ink-soft); line-height:1.5;}
+  .opsdash-brief-item::before{content:""; width:5px; height:5px; border-radius:50%; background:var(--op-accent); margin-top:.5rem; flex:0 0 auto;}
+  .opsdash-empty-note{margin:0; padding:.85rem 1.1rem; font-size:.82rem; color:var(--ink-faint); line-height:1.5;}
+
+  .opsdash-adstate{padding:.85rem 1.1rem;}
+  .opsdash-adstate-row{display:flex; align-items:baseline; justify-content:space-between; gap:.6rem; padding:.4rem 0;}
+  .opsdash-adstate-row + .opsdash-adstate-row{border-top:1px solid var(--border);}
+  .opsdash-adstate-label{font-size:.8rem; color:var(--ink-soft);}
+  .opsdash-adstate-value{font-family:var(--f-mono); font-weight:700; font-size:1.05rem; color:var(--ink);}
+  .opsdash-adstate-note{margin-top:.6rem; padding-top:.6rem; border-top:1px solid var(--border); font-size:.82rem; color:var(--ink-soft); line-height:1.45; display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;}
+  /* 상태 배지 — 판단 근거가 명확한 경우에만 제한적으로 색을 쓴다(요구사항
+     17 "danger/warning은 상태 표현에만 제한적으로 사용"). good=오늘 효율이
+     이번 달 평균보다 높음, warn=광고비는 쓰는데 구매가 없음, neutral=그 외
+     (평균과 비슷/낮음/데이터 없음 등 판단을 단정할 근거가 약한 경우). */
+  .opsdash-pill{display:inline-block; padding:.15rem .55rem; border-radius:99px; font-size:.75rem; font-weight:700; flex:0 0 auto;}
+  .opsdash-pill.good{background:var(--op-accent-soft); color:var(--op-accent-ink);}
+  .opsdash-pill.warn{background:#f7e6d3; color:#8a5a20;}
+  .opsdash-pill.neutral{background:var(--sidebar-bg); color:var(--ink-faint);}
+
+  .opsdash-summary{display:flex; align-items:stretch; gap:1.4rem; padding:.85rem 1.1rem; flex-wrap:wrap;}
+  .opsdash-summary-group{display:flex; flex-direction:column; gap:.5rem; min-width:0;}
+  .opsdash-summary-group-label{font-size:.75rem; font-weight:700; color:var(--ink-faint);}
+  .opsdash-summary-divider{width:1px; align-self:stretch; background:var(--border); flex:0 0 auto;}
+  .opsdash-summary-stats{display:flex; gap:1.3rem; flex-wrap:wrap;}
+  .opsdash-stat{display:flex; flex-direction:column; gap:.15rem;}
+  .opsdash-stat-label{font-size:.75rem; color:var(--ink-faint); white-space:nowrap;}
+  .opsdash-stat-value{font-family:var(--f-mono); font-weight:700; font-size:.92rem; color:var(--ink); white-space:nowrap;}
+
+  .opsdash-wholesaler-row{display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.55rem 1.1rem; border-bottom:1px solid var(--border);}
+  .opsdash-wholesaler-row:last-child{border-bottom:none;}
+  .opsdash-wholesaler-name{font-size:.83rem; font-weight:700; color:var(--ink);}
+  .opsdash-wholesaler-meta{font-size:.75rem; color:var(--ink-faint); margin-top:.1rem;}
+  .opsdash-see-all{display:block; text-align:center; padding:.6rem 1.1rem; font-size:.8rem; font-weight:600; color:var(--op-accent-ink); border-top:1px solid var(--border);}
+  .opsdash-see-all:hover{color:var(--op-accent);}
+
+  .opsdash-inquiry{padding:.85rem 1.1rem; display:flex; flex-direction:column; gap:.6rem; align-items:flex-start;}
+  .opsdash-inquiry p{margin:0; font-size:.83rem; color:var(--ink-soft);}
+  .opsdash-inquiry-note{font-size:.75rem; color:var(--ink-faint);}
+
+  .opsdash-connection-list{padding:.2rem 1.1rem .3rem;}
+  .opsdash-connection-row{display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.5rem 0; border-bottom:1px solid var(--border); font-size:.83rem; color:var(--ink);}
+  .opsdash-connection-row:last-child{border-bottom:none;}
+  .opsdash-connection-label{display:flex; align-items:center; gap:.5rem;}
+  .opsdash-connection-label svg{flex:0 0 auto; color:var(--ink-faint); width:16px; height:16px;}
+  /* "다음 할 일" — 별도 큰 카드 대신 연결 상태 패널 맨 아래 강조 행 하나로
+     합친다. 라벨(작은 muted)과 실제 액션(굵게)을 같은 줄에 붙이지 않고
+     위/아래로 분리한다(요구사항 2·5 — 제목/설명이 옆에 붙어 보이는 문제
+     수정). */
+  .opsdash-next-action{display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.7rem 0 .5rem; margin-top:.1rem; color:var(--op-accent-ink);}
+  .opsdash-next-action-text{display:flex; flex-direction:column; gap:.2rem; min-width:0;}
+  .opsdash-next-action-label{font-size:.75rem; color:var(--ink-faint); font-weight:600;}
+  .opsdash-next-action-title{font-size:.87rem; font-weight:700;}
+  .opsdash-next-action svg{flex:0 0 auto; color:var(--ink-faint);}
+
+  /* ---------------------------------------------------------------------
+     3차 패스 — 첨부 레퍼런스 레이아웃 골격(Hero → KPI → 2:1 grid → 하단
+     3열 → 압축 로드맵)에 맞춘 추가 컴포넌트. 기존 opsdash-* 토큰/색을
+     그대로 재사용하고 새 색은 넣지 않는다.
+     --------------------------------------------------------------------- */
+
+  /* Hero — compact brand panel. 실제 사진/스톡 이미지를 새로 가져오지
+     않고, 이 파일이 이미 쓰는 색 토큰만으로 그린 인라인 SVG 일러스트(박스
+     +문서+식물 모티프)로 "브랜드 무드"를 표현한다(요구사항 1). */
+  .opsdash-hero{display:flex; align-items:center; justify-content:space-between; gap:1.4rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem 1.4rem; margin-bottom:1rem; min-height:132px;}
+  .opsdash-hero-text p{margin:0 0 .35rem; font-size:.78rem; font-weight:700; color:var(--op-accent-ink); text-transform:uppercase; letter-spacing:.03em;}
+  .opsdash-hero-text h2{font-size:1.15rem; font-weight:700; color:var(--ink); line-height:1.4; max-width:34ch;}
+  .opsdash-hero-visual{flex:0 0 auto; width:190px; display:flex; flex-direction:column; align-items:center; gap:.4rem;}
+  .opsdash-hero-visual svg{width:100%; height:auto; display:block;}
+  .opsdash-hero-mark{font-family:var(--f-display); font-weight:700; font-style:italic; font-size:.86rem; color:var(--op-accent-ink);}
+  @media (max-width:700px){ .opsdash-hero{flex-direction:column; align-items:stretch; text-align:left;} .opsdash-hero-visual{align-self:flex-start;} }
+
+  /* 패널/서브헤드 라인 아이콘 공통 — 이모지 대신 이 파일에서 직접 그린
+     24x24 line icon만 쓴다(요구사항 7). 새 아이콘 라이브러리 설치 없음,
+     전부 인라인 SVG. */
+  .opsdash-head-icon{display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-right:.45rem; vertical-align:-4px; color:var(--op-accent-ink);}
+  .opsdash-head-icon svg{width:100%; height:100%;}
+  .opsdash-subhead{display:flex; align-items:center;}
+
+  /* 쇼핑몰 운영 현황 — 브리핑/광고상태/월간현황을 한 패널 안에 합친다.
+     "카드 안에 카드" 대신 얇은 divider와 서브 타이틀만 쓴다(요구사항 6). */
+  .opsdash-ops-body{padding:.2rem 0 .3rem;}
+  .opsdash-subhead{font-size:.82rem; font-weight:700; color:var(--ink); padding:.7rem 1.1rem .3rem;}
+  .opsdash-ops-split{display:flex; align-items:stretch;}
+  .opsdash-ops-col{flex:1; min-width:0;}
+  .opsdash-ops-divider{width:1px; background:var(--border); margin:.7rem 0; flex:0 0 auto;}
+  .opsdash-ops-hr{height:1px; background:var(--border); margin:.4rem 1.1rem;}
+  @media (max-width:640px){ .opsdash-ops-split{flex-direction:column;} .opsdash-ops-divider{display:none;} }
+
+  /* 세팅 대행 — 실제 플랜 이름(index.html #view-services-setup의
+     data-plan="basic|integration|full"과 동일한 이름)만 정적으로 나열.
+     문의 상태 조회 기능은 만들지 않는다(요구사항 10). */
+  .opsdash-service-list{padding:.2rem 1.1rem 0;}
+  .opsdash-service-row{display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.5rem 0; font-size:.83rem; color:var(--ink-soft); border-bottom:1px solid var(--border);}
+  .opsdash-service-row:last-child{border-bottom:none;}
+  .opsdash-service-name{color:var(--ink);}
+  .opsdash-service-tier{font-family:var(--f-mono); font-size:.7rem; font-weight:700; color:var(--op-accent-ink); background:var(--op-accent-soft); padding:.15rem .5rem; border-radius:99px; flex:0 0 auto;}
+
+  /* 홈 대시보드/압축 로드맵 안에서만 primary 버튼을 모스그린으로 —
+     전역 .btn-primary(벽돌색)는 그대로 두고 다른 화면은 바뀌지 않는다. */
+  .opsdash .btn-primary, .opsdash-roadmap-panel .btn-primary{background:var(--op-accent);}
+  .opsdash .btn-primary:hover, .opsdash-roadmap-panel .btn-primary:hover{background:var(--op-accent-ink);}
+  .opsdash .btn-ghost:hover, .opsdash-roadmap-panel .btn-ghost:hover{border-color:var(--op-accent); color:var(--op-accent-ink); background:var(--op-accent-soft);}
+  .opsdash .btn:hover, .opsdash-roadmap-panel .btn:hover{box-shadow:0 10px 22px -14px rgba(76,107,73,.25);}
+
+  /* 로드맵 압축 — <details>/<summary>는 네이티브 토글이라 별도 JS 없이도
+     열림/닫힘과 무관하게 기존 체크리스트(.gp-row[data-chapter] 등)가
+     DOM에 항상 존재한다 — app.js의 selector가 그대로 동작한다(요구사항
+     12·17). */
+  .opsdash-roadmap-panel{margin-top:1.5rem; margin-bottom:1.6rem;}
+  .opsdash-roadmap-lead{margin:0; padding:.9rem 1.1rem 0; font-size:.83rem; color:var(--ink-soft);}
+  .opsdash-roadmap-panel .resume-banner{margin:1rem 1.1rem 1.1rem;}
+  .opsdash-roadmap-details summary{list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:flex-end; gap:.4rem; padding:.8rem 1.1rem; font-size:.83rem; font-weight:600; color:var(--op-accent-ink); border-top:1px solid var(--border);}
+  .opsdash-roadmap-details summary::-webkit-details-marker{display:none;}
+  .opsdash-roadmap-details summary svg{transition:transform .15s ease;}
+  .opsdash-roadmap-details[open] summary svg{transform:rotate(180deg);}
+  .opsdash-roadmap-details .dash-grid{padding:0 1.1rem 1.2rem; margin-top:0;}
