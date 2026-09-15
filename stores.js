@@ -112,7 +112,7 @@
   function safeHref(url){
     return /^https?:\/\//i.test(url || '') ? url : null;
   }
-  // URL 입력 UX 개선 — 초보 사용자가 "somfre.com"처럼 스킴 없이 입력해도
+  // URL 입력 UX 개선 — 초보 사용자가 "myshop.co.kr"처럼 스킴 없이 입력해도
   // 등록되게 한다. wholesalers.js의 normalizeUrl()과 규칙이 완전히 동일한
   // 중복 구현이다(TODO: 두 기능이 안정화된 뒤, 별도 공용 유틸 파일로
   // 합치는 걸 리팩터링 대상으로 남겨둔다 — 지금은 각자 다른 최상위 IIFE라
