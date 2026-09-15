@@ -169,17 +169,19 @@
     { key: 'logs',                  label: '시스템 로그' }
   ];
 
-  // "도매처 등록 문의 대기"/"세팅 대행 문의"만 실제 데이터로 연결한다 —
-  // 나머지(전체 회원/등록 쇼핑몰/Cafe24 연결/Meta 연결)는 여전히
-  // "—"(값) + "준비 중"(자리표시)으로만 보여준다(가짜 숫자로 채우지 않는다).
+  // "전체 회원"만 아직 실제 데이터가 없다(profiles 실존 여부 자체가
+  // 불확실 — 이번 단계 조사 결과 참고) — 그 카드만 여전히 "—"(값) +
+  // "준비 중"으로 남긴다. 나머지 5개는 전부 실제 데이터로 연결했다.
   var DASHBOARD_CARD_LABELS = [
     '전체 회원', '등록 쇼핑몰', 'Cafe24 연결', 'Meta 연결', '도매처 등록 문의 대기', '세팅 대행 문의'
   ];
-  // label -> pending 개수를 반환하는 fetch 함수. 새로 실연결할 카드가
-  // 생기면 여기 한 줄만 추가하면 된다(fetchPendingInquiryCount/
-  // fetchPendingSetupInquiryCount는 이 파일 안 다른 곳에 정의된 function
-  // 선언이라 호이스팅되어 여기서 참조해도 문제없다).
+  // label -> 개수를 반환하는 fetch 함수. 새로 실연결할 카드가 생기면 여기
+  // 한 줄만 추가하면 된다(각 fetch 함수는 이 파일 안 다른 곳에 정의된
+  // function 선언이라 호이스팅되어 여기서 참조해도 문제없다).
   var DASHBOARD_LIVE_CARDS = [
+    { label: '등록 쇼핑몰', fetchCount: function(){ return fetchStoreCount(); } },
+    { label: 'Cafe24 연결', fetchCount: function(){ return fetchConnectedCountByProvider('cafe24'); } },
+    { label: 'Meta 연결', fetchCount: function(){ return fetchConnectedCountByProvider('meta'); } },
     { label: '도매처 등록 문의 대기', fetchCount: function(){ return fetchPendingInquiryCount(); } },
     { label: '세팅 대행 문의', fetchCount: function(){ return fetchPendingSetupInquiryCount(); } }
   ];
@@ -223,6 +225,7 @@
   // ((container, section) => void)의 함수를 등록하기만 하면 된다.
   var SECTION_RENDERERS = {
     dashboard: renderDashboardSection,
+    stores: renderStoresSection,
     wholesalers: renderWholesalersSection,
     'wholesaler-inquiries': renderWholesalerInquiriesSection,
     'setup-inquiries': renderSetupInquiriesSection
@@ -1051,6 +1054,308 @@
         showToast(friendlyAdminActionError(res.error) || '저장에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
       });
     });
+  }
+
+  // =========================================================================
+  // "쇼핑몰" — 전체 stores + connected_accounts 운영 현황(읽기 전용)
+  // =========================================================================
+  // stores.js와 동일한 값(각자 다른 최상위 IIFE라 공유 불가, 의도적 중복 —
+  // 이미 확립된 패턴). storeFormModal의 <option>과도 일치한다.
+  var STORE_PLATFORM_LABELS = { cafe24: 'Cafe24', smartstore: '스마트스토어', other: '기타' };
+  function platformLabelFor(value){ return STORE_PLATFORM_LABELS[value] || value; }
+
+  // user_id 전체를 목록에 그대로 늘어놓지 않고 축약해서 보여준다 — 값
+  // 자체를 숨겨야 할 만큼 민감하진 않지만(그냥 uuid), 목록 가독성을 위해.
+  // 상세보기에서는 전체 값을 그대로 보여준다.
+  function shortId(id){
+    var s = String(id == null ? '' : id);
+    return s.length > 8 ? s.slice(0, 8) + '…' : (s || '-');
+  }
+
+  // connected_accounts.status로 실제 코드에 저장되는 값은 'connected'와
+  // 'pending'(Meta의 광고계정 선택 대기) 두 가지뿐이다 — 'error' 같은
+  // 세 번째 상태는 DB에 저장되지 않는다(조사 결과, 마이그레이션 파일
+  // 상단 주석 참고). 그래서 "오류" 라벨은 만들지 않는다 — 모르는 상태
+  // 값이 나오면 있는 그대로(raw) 보여줄 뿐, 추측한 라벨을 지어내지 않는다.
+  function connectionStatusFor(connByProvider, provider){
+    var row = connByProvider && connByProvider[provider];
+    if(!row) return { key: 'none', label: '연결 안 됨', row: null };
+    if(row.status === 'connected') return { key: 'connected', label: '연결됨', row: row };
+    if(row.status === 'pending') return { key: 'pending', label: '연결 진행중', row: row };
+    return { key: row.status, label: row.status, row: row };
+  }
+
+  var storeAdminItems = null;    // stores 전체(관리자 RLS로 조회)
+  var storeAdminConnMap = null;  // { [store_id]: { cafe24: row|null, meta: row|null } }
+  var storeAdminLoadSeq = 0;
+  var storeAdminPlatformFilter = 'all';
+  var storeAdminConnectionFilter = 'all';
+  var storeAdminSearchTerm = '';
+
+  // 일반 사용자는 본인 소유 stores/connected_accounts만 보는 것과 달리,
+  // 이건 관리자 전용 조회다 — RLS의 *_select_admin 정책(is_admin())이
+  // 관리자에게만 전체를 보여준다. integration_credentials는 여기서도,
+  // 다른 어디서도 조회하지 않는다.
+  function fetchAllStoresForAdmin(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    return sb.from('stores')
+      .select('id, user_id, name, platform, store_url, is_active, created_at')
+      .order('created_at', { ascending: false })
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, data: res.data || [] };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+  function fetchAllConnectedAccountsForAdmin(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    return sb.from('connected_accounts')
+      .select('id, store_id, provider, status, external_account_id, display_name, last_synced_at')
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, data: res.data || [] };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+  function fetchStoreCount(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false });
+    return sb.from('stores').select('id', { count: 'exact', head: true })
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, count: res.count || 0 };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+  function fetchConnectedCountByProvider(provider){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false });
+    return sb.from('connected_accounts').select('id', { count: 'exact', head: true })
+      .eq('provider', provider).eq('status', 'connected')
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, count: res.count || 0 };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  var STORE_PLATFORM_FILTERS = [
+    { key: 'all', label: '전체' }, { key: 'cafe24', label: 'Cafe24' },
+    { key: 'smartstore', label: '스마트스토어' }, { key: 'other', label: '기타' }
+  ];
+  var STORE_CONNECTION_FILTERS = [
+    { key: 'all', label: '전체' }, { key: 'cafe24_connected', label: 'Cafe24 연결' },
+    { key: 'meta_connected', label: 'Meta 연결' }, { key: 'none', label: '연동 없음' }
+  ];
+
+  function renderStoresSection(container){
+    container.innerHTML =
+      '<div class="admin-panel-head">쇼핑몰</div>' +
+      '<div class="admin-panel-body">' +
+        '<input type="text" id="adminStoreSearchInput" placeholder="쇼핑몰명 또는 URL 검색" ' +
+          'style="width:100%; box-sizing:border-box; margin-bottom:1rem; border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.86rem; color:var(--ink);">' +
+        '<div class="admin-filter-tab-row" id="adminStorePlatformTabs" style="margin-bottom:.6rem;">' +
+          STORE_PLATFORM_FILTERS.map(function(f){
+            return '<button type="button" class="admin-filter-tab' + (f.key === storeAdminPlatformFilter ? ' active' : '') + '" data-filter="' + f.key + '">' + escapeHtml(f.label) + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div class="admin-filter-tab-row" id="adminStoreConnTabs">' +
+          STORE_CONNECTION_FILTERS.map(function(f){
+            return '<button type="button" class="admin-filter-tab' + (f.key === storeAdminConnectionFilter ? ' active' : '') + '" data-filter="' + f.key + '">' + escapeHtml(f.label) + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div id="adminStoreListWrap"></div>' +
+      '</div>';
+
+    container.querySelector('#adminStorePlatformTabs').addEventListener('click', function(e){
+      var btn = e.target.closest('.admin-filter-tab');
+      if(!btn) return;
+      storeAdminPlatformFilter = btn.getAttribute('data-filter');
+      container.querySelectorAll('#adminStorePlatformTabs .admin-filter-tab').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      renderStoreAdminTable(container, container.querySelector('#adminStoreListWrap'));
+    });
+    container.querySelector('#adminStoreConnTabs').addEventListener('click', function(e){
+      var btn = e.target.closest('.admin-filter-tab');
+      if(!btn) return;
+      storeAdminConnectionFilter = btn.getAttribute('data-filter');
+      container.querySelectorAll('#adminStoreConnTabs .admin-filter-tab').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      renderStoreAdminTable(container, container.querySelector('#adminStoreListWrap'));
+    });
+    var searchInput = container.querySelector('#adminStoreSearchInput');
+    var searchDebounceTimer = null;
+    searchInput.addEventListener('input', function(){
+      clearTimeout(searchDebounceTimer);
+      var value = searchInput.value;
+      searchDebounceTimer = setTimeout(function(){
+        storeAdminSearchTerm = value.trim();
+        renderStoreAdminTable(container, container.querySelector('#adminStoreListWrap'));
+      }, 200);
+    });
+
+    loadStoreAdminData(container);
+  }
+
+  function loadStoreAdminData(container){
+    var wrap = container.querySelector('#adminStoreListWrap');
+    if(!wrap) return;
+    wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>불러오는 중…</p></div>';
+    var seq = ++storeAdminLoadSeq;
+    Promise.all([fetchAllStoresForAdmin(), fetchAllConnectedAccountsForAdmin()]).then(function(results){
+      if(seq !== storeAdminLoadSeq) return; // 그 사이 새 요청이 시작됐으면 이 응답은 버림
+      if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
+      var storesRes = results[0], connRes = results[1];
+      if(!storesRes.ok || !connRes.ok){
+        // 0건(정상)과 조회 실패(에러)를 반드시 구분한다.
+        wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;">' +
+          '<p>쇼핑몰 목록을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p>' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="adminStoreRetryBtn">다시 시도</button></div>';
+        var retryBtn = wrap.querySelector('#adminStoreRetryBtn');
+        if(retryBtn) retryBtn.addEventListener('click', function(){ loadStoreAdminData(container); });
+        return;
+      }
+      storeAdminItems = storesRes.data;
+      storeAdminConnMap = {};
+      connRes.data.forEach(function(row){
+        var sid = String(row.store_id);
+        if(!storeAdminConnMap[sid]) storeAdminConnMap[sid] = {};
+        storeAdminConnMap[sid][row.provider] = row;
+      });
+      renderStoreAdminTable(container, wrap);
+    }).catch(function(err){
+      if(seq !== storeAdminLoadSeq) return;
+      console.warn('[launchdesk] 관리자 쇼핑몰 목록 조회 중 오류:', err && err.message);
+      wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>쇼핑몰 목록을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p></div>';
+    });
+  }
+
+  function renderStoreAdminTable(container, wrap){
+    if(!wrap || storeAdminItems == null) return;
+
+    if(storeAdminItems.length === 0){
+      wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>등록된 쇼핑몰이 없습니다.</p></div>';
+      return;
+    }
+
+    var term = storeAdminSearchTerm.toLowerCase();
+    var filtered = storeAdminItems.filter(function(s){
+      if(storeAdminPlatformFilter !== 'all' && s.platform !== storeAdminPlatformFilter) return false;
+      var conn = storeAdminConnMap[String(s.id)] || {};
+      var cafe24Connected = !!(conn.cafe24 && conn.cafe24.status === 'connected');
+      var metaConnected = !!(conn.meta && conn.meta.status === 'connected');
+      if(storeAdminConnectionFilter === 'cafe24_connected' && !cafe24Connected) return false;
+      if(storeAdminConnectionFilter === 'meta_connected' && !metaConnected) return false;
+      if(storeAdminConnectionFilter === 'none' && (cafe24Connected || metaConnected)) return false;
+      if(term){
+        var hay = (String(s.name || '') + ' ' + String(s.store_url || '')).toLowerCase();
+        if(hay.indexOf(term) === -1) return false;
+      }
+      return true;
+    });
+
+    if(filtered.length === 0){
+      wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>검색/필터 결과가 없습니다.</p></div>';
+      return;
+    }
+
+    wrap.innerHTML = '<div class="tbl-wrap"><table>' +
+      '<thead><tr><th>쇼핑몰명</th><th>플랫폼</th><th>URL</th><th>소유자</th><th>Cafe24</th><th>Meta</th><th>등록일</th><th></th></tr></thead>' +
+      '<tbody>' +
+        filtered.map(function(s){
+          var conn = storeAdminConnMap[String(s.id)] || {};
+          var cafe24 = connectionStatusFor(conn, 'cafe24');
+          var meta = connectionStatusFor(conn, 'meta');
+          var href = safeHref(s.store_url);
+          var urlHtml = href
+            ? '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">바로가기 ↗</a>'
+            : escapeHtml(s.store_url);
+          return '<tr>' +
+            '<td><strong>' + escapeHtml(s.name) + '</strong></td>' +
+            '<td>' + escapeHtml(platformLabelFor(s.platform)) + '</td>' +
+            '<td>' + urlHtml + '</td>' +
+            '<td>' + escapeHtml(shortId(s.user_id)) + '</td>' +
+            '<td>' + escapeHtml(cafe24.label) + '</td>' +
+            '<td>' + escapeHtml(meta.label) + '</td>' +
+            '<td>' + escapeHtml(formatDate(s.created_at)) + '</td>' +
+            '<td><button type="button" class="btn btn-ghost btn-sm admin-store-detail-btn" data-id="' + escapeHtml(s.id) + '">상세보기</button></td>' +
+          '</tr>';
+        }).join('') +
+      '</tbody></table></div>';
+
+    wrap.querySelectorAll('.admin-store-detail-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var store = storeAdminItems.filter(function(s){ return String(s.id) === btn.getAttribute('data-id'); })[0];
+        if(store) openStoreDetailModal(store);
+      });
+    });
+  }
+
+  function closeStoreDetailModal(){
+    var el = document.getElementById('adminStoreDetailModal');
+    if(el) el.remove();
+    document.removeEventListener('keydown', handleStoreModalEscape);
+  }
+  function handleStoreModalEscape(e){
+    if(e.key === 'Escape') closeStoreDetailModal();
+  }
+
+  // 읽기 전용 상세 — 이번 단계에서는 수정/삭제/강제 재연결 버튼을 두지
+  // 않는다(요구사항 10). access_token/refresh_token/app secret/OAuth
+  // state/integration_credentials 내용은 애초에 이 파일이 조회하는 범위
+  // 밖이라 표시할 수도 없다 — external_account_id/display_name/
+  // last_synced_at 같은 안전한 메타데이터만 보여준다.
+  function openStoreDetailModal(store){
+    closeStoreDetailModal();
+
+    var conn = storeAdminConnMap[String(store.id)] || {};
+    var cafe24 = connectionStatusFor(conn, 'cafe24');
+    var meta = connectionStatusFor(conn, 'meta');
+
+    function row(label, valueHtml){
+      return '<div style="margin-bottom:.9rem;">' +
+        '<div style="font-size:.78rem; font-weight:700; color:var(--ink-soft); margin-bottom:.25rem;">' + escapeHtml(label) + '</div>' +
+        '<div style="font-size:.9rem; color:var(--ink); word-break:break-word;">' + valueHtml + '</div>' +
+      '</div>';
+    }
+
+    var href = safeHref(store.store_url);
+    var urlHtml = href
+      ? '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(store.store_url) + '</a>'
+      : escapeHtml(store.store_url);
+
+    var cafe24Detail = cafe24.label;
+    if(cafe24.row && cafe24.row.last_synced_at) cafe24Detail += ' · 최근 동기화 ' + formatDate(cafe24.row.last_synced_at);
+    var metaDetail = meta.label;
+    if(meta.row && meta.row.display_name) metaDetail += ' · ' + meta.row.display_name;
+    if(meta.row && meta.row.external_account_id) metaDetail += ' (' + meta.row.external_account_id + ')';
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal open';
+    overlay.id = 'adminStoreDetailModal';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML =
+      '<div class="modal-backdrop" id="adminStoreDetailBackdrop"></div>' +
+      '<div class="modal-panel" style="max-width:480px; text-align:left; max-height:85vh; overflow-y:auto;">' +
+        '<button class="modal-close" type="button" id="adminStoreDetailClose" aria-label="닫기">✕</button>' +
+        '<div class="modal-head" style="text-align:left;"><h2>' + escapeHtml(store.name) + '</h2></div>' +
+        row('플랫폼', escapeHtml(platformLabelFor(store.platform))) +
+        row('URL', urlHtml) +
+        row('등록일', escapeHtml(formatDate(store.created_at))) +
+        row('소유자(user_id)', escapeHtml(store.user_id || '-')) +
+        row('Cafe24 연결', escapeHtml(cafe24Detail)) +
+        row('Meta 연결', escapeHtml(metaDetail)) +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', handleStoreModalEscape);
+    document.getElementById('adminStoreDetailBackdrop').addEventListener('click', closeStoreDetailModal);
+    document.getElementById('adminStoreDetailClose').addEventListener('click', closeStoreDetailModal);
   }
 
   // ------------------------------------------------------------------ 관리자 여부 판별(공유)
