@@ -113,6 +113,7 @@
     if(rawMessage === 'INQUIRY_NOT_FOUND') return '문의를 찾을 수 없습니다.';
     if(rawMessage === 'INQUIRY_ALREADY_PROCESSED') return '이미 처리된 문의입니다.';
     if(rawMessage === 'WHOLESALER_NOT_FOUND') return '도매처를 찾을 수 없습니다.';
+    if(rawMessage === 'INVALID_STATUS') return '올바르지 않은 상태 값입니다.';
     return null;
   }
   // URL 입력 UX 개선 — wholesalers.js/stores.js의 normalizeUrl()과 규칙이
@@ -168,13 +169,20 @@
     { key: 'logs',                  label: '시스템 로그' }
   ];
 
-  // 이번 단계에서는 "도매처 등록 문의 대기"만 실제 데이터로 연결한다 —
-  // 나머지는 여전히 "—"(값) + "준비 중"(자리표시)으로만 보여준다(가짜
-  // 숫자로 채우지 않는다).
+  // "도매처 등록 문의 대기"/"세팅 대행 문의"만 실제 데이터로 연결한다 —
+  // 나머지(전체 회원/등록 쇼핑몰/Cafe24 연결/Meta 연결)는 여전히
+  // "—"(값) + "준비 중"(자리표시)으로만 보여준다(가짜 숫자로 채우지 않는다).
   var DASHBOARD_CARD_LABELS = [
     '전체 회원', '등록 쇼핑몰', 'Cafe24 연결', 'Meta 연결', '도매처 등록 문의 대기', '세팅 대행 문의'
   ];
-  var PENDING_INQUIRY_CARD_LABEL = '도매처 등록 문의 대기';
+  // label -> pending 개수를 반환하는 fetch 함수. 새로 실연결할 카드가
+  // 생기면 여기 한 줄만 추가하면 된다(fetchPendingInquiryCount/
+  // fetchPendingSetupInquiryCount는 이 파일 안 다른 곳에 정의된 function
+  // 선언이라 호이스팅되어 여기서 참조해도 문제없다).
+  var DASHBOARD_LIVE_CARDS = [
+    { label: '도매처 등록 문의 대기', fetchCount: function(){ return fetchPendingInquiryCount(); } },
+    { label: '세팅 대행 문의', fetchCount: function(){ return fetchPendingSetupInquiryCount(); } }
+  ];
 
   // 렌더 함수 시그니처: (container, section) => void. 문자열을 반환하는 게
   // 아니라 container.innerHTML을 직접 채우고 필요하면 자기 리스너/후속
@@ -192,13 +200,15 @@
         '</div>' +
       '</div>';
 
-    var pendingCard = container.querySelector('.kpi-card[data-kpi-label="' + PENDING_INQUIRY_CARD_LABEL + '"]');
-    if(!pendingCard) return;
-    fetchPendingInquiryCount().then(function(res){
-      if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
-      if(!res.ok) return; // 실패 시 "—"/"준비 중" 그대로 — 가짜 값으로 채우지 않는다
-      pendingCard.querySelector('.kpi-value').textContent = String(res.count);
-      pendingCard.querySelector('.admin-kpi-sub').textContent = '실시간';
+    DASHBOARD_LIVE_CARDS.forEach(function(cardDef){
+      var card = container.querySelector('.kpi-card[data-kpi-label="' + cardDef.label + '"]');
+      if(!card) return;
+      cardDef.fetchCount().then(function(res){
+        if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
+        if(!res.ok) return; // 실패 시 "—"/"준비 중" 그대로 — 가짜 값으로 채우지 않는다
+        card.querySelector('.kpi-value').textContent = String(res.count);
+        card.querySelector('.admin-kpi-sub').textContent = '실시간';
+      });
     });
   }
 
@@ -214,7 +224,8 @@
   var SECTION_RENDERERS = {
     dashboard: renderDashboardSection,
     wholesalers: renderWholesalersSection,
-    'wholesaler-inquiries': renderWholesalerInquiriesSection
+    'wholesaler-inquiries': renderWholesalerInquiriesSection,
+    'setup-inquiries': renderSetupInquiriesSection
   };
   function renderSectionInto(container, section){
     var renderer = SECTION_RENDERERS[section.key];
@@ -813,6 +824,231 @@
         }
         submitBtn.disabled = false;
         showToast(friendlyAdminActionError(res.error) || '수정에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
+      });
+    });
+  }
+
+  // =========================================================================
+  // "세팅 대행 문의" — 목록/필터/상세/상태 변경
+  // =========================================================================
+  // 기존 세팅 대행 신청 폼(setup.js)에는 이메일 필드가 없다 — "연락처"는
+  // 전화번호(phone)다. 관리자 목록/상세에도 실제 존재하는 필드만 보여준다
+  // (없는 필드를 억지로 만들지 않음).
+  var SETUP_INQUIRY_FILTERS = [
+    { key: 'pending',     label: '접수' },
+    { key: 'in_progress', label: '진행중' },
+    { key: 'completed',   label: '완료' },
+    { key: 'rejected',    label: '보류' },
+    { key: 'all',         label: '전체' }
+  ];
+  var SETUP_INQUIRY_STATUS_LABELS = { pending: '접수', in_progress: '진행중', completed: '완료', rejected: '보류' };
+
+  var setupInquiryFilter = 'pending'; // 기본값: 접수
+  var setupInquiryItems = null;
+  var setupInquiryLoadSeq = 0;
+
+  // 일반 사용자는 본인이 로그인 상태로 제출한 행만 보는 것과 달리, 이건
+  // 관리자 전용 조회다 — RLS의 setup_inquiries_select_admin 정책
+  // (is_admin())이 관리자에게만 전체(비로그인 제출 포함)를 보여준다.
+  function fetchSetupInquiries(statusFilter){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    var q = sb.from('setup_inquiries')
+      .select('id, user_id, plan_key, plan_name, plan_price, name, phone, platform, note, status, admin_note, created_at')
+      .order('created_at', { ascending: false });
+    if(statusFilter && statusFilter !== 'all') q = q.eq('status', statusFilter);
+    return q.then(function(res){
+      if(res.error) return { ok: false, error: res.error.message };
+      return { ok: true, data: res.data || [] };
+    }).catch(function(err){
+      return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+    });
+  }
+
+  function fetchPendingSetupInquiryCount(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false });
+    return sb.from('setup_inquiries').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, count: res.count || 0 };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  // 브라우저는 setup_inquiries에 대한 UPDATE 권한이 없다 — 이 RPC
+  // 호출만이 유일한 상태 변경 경로이고, 실제 쓰기는 함수 내부(SECURITY
+  // DEFINER, 관리자 재확인 포함)에서 일어난다.
+  function setSetupInquiryStatus(id, status, note){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    return sb.rpc('set_setup_inquiry_status', { p_inquiry_id: id, p_status: status, p_admin_note: note || null })
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  function renderSetupInquiriesSection(container){
+    container.innerHTML =
+      '<div class="admin-panel-head">세팅 대행 문의</div>' +
+      '<div class="admin-panel-body">' +
+        '<div class="admin-filter-tab-row" id="adminSetupInqFilterTabs">' +
+          SETUP_INQUIRY_FILTERS.map(function(f){
+            return '<button type="button" class="admin-filter-tab' + (f.key === setupInquiryFilter ? ' active' : '') +
+              '" data-filter="' + f.key + '">' + escapeHtml(f.label) + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div id="adminSetupInqListWrap"></div>' +
+      '</div>';
+
+    container.querySelector('#adminSetupInqFilterTabs').addEventListener('click', function(e){
+      var btn = e.target.closest('.admin-filter-tab');
+      if(!btn) return;
+      var key = btn.getAttribute('data-filter');
+      if(key === setupInquiryFilter) return;
+      setupInquiryFilter = key;
+      container.querySelectorAll('#adminSetupInqFilterTabs .admin-filter-tab').forEach(function(b){
+        b.classList.toggle('active', b === btn);
+      });
+      loadSetupInquiryList(container);
+    });
+
+    loadSetupInquiryList(container);
+  }
+
+  function loadSetupInquiryList(container){
+    var listWrap = container.querySelector('#adminSetupInqListWrap');
+    if(!listWrap) return;
+    listWrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>불러오는 중…</p></div>';
+    var seq = ++setupInquiryLoadSeq;
+    fetchSetupInquiries(setupInquiryFilter).then(function(res){
+      if(seq !== setupInquiryLoadSeq) return; // 그 사이 필터가 바뀌었으면 이 응답은 버림
+      if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
+      if(!res.ok){
+        listWrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;">' +
+          '<p>문의 목록을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p>' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="adminSetupInqRetryBtn">다시 시도</button></div>';
+        var retryBtn = listWrap.querySelector('#adminSetupInqRetryBtn');
+        if(retryBtn) retryBtn.addEventListener('click', function(){ loadSetupInquiryList(container); });
+        return;
+      }
+      setupInquiryItems = res.data;
+      renderSetupInquiryTable(container, listWrap);
+    });
+  }
+
+  function renderSetupInquiryTable(container, listWrap){
+    if(setupInquiryItems.length === 0){
+      var emptyText = setupInquiryFilter === 'pending' ? '접수 대기 중인 문의가 없습니다.'
+        : setupInquiryFilter === 'in_progress' ? '진행중인 문의가 없습니다.'
+        : setupInquiryFilter === 'completed' ? '완료된 문의가 없습니다.'
+        : setupInquiryFilter === 'rejected' ? '보류된 문의가 없습니다.'
+        : '등록된 문의가 없습니다.';
+      listWrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>' + escapeHtml(emptyText) + '</p></div>';
+      return;
+    }
+
+    listWrap.innerHTML = '<div class="tbl-wrap"><table>' +
+      '<thead><tr><th>신청자</th><th>연락처</th><th>신청 플랜</th><th>신청일</th><th>상태</th><th></th></tr></thead>' +
+      '<tbody>' +
+        setupInquiryItems.map(function(item){
+          return '<tr>' +
+            '<td><strong>' + escapeHtml(item.name) + '</strong></td>' +
+            '<td>' + escapeHtml(item.phone) + '</td>' +
+            '<td>' + escapeHtml(item.plan_name) + '</td>' +
+            '<td>' + escapeHtml(formatDate(item.created_at)) + '</td>' +
+            '<td>' + escapeHtml(SETUP_INQUIRY_STATUS_LABELS[item.status] || item.status) + '</td>' +
+            '<td><button type="button" class="btn btn-ghost btn-sm admin-setup-inq-detail-btn" data-id="' + escapeHtml(item.id) + '">상세보기</button></td>' +
+          '</tr>';
+        }).join('') +
+      '</tbody></table></div>';
+
+    listWrap.querySelectorAll('.admin-setup-inq-detail-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-id');
+        var item = setupInquiryItems.filter(function(it){ return String(it.id) === id; })[0];
+        if(item) openSetupInquiryDetailModal(item, container);
+      });
+    });
+  }
+
+  function closeSetupInquiryDetailModal(){
+    var el = document.getElementById('adminSetupInqDetailModal');
+    if(el) el.remove();
+    document.removeEventListener('keydown', handleSetupInquiryModalEscape);
+  }
+  function handleSetupInquiryModalEscape(e){
+    if(e.key === 'Escape') closeSetupInquiryDetailModal();
+  }
+
+  function openSetupInquiryDetailModal(item, sectionContainer){
+    closeSetupInquiryDetailModal();
+
+    function row(label, valueHtml){
+      return '<div style="margin-bottom:.9rem;">' +
+        '<div style="font-size:.78rem; font-weight:700; color:var(--ink-soft); margin-bottom:.25rem;">' + escapeHtml(label) + '</div>' +
+        '<div style="font-size:.9rem; color:var(--ink); word-break:break-word;">' + valueHtml + '</div>' +
+      '</div>';
+    }
+
+    var statusOptions = SETUP_INQUIRY_FILTERS.filter(function(f){ return f.key !== 'all'; }).map(function(f){
+      return '<option value="' + f.key + '"' + (f.key === item.status ? ' selected' : '') + '>' + escapeHtml(f.label) + '</option>';
+    }).join('');
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal open';
+    overlay.id = 'adminSetupInqDetailModal';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML =
+      '<div class="modal-backdrop" id="adminSetupInqDetailBackdrop"></div>' +
+      '<div class="modal-panel" style="max-width:480px; text-align:left; max-height:85vh; overflow-y:auto;">' +
+        '<button class="modal-close" type="button" id="adminSetupInqDetailClose" aria-label="닫기">✕</button>' +
+        '<div class="modal-head" style="text-align:left;"><h2>' + escapeHtml(item.name) + '</h2></div>' +
+        row('신청 플랜', escapeHtml(item.plan_name) + ' (₩' + Number(item.plan_price || 0).toLocaleString('ko-KR') + '원)') +
+        row('연락처', escapeHtml(item.phone)) +
+        (item.platform ? row('쇼핑몰 플랫폼', escapeHtml(item.platform)) : '') +
+        (item.note ? row('세팅 요청 사항', escapeHtml(item.note)) : '') +
+        row('신청 경로', item.user_id ? '로그인 상태로 신청' : '비로그인으로 신청') +
+        row('신청일', escapeHtml(formatDate(item.created_at))) +
+        row('현재 상태', escapeHtml(SETUP_INQUIRY_STATUS_LABELS[item.status] || item.status)) +
+        '<div style="margin-top:1.2rem; padding-top:1.1rem; border-top:1px solid var(--border);">' +
+          '<div class="ws-field" style="margin-bottom:.8rem;"><label for="adminSetupInqStatusSelect">상태 변경</label>' +
+            '<select id="adminSetupInqStatusSelect" style="border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink); width:100%;">' + statusOptions + '</select>' +
+          '</div>' +
+          '<div class="ws-field" style="margin-bottom:.8rem;"><label for="adminSetupInqAdminNote">관리자 메모(내부용, 신청자에게 보이지 않음)</label>' +
+            '<textarea id="adminSetupInqAdminNote" rows="3" placeholder="예: 전화 완료 / 견적 전달 / 고객 회신 대기">' + escapeHtml(item.admin_note || '') + '</textarea>' +
+          '</div>' +
+          '<button type="button" class="btn btn-primary" id="adminSetupInqSaveBtn" style="justify-content:center; width:100%;">저장</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', handleSetupInquiryModalEscape);
+    document.getElementById('adminSetupInqDetailBackdrop').addEventListener('click', closeSetupInquiryDetailModal);
+    document.getElementById('adminSetupInqDetailClose').addEventListener('click', closeSetupInquiryDetailModal);
+
+    document.getElementById('adminSetupInqSaveBtn').addEventListener('click', function(){
+      var saveBtn = document.getElementById('adminSetupInqSaveBtn');
+      var status = document.getElementById('adminSetupInqStatusSelect').value;
+      // 메모칸이 비어 있으면 null을 보낸다 — RPC가 null은 "기존 메모
+      // 유지"로 처리하므로(coalesce), 빈칸으로 뒀다고 기존 메모가
+      // 지워지지 않는다. 메모를 실제로 남기고 싶으면 내용을 입력한다.
+      var note = document.getElementById('adminSetupInqAdminNote').value.trim() || null;
+      saveBtn.disabled = true;
+      setSetupInquiryStatus(item.id, status, note).then(function(res){
+        if(res.ok){
+          showToast('저장되었습니다.', 'success');
+          closeSetupInquiryDetailModal();
+          loadSetupInquiryList(sectionContainer);
+          return;
+        }
+        saveBtn.disabled = false;
+        showToast(friendlyAdminActionError(res.error) || '저장에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
       });
     });
   }
