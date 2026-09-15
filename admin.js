@@ -87,6 +87,18 @@
     if(isNaN(d.getTime())) return '-';
     return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
   }
+  // 회원 섹션 전용 — "최근 로그인 시각"처럼 날짜만으로는 부족한 값에
+  // 시:분까지 함께 보여준다(formatDate는 날짜만 반환하므로 재사용하지
+  // 않고 별도로 둔다).
+  function formatDateTime(iso){
+    if(!iso) return '-';
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return '-';
+    return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(d);
+  }
 
   // showToast: app.js/tools.js/stores.js/wholesalers.js와 동일한 방식으로
   // 이 파일 안에서 따로 둔다(각자 다른 최상위 IIFE라 함수를 공유할 수 없음).
@@ -169,9 +181,8 @@
     { key: 'logs',                  label: '시스템 로그' }
   ];
 
-  // "전체 회원"만 아직 실제 데이터가 없다(profiles 실존 여부 자체가
-  // 불확실 — 이번 단계 조사 결과 참고) — 그 카드만 여전히 "—"(값) +
-  // "준비 중"으로 남긴다. 나머지 5개는 전부 실제 데이터로 연결했다.
+  // 6단계(회원 관리)에서 "전체 회원"도 실제 데이터로 연결했다 — 이제
+  // 카드 6개 전부 실제 데이터를 쓴다("준비 중" placeholder는 남지 않음).
   var DASHBOARD_CARD_LABELS = [
     '전체 회원', '등록 쇼핑몰', 'Cafe24 연결', 'Meta 연결', '도매처 등록 문의 대기', '세팅 대행 문의'
   ];
@@ -179,12 +190,78 @@
   // 한 줄만 추가하면 된다(각 fetch 함수는 이 파일 안 다른 곳에 정의된
   // function 선언이라 호이스팅되어 여기서 참조해도 문제없다).
   var DASHBOARD_LIVE_CARDS = [
+    { label: '전체 회원', fetchCount: function(){ return fetchMemberCount(); } },
     { label: '등록 쇼핑몰', fetchCount: function(){ return fetchStoreCount(); } },
     { label: 'Cafe24 연결', fetchCount: function(){ return fetchConnectedCountByProvider('cafe24'); } },
     { label: 'Meta 연결', fetchCount: function(){ return fetchConnectedCountByProvider('meta'); } },
     { label: '도매처 등록 문의 대기', fetchCount: function(){ return fetchPendingInquiryCount(); } },
     { label: '세팅 대행 문의', fetchCount: function(){ return fetchPendingSetupInquiryCount(); } }
   ];
+
+  // KPI 숫자는 Realtime subscription이 아니라 "조회 시점의 현재 DB 상태"다
+  // — 카드 sub 라벨에 그 사실을 정확히 반영한다("실시간"이라는 오해 소지
+  // 있는 표현 대신 "현재 기준"만 쓴다). 대시보드 상단에 "최근 조회" 시각과
+  // 수동 새로고침 버튼을 두어, 사용자가 언제 조회된 값인지 스스로 판단하고
+  // 필요할 때 다시 조회할 수 있게 한다. Realtime은 이번 단계에서 의도적으로
+  // 붙이지 않는다(요구사항 4) — "진입 시 조회 / 새로고침 클릭 시 재조회"
+  // 방식만 유지한다.
+  var dashboardLastFetchedAt = null; // 마지막으로 KPI 조회가 모두 끝난 시각(Date) — 다음 render에도 남아있어야 하므로 모듈 스코프
+  var dashboardRefreshInFlight = false; // 새로고침 중복 클릭 방지(요구사항 3)
+
+  // "최근 조회" 표시 전용 — formatDate/formatDateTime과 달리 Asia/Seoul로
+  // 고정하지 않는다(요구사항 2: 브라우저 로컬 시간 사용). 초 단위는 표시하지
+  // 않는다. 결과 형식: "2026.09.15 15:20".
+  function formatKpiRefreshedAt(date){
+    if(!date) return null;
+    function pad(n){ return n < 10 ? '0' + n : String(n); }
+    return date.getFullYear() + '.' + pad(date.getMonth() + 1) + '.' + pad(date.getDate()) +
+      ' ' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+
+  function updateDashboardRefreshedAtLabel(container){
+    var el = container.querySelector('#adminDashboardRefreshedAt');
+    if(!el) return;
+    el.textContent = dashboardLastFetchedAt ? ('최근 조회: ' + formatKpiRefreshedAt(dashboardLastFetchedAt)) : '';
+  }
+
+  // KPI 카드 6개를 전부 (다시) 조회한다 — 대시보드 최초 진입과 새로고침
+  // 버튼 클릭이 동일하게 이 함수 하나를 쓴다(요구사항 5: fetch 로직 복제
+  // 금지, DASHBOARD_LIVE_CARDS를 그대로 재사용). 카드별 fetchCount()는
+  // 이미 내부적으로 실패를 { ok:false }로 흡수하므로(reject하지 않음),
+  // Promise.all은 일부 카드가 실패해도 항상 끝까지 완료된다 — 그래서
+  // "조회 시도 완료 시각"은 일부 실패와 무관하게 항상 갱신할 수 있다
+  // (요구사항 2의 마지막 규칙).
+  function loadDashboardStats(container){
+    if(dashboardRefreshInFlight) return; // 중복 클릭 방지
+    dashboardRefreshInFlight = true;
+
+    var refreshBtn = container.querySelector('#adminDashboardRefreshBtn');
+    if(refreshBtn){
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = '새로고침 중…';
+    }
+
+    var fetches = DASHBOARD_LIVE_CARDS.map(function(cardDef){
+      var card = container.querySelector('.kpi-card[data-kpi-label="' + cardDef.label + '"]');
+      return cardDef.fetchCount().then(function(res){
+        if(!container.isConnected || !card) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
+        if(!res.ok) return; // 실패 시 이전 값 그대로 유지 — 가짜 값으로 채우지 않는다
+        card.querySelector('.kpi-value').textContent = String(res.count);
+        card.querySelector('.admin-kpi-sub').textContent = '현재 기준';
+      });
+    });
+
+    Promise.all(fetches).then(function(){
+      dashboardRefreshInFlight = false;
+      if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 버튼/시각을 건드리지 않음
+      dashboardLastFetchedAt = new Date();
+      updateDashboardRefreshedAtLabel(container);
+      if(refreshBtn){
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '새로고침';
+      }
+    });
+  }
 
   // 렌더 함수 시그니처: (container, section) => void. 문자열을 반환하는 게
   // 아니라 container.innerHTML을 직접 채우고 필요하면 자기 리스너/후속
@@ -194,6 +271,10 @@
   function renderDashboardSection(container){
     container.innerHTML = '<div class="admin-panel-head">대시보드</div>' +
       '<div class="admin-panel-body">' +
+        '<div style="display:flex; align-items:center; justify-content:space-between; gap:.8rem; flex-wrap:wrap;">' +
+          '<div id="adminDashboardRefreshedAt" style="font-size:.78rem; color:var(--ink-faint);"></div>' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="adminDashboardRefreshBtn">새로고침</button>' +
+        '</div>' +
         '<div class="kpi-grid">' +
           DASHBOARD_CARD_LABELS.map(function(label){
             return '<div class="kpi-card" data-kpi-label="' + escapeHtml(label) + '"><div class="kpi-head"><span>' + escapeHtml(label) + '</span></div>' +
@@ -202,16 +283,11 @@
         '</div>' +
       '</div>';
 
-    DASHBOARD_LIVE_CARDS.forEach(function(cardDef){
-      var card = container.querySelector('.kpi-card[data-kpi-label="' + cardDef.label + '"]');
-      if(!card) return;
-      cardDef.fetchCount().then(function(res){
-        if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
-        if(!res.ok) return; // 실패 시 "—"/"준비 중" 그대로 — 가짜 값으로 채우지 않는다
-        card.querySelector('.kpi-value').textContent = String(res.count);
-        card.querySelector('.admin-kpi-sub').textContent = '실시간';
-      });
+    updateDashboardRefreshedAtLabel(container); // 이전에 조회한 적 있으면(다른 메뉴 갔다 돌아온 경우) 즉시 보여준다
+    container.querySelector('#adminDashboardRefreshBtn').addEventListener('click', function(){
+      loadDashboardStats(container);
     });
+    loadDashboardStats(container);
   }
 
   function renderPlaceholderSection(container, section){
@@ -225,6 +301,7 @@
   // ((container, section) => void)의 함수를 등록하기만 하면 된다.
   var SECTION_RENDERERS = {
     dashboard: renderDashboardSection,
+    members: renderMembersSection,
     stores: renderStoresSection,
     wholesalers: renderWholesalersSection,
     'wholesaler-inquiries': renderWholesalerInquiriesSection,
@@ -1053,6 +1130,296 @@
         saveBtn.disabled = false;
         showToast(friendlyAdminActionError(res.error) || '저장에 실패했어요. 잠시 후 다시 시도해주세요.', 'error');
       });
+    });
+  }
+
+  // =========================================================================
+  // "회원" — auth.users + admin_users + stores/connected_accounts 집계
+  // 현황(읽기 전용). 브라우저는 auth.users를 직접 조회할 수 없으므로,
+  // 목록/개수 모두 SECURITY DEFINER RPC(admin_list_members / admin_member_count,
+  // 20260915240000_admin_members.sql)를 통해서만 가져온다 — 이 파일은
+  // 그 RPC가 반환하는 안전한 컬럼(이메일/가입일/최근 로그인/집계값)만
+  // 다룰 뿐, auth.users의 원래 컬럼 이름이나 비밀번호/토큰류는 여기
+  // 어디에도 없다. profiles는 실존 여부 자체가 불확실해(파일 상단 조사
+  // 결과 참고) 이번 단계에서도 전혀 참조하지 않는다.
+  // =========================================================================
+  var MEMBER_FILTERS = [
+    { key: 'all',     label: '전체' },
+    { key: 'stores',  label: '쇼핑몰 등록' },
+    { key: 'cafe24',  label: 'Cafe24 연결' },
+    { key: 'meta',    label: 'Meta 연결' },
+    { key: 'admin',   label: '관리자' }
+  ];
+
+  var memberAdminItems = null; // admin_list_members() 결과 전체(관리자 RLS 아님 — RPC 자체가 관리자 재확인)
+  var memberAdminLoadSeq = 0;
+  var memberAdminFilter = 'all';
+  var memberAdminSearchTerm = '';
+
+  // admin_member_count()는 대시보드 KPI 전용 — 목록을 전부 내려받지 않고
+  // 정수 하나만 받는다(다른 KPI 카드가 count:'exact', head:true로 가볍게
+  // 세는 것과 같은 의도, auth.users는 PostgREST 대상이 아니라서 RPC로
+  // 대신한다).
+  function fetchMemberCount(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false });
+    return sb.rpc('admin_member_count')
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, count: Number(res.data) || 0 };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  // 회원 섹션 목록 전용 — 이메일/가입일/최근 로그인/관리자 여부/쇼핑몰·
+  // Cafe24·Meta 집계까지 RPC 한 번으로 전부 받는다(N+1 없음). Beta 규모
+  // (회원 100~1000명)에서는 검색/필터를 서버 파라미터로 나누지 않고,
+  // 이 결과를 한 번만 받아 클라이언트 메모리에서 처리한다 — 쇼핑몰
+  // 섹션(fetchAllStoresForAdmin)과 동일한 판단.
+  function fetchAllMembersForAdmin(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    return sb.rpc('admin_list_members')
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, data: res.data || [] };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  function renderMembersSection(container){
+    container.innerHTML =
+      '<div class="admin-panel-head">회원</div>' +
+      '<div class="admin-panel-body">' +
+        '<input type="text" id="adminMemberSearchInput" placeholder="이메일 검색" ' +
+          'style="width:100%; box-sizing:border-box; margin-bottom:1rem; border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.86rem; color:var(--ink);">' +
+        '<div class="admin-filter-tab-row" id="adminMemberFilterTabs">' +
+          MEMBER_FILTERS.map(function(f){
+            return '<button type="button" class="admin-filter-tab' + (f.key === memberAdminFilter ? ' active' : '') + '" data-filter="' + f.key + '">' + escapeHtml(f.label) + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div id="adminMemberListWrap"></div>' +
+      '</div>';
+
+    container.querySelector('#adminMemberFilterTabs').addEventListener('click', function(e){
+      var btn = e.target.closest('.admin-filter-tab');
+      if(!btn) return;
+      memberAdminFilter = btn.getAttribute('data-filter');
+      container.querySelectorAll('#adminMemberFilterTabs .admin-filter-tab').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      renderMemberAdminTable(container, container.querySelector('#adminMemberListWrap'));
+    });
+    var searchInput = container.querySelector('#adminMemberSearchInput');
+    var searchDebounceTimer = null;
+    searchInput.addEventListener('input', function(){
+      clearTimeout(searchDebounceTimer);
+      var value = searchInput.value;
+      searchDebounceTimer = setTimeout(function(){
+        memberAdminSearchTerm = value.trim();
+        renderMemberAdminTable(container, container.querySelector('#adminMemberListWrap'));
+      }, 200);
+    });
+
+    loadMemberAdminData(container);
+  }
+
+  function loadMemberAdminData(container){
+    var wrap = container.querySelector('#adminMemberListWrap');
+    if(!wrap) return;
+    wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>불러오는 중…</p></div>';
+    var seq = ++memberAdminLoadSeq;
+    fetchAllMembersForAdmin().then(function(res){
+      if(seq !== memberAdminLoadSeq) return; // 그 사이 새 요청이 시작됐으면 이 응답은 버림
+      if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
+      if(!res.ok){
+        // 0건(정상)과 조회 실패(에러)를 반드시 구분한다.
+        wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;">' +
+          '<p>회원 목록을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p>' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="adminMemberRetryBtn">다시 시도</button></div>';
+        var retryBtn = wrap.querySelector('#adminMemberRetryBtn');
+        if(retryBtn) retryBtn.addEventListener('click', function(){ loadMemberAdminData(container); });
+        return;
+      }
+      memberAdminItems = res.data;
+      renderMemberAdminTable(container, wrap);
+    }).catch(function(err){
+      if(seq !== memberAdminLoadSeq) return;
+      console.warn('[launchdesk] 관리자 회원 목록 조회 중 오류:', err && err.message);
+      wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>회원 목록을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p></div>';
+    });
+  }
+
+  function renderMemberAdminTable(container, wrap){
+    if(!wrap || memberAdminItems == null) return;
+
+    if(memberAdminItems.length === 0){
+      wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>가입한 회원이 없습니다.</p></div>';
+      return;
+    }
+
+    var term = memberAdminSearchTerm.toLowerCase();
+    var filtered = memberAdminItems.filter(function(m){
+      if(memberAdminFilter === 'stores' && !(Number(m.store_count) > 0)) return false;
+      if(memberAdminFilter === 'cafe24' && !(Number(m.cafe24_count) > 0)) return false;
+      if(memberAdminFilter === 'meta' && !(Number(m.meta_count) > 0)) return false;
+      if(memberAdminFilter === 'admin' && !m.is_admin) return false;
+      if(term){
+        var hay = String(m.email || '').toLowerCase();
+        if(hay.indexOf(term) === -1) return false;
+      }
+      return true;
+    });
+
+    if(filtered.length === 0){
+      wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>검색/필터 결과가 없습니다.</p></div>';
+      return;
+    }
+
+    wrap.innerHTML = '<div class="tbl-wrap"><table>' +
+      '<thead><tr><th>이메일</th><th>가입일</th><th>최근 로그인</th><th>쇼핑몰</th><th>Cafe24</th><th>Meta</th><th>관리자</th><th></th></tr></thead>' +
+      '<tbody>' +
+        filtered.map(function(m){
+          return '<tr>' +
+            '<td>' + escapeHtml(m.email || '-') + '</td>' +
+            '<td>' + escapeHtml(formatDate(m.created_at)) + '</td>' +
+            '<td>' + escapeHtml(formatDateTime(m.last_sign_in_at)) + '</td>' +
+            '<td>' + Number(m.store_count || 0) + '</td>' +
+            '<td>' + Number(m.cafe24_count || 0) + '</td>' +
+            '<td>' + Number(m.meta_count || 0) + '</td>' +
+            '<td>' + (m.is_admin ? '예' : '-') + '</td>' +
+            '<td><button type="button" class="btn btn-ghost btn-sm admin-member-detail-btn" data-id="' + escapeHtml(m.user_id) + '">상세보기</button></td>' +
+          '</tr>';
+        }).join('') +
+      '</tbody></table></div>';
+
+    wrap.querySelectorAll('.admin-member-detail-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var member = memberAdminItems.filter(function(m){ return String(m.user_id) === btn.getAttribute('data-id'); })[0];
+        if(member) openMemberDetailModal(member);
+      });
+    });
+  }
+
+  function closeMemberDetailModal(){
+    var el = document.getElementById('adminMemberDetailModal');
+    if(el) el.remove();
+    document.removeEventListener('keydown', handleMemberModalEscape);
+  }
+  function handleMemberModalEscape(e){
+    if(e.key === 'Escape') closeMemberDetailModal();
+  }
+
+  // 회원 상세는 이 회원의 stores/connected_accounts까지 조회해 플랫폼/URL과
+  // 연동 상태를 보여준다 — 관리자는 stores_select_admin/connected_accounts_select_admin
+  // RLS 정책(is_admin())으로 전체 회원의 행을 볼 수 있으므로, 목록 RPC를
+  // 다시 부르지 않고 이 두 테이블만 user_id로 좁혀서 조회한다(상세보기를
+  // 누를 때만, 목록에는 없던 요청이라 N+1이 아니다). integration_credentials는
+  // 여기서도 조회하지 않는다 — 토큰/시크릿은 이 화면의 범위 밖이다.
+  function fetchStoresForMember(userId){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    return sb.from('stores')
+      .select('id, name, platform, store_url, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, data: res.data || [] };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+  function fetchConnectedAccountsForStoreIds(storeIds){
+    var sb = client();
+    if(!sb || !storeIds.length) return Promise.resolve({ ok: true, data: [] });
+    return sb.from('connected_accounts')
+      .select('id, store_id, provider, status, external_account_id, display_name, last_synced_at')
+      .in('store_id', storeIds)
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        return { ok: true, data: res.data || [] };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  function openMemberDetailModal(member){
+    closeMemberDetailModal();
+
+    function row(label, valueHtml){
+      return '<div style="margin-bottom:.9rem;">' +
+        '<div style="font-size:.78rem; font-weight:700; color:var(--ink-soft); margin-bottom:.25rem;">' + escapeHtml(label) + '</div>' +
+        '<div style="font-size:.9rem; color:var(--ink); word-break:break-word;">' + valueHtml + '</div>' +
+      '</div>';
+    }
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal open';
+    overlay.id = 'adminMemberDetailModal';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML =
+      '<div class="modal-backdrop" id="adminMemberDetailBackdrop"></div>' +
+      '<div class="modal-panel" style="max-width:520px; text-align:left; max-height:85vh; overflow-y:auto;">' +
+        '<button class="modal-close" type="button" id="adminMemberDetailClose" aria-label="닫기">✕</button>' +
+        '<div class="modal-head" style="text-align:left;"><h2>' + escapeHtml(member.email || '-') + '</h2></div>' +
+        row('user_id', escapeHtml(member.user_id || '-')) +
+        row('가입일', escapeHtml(formatDateTime(member.created_at))) +
+        row('최근 로그인', escapeHtml(formatDateTime(member.last_sign_in_at))) +
+        row('관리자 여부', member.is_admin ? '예' : '아니요') +
+        '<div style="margin-bottom:.9rem;">' +
+          '<div style="font-size:.78rem; font-weight:700; color:var(--ink-soft); margin-bottom:.4rem;">등록 쇼핑몰</div>' +
+          '<div id="adminMemberStoresWrap" style="font-size:.86rem; color:var(--ink-soft);">불러오는 중…</div>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', handleMemberModalEscape);
+    document.getElementById('adminMemberDetailBackdrop').addEventListener('click', closeMemberDetailModal);
+    document.getElementById('adminMemberDetailClose').addEventListener('click', closeMemberDetailModal);
+
+    var storesWrap = document.getElementById('adminMemberStoresWrap');
+    fetchStoresForMember(member.user_id).then(function(storesRes){
+      if(!storesWrap || !storesWrap.isConnected) return; // 그 사이 모달이 닫혔으면 반영하지 않음
+      if(!storesRes.ok){
+        storesWrap.textContent = '쇼핑몰 목록을 불러오지 못했습니다.';
+        return;
+      }
+      var stores = storesRes.data;
+      if(stores.length === 0){
+        storesWrap.textContent = '등록된 쇼핑몰이 없습니다.';
+        return;
+      }
+      return fetchConnectedAccountsForStoreIds(stores.map(function(s){ return s.id; })).then(function(connRes){
+        if(!storesWrap || !storesWrap.isConnected) return;
+        var connMap = {};
+        if(connRes.ok){
+          connRes.data.forEach(function(r){
+            var sid = String(r.store_id);
+            if(!connMap[sid]) connMap[sid] = {};
+            connMap[sid][r.provider] = r;
+          });
+        }
+        storesWrap.innerHTML = stores.map(function(s){
+          var conn = connMap[String(s.id)] || {};
+          var cafe24 = connectionStatusFor(conn, 'cafe24');
+          var meta = connectionStatusFor(conn, 'meta');
+          var href = safeHref(s.store_url);
+          var urlHtml = href
+            ? '<a href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(s.store_url) + '</a>'
+            : escapeHtml(s.store_url);
+          return '<div style="padding:.6rem 0; border-bottom:1px solid var(--border);">' +
+            '<div style="color:var(--ink); font-weight:600;">' + escapeHtml(s.name) + ' <span style="font-weight:400; color:var(--ink-soft);">(' + escapeHtml(platformLabelFor(s.platform)) + ')</span></div>' +
+            '<div style="margin-top:.2rem;">' + urlHtml + '</div>' +
+            '<div style="margin-top:.2rem; color:var(--ink-soft);">Cafe24 ' + escapeHtml(cafe24.label) + ' · Meta ' + escapeHtml(meta.label) + '</div>' +
+          '</div>';
+        }).join('');
+      });
+    }).catch(function(err){
+      if(!storesWrap || !storesWrap.isConnected) return;
+      console.warn('[launchdesk] 회원 상세 쇼핑몰 조회 중 오류:', err && err.message);
+      storesWrap.textContent = '쇼핑몰 목록을 불러오지 못했습니다.';
     });
   }
 
