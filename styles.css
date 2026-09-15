@@ -454,6 +454,12 @@
   .ws-field label{font-size:.8rem; font-weight:700; color:var(--ink-soft);}
   .ws-field input{border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink);}
   .ws-field input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
+  /* 도매처 등록 문의 폼의 "추가 설명"에만 쓰는 textarea — input과 동일한
+     토큰을 그대로 맞춘다(새 스타일 언어를 만들지 않음). #wholesaleInquiryModal로
+     범위를 좁혀서, 같은 .ws-field 클래스를 쓰는 다른 폼(예: 세팅 대행의
+     #setupNote)에는 영향을 주지 않는다. */
+  #wholesaleInquiryModal .ws-field textarea{border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink); resize:vertical; min-height:70px;}
+  #wholesaleInquiryModal .ws-field textarea:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
   .worksheet-note{padding:.75rem 1.3rem; font-size:.74rem; color:var(--ink-faint); border-top:1px solid var(--border); background:var(--sidebar-bg);}
 
   /* ---------------- tools dashboard (/tools) ---------------- */
@@ -730,3 +736,28 @@
   .store-meta-label{font-family:var(--f-mono); font-size:.68rem; font-weight:700; letter-spacing:.02em; color:var(--ink-faint); text-transform:uppercase; margin-bottom:.4rem;}
   .store-card-actions{display:flex; gap:.5rem; flex:0 0 auto; flex-wrap:wrap;}
   @media (max-width:640px){ .store-card-actions{justify-content:flex-end;} }
+
+  /* ---------------- 관리자(#/admin) — 일반 사용자 화면과 구분되는 절제된
+     운영자용 레이아웃. 새 색상/그라데이션 없이 기존 토큰만 사용한다. ---------------- */
+  .admin-layout{display:grid; grid-template-columns:200px 1fr; gap:1.4rem; margin-top:1.4rem; align-items:start;}
+  @media (max-width:760px){ .admin-layout{grid-template-columns:1fr;} }
+  .admin-nav{display:flex; flex-direction:column; gap:.15rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:.6rem;}
+  @media (max-width:760px){ .admin-nav{flex-direction:row; flex-wrap:wrap;} }
+  .admin-nav-item{display:block; width:100%; text-align:left; padding:.6rem .8rem; border-radius:var(--radius-sm); border:none; background:none; font-family:var(--f-body); font-size:.88rem; font-weight:600; color:var(--ink-soft); cursor:pointer; transition:background .15s, color .15s;}
+  @media (max-width:760px){ .admin-nav-item{width:auto;} }
+  .admin-nav-item:hover{background:var(--surface-hover); color:var(--ink);}
+  .admin-nav-item.active{background:var(--accent-soft); color:var(--accent-ink);}
+  .admin-panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); min-height:220px; min-width:0;}
+  .admin-panel-head{padding:1.05rem 1.3rem; font-size:.96rem; font-weight:700; border-bottom:1px solid var(--border);}
+  .admin-panel-body{padding:1.3rem;}
+  .admin-kpi-sub{font-size:.72rem; color:var(--ink-faint); margin-top:.3rem;}
+  /* 관리자 전용 필터 탭 — 사용자 화면의 .filter-tabs/.filter-tab와 시각적
+     스타일은 동일하지만 클래스명을 분리했다. app.js의 공용 delegated
+     클릭 핸들러가 e.target.closest('.filter-tab')로 그 클래스를 잡아
+     (스코프 없는 경우) 다른 화면(#chapterGrid)용 로직까지 태우기 때문에,
+     app.js를 건드리지 않고 이 충돌을 피하려면 클래스명 자체를 다르게
+     써야 한다. */
+  .admin-filter-tab-row{display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.3rem;}
+  .admin-filter-tab{padding:.5rem 1.05rem; border-radius:99px; border:1px solid var(--border-strong); background:var(--surface); font-family:var(--f-body); font-size:.84rem; font-weight:600; color:var(--ink-soft); cursor:pointer; transition:background .15s, color .15s, border-color .15s;}
+  .admin-filter-tab.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .admin-filter-tab:not(.active):hover{background:var(--surface-hover);}

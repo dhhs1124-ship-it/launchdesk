@@ -4,6 +4,12 @@
   // last chapter path a GA4 chapter_start fired for — see render() below;
   // declared here so it survives across every render() call, not just one
   var lastChapterStartPath = null;
+  // same duplicate-prevention idea as lastChapterStartPath above, but for the
+  // internal product_events 'dashboard_viewed' event (see render() below) —
+  // guards against render() re-running for the same route without the hash
+  // actually changing, while still firing again on every real navigation
+  // back into /tools (which is what the 7-day revisit metric needs).
+  var lastDashboardViewedPath = null;
   // set by a click on any [data-resource-cat] link (STEP02~07 → 자료실
   // links); consumed once by render() the moment /resources is reached,
   // so that STEP's relevant category filter is pre-selected automatically
@@ -26,8 +32,10 @@
     '/start/orders':  'view-start-orders',
     '/start/wrapup':  'view-start-wrapup',
     '/resources':     'view-resources',
+    '/wholesale':     'view-wholesale',
     '/services/setup': 'view-services-setup',
-    '/account':       'view-account'
+    '/account':       'view-account',
+    '/admin':         'view-admin'
   };
 
   /* Display name shown in the topbar crumb, and (for paths not in
@@ -38,6 +46,7 @@
     '/start/intro':      '챕터 00 · 시작하기 전에',
     '/tools':            '운영 도구',
     '/resources':        '자료실',
+    '/wholesale':        '도매처 찾기',
     '/services/setup':   '대행 서비스',
     '/login':            '로그인',
     '/contact':          '문의하기',
@@ -53,12 +62,34 @@
     '/start/marketing':  '06 · 마케팅 & SNS',
     '/start/orders':     '07 · 주문 · CS 관리',
     '/start/wrapup':     '08 · 마무리',
-    '/account':          '내 쇼핑몰'
+    '/account':          '내 쇼핑몰',
+    '/admin':            'LaunchDesk Admin'
   };
 
   function currentPath(){
     var h = location.hash.replace(/^#/, '');
     return h || '/';
+  }
+
+  /* GA4로 보낼 page_location을 안전하게 만든다(2026-09-15 감사 반영). 왜
+     필요한가: 이메일 인증 확인/매직링크 등 Supabase 인증 콜백이 이 페이지로
+     돌아올 때 URL 해시에 access_token/refresh_token 등 자격증명이 실려
+     온다(예: '#access_token=...&refresh_token=...&type=signup'). Supabase
+     SDK가 detectSessionInUrl로 그 해시를 세션에 반영하고 정리하지만, 그
+     처리는 비동기이고 이 스크립트는 파일 하단에서 render()를 동기로 1회
+     호출한다(초기 진입) — SDK 정리가 끝나기 전에 이 render()가 먼저 실행돼
+     location.href를 그대로 읽어갈 수 있다. 이 앱의 정상 해시 라우트는
+     전부 '#/'로 시작하므로(BUILT/TITLES 전부 '/'로 시작하는 경로,
+     currentPath() 참고) 해시가 그 형태일 때만 포함하고, 그 외에는(위
+     access_token 케이스 포함, 형태를 알 수 없는 무엇이든) 해시를 통째로
+     잘라낸다 — page_path/page_title은 이 함수와 무관하게 그대로 정확한
+     값을 계속 보내므로 정상 SPA 분석에는 영향이 없다. Supabase 인증 흐름
+     자체는 전혀 건드리지 않는다(그 정리 로직은 그대로 자기 타이밍에
+     실행된다 — 여기서는 GA4로 나가는 문자열만 방어적으로 다시 만든다). */
+  function safePageLocation(){
+    var hash = location.hash;
+    var safeHash = (hash.indexOf('#/') === 0) ? hash : '';
+    return location.origin + location.pathname + location.search + safeHash;
   }
 
   function setActiveNav(path){
@@ -127,7 +158,7 @@
     if(typeof gtag === 'function'){
       gtag('event', 'page_view', {
         page_title: TITLES[path] || '준비 중',
-        page_location: location.href,
+        page_location: safePageLocation(), // location.href 그대로 쓰지 않음 — 위 safePageLocation() 주석 참고(인증 콜백 토큰 해시 유출 방지)
         page_path: path
       });
     }
@@ -159,9 +190,49 @@
             chapter_title: TITLES[path] || path
           });
         }
+        /* internal product event: roadmap_started — "사용자가 로드맵을
+           처음 실제 시작한 시점"을 STEP01~07(실제 작업 챕터) 중 어느
+           것이든 처음 진입하는 순간으로 정의한다(2026-09-15 감사 반영 —
+           STEP01만이 아니라 STEP03부터 시작하는 것처럼 STEP을 건너뛴
+           진입도 "시작"으로 잡아야 정의가 정확하다). STEP00(/start/intro)과
+           STEP08(/start/wrapup)은 게이트 없는 소개/마무리 화면이라
+           제외한다 — 이 두 경로만 리터럴로 비교해서, 뒤에서 정의되는
+           GATED_STEPS 배열을 여기서 참조하지 않는다(전에는 GATED_STEPS[0]을
+           참조했는데, render() 호출이 항상 그 정의 이후라 실제로는
+           안전했지만 이 블록만 봐서는 알 수 없는 깨지기 쉬운 구조였다 —
+           지금은 이 블록만으로도 안전하다). 이미 이 if(path !==
+           lastChapterStartPath) 가드 안이므로 같은 경로 재진입 시 중복
+           기록되지 않고, 관리자 집계가 distinct user 기준이라 STEP01~07
+           여러 개에 걸쳐 진입해도 사용자당 1명으로만 반영된다. 로그인
+           여부 확인은 trackProductEvent가 전담. */
+        if(window.launchdeskProductEvents && path !== '/start/intro' && path !== '/start/wrapup'){
+          window.launchdeskProductEvents.track('roadmap_started');
+        }
       }
     } else {
       lastChapterStartPath = null;
+    }
+
+    /* internal product event: dashboard_viewed — "사용자가 실제 운영
+       대시보드에 진입했을 때"를 /tools 진입 시점으로 정의한다. /tools는
+       상단에 ops-overview.js가 그리는 "쇼핑몰 운영 현황" 패널(연결된
+       Cafe24 쇼핑몰의 실제 orders 집계)을 항상 포함하는, 이 저장소에서
+       유일하게 실제 데이터를 보여주는 운영 대시보드다(그 아래 시뮬레이터/
+       광고기록 탭과 달리 "분석 대시보드" 탭은 아직 예시 데이터라 별도
+       화면으로 취급하지 않는다 — 전부 같은 /tools 라우트 안에 있다).
+       lastDashboardViewedPath 가드로 같은 라우트에서 render()가 반복
+       호출돼도 중복 기록하지 않지만(요구사항 6 — render마다 기록 금지),
+       /tools를 벗어났다가 다른 날 다시 들어오면(hashchange가 다시 발생)
+       정상적으로 새 이벤트로 기록된다 — 7일 재방문 지표가 필요로 하는
+       바로 그 동작이다. 로그인 여부 확인/실패 시 무시는 trackProductEvent가
+       전담하므로 여기서는 라우트 판별만 한다. */
+    if(path === '/tools'){
+      if(path !== lastDashboardViewedPath){
+        lastDashboardViewedPath = path;
+        if(window.launchdeskProductEvents) window.launchdeskProductEvents.track('dashboard_viewed');
+      }
+    } else {
+      lastDashboardViewedPath = null;
     }
   }
 
@@ -249,6 +320,12 @@
     loginModal.classList.add('open');
     document.getElementById('loginEmail').focus();
   }
+  // 다른 독립 모듈(wholesalers.js 등)이 "로그인이 필요합니다" 상황에서
+  // 로그인 화면 상태(loginMode='login' 초기화 포함)로 정확히 여는 최소
+  // 진입점 — 그 모듈들이 이 로직을 복제하지 않고 이 함수를 그대로 재사용
+  // 하게 하기 위함. 이 함수 자체의 동작은 위 openLoginModal()과 완전히
+  // 동일하다(별도 로직 없음, 그대로 노출만).
+  window.launchdeskOpenLoginModal = openLoginModal;
   function closeLoginModal(){
     loginModal.classList.remove('open');
     loginForm.reset();
@@ -585,6 +662,21 @@
           chapter_title: TITLES[path] || path
         });
       }
+      /* 2026-09-15 감사 반영 — 여기 있던 내부 product event
+         'roadmap_completed' 계측을 제거했다. 로드맵 완료 여부는 이미
+         user_step_progress(is_completed)가 canonical하게 갖고 있고
+         (STEP01~07 전체 완료 = 그 7개 step_path 모두 is_completed=true),
+         이 함수(setChapterDone)를 거치지 않는 완료 경로가 여러 개 있어
+         이벤트만으로는 놓치는 사용자가 생긴다 — 게스트로 로드맵을 다
+         끝낸 뒤 로그인 시 병합(mergeGuestSnapshotToAccount, 이 함수를
+         거치지 않고 user_step_progress에 직접 upsert), reconcileCompleted
+         Chapters()의 보정 upsert, 배포 이전에 이미 완료한 사용자, 다른
+         기기에서 완료한 사용자 전부 이 이벤트가 찍히지 않는다. 그래서
+         admin_beta_behavior_overview()의 roadmap_completed_users는 이제
+         product_events가 아니라 user_step_progress를 직접 집계한다
+         (20260915300000_admin_beta_behavior.sql 참고) — 상태(canonical
+         DB)가 이미 답을 갖고 있는 사실을 행동 이벤트로 다시 만들지
+         않는다는 원칙(요구사항 0)을 그대로 따른 것이다. */
     }
     else if(!isDone && idx !== -1){
       recomputeProgress();
@@ -1169,6 +1261,12 @@
         });
         return;
       }
+      // 도매처 찾기(#/wholesale) 필터 — active 클래스 토글은 위에서 이미
+      // 공통으로 처리됐으니, 실제 목록 다시 그리기는 wholesalers.js가
+      // 자기 컨테이너에 직접 건 리스너에서 한다. 여기서 더 진행하면 바로
+      // 아래 #chapterGrid 로직(다른 화면 전용)까지 타버리므로 반드시
+      // return한다.
+      if(scope === 'wholesale'){ return; }
       var anyVisible = false;
       document.querySelectorAll('#chapterGrid .guide-card').forEach(function(card){
         var tier = card.getAttribute('data-tier');
