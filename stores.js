@@ -112,6 +112,27 @@
   function safeHref(url){
     return /^https?:\/\//i.test(url || '') ? url : null;
   }
+  // URL 입력 UX 개선 — 초보 사용자가 "somfre.com"처럼 스킴 없이 입력해도
+  // 등록되게 한다. wholesalers.js의 normalizeUrl()과 규칙이 완전히 동일한
+  // 중복 구현이다(TODO: 두 기능이 안정화된 뒤, 별도 공용 유틸 파일로
+  // 합치는 걸 리팩터링 대상으로 남겨둔다 — 지금은 각자 다른 최상위 IIFE라
+  // 함수를 그냥 공유할 수 없고, 이번 작업 범위도 stores.js 단독 수정이라
+  // 새 파일을 만들지 않았다).
+  //   1) 앞뒤 공백 제거
+  //   2) 이미 http:// 또는 https://면 그대로 유지
+  //   3) 그 외 "단어:" 스킴(javascript:, data:, file: 등)이 있으면 거부(null)
+  //   4) 스킴이 아예 없으면 https://를 붙인다
+  // 반환값: 정규화된 URL 문자열 | ''(빈 입력) | null(허용 안 되는 스킴).
+  function normalizeStoreUrl(raw){
+    var v = String(raw == null ? '' : raw).trim();
+    if(!v) return '';
+    var schemeMatch = /^([a-zA-Z][a-zA-Z0-9+.-]*):/.exec(v);
+    if(schemeMatch){
+      var scheme = schemeMatch[1].toLowerCase();
+      return (scheme === 'http' || scheme === 'https') ? v : null;
+    }
+    return 'https://' + v;
+  }
   // store_url이 정확히 "*.cafe24.com" 서브도메인일 때만 mall_id를 뽑아
   // 기본값으로 제안한다 — 커스텀 도메인(예: www.myshop.com)일 수 있으므로,
   // 확실하지 않으면 빈 값을 반환해 사용자가 직접 입력하게 한다(자동으로
@@ -928,8 +949,15 @@
 
     var name = nameInput.value.trim();
     var platform = platformSelect.value;
-    var storeUrl = urlInput.value.trim();
-    if(!name || !storeUrl) return; // required 속성이 이미 막아주지만 한 번 더 방어
+    // normalizeStoreUrl()이 스킴 없는 입력엔 https://를 붙이고, http(s) 외의
+    // 스킴(javascript:/data:/file: 등)은 null로 거부한다 — 저장되는 값은
+    // 항상 이 정규화된 값이다(입력창의 실제 value는 건드리지 않는다).
+    var storeUrl = normalizeStoreUrl(urlInput.value);
+    if(!name) return; // required 속성이 이미 막아주지만 한 번 더 방어
+    if(!storeUrl){
+      showToast('올바른 쇼핑몰 URL을 입력해주세요.', 'error');
+      return;
+    }
 
     submitBtn.disabled = true;
 

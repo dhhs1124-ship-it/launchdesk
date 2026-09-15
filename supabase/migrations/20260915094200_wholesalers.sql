@@ -94,6 +94,12 @@ create policy "wholesalers_select_published"
 -- authenticated) 키로는 어떤 쓰기도 불가능하고, 운영자는 service_role
 -- (Supabase Studio)로만 관리한다.
 
+-- RLS 정책만으로는 부족하다 — PostgREST는 테이블 자체에 대한 GRANT가
+-- 없으면 RLS 정책과 무관하게 401을 반환한다(실제 배포 후 브라우저에서
+-- 확인된 증상). anon/authenticated 모두 SELECT만 허용하고, 실제로 어떤
+-- 행이 보이는지는 위 wholesalers_select_published 정책이 계속 걸러낸다.
+grant select on table public.wholesalers to anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- B. wholesaler_inquiries — 로그인 사용자의 도매처 등록 문의
 -- ---------------------------------------------------------------------------
@@ -165,6 +171,12 @@ create policy "wholesaler_inquiries_insert_own"
 
 -- update/delete는 일부러 정책 없음 — 제출 후에는 신청자도 수정/삭제 불가,
 -- 상태 변경(승인/반려)은 운영자가 Studio(service_role)에서만 처리한다.
+
+-- wholesalers와 같은 이유의 GRANT — authenticated에게 SELECT/INSERT
+-- 테이블 권한을 주되, 실제로 어떤 행을 보고 쓸 수 있는지는 위
+-- wholesaler_inquiries_select_own/insert_own 정책이 계속 제한한다.
+-- anon에게는 어떤 권한도 주지 않는다(이 테이블은 완전히 비공개).
+grant select, insert on table public.wholesaler_inquiries to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- wholesalers.source_inquiry_id FK — wholesaler_inquiries가 위(B)에서 막

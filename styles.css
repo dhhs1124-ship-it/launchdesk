@@ -454,6 +454,12 @@
   .ws-field label{font-size:.8rem; font-weight:700; color:var(--ink-soft);}
   .ws-field input{border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink);}
   .ws-field input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
+  /* 도매처 등록 문의 폼의 "추가 설명"에만 쓰는 textarea — input과 동일한
+     토큰을 그대로 맞춘다(새 스타일 언어를 만들지 않음). #wholesaleInquiryModal로
+     범위를 좁혀서, 같은 .ws-field 클래스를 쓰는 다른 폼(예: 세팅 대행의
+     #setupNote)에는 영향을 주지 않는다. */
+  #wholesaleInquiryModal .ws-field textarea{border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.6rem .8rem; font-family:var(--f-body); font-size:.88rem; color:var(--ink); resize:vertical; min-height:70px;}
+  #wholesaleInquiryModal .ws-field textarea:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
   .worksheet-note{padding:.75rem 1.3rem; font-size:.74rem; color:var(--ink-faint); border-top:1px solid var(--border); background:var(--sidebar-bg);}
 
   /* ---------------- tools dashboard (/tools) ---------------- */

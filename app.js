@@ -26,6 +26,7 @@
     '/start/orders':  'view-start-orders',
     '/start/wrapup':  'view-start-wrapup',
     '/resources':     'view-resources',
+    '/wholesale':     'view-wholesale',
     '/services/setup': 'view-services-setup',
     '/account':       'view-account'
   };
@@ -38,6 +39,7 @@
     '/start/intro':      '챕터 00 · 시작하기 전에',
     '/tools':            '운영 도구',
     '/resources':        '자료실',
+    '/wholesale':        '도매처 찾기',
     '/services/setup':   '대행 서비스',
     '/login':            '로그인',
     '/contact':          '문의하기',
@@ -249,6 +251,12 @@
     loginModal.classList.add('open');
     document.getElementById('loginEmail').focus();
   }
+  // 다른 독립 모듈(wholesalers.js 등)이 "로그인이 필요합니다" 상황에서
+  // 로그인 화면 상태(loginMode='login' 초기화 포함)로 정확히 여는 최소
+  // 진입점 — 그 모듈들이 이 로직을 복제하지 않고 이 함수를 그대로 재사용
+  // 하게 하기 위함. 이 함수 자체의 동작은 위 openLoginModal()과 완전히
+  // 동일하다(별도 로직 없음, 그대로 노출만).
+  window.launchdeskOpenLoginModal = openLoginModal;
   function closeLoginModal(){
     loginModal.classList.remove('open');
     loginForm.reset();
@@ -1169,6 +1177,12 @@
         });
         return;
       }
+      // 도매처 찾기(#/wholesale) 필터 — active 클래스 토글은 위에서 이미
+      // 공통으로 처리됐으니, 실제 목록 다시 그리기는 wholesalers.js가
+      // 자기 컨테이너에 직접 건 리스너에서 한다. 여기서 더 진행하면 바로
+      // 아래 #chapterGrid 로직(다른 화면 전용)까지 타버리므로 반드시
+      // return한다.
+      if(scope === 'wholesale'){ return; }
       var anyVisible = false;
       document.querySelectorAll('#chapterGrid .guide-card').forEach(function(card){
         var tier = card.getAttribute('data-tier');
