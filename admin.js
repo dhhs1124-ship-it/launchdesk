@@ -305,7 +305,8 @@
     stores: renderStoresSection,
     wholesalers: renderWholesalersSection,
     'wholesaler-inquiries': renderWholesalerInquiriesSection,
-    'setup-inquiries': renderSetupInquiriesSection
+    'setup-inquiries': renderSetupInquiriesSection,
+    beta: renderBetaOverviewSection
   };
   function renderSectionInto(container, section){
     var renderer = SECTION_RENDERERS[section.key];
@@ -1723,6 +1724,170 @@
     document.addEventListener('keydown', handleStoreModalEscape);
     document.getElementById('adminStoreDetailBackdrop').addEventListener('click', closeStoreDetailModal);
     document.getElementById('adminStoreDetailClose').addEventListener('click', closeStoreDetailModal);
+  }
+
+  // =========================================================================
+  // "Beta 사용자 현황" — 회원가입 → 쇼핑몰 등록 → Cafe24 연결 → Meta 연결
+  // 퍼널(읽기 전용, 1차 범위). SECURITY DEFINER RPC(admin_beta_overview(),
+  // 20260915260000_admin_beta_overview.sql) 하나로 지표 5개를 한 번에
+  // 받는다 — auth.users/stores/connected_accounts를 브라우저에서 여러 번
+  // 내려받아 직접 집계하지 않는다. 기존 관리자 대시보드 KPI
+  // (DASHBOARD_LIVE_CARDS/loadDashboardStats)는 이 섹션과 완전히 무관하게
+  // 그대로 유지되고, 이 섹션은 그 로직을 재사용하거나 중복하지 않는다 —
+  // 별도 RPC/별도 상태를 쓰는 상세 분석 화면이다.
+  //
+  // 아직 구현하지 않은 지표 — 7일 재방문/dashboard_viewed/
+  // meta_insights_viewed/roadmap_started·completed/UTM 전환율 — 은 이
+  // 저장소 어디에도 저장하는 행동 이벤트 테이블이 없어서(GA4 gtag() 이벤트는
+  // 브라우저에서 Google로만 전송되고 Supabase DB에 저장되지 않는다 —
+  // docs/plans/beta-30-day-validation.md도 "실행 계획 문서, 코드는 아직
+  // 이걸로 안 바뀜"이라고 스스로 명시) 화면에 만들지 않는다 — 가짜 0 대신
+  // 안내 문구만 보여준다(아래 렌더 함수 마지막 블록).
+  // =========================================================================
+  var betaLoadSeq = 0;
+
+  // 전체 회원 대비/직전 단계 대비 비율 — 분모가 0이면 NaN 대신 안전하게 0%.
+  // 정수면 소수점을 붙이지 않고(예: "60%"), 아니면 소수 첫째 자리까지만
+  // (예: "58.3%") — 요구사항 예시 표기와 동일한 형식.
+  function formatBetaPercent(numerator, denominator){
+    if(!denominator) return '0%';
+    var rounded = Math.round((numerator / denominator) * 1000) / 10;
+    return (rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)) + '%';
+  }
+
+  function fetchBetaOverview(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    return sb.rpc('admin_beta_overview')
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        var row = Array.isArray(res.data) ? res.data[0] : res.data;
+        if(!row) return { ok: false, error: 'EMPTY_RESULT' };
+        return { ok: true, data: {
+          totalUsers: Number(row.total_users) || 0,
+          usersWithStore: Number(row.users_with_store) || 0,
+          usersWithCafe24: Number(row.users_with_cafe24) || 0,
+          // 순차 퍼널의 마지막 단계 — 정의상 usersWithCafe24의 부분집합
+          // (같은 user_id가 Cafe24 status='connected'이면서 동시에 Meta
+          // status='connected'). 이 보장 덕분에 "직전 단계 대비" 전환율이
+          // 100%를 넘지 않는다.
+          usersWithCafe24AndMeta: Number(row.users_with_cafe24_and_meta) || 0,
+          // 순차 퍼널에는 쓰지 않는 독립 참고 지표 — Cafe24 연결 여부와
+          // 무관하게 Meta를 연결한 모든 사용자(usersWithCafe24의 부분집합이
+          // 아닐 수 있음).
+          usersWithMeta: Number(row.users_with_meta) || 0,
+          usersWithOrders: Number(row.users_with_orders) || 0
+        } };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  function renderBetaOverviewSection(container){
+    container.innerHTML = '<div class="admin-panel-head">Beta 사용자 현황</div>' +
+      '<div class="admin-panel-body">' +
+        '<p style="margin:0 0 1.4rem; font-size:.86rem; color:var(--ink-soft);">현재까지의 사용자 활성화 단계입니다.</p>' +
+        '<div id="adminBetaWrap"></div>' +
+      '</div>';
+    loadBetaOverview(container);
+  }
+
+  function loadBetaOverview(container){
+    var wrap = container.querySelector('#adminBetaWrap');
+    if(!wrap) return;
+    wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>불러오는 중…</p></div>';
+    var seq = ++betaLoadSeq;
+    fetchBetaOverview().then(function(res){
+      if(seq !== betaLoadSeq) return; // 그 사이 새 요청이 시작됐으면 이 응답은 버림
+      if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
+      if(!res.ok){
+        wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;">' +
+          '<p>Beta 사용자 현황을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p>' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="adminBetaRetryBtn">다시 시도</button></div>';
+        var retryBtn = wrap.querySelector('#adminBetaRetryBtn');
+        if(retryBtn) retryBtn.addEventListener('click', function(){ loadBetaOverview(container); });
+        return;
+      }
+      renderBetaFunnel(wrap, res.data);
+    }).catch(function(err){
+      if(seq !== betaLoadSeq) return;
+      console.warn('[launchdesk] Beta 사용자 현황 조회 중 오류:', err && err.message);
+      wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>Beta 사용자 현황을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p></div>';
+    });
+  }
+
+  function renderBetaFunnel(wrap, d){
+    if(d.totalUsers === 0){
+      wrap.innerHTML = '<div class="empty-state" style="padding:2rem 1rem;"><p>아직 가입한 회원이 없습니다.</p></div>';
+      return;
+    }
+
+    // 직전 단계 대비 전환율의 분모(prevCount)는 바로 앞 단계의 count다.
+    // 회원가입은 퍼널의 시작점이라 직전 단계가 없다(prevCount: null).
+    // 마지막 단계는 usersWithMeta가 아니라 usersWithCafe24AndMeta를 쓴다 —
+    // usersWithMeta는 usersWithCafe24의 부분집합이라는 보장이 없어서(Cafe24
+    // 없이 Meta만 연결한 사용자도 포함될 수 있음) 순차 퍼널에 그대로
+    // 이어붙이면 "직전 단계 대비" 비율이 100%를 넘을 수 있다. usersWithMeta는
+    // 아래 "참고 지표"에 독립적으로 남긴다.
+    var stages = [
+      { label: '회원가입',        count: d.totalUsers,           prevCount: null },
+      { label: '쇼핑몰 등록',     count: d.usersWithStore,       prevCount: d.totalUsers },
+      { label: 'Cafe24 연결',     count: d.usersWithCafe24,      prevCount: d.usersWithStore },
+      { label: 'Cafe24 + Meta 연결', count: d.usersWithCafe24AndMeta, prevCount: d.usersWithCafe24 }
+    ];
+
+    var rowsHtml = stages.map(function(stage, i){
+      var overallPct = formatBetaPercent(stage.count, d.totalUsers);
+      var barWidth = Math.min(100, Math.round((d.totalUsers ? (stage.count / d.totalUsers) * 100 : 0) * 10) / 10);
+      var prevHtml = stage.prevCount != null
+        ? '<div style="margin-top:.3rem; font-size:.76rem; color:var(--ink-faint);">직전 단계 대비 ' + formatBetaPercent(stage.count, stage.prevCount) + '</div>'
+        : '';
+      var arrowHtml = i > 0
+        ? '<div style="text-align:center; color:var(--ink-faint); font-size:.86rem; margin:.5rem 0;">↓</div>'
+        : '';
+      return arrowHtml +
+        '<div>' +
+          '<div style="display:flex; align-items:baseline; justify-content:space-between; gap:.6rem; margin-bottom:.35rem; flex-wrap:wrap;">' +
+            '<span style="font-size:.9rem; font-weight:700; color:var(--ink);">' + escapeHtml(stage.label) + '</span>' +
+            '<span style="font-size:.86rem; color:var(--ink-soft);">' +
+              '<b style="font-family:var(--f-mono); color:var(--ink);">' + Number(stage.count) + '명</b> · 전체 회원 대비 ' + overallPct +
+            '</span>' +
+          '</div>' +
+          '<div style="height:8px; border-radius:99px; background:var(--border); overflow:hidden;">' +
+            '<div style="height:100%; width:' + barWidth + '%; background:var(--accent); border-radius:99px;"></div>' +
+          '</div>' +
+          prevHtml +
+        '</div>';
+    }).join('');
+
+    var ordersOverallPct = formatBetaPercent(d.usersWithOrders, d.totalUsers);
+    var metaOverallPct = formatBetaPercent(d.usersWithMeta, d.totalUsers);
+
+    wrap.innerHTML = rowsHtml +
+      // "참고 지표" — 위 4단계 퍼널과 분리해서 보여준다(순차 퍼널의 부분집합
+      // 보장이 없는 값들이라, 전환율 계산에는 쓰지 않고 전체 회원 대비
+      // 숫자만 보여준다). Activation 수치가 아니라는 점을 문구로 명확히
+      // 한다(요구사항 6 — 현재 DB로는 "실제 주문 데이터 확인"과 "orders
+      // 존재"를 구분할 수 없어, Activation을 억지로 확정하지 않았다. 작업
+      // 보고서 참고).
+      '<div style="margin-top:1.8rem; padding-top:1.4rem; border-top:1px solid var(--border);">' +
+        '<div style="font-size:.78rem; font-weight:700; color:var(--ink-soft); margin-bottom:.5rem;">참고 지표</div>' +
+        '<div style="display:flex; align-items:baseline; justify-content:space-between; gap:.6rem; flex-wrap:wrap;">' +
+          '<span style="font-size:.88rem; color:var(--ink);">Meta 연결 사용자</span>' +
+          '<span style="font-size:.86rem; color:var(--ink-soft);"><b style="font-family:var(--f-mono); color:var(--ink);">' + Number(d.usersWithMeta) + '명</b> · 전체 회원 대비 ' + metaOverallPct + '</span>' +
+        '</div>' +
+        '<p style="margin:.5rem 0 0; font-size:.76rem; color:var(--ink-faint);">Cafe24 연결 여부와 무관하게 Meta를 연결한 모든 사용자입니다 — 위 퍼널의 "Cafe24 + Meta 연결"(교집합)과는 다른 숫자입니다.</p>' +
+        '<div style="display:flex; align-items:baseline; justify-content:space-between; gap:.6rem; flex-wrap:wrap; margin-top:1rem;">' +
+          '<span style="font-size:.88rem; color:var(--ink);">Cafe24 주문 데이터 동기화됨</span>' +
+          '<span style="font-size:.86rem; color:var(--ink-soft);"><b style="font-family:var(--f-mono); color:var(--ink);">' + Number(d.usersWithOrders) + '명</b> · 전체 회원 대비 ' + ordersOverallPct + '</span>' +
+        '</div>' +
+        '<p style="margin:.5rem 0 0; font-size:.76rem; color:var(--ink-faint);">Cafe24 연결 여부와 무관하게, 해당 사용자의 쇼핑몰에 주문 데이터가 한 번이라도 동기화된 적이 있는지만 봅니다. "Activation" 지표는 아닙니다 — 사용자가 이 데이터를 실제로 확인했는지는 현재 데이터베이스 구조로는 판단할 수 없습니다.</p>' +
+      '</div>' +
+      // 행동 이벤트 추적 구조 자체가 아직 없는 지표는 0으로 채우지 않고
+      // 안내 문구로만 남긴다(요구사항 2).
+      '<div style="margin-top:1.2rem; padding:.9rem 1rem; border:1px dashed var(--border-strong); border-radius:var(--radius-sm); font-size:.8rem; color:var(--ink-faint);">' +
+        '7일 재방문, 대시보드/Meta 인사이트 재조회 같은 행동 지표는 아직 추적하지 않습니다. 행동 추적 준비 중입니다.' +
+      '</div>';
   }
 
   // ------------------------------------------------------------------ 관리자 여부 판별(공유)
