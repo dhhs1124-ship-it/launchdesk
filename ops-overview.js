@@ -61,6 +61,7 @@
     todayRevenue: document.getElementById('metaTodayRevenue'),
     todayPurchases: document.getElementById('metaTodayPurchases'),
     todayRoas: document.getElementById('metaTodayRoas'),
+    todayRoasNote: document.getElementById('metaTodayRoasNote'),
     todayCtr: document.getElementById('metaTodayCtr'),
     todayCpc: document.getElementById('metaTodayCpc'),
     todayCpm: document.getElementById('metaTodayCpm'),
@@ -68,6 +69,7 @@
     monthRevenue: document.getElementById('metaMonthRevenue'),
     monthPurchases: document.getElementById('metaMonthPurchases'),
     monthRoas: document.getElementById('metaMonthRoas'),
+    monthRoasNote: document.getElementById('metaMonthRoasNote'),
     monthCtr: document.getElementById('metaMonthCtr'),
     monthCpc: document.getElementById('metaMonthCpc'),
     monthCpm: document.getElementById('metaMonthCpm')
@@ -120,9 +122,30 @@
       return (currency ? currency + ' ' : '') + n.toLocaleString('en-US');
     }
   }
+  // ROAS 보조 설명의 "광고비 1당" 부분 전용 — 소수점 없이(예: "$1", "₩1").
+  function formatMetaMoneyRounded(amount, currency){
+    var n = Number(amount) || 0;
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n);
+    } catch(e){
+      return (currency ? currency + ' ' : '') + Math.round(n).toLocaleString('en-US');
+    }
+  }
   // 0 분모라 계산 불가인 지표(서버가 null로 내려줌)는 0이 아니라 "—"로
   // 구분해서 보여준다 — 데이터 없음(0)과 계산 불가는 다른 의미다.
-  function formatMetaRoas(x){ return (x === null || x === undefined) ? '—' : (Number(x).toFixed(2) + 'x'); }
+  //
+  // 서버는 ROAS를 ratio(purchase_value/spend, 예: 3.379073...)로 내려준다 —
+  // 이 계산/응답은 그대로 두고(백엔드 수정 금지), 한국 쇼핑몰 운영자에게
+  // 익숙한 퍼센트 표시로 UI에서만 변환한다(예: 3.379073 → "338%").
+  function formatMetaRoas(x){ return (x === null || x === undefined) ? '—' : (Math.round(Number(x) * 100).toLocaleString('ko-KR') + '%'); }
+  // 보조 설명 — 원래 ratio를 "광고비 1당 약 얼마의 매출"로 풀어서 보여준다.
+  // roas === null(=spend 0 등 계산 불가)이면 표시할 게 없으므로 빈 문자열.
+  function formatMetaRoasNote(x, currency){
+    if(x === null || x === undefined) return '';
+    var perUnit = formatMetaMoneyRounded(1, currency);
+    var yieldAmount = formatMetaMoney(x, currency);
+    return '광고비 ' + perUnit + '당 약 ' + yieldAmount + '의 Meta 광고매출';
+  }
   function formatMetaPercent(x){ return (x === null || x === undefined) ? '—' : (Number(x).toFixed(2) + '%'); }
   function formatMetaMoneyOrDash(x, currency){ return (x === null || x === undefined) ? '—' : formatMetaMoney(x, currency); }
   function formatMetaCount(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '건'; }
@@ -155,6 +178,7 @@
     if(metaEls.todayRevenue) metaEls.todayRevenue.textContent = formatMetaMoney(today.purchase_value, currency);
     if(metaEls.todayPurchases) metaEls.todayPurchases.textContent = formatMetaCount(today.purchase_count);
     if(metaEls.todayRoas) metaEls.todayRoas.textContent = formatMetaRoas(today.roas);
+    if(metaEls.todayRoasNote) metaEls.todayRoasNote.textContent = formatMetaRoasNote(today.roas, currency);
     if(metaEls.todayCtr) metaEls.todayCtr.textContent = formatMetaPercent(today.ctr);
     if(metaEls.todayCpc) metaEls.todayCpc.textContent = formatMetaMoneyOrDash(today.cpc, currency);
     if(metaEls.todayCpm) metaEls.todayCpm.textContent = formatMetaMoneyOrDash(today.cpm, currency);
@@ -163,6 +187,7 @@
     if(metaEls.monthRevenue) metaEls.monthRevenue.textContent = formatMetaMoney(month.purchase_value, currency);
     if(metaEls.monthPurchases) metaEls.monthPurchases.textContent = formatMetaCount(month.purchase_count);
     if(metaEls.monthRoas) metaEls.monthRoas.textContent = formatMetaRoas(month.roas);
+    if(metaEls.monthRoasNote) metaEls.monthRoasNote.textContent = formatMetaRoasNote(month.roas, currency);
     if(metaEls.monthCtr) metaEls.monthCtr.textContent = formatMetaPercent(month.ctr);
     if(metaEls.monthCpc) metaEls.monthCpc.textContent = formatMetaMoneyOrDash(month.cpc, currency);
     if(metaEls.monthCpm) metaEls.monthCpm.textContent = formatMetaMoneyOrDash(month.cpm, currency);
