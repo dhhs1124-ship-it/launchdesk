@@ -1950,6 +1950,58 @@
         </div>
       </div>
 
+      <!-- Meta 광고 성과 — 위 "쇼핑몰 운영 현황"에서 선택된 쇼핑몰에 연결된
+           Meta 광고계정의 실제 Insights. Cafe24 결제금액과 물리적으로
+           분리된 별도 패널이다 — Meta "광고매출"은 Meta 자체 집계치이며
+           Cafe24 실제 결제금액과 다를 수 있다(혼동 방지). 로그인/쇼핑몰
+           미연결 상태는 위 패널이 이미 안내하므로, 이 패널은 위에서 실제
+           쇼핑몰이 선택됐을 때만(state='data') 나타난다. -->
+      <div class="dash-panel" id="metaOpsPanel" style="margin-bottom:1.3rem;" hidden>
+        <div class="dash-panel-head">Meta 광고 성과</div>
+        <div style="padding:1.2rem 1.3rem;">
+          <div class="empty-state" id="metaOpsNotConnected" style="padding:1.6rem 1rem;" hidden>
+            <div class="es-icon">📣</div>
+            <p>Meta 광고 계정을 연결해주세요.</p>
+            <a class="btn btn-ghost btn-sm" href="#/account">내 쇼핑몰 관리로 이동</a>
+          </div>
+          <div class="empty-state" id="metaOpsNotSelected" style="padding:1.6rem 1rem;" hidden>
+            <div class="es-icon">🗂️</div>
+            <p>분석할 광고계정을 선택해주세요.</p>
+            <a class="btn btn-ghost btn-sm" href="#/account">내 쇼핑몰 관리로 이동</a>
+          </div>
+          <div class="empty-state" id="metaOpsLoading" style="padding:1.6rem 1rem;" hidden>
+            <p>Meta 광고 데이터를 불러오는 중...</p>
+          </div>
+          <div class="empty-state" id="metaOpsError" style="padding:1.6rem 1rem;" hidden>
+            <div class="es-icon">⚠️</div>
+            <p id="metaOpsErrorMsg">Meta 데이터를 불러오지 못했습니다.</p>
+            <button type="button" class="btn btn-ghost btn-sm" id="metaOpsRetryBtn">다시 시도</button>
+          </div>
+          <div id="metaOpsDataWrap" hidden>
+            <div style="font-size:.82rem; font-weight:700; color:var(--ink-soft); margin-bottom:.5rem;">오늘</div>
+            <div class="adlog-summary" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
+              <div class="adlog-sum-card"><div class="al-label">Meta 광고비</div><div class="al-value" id="metaTodaySpend">-</div></div>
+              <div class="adlog-sum-card"><div class="al-label">Meta 광고매출</div><div class="al-value" id="metaTodayRevenue">-</div></div>
+              <div class="adlog-sum-card"><div class="al-label">구매</div><div class="al-value" id="metaTodayPurchases">-</div></div>
+              <div class="adlog-sum-card"><div class="al-label">ROAS</div><div class="al-value" id="metaTodayRoas">-</div></div>
+            </div>
+            <div style="font-size:.76rem; color:var(--ink-faint); margin-top:.4rem;">CTR <b id="metaTodayCtr">-</b> · CPC <b id="metaTodayCpc">-</b> · CPM <b id="metaTodayCpm">-</b></div>
+
+            <div style="font-size:.82rem; font-weight:700; color:var(--ink-soft); margin:1.1rem 0 .5rem;">이번 달</div>
+            <div class="adlog-summary" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
+              <div class="adlog-sum-card"><div class="al-label">Meta 광고비</div><div class="al-value" id="metaMonthSpend">-</div></div>
+              <div class="adlog-sum-card"><div class="al-label">Meta 광고매출</div><div class="al-value" id="metaMonthRevenue">-</div></div>
+              <div class="adlog-sum-card"><div class="al-label">구매</div><div class="al-value" id="metaMonthPurchases">-</div></div>
+              <div class="adlog-sum-card"><div class="al-label">ROAS</div><div class="al-value" id="metaMonthRoas">-</div></div>
+            </div>
+            <div style="font-size:.76rem; color:var(--ink-faint); margin-top:.4rem;">CTR <b id="metaMonthCtr">-</b> · CPC <b id="metaMonthCpc">-</b> · CPM <b id="metaMonthCpm">-</b></div>
+
+            <p style="font-size:.76rem; color:var(--ink-faint); margin-top:1rem;">Meta 광고매출은 Meta 자체 집계 기준(광고주 신고 전환)이며, Cafe24 실제 결제금액과 다를 수 있습니다.</p>
+            <p style="font-size:.72rem; color:var(--ink-faint); margin-top:.3rem;" id="metaOpsDebugInfo"></p>
+          </div>
+        </div>
+      </div>
+
       <div class="tools-tab-bar" id="toolsTabBar">
         <button class="tools-tab-btn active" type="button" data-tools-tab="dashboard">🖥️ 대시보드</button>
         <button class="tools-tab-btn" type="button" data-tools-tab="simulator">🧮 수익 시뮬레이터</button>

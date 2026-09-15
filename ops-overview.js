@@ -43,6 +43,36 @@
   var lastSyncedEl = document.getElementById('opsLastSynced');
   if(!panel || !storeSelect || !guestNotice || !noStoreNotice || !dataWrap){ return; }
 
+  // ---- Meta 광고 성과 패널 — 위 Cafe24 패널에서 선택된 쇼핑몰에 연결된
+  // Meta 광고계정의 실제 Insights(supabase/functions/meta-insights). 이 DOM이
+  // 없어도(예: 예전 캐시된 index.html) Cafe24 패널은 그대로 동작해야 하므로
+  // 별도 얼리 리턴 없이 아래에서 각 참조를 매번 null 체크한다.
+  var metaPanel = document.getElementById('metaOpsPanel');
+  var metaOpsNotConnected = document.getElementById('metaOpsNotConnected');
+  var metaOpsNotSelected = document.getElementById('metaOpsNotSelected');
+  var metaOpsLoading = document.getElementById('metaOpsLoading');
+  var metaOpsError = document.getElementById('metaOpsError');
+  var metaOpsErrorMsg = document.getElementById('metaOpsErrorMsg');
+  var metaOpsRetryBtn = document.getElementById('metaOpsRetryBtn');
+  var metaOpsDataWrap = document.getElementById('metaOpsDataWrap');
+  var metaOpsDebugInfo = document.getElementById('metaOpsDebugInfo');
+  var metaEls = {
+    todaySpend: document.getElementById('metaTodaySpend'),
+    todayRevenue: document.getElementById('metaTodayRevenue'),
+    todayPurchases: document.getElementById('metaTodayPurchases'),
+    todayRoas: document.getElementById('metaTodayRoas'),
+    todayCtr: document.getElementById('metaTodayCtr'),
+    todayCpc: document.getElementById('metaTodayCpc'),
+    todayCpm: document.getElementById('metaTodayCpm'),
+    monthSpend: document.getElementById('metaMonthSpend'),
+    monthRevenue: document.getElementById('metaMonthRevenue'),
+    monthPurchases: document.getElementById('metaMonthPurchases'),
+    monthRoas: document.getElementById('metaMonthRoas'),
+    monthCtr: document.getElementById('metaMonthCtr'),
+    monthCpc: document.getElementById('metaMonthCpc'),
+    monthCpm: document.getElementById('metaMonthCpm')
+  };
+
   function client(){ return window.launchdeskSupabase || null; }
 
   var KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -78,6 +108,162 @@
   }
   function formatWon(n){ return Math.round(n).toLocaleString('ko-KR') + '원'; }
 
+  // ---------------------------------------------------------- Meta 포맷 헬퍼
+  // 환율 변환은 절대 하지 않는다 — 광고계정 실제 currency로만 표시(요구사항
+  // 9). Intl이 지원하지 않는/알 수 없는 통화 코드라도 catch에서 ISO 코드
+  // 자체가 보이는 형태로 fallback한다.
+  function formatMetaMoney(amount, currency){
+    var n = Number(amount) || 0;
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 2 }).format(n);
+    } catch(e){
+      return (currency ? currency + ' ' : '') + n.toLocaleString('en-US');
+    }
+  }
+  // 0 분모라 계산 불가인 지표(서버가 null로 내려줌)는 0이 아니라 "—"로
+  // 구분해서 보여준다 — 데이터 없음(0)과 계산 불가는 다른 의미다.
+  function formatMetaRoas(x){ return (x === null || x === undefined) ? '—' : (Number(x).toFixed(2) + 'x'); }
+  function formatMetaPercent(x){ return (x === null || x === undefined) ? '—' : (Number(x).toFixed(2) + '%'); }
+  function formatMetaMoneyOrDash(x, currency){ return (x === null || x === undefined) ? '—' : formatMetaMoney(x, currency); }
+  function formatMetaCount(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '건'; }
+
+  // stores.js의 같은 이름 helper와 동일한 이유로 이 IIFE 안에 별도 선언
+  // (각자 다른 최상위 IIFE라 공유 불가) — functions.invoke 에러 응답의 JSON
+  // body(예: { error, code })를 안전하게 읽는다.
+  function readInvokeErrorBody(error){
+    if(error && error.context && typeof error.context.json === 'function'){
+      return error.context.json().catch(function(){ return null; });
+    }
+    return Promise.resolve(null);
+  }
+
+  function showMetaState(state){ // 'not-connected'|'not-selected'|'loading'|'error'|'data'
+    if(!metaPanel) return;
+    if(metaOpsNotConnected) metaOpsNotConnected.hidden = state !== 'not-connected';
+    if(metaOpsNotSelected) metaOpsNotSelected.hidden = state !== 'not-selected';
+    if(metaOpsLoading) metaOpsLoading.hidden = state !== 'loading';
+    if(metaOpsError) metaOpsError.hidden = state !== 'error';
+    if(metaOpsDataWrap) metaOpsDataWrap.hidden = state !== 'data';
+  }
+
+  function renderMetaData(payload){
+    var currency = payload.account && payload.account.currency;
+    var today = payload.today || {};
+    var month = payload.month || {};
+
+    if(metaEls.todaySpend) metaEls.todaySpend.textContent = formatMetaMoney(today.spend, currency);
+    if(metaEls.todayRevenue) metaEls.todayRevenue.textContent = formatMetaMoney(today.purchase_value, currency);
+    if(metaEls.todayPurchases) metaEls.todayPurchases.textContent = formatMetaCount(today.purchase_count);
+    if(metaEls.todayRoas) metaEls.todayRoas.textContent = formatMetaRoas(today.roas);
+    if(metaEls.todayCtr) metaEls.todayCtr.textContent = formatMetaPercent(today.ctr);
+    if(metaEls.todayCpc) metaEls.todayCpc.textContent = formatMetaMoneyOrDash(today.cpc, currency);
+    if(metaEls.todayCpm) metaEls.todayCpm.textContent = formatMetaMoneyOrDash(today.cpm, currency);
+
+    if(metaEls.monthSpend) metaEls.monthSpend.textContent = formatMetaMoney(month.spend, currency);
+    if(metaEls.monthRevenue) metaEls.monthRevenue.textContent = formatMetaMoney(month.purchase_value, currency);
+    if(metaEls.monthPurchases) metaEls.monthPurchases.textContent = formatMetaCount(month.purchase_count);
+    if(metaEls.monthRoas) metaEls.monthRoas.textContent = formatMetaRoas(month.roas);
+    if(metaEls.monthCtr) metaEls.monthCtr.textContent = formatMetaPercent(month.ctr);
+    if(metaEls.monthCpc) metaEls.monthCpc.textContent = formatMetaMoneyOrDash(month.cpc, currency);
+    if(metaEls.monthCpm) metaEls.monthCpm.textContent = formatMetaMoneyOrDash(month.cpm, currency);
+
+    // Ads Manager 대조용(요구사항 14) — 일반 사용자에겐 작은 보조 텍스트로만.
+    if(metaOpsDebugInfo && payload.account && payload.queried_range){
+      metaOpsDebugInfo.textContent = '기준: ' + payload.account.timezone_name + ' · ' + payload.account.currency +
+        ' · 구매전환: ' + (today.purchase_basis || month.purchase_basis || '데이터 없음') +
+        ' · 이번 달 조회기간: ' + payload.queried_range.month.since + ' ~ ' + payload.queried_range.month.until;
+    }
+
+    showMetaState('data');
+  }
+
+  var META_ERROR_MESSAGES = {
+    META_NOT_CONNECTED: 'Meta 광고 계정을 연결해주세요.',
+    META_ACCOUNT_NOT_SELECTED: '분석할 광고계정을 선택해주세요.',
+    RECONNECT_REQUIRED: 'Meta 연결이 만료되었습니다. 다시 연결해주세요.',
+    PERMISSION_REQUIRED: '이 광고계정에 대한 접근 권한이 없습니다. 다시 연결해주세요.',
+    RATE_LIMITED: 'Meta 요청이 많아 잠시 후 다시 시도해주세요.',
+    ACCOUNT_UNAVAILABLE: '이 광고계정에 접근할 수 없습니다.',
+    TEMPORARY_ERROR: 'Meta 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'
+  };
+
+  function renderMetaError(body, fallbackMessage){
+    var code = body && body.code;
+    if(metaOpsErrorMsg){
+      metaOpsErrorMsg.textContent = (code && META_ERROR_MESSAGES[code]) || (body && body.error) || fallbackMessage || META_ERROR_MESSAGES.TEMPORARY_ERROR;
+    }
+    showMetaState('error');
+  }
+
+  var metaLastStoreId = null; // 재시도 버튼이 다시 쓸 마지막 storeId
+
+  function fetchMetaInsights(connectedAccountId, mySeq){
+    var sb = client();
+    if(!sb) return;
+    sb.functions.invoke('meta-insights', { body: { connected_account_id: connectedAccountId } })
+      .then(function(res){
+        if(mySeq !== seq) return; // 그 사이 쇼핑몰 선택이 바뀌었으면 버림
+        if(res.error){
+          return readInvokeErrorBody(res.error).then(function(bodyJson){
+            if(mySeq !== seq) return;
+            renderMetaError(bodyJson, res.error.message);
+          });
+        }
+        var data = res.data;
+        if(!data || data.ok !== true){
+          renderMetaError(data, null);
+          return;
+        }
+        renderMetaData(data);
+      })
+      .catch(function(err){
+        if(mySeq !== seq) return;
+        console.warn('[launchdesk] meta-insights 호출 중 오류:', err && err.message);
+        renderMetaError(null, null);
+      });
+  }
+
+  // 선택된 Cafe24 쇼핑몰에 연결된 Meta 광고계정을 찾는다 — stores.js의
+  // fetchMetaAccounts와 동일하게 provider='meta'만 걸고 RLS로 소유권을
+  // 확인하되, 여기서는 이 store_id 하나로 좁혀 단일 행만 조회한다.
+  function loadMetaForStore(storeId, mySeq){
+    if(!metaPanel) return;
+    metaLastStoreId = storeId;
+    showMetaState('loading');
+    var sb = client();
+    if(!sb) return;
+    sb.from('connected_accounts')
+      .select('id, status')
+      .eq('provider', 'meta')
+      .eq('store_id', storeId)
+      .maybeSingle()
+      .then(function(res){
+        if(mySeq !== seq) return;
+        if(res.error){
+          console.warn('[launchdesk] meta ops: connected_accounts 조회 실패:', res.error.message);
+          renderMetaError(null, null);
+          return;
+        }
+        var row = res.data;
+        if(!row){ showMetaState('not-connected'); return; }
+        if(row.status !== 'connected'){ showMetaState('not-selected'); return; }
+        fetchMetaInsights(row.id, mySeq);
+      })
+      .catch(function(err){
+        if(mySeq !== seq) return;
+        console.warn('[launchdesk] meta ops: connected_accounts 조회 중 오류:', err && err.message);
+        renderMetaError(null, null);
+      });
+  }
+
+  if(metaOpsRetryBtn){
+    metaOpsRetryBtn.addEventListener('click', function(){
+      if(!metaLastStoreId) return;
+      seq += 1;
+      loadMetaForStore(metaLastStoreId, seq);
+    });
+  }
+
   // ------------------------------------------------------------------ state
   var currentUserId = null;
   var eligibleStores = []; // [{ id, name, last_synced_at }] — platform=cafe24 & connected_accounts(provider=cafe24,status=connected) 교집합
@@ -95,6 +281,11 @@
     noStoreNotice.hidden = state !== 'no-store';
     dataWrap.hidden = state !== 'data';
     storeSelect.hidden = !(state === 'data' && eligibleStores.length > 1);
+    // Meta 패널은 Cafe24 쇼핑몰이 실제로 선택된 경우에만 의미가 있다 —
+    // guest/no-store/loading일 때는 위 Cafe24 안내가 이미 상황을 설명하므로
+    // 통째로 숨긴다(요구사항 13과 별개로, "쇼핑몰이 없는데 Meta 상태만
+    // 보이는" 혼란을 막기 위함).
+    if(metaPanel) metaPanel.hidden = state !== 'data';
   }
 
   function populateSelect(){
@@ -177,6 +368,7 @@
     var mySeq = seq;
     renderOrderSummary(EMPTY_SUMMARY); // 새 쇼핑몰로 바뀌는 동안 이전 값이 잠깐이라도 남지 않게 즉시 리셋
     loadOrdersFor(storeId, mySeq);
+    loadMetaForStore(storeId, mySeq);
   }
 
   // platform='cafe24'인 내 stores와, provider='cafe24' && status='connected'인

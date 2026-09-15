@@ -389,9 +389,7 @@ verify_jwt = true
 [functions.meta-disconnect]
 verify_jwt = true
 
-# 임시 진단 전용 — docs/plans/meta-insights.md §12 검증용. 확인이 끝나면
-# 이 블록과 supabase/functions/meta-insights-diagnostic/를 함께 제거한다.
-[functions.meta-insights-diagnostic]
+[functions.meta-insights]
 verify_jwt = true
 
 [edge_runtime]

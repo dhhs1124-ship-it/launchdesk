@@ -1,6 +1,6 @@
 # Meta Insights 구현 설계
 
-> 상태: **설계 문서 — 구현 전.** 코드는 아직 작성되지 않았습니다.
+> 상태: **정식 구현 완료.** `supabase/functions/meta-insights/index.ts`로 대체되었고, 임시 진단 함수(`meta-insights-diagnostic`)는 삭제되었습니다. 아래 본문은 조사/설계 기록이며, §6·§10은 실제 구현에서 확정된 내용으로 마지막에 갱신했습니다(하단 "구현 완료 체크포인트" 참고).
 >
 > 이 문서는 세 가지를 합쳐 작성했습니다:
 > 1. 외부 Opus가 작성한 초안 설계(실제 코드베이스를 읽지 않은 상태에서 작성됨)
@@ -261,15 +261,37 @@ Security Agent 조사 결과를 그대로 반영한다.
    ```
 4. 출력된 JSON을 Claude에게 붙여넣기(access_token은 포함되지 않음 — 광고 성과 수치이므로 붙여넣는 건 사용자 판단)
 
-**다음 작업(순서대로):**
-1. 회사 Meta 광고계정으로 diagnostic 실행(위 테스트 방법)
-2. 응답의 `actions`/`action_values`/`purchase_roas` 실제 구조 확인 — §6 후보(`offsite_conversion.fb_pixel_purchase`/`omni_purchase`/`purchase`) 중 실제로 존재하는 것 확인
-3. 구매 전환 basis 확정 → 이 문서 §6/§10 개정
-4. `meta-insights-diagnostic` 함수 삭제(`supabase functions delete meta-insights-diagnostic` 등)
-5. `supabase/config.toml`의 `[functions.meta-insights-diagnostic]` 임시 블록 원복(삭제)
-6. `meta-insights` 실제 구현 시작(§ "구현 순서" 2단계부터)
+**다음 작업(순서대로):** 전부 완료됨 — 아래 "구현 완료 체크포인트" 참고.
 
-**커밋 상태 — 반드시 확인:**
-- 이 문서(`docs/plans/meta-insights.md`)는 **아직 커밋되지 않음.**
-- `supabase/functions/meta-insights-diagnostic/` 임시 진단 코드도 **아직 커밋되지 않음** — 4번(함수 삭제) 전까지는 커밋하지 말 것.
-- `supabase/config.toml`의 diagnostic 관련 임시 항목도 **아직 커밋되지 않음** — 5번(원복) 전까지는 커밋하지 말 것.
+---
+
+## 구현 완료 체크포인트 (2026-09-15)
+
+**실제 회사 계정 diagnostic 검증 결과(§12 확정):**
+- 최근 30일(2026-08-16~2026-09-15) 실제 응답에서 `offsite_conversion.fb_pixel_purchase` / `omni_purchase` / `purchase` 세 action_type이 **모두** 존재했고 count=8, value=292.42로 완전히 동일했다(같은 구매의 중복 표현 확인됨 — 절대 합산 금지가 실제로 중요했음).
+- `time_increment=all_days`는 기간 전체 합산 한 행만 반환하는 것으로 확인되어(빈 배열 = 그 기간 데이터 없음, 에러 아님) 설계 그대로 채택.
+- **§6 확정: purchase basis 우선순위 = `offsite_conversion.fb_pixel_purchase` → `omni_purchase` → `purchase`** (요청 지시 그대로, 실제 응답에서 셋 다 존재해 최우선 후보가 그대로 채택됨). count/value 모두 반드시 같은 action_type에서 가져온다.
+- ROAS는 Meta의 `purchase_roas` 필드를 쓰지 않고 `purchase_value / spend`로 서버가 직접 계산(§8 그대로).
+
+**§5 timezone 처리 — 설계보다 더 견고하게 구현:**
+- 이 문서 §3-2/§5는 "Asia/Seoul 고정 계산 + 다른 timezone이면 경고 플래그"를 제안했지만, 실제 `meta-insights/index.ts`는 **`Intl.DateTimeFormat`에 계정의 실제 `timezone_name`을 그대로 넘겨 today/month 날짜를 계산**한다(고정 오프셋을 더하는 방식이 아님 — DST가 있는 timezone에서도 정확). 그래서 timezone_warning 플래그 자체가 불필요해졌다 — 어떤 timezone 계정이든 항상 그 계정 기준으로 정확하게 계산된다.
+
+**§10 에러 코드 — 실제 구현 기준:**
+| code | 트리거 | HTTP |
+|---|---|---|
+| `META_NOT_CONNECTED` | 이 store에 provider='meta' 행 자체가 없음 | 404 |
+| `META_ACCOUNT_NOT_SELECTED` | 행은 있지만 `status !== 'connected'`(광고계정 미선택) | 409 |
+| `RECONNECT_REQUIRED` | 토큰 만료/조회 실패(`CREDENTIAL_NOT_FOUND` 포함, 둘 다 "다시 연결"로 안내) 또는 Meta가 `code=190`/`type=OAuthException` 반환 | 401 |
+| `PERMISSION_REQUIRED` | Meta가 `code=200`(Permissions error) 또는 `code=10` 반환 | 403 |
+| `RATE_LIMITED` | Meta가 `code=4/17/32/613`(표준 rate limit 코드) 반환 | 429 |
+| `ACCOUNT_UNAVAILABLE` | 광고계정 메타데이터의 `account_status !== 1`(ACTIVE 아님) | 409 |
+| `TEMPORARY_ERROR` | 그 외 전부(불확실한 코드를 억지로 세분하지 않음) | 502 |
+
+실제 Meta 에러 코드는 운영 중 로그(`console.error` — access token은 남기지 않음)로 계속 관찰하며 필요시 이 표를 갱신한다.
+
+**완료된 파일:**
+- 신규: `supabase/functions/meta-insights/index.ts`
+- 삭제: `supabase/functions/meta-insights-diagnostic/`
+- 수정: `supabase/config.toml`(`meta-insights-diagnostic` 블록 제거, `meta-insights` `verify_jwt=true` 추가), `index.html`(`#metaOpsPanel` 추가), `ops-overview.js`(Meta 패널 로직 추가 — 기존 Cafe24 상태 머신/seq 가드 재사용)
+
+**커밋 상태:** 이 문서를 포함해 전부 **아직 커밋되지 않음** — 사용자 승인 후 커밋.
