@@ -1786,10 +1786,16 @@
   function renderBetaOverviewSection(container){
     container.innerHTML = '<div class="admin-panel-head">Beta 사용자 현황</div>' +
       '<div class="admin-panel-body">' +
-        '<p style="margin:0 0 1.4rem; font-size:.86rem; color:var(--ink-soft);">현재까지의 사용자 활성화 단계입니다.</p>' +
+        '<p style="margin:0 0 1.4rem; font-size:.86rem; color:var(--ink-soft);">현재까지의 사용자 활성화 단계입니다. 관리자 계정을 포함한 전체 회원 기준입니다(아래 "최근 사용 현황"은 관리자 계정을 제외합니다 — 모수가 서로 다릅니다).</p>' +
         '<div id="adminBetaWrap"></div>' +
+        '<div style="margin-top:1.8rem; padding-top:1.6rem; border-top:1px solid var(--border);">' +
+          '<div style="font-size:.92rem; font-weight:700; color:var(--ink); margin-bottom:.3rem;">최근 사용 현황</div>' +
+          '<p style="margin:0 0 1.1rem; font-size:.8rem; color:var(--ink-faint);">행동 데이터는 추적 기능 적용 이후부터 집계됩니다 — 아래 숫자는 LaunchDesk 출시 이후 전체 기간이 아니라 이 기능이 배포된 시점부터의 데이터입니다.</p>' +
+          '<div id="adminBetaBehaviorWrap"></div>' +
+        '</div>' +
       '</div>';
     loadBetaOverview(container);
+    loadBetaBehaviorOverview(container);
   }
 
   function loadBetaOverview(container){
@@ -1882,12 +1888,84 @@
           '<span style="font-size:.86rem; color:var(--ink-soft);"><b style="font-family:var(--f-mono); color:var(--ink);">' + Number(d.usersWithOrders) + '명</b> · 전체 회원 대비 ' + ordersOverallPct + '</span>' +
         '</div>' +
         '<p style="margin:.5rem 0 0; font-size:.76rem; color:var(--ink-faint);">Cafe24 연결 여부와 무관하게, 해당 사용자의 쇼핑몰에 주문 데이터가 한 번이라도 동기화된 적이 있는지만 봅니다. "Activation" 지표는 아닙니다 — 사용자가 이 데이터를 실제로 확인했는지는 현재 데이터베이스 구조로는 판단할 수 없습니다.</p>' +
-      '</div>' +
-      // 행동 이벤트 추적 구조 자체가 아직 없는 지표는 0으로 채우지 않고
-      // 안내 문구로만 남긴다(요구사항 2).
-      '<div style="margin-top:1.2rem; padding:.9rem 1rem; border:1px dashed var(--border-strong); border-radius:var(--radius-sm); font-size:.8rem; color:var(--ink-faint);">' +
-        '7일 재방문, 대시보드/Meta 인사이트 재조회 같은 행동 지표는 아직 추적하지 않습니다. 행동 추적 준비 중입니다.' +
       '</div>';
+  }
+
+  // =========================================================================
+  // "최근 사용 현황" — product_events(20260915280000_product_events.sql)
+  // 기반 행동 지표. 위 renderBetaFunnel()의 캐노니컬 퍼널(가입/쇼핑몰/
+  // Cafe24/Meta)과 완전히 분리된 별도 RPC(admin_beta_behavior_overview(),
+  // 20260915300000_admin_beta_behavior.sql)·별도 상태를 쓴다 — 한쪽 조회가
+  // 실패해도 다른 쪽 표시에 영향을 주지 않는다(그래서 두 로드 함수와 두
+  // 재시도 버튼을 독립적으로 둔다).
+  //
+  // "최근 7일 대시보드 방문/반복 방문"은 dashboard_viewed 기준, "로드맵
+  // 시작/완료"는 기간 제한 없는 누적 distinct 사용자 수다(요구사항 8·9).
+  // 반복 방문율은 admin_beta_overview()와 동일하게 formatBetaPercent()로
+  // 클라이언트에서 계산한다(반올림/표기 규칙을 한 곳에만 둔다).
+  // =========================================================================
+  var betaBehaviorLoadSeq = 0;
+
+  function fetchBetaBehaviorOverview(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    return sb.rpc('admin_beta_behavior_overview')
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        var row = Array.isArray(res.data) ? res.data[0] : res.data;
+        if(!row) return { ok: false, error: 'EMPTY_RESULT' };
+        return { ok: true, data: {
+          dashboardUsers7d: Number(row.dashboard_users_7d) || 0,
+          dashboardReturningUsers7d: Number(row.dashboard_returning_users_7d) || 0,
+          roadmapStartedUsers: Number(row.roadmap_started_users) || 0,
+          roadmapCompletedUsers: Number(row.roadmap_completed_users) || 0
+        } };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  function loadBetaBehaviorOverview(container){
+    var wrap = container.querySelector('#adminBetaBehaviorWrap');
+    if(!wrap) return;
+    wrap.innerHTML = '<div class="empty-state" style="padding:1.6rem 1rem;"><p>불러오는 중…</p></div>';
+    var seq = ++betaBehaviorLoadSeq;
+    fetchBetaBehaviorOverview().then(function(res){
+      if(seq !== betaBehaviorLoadSeq) return; // 그 사이 새 요청이 시작됐으면 이 응답은 버림
+      if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
+      if(!res.ok){
+        wrap.innerHTML = '<div class="empty-state" style="padding:1.6rem 1rem;">' +
+          '<p>최근 사용 현황을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p>' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="adminBetaBehaviorRetryBtn">다시 시도</button></div>';
+        var retryBtn = wrap.querySelector('#adminBetaBehaviorRetryBtn');
+        if(retryBtn) retryBtn.addEventListener('click', function(){ loadBetaBehaviorOverview(container); });
+        return;
+      }
+      renderBetaBehaviorRows(wrap, res.data);
+    }).catch(function(err){
+      if(seq !== betaBehaviorLoadSeq) return;
+      console.warn('[launchdesk] 최근 사용 현황 조회 중 오류:', err && err.message);
+      wrap.innerHTML = '<div class="empty-state" style="padding:1.6rem 1rem;"><p>최근 사용 현황을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p></div>';
+    });
+  }
+
+  function renderBetaBehaviorRows(wrap, d){
+    var returnRate = formatBetaPercent(d.dashboardReturningUsers7d, d.dashboardUsers7d);
+    var rows = [
+      { label: '최근 7일 대시보드 방문', value: d.dashboardUsers7d + '명' },
+      { label: '최근 7일 반복 방문', value: d.dashboardReturningUsers7d + '명' },
+      { label: '반복 방문율', value: returnRate },
+      { label: '로드맵 시작', value: d.roadmapStartedUsers + '명' },
+      { label: '로드맵 완료', value: d.roadmapCompletedUsers + '명' }
+    ];
+    wrap.innerHTML = rows.map(function(row, i){
+      return '<div style="display:flex; align-items:baseline; justify-content:space-between; gap:.6rem; flex-wrap:wrap;' +
+          (i > 0 ? ' margin-top:.85rem; padding-top:.85rem; border-top:1px solid var(--border);' : '') + '">' +
+        '<span style="font-size:.88rem; color:var(--ink);">' + escapeHtml(row.label) + '</span>' +
+        '<span style="font-family:var(--f-mono); font-size:.94rem; font-weight:700; color:var(--ink);">' + escapeHtml(row.value) + '</span>' +
+      '</div>';
+    }).join('') +
+      '<p style="margin:1.1rem 0 0; font-size:.76rem; color:var(--ink-faint);">"대시보드 방문"은 운영 도구(/tools) 화면 진입 기준이며, 쇼핑몰·Cafe24 연결 여부와 무관합니다. "반복 방문"은 최근 7일 동안 서로 다른 날짜(한국 시간 기준)에 대시보드를 2일 이상 확인한 사용자입니다 — 가입 후 정확히 7일째 재방문했는지를 보는 코호트 지표(D7 retention)와는 다릅니다. "로드맵 시작/완료"는 기간 제한 없는 누적 인원입니다. 위 5개 지표 모두 관리자 계정은 제외됩니다.</p>';
   }
 
   // ------------------------------------------------------------------ 관리자 여부 판별(공유)
