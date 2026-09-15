@@ -1116,6 +1116,13 @@
       var user = session && session.user;
       if(user){
         checkProfileRow(user);
+        // UTM First-Touch Acquisition — auth.uid()가 확정된 이 지점에서만
+        // 대기 중인 UTM(있으면)을 record_user_acquisition() RPC로 전송한다.
+        // 아래 hydrate 중복 방지 return보다 앞에 둬서, 이미 hydrate된
+        // 기존 로그인 사용자에게도(예: 나중에 광고 링크로 재방문 후 세션이
+        // 재확인될 때) pending이 있으면 기록되고, RPC 실패 시에도 다음
+        // 세션 이벤트에서 자동 재시도된다(utm-acquisition.js 참고).
+        if(window.launchdeskUtmAcquisition) window.launchdeskUtmAcquisition.sendPendingIfAny();
         if(!isFreshSignIn && lastHydratedUserId === user.id) return;
         // 게스트 메모리 스냅샷은 반드시 hydrate() 호출 전에 떠야 한다 —
         // hydrate()가 이 메모리를 서버 값으로 덮어쓰기 때문이다. 이미 다른

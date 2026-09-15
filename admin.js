@@ -1786,16 +1786,22 @@
   function renderBetaOverviewSection(container){
     container.innerHTML = '<div class="admin-panel-head">Beta 사용자 현황</div>' +
       '<div class="admin-panel-body">' +
-        '<p style="margin:0 0 1.4rem; font-size:.86rem; color:var(--ink-soft);">현재까지의 사용자 활성화 단계입니다. 관리자 계정을 포함한 전체 회원 기준입니다(아래 "최근 사용 현황"은 관리자 계정을 제외합니다 — 모수가 서로 다릅니다).</p>' +
+        '<p style="margin:0 0 1.4rem; font-size:.86rem; color:var(--ink-soft);">현재까지의 사용자 활성화 단계입니다. 관리자 계정을 포함한 전체 회원 기준입니다(아래 "최근 사용 현황"·"유입별 전환"은 관리자 계정을 제외합니다 — 모수가 서로 다릅니다).</p>' +
         '<div id="adminBetaWrap"></div>' +
         '<div style="margin-top:1.8rem; padding-top:1.6rem; border-top:1px solid var(--border);">' +
           '<div style="font-size:.92rem; font-weight:700; color:var(--ink); margin-bottom:.3rem;">최근 사용 현황</div>' +
           '<p style="margin:0 0 1.1rem; font-size:.8rem; color:var(--ink-faint);">행동 데이터는 추적 기능 적용 이후부터 집계됩니다 — 아래 숫자는 LaunchDesk 출시 이후 전체 기간이 아니라 이 기능이 배포된 시점부터의 데이터입니다.</p>' +
           '<div id="adminBetaBehaviorWrap"></div>' +
         '</div>' +
+        '<div style="margin-top:1.8rem; padding-top:1.6rem; border-top:1px solid var(--border);">' +
+          '<div style="font-size:.92rem; font-weight:700; color:var(--ink); margin-bottom:.3rem;">유입별 전환</div>' +
+          '<p style="margin:0 0 1.1rem; font-size:.8rem; color:var(--ink-faint);">UTM 파라미터(utm_source 등)로 유입된 가입자만 집계됩니다 — UTM 추적 기능 적용 이후 가입부터 집계되며, "가입 사용자"는 광고 클릭 수·방문자 수가 아니라 실제로 회원가입까지 완료한 사용자 수입니다.</p>' +
+          '<div id="adminAcquisitionWrap"></div>' +
+        '</div>' +
       '</div>';
     loadBetaOverview(container);
     loadBetaBehaviorOverview(container);
+    loadAcquisitionOverview(container);
   }
 
   function loadBetaOverview(container){
@@ -1966,6 +1972,102 @@
       '</div>';
     }).join('') +
       '<p style="margin:1.1rem 0 0; font-size:.76rem; color:var(--ink-faint);">"대시보드 방문"은 운영 도구(/tools) 화면 진입 기준이며, 쇼핑몰·Cafe24 연결 여부와 무관합니다. "반복 방문"은 최근 7일 동안 서로 다른 날짜(한국 시간 기준)에 대시보드를 2일 이상 확인한 사용자입니다 — 가입 후 정확히 7일째 재방문했는지를 보는 코호트 지표(D7 retention)와는 다릅니다. "로드맵 시작/완료"는 기간 제한 없는 누적 인원입니다. 위 5개 지표 모두 관리자 계정은 제외됩니다.</p>';
+  }
+
+  // =========================================================================
+  // "유입별 전환" — UTM First-Touch Acquisition(user_acquisition,
+  // 20260915320000_user_acquisition.sql) 기반. 위 두 섹션과 완전히 분리된
+  // 별도 RPC(admin_beta_acquisition_overview())·별도 상태를 쓴다(한쪽 조회
+  // 실패가 다른 쪽에 영향 주지 않음, 기존 두 섹션과 동일한 아키텍처).
+  //
+  // source+medium으로 그룹핑한다(campaign까지는 세분화하지 않음 — Beta
+  // 규모에서 캠페인 단위까지 쪼개면 그룹당 표본이 너무 작아져 전환율이
+  // 의미 없어질 수 있다는 판단, 작업 보고서 참고). "가입 사용자"는 광고
+  // 클릭 수·방문자 수가 아니라 user_acquisition에 first-touch가 기록된
+  // distinct 사용자 수다(요구사항 14). 각 전환율은 그 유입의 가입 사용자
+  // 대비 독립 비율이다(직전 단계 대비 퍼널이 아니다 — 요구사항 15, 각 값이
+  // "가입 사용자 중 몇 %가 여기까지 갔는가"만 뜻하고 Cafe24+Meta는 실제
+  // 교집합이다).
+  // =========================================================================
+  var acquisitionLoadSeq = 0;
+
+  function fetchAcquisitionOverview(){
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, error: 'SUPABASE_UNAVAILABLE' });
+    return sb.rpc('admin_beta_acquisition_overview')
+      .then(function(res){
+        if(res.error) return { ok: false, error: res.error.message };
+        var rows = Array.isArray(res.data) ? res.data : [];
+        return { ok: true, data: rows.map(function(row){
+          return {
+            source: row.source,
+            medium: row.medium,
+            signups: Number(row.signups) || 0,
+            usersWithStore: Number(row.users_with_store) || 0,
+            usersWithCafe24: Number(row.users_with_cafe24) || 0,
+            usersWithCafe24AndMeta: Number(row.users_with_cafe24_and_meta) || 0
+          };
+        }) };
+      }).catch(function(err){
+        return { ok: false, error: (err && err.message) || 'UNKNOWN_ERROR' };
+      });
+  }
+
+  function loadAcquisitionOverview(container){
+    var wrap = container.querySelector('#adminAcquisitionWrap');
+    if(!wrap) return;
+    wrap.innerHTML = '<div class="empty-state" style="padding:1.6rem 1rem;"><p>불러오는 중…</p></div>';
+    var seq = ++acquisitionLoadSeq;
+    fetchAcquisitionOverview().then(function(res){
+      if(seq !== acquisitionLoadSeq) return; // 그 사이 새 요청이 시작됐으면 이 응답은 버림
+      if(!container.isConnected) return; // 그 사이 다른 메뉴로 전환했으면 반영하지 않음
+      if(!res.ok){
+        wrap.innerHTML = '<div class="empty-state" style="padding:1.6rem 1rem;">' +
+          '<p>유입별 전환을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p>' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="adminAcquisitionRetryBtn">다시 시도</button></div>';
+        var retryBtn = wrap.querySelector('#adminAcquisitionRetryBtn');
+        if(retryBtn) retryBtn.addEventListener('click', function(){ loadAcquisitionOverview(container); });
+        return;
+      }
+      renderAcquisitionRows(wrap, res.data);
+    }).catch(function(err){
+      if(seq !== acquisitionLoadSeq) return;
+      console.warn('[launchdesk] 유입별 전환 조회 중 오류:', err && err.message);
+      wrap.innerHTML = '<div class="empty-state" style="padding:1.6rem 1rem;"><p>유입별 전환을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p></div>';
+    });
+  }
+
+  function renderAcquisitionRows(wrap, rows){
+    if(!rows.length){
+      wrap.innerHTML = '<div class="empty-state" style="padding:1.6rem 1rem;">' +
+        '<p>아직 UTM으로 기록된 가입자가 없습니다.</p>' +
+        '<p style="margin-top:.4rem; font-size:.78rem; color:var(--ink-faint);">UTM 추적 기능 적용 이후 가입부터 집계됩니다.</p>' +
+        '</div>';
+      return;
+    }
+
+    var rowsHtml = rows.map(function(row){
+      var label = escapeHtml(row.source) + (row.medium ? ' / ' + escapeHtml(row.medium) : '');
+      var storePct = formatBetaPercent(row.usersWithStore, row.signups);
+      var cafe24Pct = formatBetaPercent(row.usersWithCafe24, row.signups);
+      var bothPct = formatBetaPercent(row.usersWithCafe24AndMeta, row.signups);
+      return '<tr>' +
+        '<td>' + label + '</td>' +
+        '<td>' + row.signups + '</td>' +
+        '<td>' + row.usersWithStore + ' (' + storePct + ')</td>' +
+        '<td>' + row.usersWithCafe24 + ' (' + cafe24Pct + ')</td>' +
+        '<td>' + row.usersWithCafe24AndMeta + ' (' + bothPct + ')</td>' +
+      '</tr>';
+    }).join('');
+
+    // 기존 회원 목록(.tbl-wrap + <table>, styles.css:406-409)과 동일한
+    // 컴포넌트를 재사용한다 — overflow-x:auto가 이미 이 클래스에 있어
+    // 모바일 390px에서도 페이지 전체가 아니라 표 안에서만 가로 스크롤된다.
+    wrap.innerHTML = '<div class="tbl-wrap"><table>' +
+      '<thead><tr><th>유입</th><th>가입</th><th>쇼핑몰</th><th>Cafe24</th><th>Cafe24+Meta</th></tr></thead>' +
+      '<tbody>' + rowsHtml + '</tbody>' +
+      '</table></div>' +
+      '<p style="margin:.9rem 0 0; font-size:.76rem; color:var(--ink-faint);">각 비율은 그 유입의 "가입 사용자" 대비 독립 비율입니다(직전 단계 대비 퍼널이 아닙니다). "Cafe24+Meta"는 실제 교집합(동일 사용자가 둘 다 연결)입니다. 관리자 계정은 제외됩니다.</p>';
   }
 
   // ------------------------------------------------------------------ 관리자 여부 판별(공유)
