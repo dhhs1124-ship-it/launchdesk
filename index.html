@@ -59,6 +59,7 @@
         <div class="logo-mini"><span class="dot"></span>LAUNCH<span class="grad-text">DESK</span></div>
         <h2 id="loginModalTitle">로그인</h2>
         <p id="loginModalLead">로그인하면 진행 상황이 계정에 저장돼요.</p>
+        <p class="modal-hint" id="loginModalHint" hidden></p>
       </div>
       <!-- Google/Kakao 로그인 — 기존 이메일 로그인/회원가입 폼은 그대로
            두고, 그 위에 배치한다(요구사항 4). 두 버튼 모두 Supabase Auth의
@@ -387,7 +388,7 @@
                     <span class="qr-text"><span class="qr-title">운영 가이드 보기</span><span class="qr-sub">처음이라도 하나씩 따라가며 시작해보세요</span></span>
                     <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
                   </a>
-                  <a class="quick-row" href="#/tools">
+                  <a class="quick-row" href="#/tools" data-tools-target="calc">
                     <span class="qr-icon tone-b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><circle cx="8.5" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="8.5" cy="16" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r=".6" fill="currentColor" stroke="none"/><circle cx="15.5" cy="16" r=".6" fill="currentColor" stroke="none"/></svg></span>
                     <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가와 판매가를 기준으로 마진을 확인하세요</span></span>
                     <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
@@ -399,6 +400,15 @@
                   </a>
                 </div>
               </div>
+            </div>
+
+            <!-- 내 계획 — 마진 계산기에서 만든 계획을 재확인일 순으로(지난 날짜·
+                 오늘 → 예정, 완료는 분리) 보여준다. 내용 렌더링·저장은 전부
+                 plans.js(public.plans, RLS 본인 행만). 로그인 전에는 안내만. -->
+            <div class="dash-panel ldplan-panel" id="ldPlanPanel">
+              <div class="dash-panel-head">내 계획 <span class="ldplan-head-note" id="ldPlanHeadNote"></span></div>
+              <div class="ldplan-draft" id="ldPlanDraftNotice" hidden></div>
+              <div id="ldPlanBody"></div>
             </div>
 
             <!-- 하단 3열 — 도매처 / 세팅 대행 / 연결 상태(+다음 할 일)
@@ -515,7 +525,7 @@
               <div>
                 <div class="dash-panel-head" style="padding:0 0 .7rem; border:none;">운영 도구</div>
                 <div class="quick-row-list">
-                  <a class="quick-row" href="#/tools">
+                  <a class="quick-row" href="#/tools" data-tools-target="calc">
                     <span class="qr-icon tone-b">🧮</span>
                     <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가 · 판매가 · 마진율 계산</span></span>
                     <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
@@ -1622,7 +1632,7 @@
                 <a class="btn btn-primary" href="#/tools">운영도구로 이동 →</a>
               </div>
               <div class="quick-row-list">
-                <a class="quick-row" href="#/tools">
+                <a class="quick-row" href="#/tools" data-tools-target="calc">
                   <span class="qr-icon tone-b">🧮</span>
                   <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가 · 판매가 · 마진율 계산</span></span>
                   <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
@@ -2030,7 +2040,7 @@
                 <div><div class="co-label">마진율</div><div class="co-value muted" id="calcRate">—</div></div>
               </div>
             </div>
-            <p style="font-size:.78rem; color:var(--ink-faint); margin-top:-.6rem;">이건 "최소 2배 마진 법칙"만 빠르게 확인하는 간단 버전이에요. 수수료 · 배송비까지 반영한 정밀 계산은 <a href="#/tools" style="color:var(--accent-ink); font-weight:600;">운영 도구의 마진 계산기</a>를 이용하세요.</p>
+            <p style="font-size:.78rem; color:var(--ink-faint); margin-top:-.6rem;">이건 "최소 2배 마진 법칙"만 빠르게 확인하는 간단 버전이에요. 수수료 · 배송비까지 반영한 정밀 계산은 <a href="#/tools" data-tools-target="calc" style="color:var(--accent-ink); font-weight:600;">운영 도구의 마진 계산기</a>를 이용하세요.</p>
 
             <div class="tbl-wrap"><table>
               <thead><tr><th>마진을 올리는 방법</th><th>특징</th><th>한계</th></tr></thead>
@@ -2178,58 +2188,382 @@
 
       <div class="tools-tab-bar" id="toolsTabBar">
         <button class="tools-tab-btn active" type="button" data-tools-tab="dashboard">🖥️ 대시보드</button>
+        <button class="tools-tab-btn" type="button" data-tools-tab="calc">🧾 마진 계산기</button>
         <button class="tools-tab-btn" type="button" data-tools-tab="simulator">🧮 수익 시뮬레이터</button>
         <button class="tools-tab-btn" type="button" data-tools-tab="adlog">🎯 광고 기록</button>
       </div>
 
       <div class="tools-pane active" data-tools-tab="dashboard">
-      <div class="tools-grid">
-        <div class="tools-main">
-
-          <!-- 분석 대시보드 — 판매/광고 채널 연동이 더 갖춰지면 확장할
-               자리. 위 "쇼핑몰 운영 현황"과 달리 아직 실제 데이터가 없으므로
-               가짜 숫자/차트 대신 이 안내만 둔다(혼동 방지). -->
-          <div class="dash-panel">
-            <div class="dash-panel-head">분석 대시보드</div>
-            <div class="empty-state" style="padding:2.6rem 1.3rem;">
-              <div class="es-icon">📊</div>
-              <p>판매 채널과 광고 채널 연결이 완료되면<br>매출 추이, 광고 효율, 채널별 성과를 한곳에서 확인할 수 있어요.</p>
-              <span style="display:inline-flex; align-items:center; font-size:.76rem; font-weight:700; padding:.3rem .8rem; border-radius:99px; background:var(--surface-hover); color:var(--ink-faint);">준비 중</span>
-            </div>
+        <!-- 분석 대시보드 — 판매/광고 채널 연동이 더 갖춰지면 확장할
+             자리. 위 "쇼핑몰 운영 현황"과 달리 아직 실제 데이터가 없으므로
+             가짜 숫자/차트 대신 이 안내만 둔다(혼동 방지). 마진 계산기는
+             이 탭의 사이드바에서 "🧾 마진 계산기" 탭으로 옮겼다. -->
+        <div class="dash-panel">
+          <div class="dash-panel-head">분석 대시보드</div>
+          <div class="empty-state" style="padding:2.6rem 1.3rem;">
+            <div class="es-icon">📊</div>
+            <p>판매 채널과 광고 채널 연결이 완료되면<br>매출 추이, 광고 효율, 채널별 성과를 한곳에서 확인할 수 있어요.</p>
+            <span style="display:inline-flex; align-items:center; font-size:.76rem; font-weight:700; padding:.3rem .8rem; border-radius:99px; background:var(--surface-hover); color:var(--ink-faint);">준비 중</span>
           </div>
+        </div>
+      </div>
 
+      <!-- ============ 마진 계산기 — 주문 1건 기준 ============
+           계산은 margin-calc.js(순수 함수), 화면 제어는 tools.js.
+           "간편 입력 / 상세 입력"은 같은 폼·같은 입력 DOM을 공유하는 표시
+           모드일 뿐이다 — 두 개의 계산기가 아니다. data-mc-mode="detailed"가
+           붙은 필드는 상세 입력에서만 보이고, 숨겨져도 값은 그대로 유지되어
+           계산에 반영된다(모드 전환이 값을 지우거나 계산에서 빼지 않는다).
+           "순이익"/"세후 마진"이라는 말은 쓰지 않는다 — 여기서 나오는 값은
+           부가세 납부액 · 소득세 · 미입력 고정비 반영 전의 "예상 잔액"이다. -->
+      <div class="tools-pane" data-tools-tab="calc">
+
+        <div class="mc-hero">
+          <h2>이 상품을 팔면 얼마가 남을까요?</h2>
+          <p>상품 또는 세트 1개를 판매하는 주문부터 계산해보세요.</p>
         </div>
 
-        <aside class="tools-side">
-          <div class="dash-panel">
-            <div class="dash-panel-head">마진 계산기</div>
-            <div style="padding:1.2rem 1.3rem;">
-              <div class="ws-field" style="margin-bottom:.9rem;"><label for="toolsCost">원가 (원)</label><input id="toolsCost" type="number" min="0" value="25000"></div>
-              <div class="ws-field" style="margin-bottom:.9rem;"><label for="toolsPrice">판매가 (원)</label><input id="toolsPrice" type="number" min="0" value="59000"></div>
-              <div class="ws-field" style="margin-bottom:.9rem;"><label for="toolsFee">수수료 (%)</label><input id="toolsFee" type="number" min="0" step="0.1" value="3.5"></div>
-              <div class="ws-field" style="margin-bottom:1.1rem;"><label for="toolsShip">배송비 (원)</label><input id="toolsShip" type="number" min="0" value="3000"></div>
+        <div class="mc-mode-bar">
+          <div class="mc-mode-toggle" role="group" aria-label="입력 방식">
+            <button type="button" class="mc-mode-btn active" data-mc-mode-btn="simple" aria-pressed="true">간편 입력</button>
+            <button type="button" class="mc-mode-btn" data-mc-mode-btn="detailed" aria-pressed="false">상세 입력</button>
+          </div>
+          <button type="button" class="mc-example-toggle" id="mcExampleToggle" aria-expanded="false">입력이 막히나요? <span>예시로 해보기</span></button>
+        </div>
 
-              <div class="gauge-wrap">
-                <svg viewBox="0 0 140 80" role="img" aria-label="예상 순이익률 게이지">
-                  <path d="M10,72 A60,60 0 0 1 130,72" fill="none" style="stroke:var(--border)" stroke-width="12" stroke-linecap="round"/>
-                  <path id="toolsGaugeArc" d="M10,72 A60,60 0 0 1 130,72" fill="none" style="stroke:var(--badge-c)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 188.5"/>
-                </svg>
-                <div class="gauge-value" id="toolsGaugeValue">0%</div>
-                <div class="gauge-sub" id="toolsGaugeSub">순이익 ₩0</div>
-                <span class="gauge-tag good" id="toolsGaugeTag" hidden></span>
+        <div class="mc-examples" id="mcExamplesPanel" hidden>
+          <div class="dash-panel">
+            <div class="dash-panel-head mc-panel-head">
+              <span>예시로 계산해보기</span>
+              <span class="mc-tag">가상 가격 · 가상 수수료</span>
+            </div>
+            <div class="mc-example-grid" id="mcExampleGrid"></div>
+            <p class="mc-examples-foot">예시를 열어도 지금 입력 중인 값은 따로 보관돼요. 예시 자체는 저장되지 않아요.</p>
+          </div>
+        </div>
+
+        <div class="mc-example-banner" id="mcExampleBanner" hidden>
+          <div class="mc-example-banner-text">📎 <b id="mcExampleBannerTitle"></b> 예시 (가상 값)</div>
+          <button type="button" class="btn btn-ghost btn-sm" id="mcExampleExit">내 계산으로 돌아가기</button>
+        </div>
+
+        <div class="mc-layout">
+          <div class="mc-inputs">
+
+            <div class="dash-panel">
+              <div class="dash-panel-head">기본 정보</div>
+              <div class="mc-form">
+
+                <div class="mc-field" data-mc-field="price">
+                  <label for="mcPrice">판매가 <span class="mc-unit">원</span> <span class="mc-req">필수</span></label>
+                  <div class="mc-q">얼마에 판매하나요?</div>
+                  <input id="mcPrice" type="number" inputmode="decimal" min="0" placeholder="예: 30000">
+                  <div class="mc-err" data-mc-err="price"></div>
+                </div>
+
+                <div class="mc-field mc-detail-only" data-mc-field="qty" data-mc-mode="detailed" hidden>
+                  <label for="mcQty">판매 수량 <span class="mc-unit">개</span> <span class="mc-req">필수</span></label>
+                  <input id="mcQty" type="number" inputmode="numeric" min="1" step="1" value="1">
+                  <div class="mc-help">이 주문에서 팔린 개수 (세트면 세트 수 — 세트 안 낱개 수는 다시 곱하지 마세요)</div>
+                  <div class="mc-err" data-mc-err="qty"></div>
+                </div>
+
+                <div class="mc-field" data-mc-field="unitCost">
+                  <label for="mcUnitCost">상품 원가 <span class="mc-unit">원</span> <span class="mc-req">필수</span></label>
+                  <div class="mc-q">상품을 얼마에 가져오나요?</div>
+                  <input id="mcUnitCost" type="number" inputmode="decimal" min="0" placeholder="예: 15000">
+                  <div class="mc-help">세트라면 세트 1개 전체 원가</div>
+                  <div class="mc-err" data-mc-err="unitCost"></div>
+                </div>
+
+                <div class="mc-field mc-detail-only" data-mc-field="sellerDiscount" data-mc-mode="detailed" hidden>
+                  <label for="mcDiscount">판매자 부담 할인액 <span class="mc-unit">원</span></label>
+                  <input id="mcDiscount" type="number" inputmode="decimal" min="0" placeholder="0">
+                  <div class="mc-help">주문 전체 기준. 플랫폼이 비용을 부담하는 쿠폰은 넣지 않아요</div>
+                  <div class="mc-err" data-mc-err="sellerDiscount"></div>
+                </div>
+
+                <div class="mc-field">
+                  <div class="mc-field-label">배송 조건</div>
+                  <div class="mc-radio-row" id="mcShipCondition">
+                    <label><input type="radio" name="mcShipCondition" value="free" checked> 무료배송</label>
+                    <label><input type="radio" name="mcShipCondition" value="paid"> 고객이 배송비를 내요</label>
+                  </div>
+                </div>
+
+                <div class="mc-field" data-mc-field="customerShipping" id="mcCustShipWrap" hidden>
+                  <label for="mcCustShip">고객에게 받는 배송비 <span class="mc-unit">원</span></label>
+                  <input id="mcCustShip" type="number" inputmode="decimal" min="0" placeholder="예: 3000">
+                  <div class="mc-err" data-mc-err="customerShipping"></div>
+                </div>
+
+                <div class="mc-field" data-mc-field="actualShipping">
+                  <label for="mcActualShip">실제 배송비 <span class="mc-unit">원</span></label>
+                  <div class="mc-q">택배 보내는 데 얼마가 드나요?</div>
+                  <input id="mcActualShip" type="number" inputmode="decimal" min="0" placeholder="예: 3000">
+                  <div class="mc-help">무료배송이어도 택배사에 실제로 내는 금액은 입력해주세요. 주문 전체 기준</div>
+                  <div class="mc-err" data-mc-err="actualShipping"></div>
+                </div>
+
+                <div class="mc-field" data-mc-field="packaging">
+                  <label for="mcPackaging">포장비 <span class="mc-unit">원</span></label>
+                  <div class="mc-q">포장에 얼마가 드나요?</div>
+                  <input id="mcPackaging" type="number" inputmode="decimal" min="0" placeholder="예: 1200">
+                  <div class="mc-help">부자재 포함, 주문 전체 기준 — 수량과 곱하지 않아요</div>
+                  <div class="mc-err" data-mc-err="packaging"></div>
+                </div>
+
+                <div class="mc-field mc-detail-only" data-mc-field="otherCost" data-mc-mode="detailed" hidden>
+                  <label for="mcOtherCost">기타 비용 <span class="mc-unit">원</span></label>
+                  <input id="mcOtherCost" type="number" inputmode="decimal" min="0" placeholder="0">
+                  <div class="mc-help">주문당 그 밖의 지출 (사은품, 샘플 등)</div>
+                  <div class="mc-err" data-mc-err="otherCost"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="dash-panel">
+              <div class="dash-panel-head mc-panel-head">
+                <span>판매 수수료</span>
+                <button type="button" class="mc-link-btn" id="mcFeeHelpToggle" aria-expanded="false">내 수수료 확인 방법</button>
+              </div>
+              <div class="mc-form">
+                <div class="mc-field" data-mc-field="feeRate">
+                  <label for="mcFeeRate">판매 수수료율 <span class="mc-unit">%</span> <span class="mc-req">필수</span></label>
+                  <div class="mc-q">판매처에 내는 수수료는 몇 %인가요?</div>
+                  <input id="mcFeeRate" type="number" inputmode="decimal" min="0" max="100" step="0.01" placeholder="예: 6">
+                  <div class="mc-help">수수료가 없으면 0을 입력하세요 — 비워두면 계산되지 않아요</div>
+                  <div class="mc-err" data-mc-err="feeRate"></div>
+                </div>
+
+                <div class="mc-platform-panel" id="mcPlatformPanel" hidden>
+                  <div class="mc-field">
+                    <label for="mcPlatform">판매 플랫폼 <span class="mc-optional">안내용</span></label>
+                    <select id="mcPlatform" class="mc-select">
+                      <option value="">선택하면 확인할 수수료를 안내해요</option>
+                      <option value="cafe24">카페24</option>
+                      <option value="smartstore">스마트스토어</option>
+                      <option value="coupang">쿠팡</option>
+                      <option value="other">기타 · 자사몰</option>
+                    </select>
+                    <div class="mc-help">플랫폼을 골라도 위 수수료율은 자동으로 바뀌지 않아요 — 판매자센터 · 계약에서 확인한 값을 직접 입력하세요.</div>
+                  </div>
+                  <div class="mc-platform-guide" id="mcPlatformGuide" hidden></div>
+                </div>
+
+                <div class="mc-detail-only" data-mc-mode="detailed" hidden>
+                  <div class="mc-grid-2">
+                    <div class="mc-field" data-mc-field="pgRate">
+                      <label for="mcPgRate">별도 PG(결제) 수수료율 <span class="mc-unit">%</span></label>
+                      <input id="mcPgRate" type="number" inputmode="decimal" min="0" max="100" step="0.01" placeholder="비워두면 없음">
+                      <div class="mc-help">위 수수료에 결제 수수료가 이미 포함됐다면 비워두세요(중복 차감 방지). 결제 총액(상품 결제금액 + 고객배송비)에 적용되고, 아래 "수수료 부가세" 설정을 같이 따라요.</div>
+                      <div class="mc-err" data-mc-err="pgRate"></div>
+                    </div>
+                  </div>
+
+                  <div class="mc-field">
+                    <div class="mc-field-label">상품 수수료 기준</div>
+                    <div class="mc-radio-row">
+                      <label><input type="radio" name="mcFeeBase" value="after_discount" checked> 할인 후 상품 결제금액 <span class="mc-radio-hint">(기본)</span></label>
+                      <label><input type="radio" name="mcFeeBase" value="before_discount"> 할인 전 상품금액</label>
+                    </div>
+                    <div class="mc-help">판매자 부담 할인이 있을 때, 플랫폼이 수수료를 어느 금액에 매기는지 판매자센터에서 확인하세요.</div>
+                  </div>
+
+                  <div class="mc-field">
+                    <div class="mc-field-label">배송비 수수료</div>
+                    <div class="mc-radio-row">
+                      <label><input type="radio" name="mcShipFeeMode" value="none" checked> 없음</label>
+                      <label><input type="radio" name="mcShipFeeMode" value="same"> 상품과 동일 요율</label>
+                      <label><input type="radio" name="mcShipFeeMode" value="separate"> 별도 요율</label>
+                    </div>
+                    <div class="mc-field mc-subfield" data-mc-field="shippingFeeRate" id="mcShipFeeRateWrap" hidden>
+                      <label for="mcShipFeeRate">배송비 수수료율 <span class="mc-unit">%</span></label>
+                      <input id="mcShipFeeRate" type="number" inputmode="decimal" min="0" max="100" step="0.01" placeholder="예: 3">
+                      <div class="mc-err" data-mc-err="shippingFeeRate"></div>
+                    </div>
+                    <div class="mc-help">고객에게 받은 배송비에도 수수료가 붙는 플랫폼이 있어요. 확인한 요율만 넣고, 다른 상품이나 통상 값에서 가져오지 마세요.</div>
+                  </div>
+
+                  <div class="mc-field">
+                    <div class="mc-field-label">수수료 부가세</div>
+                    <div class="mc-radio-row">
+                      <label><input type="radio" name="mcFeeVat" value="included" checked> 부가세 포함 요율 <span class="mc-radio-hint">(기본)</span></label>
+                      <label><input type="radio" name="mcFeeVat" value="excluded"> 부가세 별도 요율 → 10%를 더해 차감</label>
+                    </div>
+                    <div class="mc-help">"6% (VAT 별도)"처럼 고지됐다면 실제 차감은 6.6%예요. 위 판매 수수료 · 배송비 수수료 · 별도 PG 수수료 모두 이 설정을 따릅니다.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mc-mode-footer">
+              <button type="button" class="mc-link-btn mc-mode-footer-link" id="mcGoDetailed" data-mc-mode-btn="detailed">추가 조건까지 입력하기 →</button>
+              <div class="mc-detail-summary" id="mcDetailSummary" hidden>
+                <div class="mc-detail-summary-head">
+                  <span class="mc-detail-summary-badge">상세 조건 적용 중</span>
+                  <button type="button" class="mc-link-btn" id="mcDetailSummaryEdit" data-mc-mode-btn="detailed">수정하기</button>
+                </div>
+                <div class="mc-detail-summary-text" id="mcDetailSummaryText"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 광고비 패널을 결과 패널보다 먼저 배치한다 — 입력 → 광고비
+               비교 → (그 선택이 곧바로 반영된) 결과 확인 → 계획 만들기 순으로
+               페이지를 아래로 스크롤하는 것만으로 자연스럽게 이어지게
+               하기 위함(요구사항). 결과 패널은 하나뿐이고 위치만 옮겼을
+               뿐 — 광고비를 "사용 안 함"(기본값)인 채로 보면 그게 곧
+               기본 결과이고, 값을 넣으면 같은 패널이 그 자리에서 최종
+               결과로 바뀐다(중복 패널 없음, 계산 로직도 그대로). -->
+          <div class="dash-panel" id="mcAdPanel">
+            <div class="dash-panel-head">광고비를 쓰면 얼마나 남을까요?</div>
+            <div class="mc-form">
+              <div class="mc-chip-row" id="mcAdChips">
+                <button type="button" class="mc-chip active" data-ad-mode="none">사용 안 함</button>
+                <button type="button" class="mc-chip" data-ad-preset="6">6%</button>
+                <button type="button" class="mc-chip" data-ad-preset="10">10%</button>
+                <button type="button" class="mc-chip" data-ad-preset="20">20%</button>
+                <button type="button" class="mc-chip" data-ad-mode="custom">직접 입력</button>
               </div>
 
-              <button type="button" class="btn btn-primary" id="toolsSaveCalc" style="width:100%; justify-content:center;">결과 저장</button>
+              <div class="mc-ad-custom" id="mcAdCustomWrap" hidden>
+                <div class="mc-radio-row mc-radio-row-sm">
+                  <label><input type="radio" name="mcAdCustomKind" value="rate" checked> 비율(%)로 입력</label>
+                  <label><input type="radio" name="mcAdCustomKind" value="amount"> 주문당 금액(원)으로 입력</label>
+                </div>
+                <div class="mc-field mc-subfield" data-mc-field="adRate" id="mcAdRateWrap" hidden>
+                  <label for="mcAdRate">광고비 비율 <span class="mc-unit">%</span></label>
+                  <input id="mcAdRate" type="number" inputmode="decimal" min="0" step="0.1" placeholder="예: 15">
+                  <div class="mc-err" data-mc-err="adRate"></div>
+                </div>
+                <div class="mc-field mc-subfield" data-mc-field="adAmount" id="mcAdAmountWrap" hidden>
+                  <label for="mcAdAmount">주문당 광고비 <span class="mc-unit">원</span></label>
+                  <input id="mcAdAmount" type="number" inputmode="decimal" min="0" placeholder="예: 2000">
+                  <div class="mc-err" data-mc-err="adAmount"></div>
+                </div>
+              </div>
+
+              <p class="mc-help mc-help-block">배송비를 제외한 할인 후 상품금액을 기준으로 계산해요. 6%·10%·20%는 운영 경험에 따른 비교 예시이며, 업계 평균이나 필수 지출 기준은 아니에요.</p>
+
+              <details class="mc-secondary mc-ad-more">
+                <summary>참고 설명 더보기</summary>
+                <ul class="mc-preset-desc">
+                  <li><b>6%</b> 안정화 후 효율 관리 참고안</li>
+                  <li><b>10%</b> 평소 운영 계획 참고안</li>
+                  <li><b>20%</b> 초기 유입 · 반응 테스트 참고안</li>
+                </ul>
+                <p class="mc-help mc-help-block">주문당 광고비 배분액 = 상품 결제금액 × 비율. 비율과 금액 중 하나만 적용되며, 이 값은 계획용 배분액이지 실제 고객획득비용이나 광고 성과 예측값이 아니에요. 20%보다 높게 입력해도 돼요(상한 없음).</p>
+              </details>
+
+              <button type="button" class="mc-link-btn mc-target-toggle" id="mcTargetToggle" aria-expanded="false">목표 금액에 맞춰 광고비 계산하기</button>
+              <div class="mc-field" data-mc-field="targetProfit" id="mcTargetProfitWrap" hidden>
+                <label for="mcTargetProfit">주문당 남기고 싶은 금액 <span class="mc-unit">원</span></label>
+                <input id="mcTargetProfit" type="number" inputmode="decimal" min="0" placeholder="예: 5000">
+                <div class="mc-help">"광고비 차감 전 예상 잔액 − 이 금액"으로 쓸 수 있는 광고비 여유를 알려드려요. 이 금액으로 실제 주문이 들어온다는 보장은 아니에요.</div>
+                <div class="mc-err" data-mc-err="targetProfit"></div>
+              </div>
             </div>
           </div>
 
-          <div class="dash-panel">
-            <div class="dash-panel-head">최근 저장한 계산</div>
-            <div id="savedCalcList" class="saved-calc-list"></div>
+          <div class="mc-results">
+            <div class="dash-panel">
+              <div class="mc-result-body">
+                <div class="mc-result-empty" id="mcResultEmpty">판매가 · 상품 원가 · 판매 수수료율을 입력하면 결과가 여기에 나와요.</div>
+                <div class="mc-errors" id="mcErrors" hidden></div>
+
+                <div id="mcResultWrap" hidden>
+                  <div class="mc-result-hero" id="mcResultHero">
+                    <div class="mc-result-hero-label" id="mcResultHeroLabel">이 조건으로 한 주문을 판매하면</div>
+                    <div class="mc-result-hero-value" id="mcResPostAdHero">약 —</div>
+                    <div class="mc-result-hero-sub" id="mcResultHeroSub"></div>
+                  </div>
+
+                  <div class="mc-result-facts" id="mcResultFacts"></div>
+
+                  <!-- 주 행동은 "계획 만들기"(베타 핵심 행동), 계산 기록 저장은
+                       보조 행동으로 약하게. 두 버튼 모두 예시·오류·미계산
+                       상태에서는 숨김/비활성(tools.js mcRender). -->
+                  <div class="mc-actions">
+                    <button type="button" class="btn btn-primary" id="mcPlanOpen" style="width:100%; justify-content:center;">이 조건으로 계획 만들기</button>
+                    <button type="button" class="btn btn-ghost btn-sm mc-secondary-action" id="toolsSaveCalc">결과 저장</button>
+                    <button type="button" class="btn btn-primary" id="mcExampleAdopt" style="width:100%; justify-content:center;" hidden>이 예시를 수정해서 내 상품 계산하기</button>
+                    <div class="mc-save-hint" id="mcSaveHint" hidden></div>
+                  </div>
+
+                  <details class="mc-secondary" id="mcSecondary">
+                    <summary>잔액률 · 계산 과정 보기</summary>
+                    <div class="mc-secondary-body">
+                      <div class="mc-res-row"><span>총 수입</span><b id="mcResIncome">—</b></div>
+                      <div class="mc-res-row"><span>광고비 차감 전 예상 잔액</span><b id="mcResPreAd">—</b></div>
+                      <div class="mc-res-row"><span>주문당 광고비 배분액</span><b id="mcResAdCost">—</b></div>
+                      <div class="mc-res-row"><span>총 수입 대비 예상 잔액률</span><b id="mcResRatio">—</b></div>
+                      <div class="mc-res-room" id="mcResRoom" hidden></div>
+                      <p class="mc-disclaimer">플랫폼별 정산의 절사 · 반올림 규칙까지는 재현하지 않으므로 추정값입니다.</p>
+                      <div class="mc-breakdown-body" id="mcBreakdownBody"></div>
+                    </div>
+                  </details>
+                </div>
+
+                <!-- 계획 폼 — #mcResultWrap 바깥에 둔다. 폼을 연 순간의 계산이
+                     스냅샷으로 고정되므로, 이후 계산기 입력이 바뀌거나 결과가
+                     사라져도 폼은 그대로 남아야 한다(plans.js). 사용자 입력은
+                     전부 textContent/value로만 다룬다. -->
+                <div class="mc-plan-form" id="mcPlanForm" hidden>
+                  <div class="mc-plan-head">
+                    <strong>계획 만들기</strong>
+                    <button type="button" class="mc-link-btn" id="mcPlanClose">닫기</button>
+                  </div>
+                  <div class="mc-plan-banner" id="mcPlanBanner" hidden></div>
+                  <div class="mc-plan-snapshot">
+                    <div class="mc-plan-snapshot-label">계획에 저장할 계산 조건</div>
+                    <div class="mc-plan-snapshot-text" id="mcPlanSnapshot"></div>
+                  </div>
+                  <!-- 계획 폼을 연 뒤 계산기 입력(광고비 포함)을 바꾸면 나타난다.
+                       위 스냅샷은 폼을 열었을 때 값 그대로 유지되고, 이 버튼을
+                       눌러야만(명시적 동작) 지금 계산으로 갱신된다 — 자동으로
+                       조용히 바뀌지 않는다. 제목·실행할 일 등 이미 입력한 내용은
+                       그대로 남는다. -->
+                  <div class="mc-plan-mismatch" id="mcPlanMismatch" hidden>
+                    <p>계획을 연 뒤 계산 조건이 바뀌었어요. 계획에는 열었을 때 조건이 그대로 저장돼요.</p>
+                    <button type="button" class="btn btn-ghost btn-sm" id="mcPlanUseCurrent">현재 계산으로 새로 시작하기</button>
+                  </div>
+                  <div class="mc-field">
+                    <label for="mcPlanTitle">계획 이름</label>
+                    <input id="mcPlanTitle" type="text" maxlength="80" autocomplete="off" placeholder="예: 판매가 32,000원으로 올리기">
+                    <div class="mc-err" data-plan-err="title"></div>
+                  </div>
+                  <div class="mc-field">
+                    <label for="mcPlanAction">실행할 일</label>
+                    <textarea id="mcPlanAction" rows="3" maxlength="300" placeholder="예: 상세페이지 가격 수정하고 광고 10%로 일주일 테스트"></textarea>
+                    <div class="mc-err" data-plan-err="action_text"></div>
+                  </div>
+                  <div class="mc-field">
+                    <label for="mcPlanDate">재확인일</label>
+                    <input id="mcPlanDate" type="date">
+                    <div class="mc-help">이 날짜에 홈에서 다시 확인하자고 알려드려요(한국 시간 기준 날짜).</div>
+                    <div class="mc-err" data-plan-err="review_date"></div>
+                  </div>
+                  <div class="mc-plan-account" id="mcPlanAccount"></div>
+                  <div class="mc-plan-error" id="mcPlanError" hidden></div>
+                  <div class="mc-plan-actions">
+                    <button type="button" class="btn btn-primary" id="mcPlanSave" style="width:100%; justify-content:center;">계획 저장</button>
+                    <button type="button" class="mc-link-btn" id="mcPlanDiscard" hidden>초안 버리기</button>
+                  </div>
+                  <p class="mc-plan-note" id="mcPlanTtlNote"></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="dash-panel">
+              <div class="dash-panel-head">최근 저장한 계산</div>
+              <div id="savedCalcList" class="saved-calc-list"></div>
+            </div>
           </div>
-        </aside>
+        </div>
       </div>
-      </div>
+
 
       <div class="tools-pane" data-tools-tab="simulator">
         <div class="sim-grid">
@@ -2541,12 +2875,15 @@
 <script src="utm-acquisition.js"></script>
 <script src="store.js"></script>
 <script src="app.js"></script>
+<script src="margin-calc.js"></script>
+<script src="plans-core.js"></script>
 <script src="tools.js"></script>
 <script src="setup.js"></script>
 <script src="stores.js"></script>
 <script src="ops-overview.js"></script>
 <script src="wholesalers.js"></script>
 <script src="home-dashboard.js"></script>
+<script src="plans.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

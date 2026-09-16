@@ -52,7 +52,11 @@
   // 여부는 canonical DB(user_step_progress)로만 판단하고 이벤트로 다시
   // 만들지 않는다. 관리자 집계 쪽 이유는 admin_beta_behavior_overview()
   // 마이그레이션 주석 참고.
-  var ALLOWED_EVENTS = ['dashboard_viewed', 'roadmap_started'];
+  // plan_created/plan_reviewed는 20260916120000_plan_product_events.sql이
+  // 적용된 뒤에만 서버가 받아준다 — 그 전에는 RPC가 INVALID_EVENT_NAME으로
+  // 거부하고, 이 파일은 그 실패를 콘솔 경고로만 남긴다(계획 저장/검토
+  // 자체는 plans.js가 DB 성공을 확인한 뒤에 이 함수를 부르므로 영향 없음).
+  var ALLOWED_EVENTS = ['dashboard_viewed', 'roadmap_started', 'plan_created', 'plan_reviewed'];
 
   // 분석 데이터 오염 방지 전용 allowlist(보안 장치 아님 — 위 파일 상단
   // 설명 참고). 새 운영 도메인이 생기면 여기 추가한다.

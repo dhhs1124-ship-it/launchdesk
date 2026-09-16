@@ -340,11 +340,20 @@
       if(loginPwConfirm) loginPwConfirm.value = '';
     }
   }
-  function openLoginModal(){
+  function openLoginModal(opts){
     loginMode = 'login';
     applyLoginModalMode();
     loginFormWrap.hidden = false;
     loginNotice.hidden = true;
+    // 선택적 한 줄 안내(예: plans.js — "로그인 후 작성한 내용을 확인하고
+    // 저장할 수 있어요."). 문자열이 아니면(이벤트 객체가 그대로 넘어온
+    // 경우 포함) 아무 것도 표시하지 않는다. 인증 흐름 자체는 바뀌지 않는다.
+    var hintEl = document.getElementById('loginModalHint');
+    if(hintEl){
+      var hint = (opts && typeof opts.hint === 'string') ? opts.hint : '';
+      hintEl.textContent = hint;
+      hintEl.hidden = !hint;
+    }
     loginModal.classList.add('open');
     document.getElementById('loginEmail').focus();
   }
@@ -423,6 +432,16 @@
     if(oauthInFlight) return;
     var sb = window.launchdeskSupabase;
     if(!sb){ showLoginNotice(); return; }
+    // OAuth는 전체 페이지 이동이라 메모리에만 있는 작성 내용은 사라진다.
+    // plans.js가 "저장을 눌렀지만 이 브라우저에 보관하지 못한 계획 폼"을
+    // 갖고 있으면 떠나기 전에 확인받는다(false면 중단). 인증 제공자 설정·
+    // 방식은 그대로이고, 이 훅이 없으면(모듈 미로딩) 기존과 동일하게 진행한다.
+    var plansGuard = window.launchdeskPlans && window.launchdeskPlans.beforeOAuthRedirect;
+    if(typeof plansGuard === 'function'){
+      var proceed = true;
+      try{ proceed = plansGuard() !== false; }catch(e){ proceed = true; }
+      if(!proceed) return;
+    }
     oauthInFlight = true;
     setOAuthButtonsBusy(true);
     markOAuthFreshLoginPending();
