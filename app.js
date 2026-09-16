@@ -65,6 +65,13 @@
     '/account':          '내 쇼핑몰',
     '/admin':            'LaunchDesk Admin'
   };
+  /* 상단바 crumb에만 쓰는 표시 라벨(2026-09 UI 재설계 1차) — 사이드바 메뉴
+     이름(시작 데스크 / 쇼핑몰 준비)과 맞추기 위한 것. GA4 page_title은
+     계속 TITLES를 쓰므로 분석 지표는 바뀌지 않는다. */
+  var CRUMB_LABELS = {
+    '/':      '시작 데스크',
+    '/start': '쇼핑몰 준비'
+  };
 
   function currentPath(){
     var h = location.hash.replace(/^#/, '');
@@ -162,7 +169,7 @@
     }
     target.hidden = false;
     if(!reduceMotion){ target.classList.add('fade-in'); applyStagger(target); }
-    document.getElementById('crumbLabel').textContent = TITLES[path] || '준비 중';
+    document.getElementById('crumbLabel').textContent = CRUMB_LABELS[path] || TITLES[path] || '준비 중';
     setActiveNav(path);
     window.scrollTo(0, 0);
     closeSidebar();
@@ -276,6 +283,17 @@
     navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
   scrim.addEventListener('click', closeSidebar);
+  // 2026-09 UI 재설계 1차 — 서랍은 햄버거·스크림 외에 닫기 버튼·Escape·
+  // 서랍 안 링크 클릭으로도 닫힌다(같은 경로 링크는 hashchange가 없어
+  // render()의 closeSidebar()가 돌지 않으므로 여기서 직접 닫는다).
+  var sidebarClose = document.getElementById('sidebarClose');
+  if(sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && sidebar.classList.contains('open')) closeSidebar();
+  });
+  sidebar.addEventListener('click', function(e){
+    if(e.target.closest('a[href]')) closeSidebar();
+  });
 
   /* photo lightbox — event-delegated so it works across every view */
   var lightbox = document.getElementById('lightbox');
@@ -1180,10 +1198,16 @@
   function renderAuthUI(session){
     var user = session && session.user;
     isAuthed = !!user;
+    // 2026-09 UI 재설계 1차 — 사이드바 게스트 카드/프로필 카드와 상단바
+    // 사용자 배지의 표시 전환은 CSS(body.is-authed)가 담당한다. 인증 흐름과
+    // 아래 프로필/로그아웃/"내 계정" 처리는 그대로다.
+    document.body.classList.toggle('is-authed', !!user);
+    var topbarUserName = document.getElementById('topbarUserName');
     if(user){
       var localPart = (user.email || '').split('@')[0] || '사용자';
       profileAvatarLetter.textContent = localPart.charAt(0).toUpperCase();
       profileName.textContent = localPart;
+      if(topbarUserName) topbarUserName.textContent = localPart;
       profileDayEl.innerHTML = '<a href="#" id="profileLogoutBtn">로그아웃</a>';
       document.getElementById('profileLogoutBtn').addEventListener('click', function(e){
         e.preventDefault();
@@ -1209,6 +1233,7 @@
     } else {
       profileAvatarLetter.textContent = '?';
       profileName.textContent = '로그인을 해주세요';
+      if(topbarUserName) topbarUserName.textContent = '게스트';
       profileDayEl.textContent = '진행상황을 저장하고 다른 기기에서도 이어볼 수 있어요.';
       if(topbarLoginBtn){
         topbarLoginBtn.textContent = '로그인';

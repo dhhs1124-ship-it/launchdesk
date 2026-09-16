@@ -22,13 +22,35 @@
     --gradient:       linear-gradient(135deg,var(--accent) 0%,var(--badge-b) 100%);
     --radius:         14px;
     --radius-sm:      10px;
-    --sidebar-w:      252px;
-    --topbar-h:        60px;
+    --sidebar-w:      220px;   /* 2026-09 UI 재설계 1차 — large(≥1100) 고정 사이드바 */
+    --topbar-h:        56px;
     --maxw-narrow:    720px;
     --f-display:'Space Grotesk','IBM Plex Sans KR',sans-serif;
     --f-body:'IBM Plex Sans KR',-apple-system,'Malgun Gothic',sans-serif;
     --f-mono:'JetBrains Mono','SFMono-Regular',monospace;
+
+    /* ---- 2026-09 UI 재설계 1차 토큰(피그마 Make 시안, 올리브 계열) ----
+       새 셸(사이드바·상단바·서랍)과 시작 데스크(.desk) 범위에서만 참조한다.
+       전역 --accent(벽돌색)와 기존 화면의 스타일은 그대로다. 폰트는 기존
+       --f-body(IBM Plex Sans KR)를 유지한다. */
+    --ld-bg:          #F5F4F0;
+    --ld-panel:       #FFFFFF;
+    --ld-text:        #252925;
+    --ld-accent:      #46543B;
+    --ld-accent-dark: #364230;
+    --ld-accent-light:#EDF2EC;
+    --ld-accent-mid:  #8FAB7E;
+    --ld-border:      #E1E4DE;
+    --ld-muted:       #6B7268;
+    --ld-muted-bg:    #F0EFE9;
+    --ld-olive-bg:    #3A4A30;
+    --ld-drawer-w:    280px;
+    --ld-right-w:     300px;
+    --ld-maxw:        1100px;
+    --ld-gutter:      32px;    /* large 32 / medium 24 / small 16 — 아래 미디어쿼리 */
   }
+  @media (max-width:1099px){ :root{ --ld-gutter:24px; } }
+  @media (max-width:639px){ :root{ --ld-gutter:16px; } }
   *{box-sizing:border-box;}
   /* 클래스에 display 값을 지정한 요소(.ws-field 등)는 브라우저 기본
      [hidden]{display:none} UA 스타일보다 author 스타일이 우선 적용돼
@@ -37,7 +59,9 @@
      모드에서도 계속 보이던 버그의 원인). */
   [hidden]{display:none !important;}
   html{scroll-behavior:auto;}
-  body{background:var(--bg); color:var(--ink); font-family:var(--f-body); line-height:1.65; -webkit-font-smoothing:antialiased;}
+  /* 앱 배경만 피그마 시안의 회백색(--ld-bg)으로 — --bg 토큰 자체는 바꾸지
+     않아 입력칸 배경(var(--bg)) 등 다른 화면 요소는 그대로다. */
+  body{background:var(--ld-bg); color:var(--ink); font-family:var(--f-body); line-height:1.65; -webkit-font-smoothing:antialiased;}
   h1,h2,h3{font-family:var(--f-body); font-weight:800; text-wrap:balance; margin:0; letter-spacing:-.01em; color:var(--ink);}
   p{margin:0 0 1em; color:var(--ink-soft); max-width:66ch;}
   a{color:inherit; text-decoration:none;}
@@ -57,63 +81,112 @@
   .eyebrow{display:inline-flex; align-items:center; gap:.5rem; font-family:var(--f-mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent-ink); background:var(--accent-soft); border:1px solid var(--badge-a-bg); padding:.35rem .8rem; border-radius:99px; margin-bottom:1.2rem;}
   .eyebrow::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--accent);}
 
-  /* ---------------- shell: sidebar + topbar ---------------- */
+  /* ---------------- shell: sidebar + topbar (2026-09 UI 재설계 1차) ----------------
+     피그마 Make 시안의 올리브 토큰(--ld-*)을 셸(사이드바·상단바·서랍)에만
+     적용한다. 전역 --accent(벽돌색)와 다른 화면의 스타일은 그대로다.
+     마크업의 id/data 속성(#sidebar #scrim #navToggle #profileCard
+     #adminSidebarLink #crumbLabel #topbarLoginBtn, .side-nav a[data-match])은
+     app.js/admin.js가 그대로 쓴다. 화면 구간: small <640 / medium 640~1099 /
+     large ≥1100 — 1100 미만은 사이드바를 서랍으로 표시한다. 내부 스크롤
+     컨테이너는 만들지 않는다(문서 스크롤 + sticky 그대로). */
   .app-shell{display:flex; min-height:100vh; min-height:100dvh;}
-  .scrim{position:fixed; inset:0; background:rgba(28,26,22,.32); z-index:75; opacity:0; pointer-events:none; transition:opacity .2s ease;}
+  .scrim{position:fixed; inset:0; background:rgba(0,0,0,.35); -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); z-index:75; opacity:0; pointer-events:none; transition:opacity .2s ease;}
   .scrim.show{opacity:1; pointer-events:auto;}
 
-  /* 사이드바 전용 green 토큰 + white 배경 — 전역 --accent(벽돌색)/--gradient/
-     --sidebar-bg(다른 화면의 테이블 헤더·워크시트 헤더 등에서 계속 쓰임)는
-     그대로 두고, .sidebar 요소 자체의 background만 흰색으로 직접
-     지정한다(변수를 바꾸지 않고 규칙 안에서 리터럴로 덮어씀 — 다른 화면은
-     전혀 영향받지 않는다). 로고 점/프로필 아바타/진행바/메뉴 선택 상태는
-     새 스코프 변수로 moss green 언어에 맞춘다. --badge-c는 기존에 이미
-     있던 값(자료실 배지)을 재사용한 것뿐 새 색이 아니다. */
   .sidebar{
-    --sidebar-accent: var(--badge-c);
-    --sidebar-accent-soft: var(--badge-c-bg);
-    --sidebar-accent-ink: #33502f;
-    --sidebar-gradient: linear-gradient(135deg, #4c6b49 0%, #6d8c63 100%);
-    width:var(--sidebar-w); flex:0 0 auto; background:#fff; border-right:1px solid var(--border); display:flex; flex-direction:column; padding:1.3rem .9rem 1.4rem; position:sticky; top:0; align-self:flex-start; height:100vh; height:100dvh; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border-strong) transparent;
+    --sidebar-accent: var(--ld-accent);
+    --sidebar-accent-soft: var(--ld-accent-light);
+    --sidebar-accent-ink: var(--ld-accent);
+    --sidebar-gradient: linear-gradient(135deg, var(--ld-accent) 0%, #6B7A5E 100%);
+    width:var(--sidebar-w); flex:0 0 auto; background:var(--ld-panel); border-right:1px solid var(--ld-border); display:flex; flex-direction:column; padding:20px 12px 20px; position:sticky; top:0; align-self:flex-start; height:100vh; height:100dvh; overflow-y:auto; scrollbar-width:thin; scrollbar-color:transparent transparent; transition:scrollbar-color .3s;
   }
-  .sidebar::-webkit-scrollbar{width:3px;}
-  .sidebar::-webkit-scrollbar-thumb{background:var(--border-strong); border-radius:99px;}
-  .sidebar .logo{display:flex; align-items:center; gap:.5rem; font-family:var(--f-display); font-weight:700; font-size:1.08rem; letter-spacing:-.01em; padding:.5rem .6rem 1.2rem;}
-  .sidebar .logo .dot{width:10px; height:10px; border-radius:3px; background:var(--sidebar-gradient); flex:0 0 auto;}
+  .sidebar:hover{scrollbar-color:#C8CCC4 transparent;}
+  .sidebar::-webkit-scrollbar{width:6px;}
+  .sidebar::-webkit-scrollbar-thumb{background:transparent; border-radius:3px;}
+  .sidebar:hover::-webkit-scrollbar-thumb{background:#C8CCC4;}
 
-  .profile-card{display:flex; align-items:center; gap:.7rem; padding:.5rem .6rem; margin-bottom:.6rem; cursor:pointer;}
-  .profile-avatar{position:relative; width:36px; height:36px; border-radius:50%; background:var(--sidebar-gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--f-display); font-weight:700; font-size:.95rem; flex:0 0 auto;}
-  .profile-name{font-size:.88rem; font-weight:700; color:var(--ink);}
-  .profile-day{font-family:var(--f-mono); font-size:.68rem; color:var(--ink-faint); margin-top:.1rem;}
-  .progress-mini{padding:0 .6rem 1rem; border-bottom:1px solid var(--border); margin-bottom:.6rem;}
-  .pm-head{display:flex; justify-content:space-between; font-size:.74rem; color:var(--ink-soft); margin-bottom:.4rem;}
-  .pm-head b{font-weight:700; color:var(--sidebar-accent);}
-  .pm-bar{height:6px; border-radius:99px; background:var(--border); overflow:hidden;}
-  .pm-fill{height:100%; width:0%; background:var(--sidebar-gradient); border-radius:99px; transition:width .35s ease;}
+  .sidebar-head{display:flex; align-items:flex-start; justify-content:space-between; gap:8px; padding:4px 8px 8px;}
+  .sidebar .logo{display:flex; align-items:center; gap:8px; color:var(--ld-text); font-weight:700; font-size:16px; letter-spacing:-.01em; line-height:1.2;}
+  .sidebar .logo-mark{width:28px; height:28px; border-radius:7px; background:var(--ld-accent); color:#fff; display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  .sidebar .logo-mark svg{width:14px; height:14px;}
+  .sidebar .logo-text{display:flex; flex-direction:column; gap:2px;}
+  .sidebar .logo-text small{font-size:11px; font-weight:400; color:var(--ld-muted); letter-spacing:.01em;}
+  .sidebar-close{display:none; width:44px; height:44px; margin:-8px -8px 0 0; border:none; background:none; color:var(--ld-muted); cursor:pointer; align-items:center; justify-content:center; border-radius:8px; flex:0 0 auto;}
+  .sidebar-close:hover{background:var(--ld-muted-bg); color:var(--ld-text);}
+  .sidebar-close svg{width:20px; height:20px;}
 
-  .side-nav{display:flex; flex-direction:column; gap:.1rem;}
-  .side-nav a{position:relative; display:flex; align-items:center; gap:.7rem; padding:.52rem .7rem; border-radius:var(--radius-sm); font-size:.88rem; font-weight:600; color:var(--ink-soft); transition:background .15s, color .15s;}
+  .side-nav{display:flex; flex-direction:column; gap:2px; padding-top:12px;}
+  .side-nav a{position:relative; display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; font-size:14px; font-weight:400; color:var(--ld-text); transition:background .15s, color .15s;}
   .side-nav a svg{width:17px; height:17px; flex:0 0 auto;}
-  .side-nav a:hover{background:var(--surface-hover); color:var(--ink);}
-  .side-nav a.nav-current{background:var(--sidebar-accent-soft); color:var(--sidebar-accent-ink);}
-  .side-nav a.nav-current::before{content:""; position:absolute; left:-.9rem; top:.5rem; bottom:.5rem; width:3px; border-radius:0 3px 3px 0; background:var(--sidebar-accent);}
+  .side-nav a:hover{background:var(--ld-muted-bg); color:var(--ld-text);}
+  .side-nav a.nav-current{background:var(--ld-accent-light); color:var(--ld-accent); font-weight:600;}
+  .side-nav-divider{display:block; height:1px; background:var(--ld-border); margin:12px 0;}
 
-  .side-nav-foot{margin-top:auto; padding-top:.8rem; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:.1rem;}
-  .side-nav-foot a{font-size:.79rem; color:var(--ink-faint); padding:.45rem .7rem; border-radius:var(--radius-sm); transition:background .15s, color .15s;}
-  .side-nav-foot a:hover{color:var(--ink-soft); background:var(--surface-hover);}
+  /* 비회원: 피그마의 로그인 유도 카드. 회원: 기존 #profileCard(이름·로그아웃).
+     둘의 전환은 app.js renderAuthUI()가 body에 붙이는 .is-authed 클래스만 본다. */
+  .sidebar-guest{margin:12px 0 0; padding:16px; border-radius:10px; background:var(--ld-muted-bg); border:1px solid var(--ld-border);}
+  .sidebar-guest .sg-title{margin:0 0 4px; font-size:13px; font-weight:600; color:var(--ld-text); line-height:1.5; max-width:none;}
+  .sidebar-guest .sg-desc{margin:0 0 12px; font-size:12px; color:var(--ld-muted); line-height:1.6; max-width:none;}
+  .sidebar-guest .sg-btn{display:flex; align-items:center; justify-content:center; width:100%; min-height:36px; padding:9px 0; border-radius:8px; background:var(--ld-accent); color:#fff; font-size:13px; font-weight:600; transition:background .15s;}
+  .sidebar-guest .sg-btn:hover{background:var(--ld-accent-dark);}
+  body.is-authed .sidebar-guest{display:none;}
+  body:not(.is-authed) .profile-card{display:none;}
 
-  @media (max-width:960px){
-    .sidebar{position:fixed; left:0; top:0; z-index:80; transform:translateX(-100%); transition:transform .22s ease; box-shadow:none;}
-    .sidebar.open{transform:translateX(0); box-shadow:24px 0 48px -24px rgba(28,26,22,.35);}
+  .profile-card{display:flex; align-items:center; gap:10px; margin:12px 0 0; padding:12px; border-radius:10px; background:var(--ld-muted-bg); border:1px solid var(--ld-border); cursor:pointer; min-width:0;}
+  .profile-card:hover{border-color:var(--ld-accent);}
+  .profile-card > div:last-child{min-width:0;}
+  .profile-avatar{position:relative; width:34px; height:34px; border-radius:50%; background:var(--sidebar-gradient); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex:0 0 auto;}
+  .profile-name{font-size:13px; font-weight:600; color:var(--ld-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .profile-day{font-size:12px; color:var(--ld-muted); margin-top:2px; line-height:1.5;}
+  .profile-day a{color:var(--ld-accent); font-weight:600;}
+  .progress-mini{padding:12px 8px 0;}
+  .pm-head{display:flex; justify-content:space-between; font-size:12px; color:var(--ld-muted); margin-bottom:6px;}
+  .pm-head b{font-weight:700; color:var(--sidebar-accent);}
+  .pm-bar{height:4px; border-radius:2px; background:var(--ld-muted-bg); overflow:hidden;}
+  .pm-fill{height:100%; width:0%; background:var(--ld-accent); border-radius:2px; transition:width .35s ease;}
+
+  .side-nav-foot{margin-top:auto; padding:16px 8px 0; display:flex; flex-direction:column; gap:10px;}
+  .sidebar-links{display:flex; justify-content:center; gap:14px;}
+  .sidebar-links a{font-size:11px; color:var(--ld-muted); padding:4px 0;}
+  .sidebar-links a:hover{color:var(--ld-text);}
+  .sidebar-tagline{margin:0; font-size:11px; color:var(--ld-muted); line-height:1.7; text-align:center; max-width:none;}
+  .sidebar-tagline b{font-weight:600; color:var(--ld-accent);}
+
+  @media (max-width:1099px){
+    .sidebar{position:fixed; left:0; top:0; z-index:80; width:var(--ld-drawer-w); max-width:88vw; transform:translateX(-100%); transition:transform .22s ease; box-shadow:none; padding:16px 8px 20px;}
+    .sidebar.open{transform:translateX(0); box-shadow:4px 0 24px rgba(0,0,0,.12);}
+    .sidebar-close{display:flex;}
+    .side-nav a{padding:10px 14px; min-height:44px;}
+    .sidebar-guest .sg-btn, .profile-card{min-height:44px;}
   }
+  @media (prefers-reduced-motion:reduce){ .sidebar{transition:none;} }
 
   .app-main{flex:1; min-width:0; display:flex; flex-direction:column;}
-  .topbar{height:var(--topbar-h); flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding-inline:1.6rem; border-bottom:1px solid var(--border); background:var(--bg); position:sticky; top:0; z-index:40;}
-  .topbar-left{display:flex; align-items:center; gap:.8rem; min-width:0;}
-  .crumb{font-size:.86rem; font-weight:600; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .menu-btn{display:none; flex-direction:column; justify-content:center; gap:4px; width:34px; height:34px; border-radius:9px; border:1px solid var(--border-strong); background:var(--surface); cursor:pointer; flex:0 0 auto;}
-  .menu-btn span{display:block; width:14px; height:1.6px; background:var(--ink); margin-inline:auto;}
-  @media (max-width:960px){ .menu-btn{display:flex;} }
+  .topbar{height:var(--topbar-h); flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:8px; padding-inline:var(--ld-gutter); border-bottom:1px solid var(--ld-border); background:var(--ld-panel); position:sticky; top:0; z-index:40;}
+  .topbar-left{display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto;}
+  .crumbs{display:flex; align-items:center; gap:6px; min-width:0; font-size:13px; line-height:1.2;}
+  .crumb-root{color:var(--ld-muted); white-space:nowrap; flex:0 0 auto;}
+  .crumb-sep{color:var(--ld-border); flex:0 0 auto;}
+  .crumb{font-size:13px; font-weight:600; color:var(--ld-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; word-break:keep-all;}
+  .topbar-right{display:flex; align-items:center; gap:10px; flex:0 0 auto;}
+  .topbar-user{display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:500; color:var(--ld-muted); white-space:nowrap; min-width:0;}
+  .topbar-user .tu-avatar{width:26px; height:26px; border-radius:50%; background:var(--ld-muted-bg); border:1px solid var(--ld-border); display:flex; align-items:center; justify-content:center; flex:0 0 auto; color:var(--ld-muted);}
+  .topbar-user .tu-avatar svg{width:13px; height:13px;}
+  .topbar-user .tu-name{max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .topbar .btn.topbar-login{border-radius:7px; min-width:64px; min-height:34px; padding:6px 14px; font-size:13px; font-weight:600; border:1px solid var(--ld-border); background:var(--ld-panel); color:var(--ld-text); white-space:nowrap; flex:0 0 auto; justify-content:center;}
+  .topbar .btn.topbar-login:hover{border-color:var(--ld-accent); color:var(--ld-accent); background:var(--ld-panel); transform:none; box-shadow:none;}
+  .menu-btn{display:none; flex-direction:column; justify-content:center; align-items:center; gap:4px; width:44px; height:44px; margin-left:-8px; border-radius:8px; border:none; background:none; cursor:pointer; flex:0 0 auto;}
+  .menu-btn:hover{background:var(--ld-muted-bg);}
+  .menu-btn span{display:block; width:18px; height:1.5px; background:var(--ld-text); border-radius:1px;}
+  @media (max-width:1099px){
+    .menu-btn{display:flex;}
+    .crumb-root, .crumb-sep{display:none;}
+  }
+  @media (max-width:639px){
+    .topbar-right{gap:8px;}
+    .topbar-user .tu-name{max-width:64px;}
+    .topbar .btn.topbar-login{padding:6px 12px;}
+  }
 
   /* ---------------- shared buttons ---------------- */
   .btn{display:inline-flex; align-items:center; gap:.4rem; font-family:var(--f-body); font-weight:700; font-size:.86rem; padding:.62rem 1.1rem; border-radius:99px; border:1px solid transparent; transition:transform .15s ease, border-color .15s ease, background .15s ease, color .15s ease;}
@@ -125,7 +198,12 @@
   .btn-sm{padding:.55rem .95rem; font-size:.82rem;}
 
   /* ---------------- views ---------------- */
-  .content{flex:1; padding:2rem 1.6rem 3.2rem; max-width:1080px; width:100%;}
+  /* 콘텐츠 프레임(2026-09 UI 재설계 1차): 내부 최대 1100px + 구간별 좌우 여백
+     (large 32 / medium 24 / small 16). 가운데 정렬은 화면이 1100+여백보다
+     넓을 때만 체감된다. */
+  .content{flex:1; width:100%; max-width:calc(var(--ld-maxw) + var(--ld-gutter) * 2); margin-inline:auto; padding:32px var(--ld-gutter) 48px;}
+  @media (max-width:1099px){ .content{padding-top:28px;} }
+  @media (max-width:639px){ .content{padding-top:20px; padding-bottom:40px;} }
   .view.fade-in{animation:viewIn .25s cubic-bezier(.22,.61,.36,1);}
   @keyframes viewIn{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;} }
   @media (prefers-reduced-motion:reduce){ .view.fade-in{animation:none;} }
@@ -443,7 +521,7 @@
   .timeline::before{content:""; position:absolute; left:.4rem; top:.3rem; bottom:.3rem; width:1px; background:var(--border-strong);}
   .t-item{position:relative; padding-bottom:1.5rem;}
   .t-item:last-child{padding-bottom:0;}
-  .t-item::before{content:""; position:absolute; left:-1.8rem; top:.3rem; width:9px; height:9px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--bg);}
+  .t-item::before{content:""; position:absolute; left:-1.8rem; top:.3rem; width:9px; height:9px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--ld-bg);} /* 점 주위 링은 페이지 배경색과 같아야 선을 가린다 — body 배경을 --ld-bg로 바꾼 데 따른 조정 */
   .t-item h3{font-size:.96rem; font-weight:700; margin-bottom:.28rem;}
   .t-item p{font-size:.88rem; margin-bottom:0;}
 
@@ -958,7 +1036,7 @@
   .opsdash .dash-panel-head, .opsdash-roadmap-panel > .dash-panel-head{padding:.8rem 1.1rem; font-size:.94rem;}
 
   .opsdash-header{display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:.9rem;}
-  .opsdash-header h1{font-size:1.85rem;}
+  .opsdash-header h1, .opsdash-header h2{font-size:1.85rem;}
   .opsdash-header p{margin:.3rem 0 0; font-size:.86rem; color:var(--ink-soft);}
 
   .opsdash-kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:.85rem; margin-bottom:.9rem;}
@@ -1139,3 +1217,129 @@
   .opsdash-roadmap-details summary svg{transition:transform .15s ease;}
   .opsdash-roadmap-details[open] summary svg{transform:rotate(180deg);}
   .opsdash-roadmap-details .dash-grid{padding:0 1.1rem 1.2rem; margin-top:0;}
+
+  /* =========================================================================
+     시작 데스크(#view-home 상단, desk.js) — 2026-09 UI 재설계 1차.
+     피그마 Make 시안(App.tsx 홈)을 정적 마크업 + 클래스로 옮긴 것. 토큰은
+     :root의 --ld-*만 쓰고, 벽돌색 전역 .btn-primary는 이 스코프(.desk) 안에서만
+     올리브로 덮어쓴다(.opsdash가 --op-accent로 하던 방식과 동일).
+     레이아웃: large(≥1100)는 [본문 | 300px 우측 열], 미만은 한 열. 우측 열의
+     세 패널(도구 / 정할 것 / 도움)은 DOM에 한 번만 있고, 한 열일 때는
+     .desk-aside{display:contents}로 grid-template-areas 순서에 끼워 넣는다 —
+     같은 내용을 두 번 그리지 않는다(id 중복 없음).
+     ========================================================================= */
+  .desk{display:grid; grid-template-columns:1fr; gap:16px; margin-bottom:24px;
+        grid-template-areas:"hero" "situation" "decide" "roadmap" "tools" "help";}
+  .desk-hero{grid-area:hero;} .desk-situation{grid-area:situation;} .desk-roadmap{grid-area:roadmap;}
+  .desk-tools{grid-area:tools;} .desk-decide{grid-area:decide;} .desk-help{grid-area:help;}
+  .desk-aside{display:contents;}
+  @media (min-width:1100px){
+    .desk{grid-template-columns:minmax(0,1fr) var(--ld-right-w); gap:20px 24px; align-items:start;
+          grid-template-areas:"hero aside" "situation aside" "roadmap aside";}
+    .desk-aside{display:flex; flex-direction:column; gap:16px; grid-area:aside; min-width:0;}
+    .desk-tools, .desk-decide, .desk-help{grid-area:auto;}
+  }
+  .desk p{margin:0; max-width:none; color:inherit;}
+  .desk h1, .desk h2, .desk h3{font-weight:700; letter-spacing:-.01em; color:var(--ld-text);}
+  .desk-panel{background:var(--ld-panel); border:1px solid var(--ld-border); border-radius:14px; padding:24px 28px; min-width:0;}
+  .desk-aside .desk-panel, .desk-tools, .desk-decide{border-radius:12px; padding:20px;}
+  .desk-panel h2{font-size:17px; margin-bottom:4px;}
+  .desk-panel h3{font-size:14px; font-weight:600;}
+  .desk-sub{font-size:13px; color:var(--ld-muted); line-height:1.6;}
+  .desk-panel-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
+  .desk-link{display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:600; color:var(--ld-accent); white-space:nowrap; padding:4px 0;}
+  .desk-link:hover{color:var(--ld-accent-dark);}
+  .desk .btn{border-radius:9px; font-size:13px; font-weight:700; min-height:44px; padding:10px 18px; justify-content:center; gap:6px;}
+  .desk .btn svg{width:14px; height:14px;}
+  .desk .btn-primary{background:var(--ld-accent); color:#fff;}
+  .desk .btn-primary:hover{background:var(--ld-accent-dark);}
+  .desk .btn:hover{transform:none; box-shadow:none;}
+  .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;}
+  .desk-fade{animation:deskFadeIn .2s ease-out;}
+  @keyframes deskFadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+  @media (prefers-reduced-motion:reduce){ .desk-fade{animation:none;} }
+
+  /* 히어로 — 이미지는 CSS background로만 넣어, 이미지를 숨기는 small 구간에서는
+     내려받지 않는다(적용되지 않는 미디어쿼리의 background-image는 요청되지 않음).
+     텍스트가 이미지 위에 오도록 z-index로 층을 나누고 keep-all로 한 글자
+     줄바꿈을 막는다. */
+  .desk-hero{position:relative; overflow:hidden; background:var(--ld-panel); border:1px solid var(--ld-border); border-radius:14px; min-height:160px; display:flex; align-items:center;}
+  .desk-hero-text{position:relative; z-index:1; padding:28px 36px; max-width:54%; word-break:keep-all;}
+  .desk-eyebrow{font-size:12px; font-weight:600; color:var(--ld-accent); letter-spacing:.02em; margin-bottom:10px;}
+  .desk-hero h1{font-size:28px; line-height:1.25; letter-spacing:-.02em; margin-bottom:10px;}
+  .desk-hero-lead{font-size:14px; color:var(--ld-muted); line-height:1.6;}
+  .desk-hero-visual{display:none;}
+  @media (min-width:640px){
+    .desk-hero-visual{display:block; position:absolute; right:0; top:0; bottom:0; width:58%; pointer-events:none;
+      background-image:linear-gradient(to right, #fff 0%, #fff 22%, rgba(255,255,255,.92) 38%, rgba(255,255,255,.55) 62%, rgba(255,255,255,0) 100%), url("assets/desk-hero.png");
+      background-repeat:no-repeat, no-repeat; background-size:100% 100%, cover; background-position:0 0, 38% center;}
+  }
+  @media (min-width:1100px){ .desk-hero-visual{width:65%;} }
+  @media (max-width:1099px){ .desk-hero{min-height:140px;} .desk-hero-text{padding:24px 28px; max-width:60%;} .desk-hero h1{font-size:24px;} }
+  @media (max-width:639px){ .desk-hero{min-height:0;} .desk-hero-text{padding:20px; max-width:none;} .desk-hero h1{font-size:22px;} }
+
+  /* 상황 선택 — 진짜 radio + label. 입력은 시각적으로만 숨기고(sr-only)
+     선택/포커스 표시는 바로 뒤 label에 그린다. */
+  .desk-sit-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:20px 0 0; padding:0; border:0; min-width:0;}
+  @media (max-width:639px){ .desk-sit-grid{grid-template-columns:1fr;} }
+  .desk-sit{display:flex; align-items:center; gap:12px; min-height:52px; padding:14px 16px; border-radius:10px; border:1.5px solid var(--ld-border); background:var(--ld-panel); cursor:pointer; font-size:14px; color:var(--ld-text); line-height:1.4; word-break:keep-all; transition:border-color .15s, background .15s;}
+  .desk-sit:hover{border-color:#b8c4b4; background:#f9f9f6;}
+  .desk-sit-radio{width:18px; height:18px; border-radius:50%; flex:0 0 auto; border:1.5px solid #c0c8bc; display:flex; align-items:center; justify-content:center; transition:border-color .15s, background .15s;}
+  .desk-sit-radio::after{content:""; width:6px; height:6px; border-radius:50%; background:#fff; opacity:0;}
+  .desk-sit-input:checked + .desk-sit{border-color:var(--ld-accent); background:var(--ld-accent-light); color:var(--ld-accent); font-weight:600;}
+  .desk-sit-input:checked + .desk-sit .desk-sit-radio{border-color:var(--ld-accent); background:var(--ld-accent);}
+  .desk-sit-input:checked + .desk-sit .desk-sit-radio::after{opacity:1;}
+  .desk-sit-input:focus-visible + .desk-sit{outline:2px solid var(--ld-accent); outline-offset:2px;}
+  .desk-rec{margin-top:16px;}
+  .desk-rec-hint{font-size:13px; color:var(--ld-muted); padding:10px 0; line-height:1.6;}
+  .desk-rec-card{display:flex; align-items:center; gap:16px; padding:18px 20px; border-radius:10px; background:var(--ld-accent-light); border:1px solid #d0dbc9;}
+  .desk-rec-icon{width:40px; height:40px; border-radius:10px; background:var(--ld-accent); color:#fff; display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  .desk-rec-icon svg{width:18px; height:18px;}
+  .desk-rec-body{flex:1; min-width:0; word-break:keep-all;}
+  .desk-rec-eyebrow{display:flex; align-items:center; gap:8px; font-size:11px; font-weight:600; color:var(--ld-accent); letter-spacing:.02em; margin-bottom:4px;}
+  .desk-rec-step{font-size:10px; font-weight:700; padding:1px 7px; border-radius:20px; background:var(--ld-panel); color:var(--ld-accent); border:1px solid #d0dbc9;}
+  .desk-rec-title{font-size:15px; margin-bottom:4px; line-height:1.35;}
+  .desk-rec-desc{font-size:13px; color:var(--ld-muted); line-height:1.55;}
+  .desk-rec-cta{flex:0 0 auto;}
+  @media (max-width:639px){ .desk-rec-card{flex-direction:column; align-items:stretch; gap:12px;} .desk-rec-cta{width:100%;} }
+
+  /* 4단계 요약 / 도구 / 정할 것 — 같은 행 구조(번호·아이콘·제목/설명·chevron) */
+  .desk-steps, .desk-tool-list{display:flex; flex-direction:column; gap:2px;}
+  .desk-step{display:flex; align-items:center; gap:16px; padding:14px 12px; border-radius:10px; min-height:44px; color:var(--ld-text); transition:background .13s;}
+  .desk-tool{display:flex; align-items:center; gap:12px; padding:11px 10px; border-radius:8px; min-height:44px; color:var(--ld-text); transition:background .13s;}
+  .desk-step:hover, .desk-tool:hover{background:var(--ld-muted-bg);}
+  .desk-step-num{font-size:12px; font-weight:700; color:var(--ld-accent); width:24px; flex:0 0 auto; letter-spacing:.02em; font-variant-numeric:tabular-nums;}
+  .desk-step-icon, .desk-tool-icon, .desk-decide-icon{border-radius:9px; background:var(--ld-accent-light); color:var(--ld-accent); display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  .desk-step-icon, .desk-tool-icon{width:36px; height:36px;}
+  .desk-step-icon svg, .desk-tool-icon svg{width:18px; height:18px;}
+  .desk-step-text, .desk-tool-text, .desk-decide-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; word-break:keep-all;}
+  .desk-step-text b{font-size:14px; font-weight:600; color:var(--ld-text);}
+  .desk-tool-text b, .desk-decide-text b{font-size:13px; font-weight:600; color:var(--ld-text);}
+  .desk-step-text small, .desk-tool-text small, .desk-decide-text small{font-size:12px; color:var(--ld-muted);}
+  .desk-chev{color:#b8c4b4; flex:0 0 auto; width:16px; height:16px;}
+  .desk-tool .desk-chev{width:14px; height:14px; color:var(--ld-muted);}
+  .desk-note{display:flex; align-items:center; gap:8px; margin-top:16px; padding:12px 14px; border-radius:8px; background:var(--ld-muted-bg); font-size:12px; color:var(--ld-muted); line-height:1.5;}
+  .desk-note svg{flex:0 0 auto; width:14px; height:14px; color:var(--ld-muted);}
+  .desk-tools h3{margin-bottom:14px;}
+  .desk-tag{font-size:11px; color:var(--ld-muted); background:var(--ld-muted-bg); padding:2px 8px; border-radius:20px; white-space:nowrap;}
+  .desk-decide-list{display:flex; flex-direction:column; gap:10px;}
+  .desk-decide-row{display:flex; gap:10px; align-items:flex-start;}
+  .desk-decide-icon{width:32px; height:32px; border-radius:7px; margin-top:1px;}
+  .desk-decide-icon svg{width:15px; height:15px;}
+
+  /* 세팅 도움 CTA(올리브 패널) */
+  .desk-help{position:relative; overflow:hidden; background:var(--ld-olive-bg); border-radius:12px; padding:20px; color:#fff;}
+  .desk-help::before, .desk-help::after{content:""; position:absolute; border-radius:50%; background:rgba(255,255,255,.05); pointer-events:none;}
+  .desk-help::before{right:-20px; bottom:-20px; width:100px; height:100px;}
+  .desk-help::after{right:10px; bottom:10px; width:60px; height:60px; background:rgba(255,255,255,.04);}
+  .desk-help h3{position:relative; color:#fff; font-size:15px; font-weight:700; margin-bottom:8px; line-height:1.4;}
+  .desk-help p{position:relative; font-size:13px; color:rgba(255,255,255,.75); margin-bottom:16px; line-height:1.6;}
+  .desk-help-btn{position:relative; display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:10px 16px; border-radius:8px; background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.25); font-size:13px; font-weight:600; transition:background .15s;}
+  .desk-help-btn:hover{background:rgba(255,255,255,.22);}
+  .desk-help-btn svg{width:14px; height:14px;}
+  .desk-help .desk-help-foot{position:relative; font-size:11px; color:rgba(255,255,255,.45); margin:14px 0 0; font-style:italic; line-height:1.5;}
+
+  /* 내 계획 패널(plans.js #ldPlanPanel)은 시작 데스크 바로 아래에 .opsdash 래퍼로
+     둔다 — .ldplan-* 규칙이 .opsdash 스코프의 --op-accent 토큰과 .opsdash
+     .btn-primary 색을 그대로 쓰기 때문이다(id는 옮겼을 뿐 중복 없음). */
+  .desk-plans{margin-bottom:1.5rem;}
