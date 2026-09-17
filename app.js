@@ -60,9 +60,9 @@
     '/start/setup':      '02 · 사업자 · 플랫폼',
     '/start/sourcing':   '03 · 상품 기획',
     '/start/content':    '04 · 촬영 & 상세페이지',
-    '/start/marketing-setup': '05 · 마케팅 인프라 세팅',
-    '/start/marketing':  '06 · 마케팅 & SNS',
-    '/start/orders':     '07 · 주문 · CS 관리',
+    '/start/marketing-setup': '06 · 마케팅 인프라 세팅',
+    '/start/marketing':  '07 · 유입 · 반응 테스트',
+    '/start/orders':     '05 · 배송 · CS · 오픈 준비',
     '/start/wrapup':     '08 · 마무리',
     '/account':          '내 쇼핑몰',
     '/admin':            'LaunchDesk Admin'

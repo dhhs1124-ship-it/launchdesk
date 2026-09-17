@@ -1991,201 +1991,302 @@
       </section>
 
       <!-- ============ VIEW: STEP 07 · 첫 유입 만들고 반응 테스트하기 ============ -->
+      <!-- STEP 07 (2026-09 UI 재설계 7차, STEP01~06 시각 구조 이식 — 피그마 시안 없음, STEP06의
+           layout·grid/order 패턴·--ld-* 토큰·반응형 규칙을 그대로 재사용) — 정적 마크업 +
+           step07.js(진행 상태·탭 부가 동작만). 저장·완료 판정은 기존 app.js 체크리스트 컨트롤러
+           (.checklist-block[data-chapter="/start/marketing"] 안의 .cl-row input[type="checkbox"]
+           정확히 2개, DOM 순서 0~1 = 저장 배열 인덱스, change 이벤트, setChapterDone/
+           checklistAllChecked)가 그대로 담당한다. 재설계 이전과 개수·순서·의미 동일하다
+           (0=대표 상품으로 첫 홍보 실행, 1=반응 확인 — 재설계 이전엔 "실제 유입 방법을 최소 1개
+           이상 실행했다"/"실제 방문자 반응을 확인했어요"였고 문구만 다듬었다) — 기존 저장값
+           ([0]·[0,1]·빈 배열)과 완전히 호환된다. 재설계 이전에 있던 참고용 7개 채널 체크리스트
+           (data-chapter 없음, app.js 전역 checklist counters 핸들러가 개수만 세고 저장은 전혀
+           하지 않던 장식용 UI)는 제거했다 — 완료 판정과 무관했고 저장도 안 됐으므로 제거해도
+           기존 데이터에 영향이 없다. 대신 채널 안내는 아래 02번 섹션의 정보 카드로 옮겼다(체크
+           항목이 아니라 읽기 전용 설명 — 채널 선택 자체를 완료 조건처럼 만들지 않기 위함).
+           반응 진단(06번 섹션)은 재설계 이전부터 있던 .diag/.diag-btn/.diag-result 위젯(app.js
+           전역 위임 클릭 핸들러, 다른 화면과 공유하는 제너릭 컴포넌트)을 그대로 재사용하고 문구만
+           "노출→클릭→장바구니→구매" 퍼널 기준으로 바꿨다 — 새 JS 없음. 이 스코프에서는 --ld-*
+           토큰으로만 재도장한다(다른 화면의 .diag는 그대로 옛 토큰). 실제 Meta API·광고 계정·
+           Cafe24·분석 SDK 연동 코드는 다루지 않으며, 인스타그램 게시 횟수·초기 프로필 링크 노출
+           관련 경험담처럼 검증되지 않은 주장은 본문에 사실처럼 적지 않는다(자료실 콘텐츠 제작은
+           이번 작업 범위 밖이라 의도적으로 옮기지 않고 생략했다 — 완료 보고에 기록). "관련 자료"
+           링크는 STEP04~06과 동일하게 #/resources의 기존 카테고리(marketing·analytics)만 쓰고
+           새 카테고리를 만들지 않는다. "운영 현황" 카드는 #/dashboard로 연결한다 — 재설계 이전
+           마크업은 "광고 기록"을 #/tools로 링크했는데, 그 기능은 이후 리팩터에서 #/dashboard로
+           옮겨져 있었다(app.js/index.html 주석 확인, 이 STEP07 작업 중 발견해 같은 화면 안에서
+           바로잡음). 스타일은 전부 #view-start-marketing 스코프(--ld-* 토큰), 다른 STEP은 그대로다. -->
       <section class="view" id="view-start-marketing" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 07</span></div>
-          <span class="eyebrow">STEP 07 · 유입 · 반응 테스트</span>
-          <div class="page-head">
-            <h1>첫 유입 만들고 반응 테스트하기</h1>
-            <p class="page-lead">쇼핑몰을 오픈했다고 고객이 자동으로 찾아오는 것은 아닙니다. 최소 하나의 방법으로 실제 방문자를 만들어보고 반응을 확인해야 합니다.</p>
-          </div>
-          <div class="chapter-body">
-            <div class="callout">
-              <p><strong>이 STEP의 핵심은 유료 광고가 아니라, 최소 하나의 유입 방법을 실제로 실행하고 반응을 확인하는 것입니다.</strong></p>
-              <p>특정 채널이 항상 가장 좋다고 단정하지 않습니다. 유료 광고를 쓰지 않아도 이 STEP을 완료할 수 있습니다.</p>
-            </div>
+        <div class="content">
+          <div class="s7" id="step07Root" data-tab="guide">
 
-            <h2 class="section-h">유입 방법 선택</h2>
-            <p>아래 중 나에게 맞는 방법을 최소 1개 골라 실제로 실행해보세요. 여러 개를 함께 시도해도 됩니다.</p>
-            <div class="checklist-block">
-              <div class="cl-head"><span class="title">실행한 유입 방법 (해당하는 것을 모두 선택하세요)</span><span class="count">0 / 7</span></div>
-              <div class="cl-group">
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">네이버 쇼핑 · 오픈마켓</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">SNS 콘텐츠</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">검색 유입</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">커뮤니티</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">인플루언서 · 크리에이터</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">유료 광고</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">기타</span></label>
+            <header class="s7-head">
+              <div class="breadcrumb s7-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 07</span></div>
+              <span class="s7-eyebrow">STEP 07 · 유입 · 반응 테스트</span>
+              <h1>첫 유입 만들고 반응 테스트하기</h1>
+              <p class="s7-lead">마케팅 강의를 전부 배우는 단계가 아니라, 첫 홍보를 실제로 실행하고 반응을 확인해 다음에 무엇을 바꿀지 판단하는 단계입니다.</p>
+            </header>
+
+            <div class="tabs s7-tabs">
+              <div class="tab-bar s7-tabbar">
+                <button class="tab-btn active" type="button" data-tab="guide">가이드</button>
+                <button class="tab-btn" type="button" data-tab="checklist">첫 홍보 체크리스트</button>
               </div>
-              <div class="cl-note">체크는 참고용이에요 — 진행률에는 반영되지 않아요. 실제 완료 표시는 아래 STEP07 체크리스트에서 합니다.</div>
-            </div>
 
-            <h2 class="section-h">반응 확인</h2>
-            <p>방문자가 왔다는 사실만으로는 부족합니다. 아래 기준으로 첫 반응을 확인해보세요. 정교한 데이터 분석이 아니라, 첫 반응을 확인하는 수준이면 충분합니다.</p>
-            <ul class="trust-list">
-              <li>방문 · 클릭이 발생했는가</li>
-              <li>어떤 상품을 많이 보는가</li>
-              <li>장바구니 · 문의 · 구매 같은 행동이 발생했는가</li>
-              <li>어떤 콘텐츠나 채널에서 반응이 나왔는가</li>
-              <li>고객이 어떤 질문을 하는가</li>
-            </ul>
+              <!-- ── 가이드 탭: 상품 → 채널 → 소재 → 인스타그램 → Meta 광고 전 확인 → 반응별 진단 → 결과 기록 ── -->
+              <div class="tab-panel s7-panel s7-panel-guide active" data-tab="guide">
+                <div class="s7-guide-intro">
+                  <h2>모든 상품 · 모든 채널을 한꺼번에 홍보하지 않아도 됩니다.</h2>
+                  <p><strong>대표 상품 몇 개로 첫 홍보를 실행하고, 반응을 확인한 뒤 다음 행동을 정하는 것</strong>이 이 단계의 목표입니다. 유료 광고를 꼭 써야 완료되는 것도 아닙니다.</p>
+                </div>
 
-            <h2 class="section-h">테스트 → 집중 → 확장</h2>
-            <p>가장 효율적인 방식은 특정 채널 하나에 몰아서 승부를 보는 게 아니라, <strong>여러 방법을 작게 시도하고 → 반응을 확인한 뒤 → 반응이 좋은 것에 더 집중하는 방식</strong>입니다. 여러 유료 광고를 동시에 돌리라는 뜻은 아닙니다.</p>
-            <div class="timeline">
-              <div class="t-item"><h3>1 · 여러 채널 · 상품에 넓게 시도</h3><p>선택한 유입 방법으로 상품을 폭넓게 노출해봅니다.</p></div>
-              <div class="t-item"><h3>2 · 소액 · 소규모로 반응 확인</h3><p>클릭 · 찜 · 장바구니 · 구매가 발생하는 채널과 상품을 찾습니다.</p></div>
-              <div class="t-item"><h3>3 · 반응 있는 것에 집중</h3><p>반응이 없는 건 줄이고, 반응이 좋은 채널 · 상품에 콘텐츠와 예산을 집중합니다.</p></div>
-              <div class="t-item"><h3>4 · 검증되면 확장</h3><p>효과가 확인된 채널 · 상품을 점차 넓혀갑니다.</p></div>
-            </div>
-            <div class="pull-quote"><p>처음부터 잘 팔릴 상품 · 채널을 맞히려 하지 않습니다. 먼저 작게 던지고, 반응을 본 뒤 집중하는 편이 훨씬 효율적입니다.</p></div>
+                <ol class="s7-sections">
+                  <li class="s7-section">
+                    <span class="s7-num">01</span>
+                    <div class="s7-section-body">
+                      <h3>첫 홍보 상품 정하기</h3>
+                      <p class="s7-summary">모든 상품을 한꺼번에 홍보하기보다, 대표 상품 1~3개부터 먼저 테스트해보세요. 정확한 개수보다 <strong>누구에게 어떤 장점을 보여줄지</strong>를 먼저 정리하는 게 중요합니다.</p>
+                      <div class="s7-example">
+                        <p class="s7-example-label">한 문장으로 정리해보기</p>
+                        <p class="s7-example-body">"<b>어떤 고객</b>에게 <b>어떤 장점</b>을 보여줄 상품인가?" — 예: 초등학생 자녀가 있는 부모에게 : 세탁해도 잘 줄지 않는 순면 수건</p>
+                      </div>
+                      <p class="s7-note">상품 개수는 참고 기준일 뿐입니다. 1개로 시작해도 되고, 상품 종류가 많다면 더 넓게 시작해도 됩니다.</p>
+                    </div>
+                  </li>
 
-            <div class="accordion">
-              <div class="acc-item">
-                <button class="acc-head" type="button"><div><div class="at">업종별 예시 보기</div><div class="as">패션 · 뷰티 · 식품 · 생활용품·잡화 · 반려동물용품</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                <div class="acc-body"><div class="acc-body-inner">
-                  <div class="info-grid">
-                    <div class="info-card"><h4>패션</h4><p>지그재그 · 에이블리 같은 버티컬 플랫폼에 상품을 넓게 등록하고, 소액 광고나 무료 노출로 반응을 테스트하는 경우가 많습니다.</p></div>
-                    <div class="info-card"><h4>뷰티</h4><p>뷰티 카테고리 오픈마켓 · 버티컬 앱에 입점해 반응을 테스트해보세요.</p></div>
-                    <div class="info-card"><h4>식품</h4><p>식품 전문 플랫폼이나 오픈마켓의 카테고리 노출을 활용해보세요.</p></div>
-                    <div class="info-card"><h4>생활용품 · 잡화</h4><p>종합몰 · 오픈마켓에 폭넓게 등록해 반응을 확인해보세요.</p></div>
-                    <div class="info-card"><h4>반려동물용품</h4><p>반려동물 전문몰이나 오픈마켓 카테고리에 등록해 반응을 확인해보세요.</p></div>
+                  <li class="s7-section">
+                    <span class="s7-num">02</span>
+                    <div class="s7-section-body">
+                      <h3>첫 유입 채널 정하기 <span class="s7-tag">선택 조합</span></h3>
+                      <p class="s7-summary">검색 · 블로그 · 인스타그램 · 숏폼 · 커뮤니티 · Meta 광고 등 채널은 다양합니다. 처음부터 전부 운영할 필요는 없습니다.</p>
+                      <div class="s7-cards">
+                        <div class="s7-card-item"><p class="s7-card-title">검색 유입</p><p>상품명 · 키워드로 찾아오는 방문자</p></div>
+                        <div class="s7-card-item"><p class="s7-card-title">블로그</p><p>후기 · 정보성 글로 신뢰를 보완</p></div>
+                        <div class="s7-card-item"><p class="s7-card-title">인스타그램</p><p>이미지 · 영상으로 브랜드를 보여줌</p></div>
+                        <div class="s7-card-item"><p class="s7-card-title">숏폼</p><p>짧은 영상으로 새로운 사람에게 도달</p></div>
+                        <div class="s7-card-item"><p class="s7-card-title">커뮤니티</p><p>관심사가 맞는 사람들에게 자연스럽게 노출</p></div>
+                        <div class="s7-card-item"><p class="s7-card-title">Meta 광고</p><p>타겟을 정해 소액으로 반응을 테스트</p></div>
+                      </div>
+                      <p class="s7-note">무료 채널 1개로 먼저 시작하고, 필요하면 유료 채널 1개를 더해보는 방향을 권장합니다. 채널을 몇 개 고르는지가 이 STEP의 완료 조건은 아닙니다.</p>
+                    </div>
+                  </li>
+
+                  <li class="s7-section">
+                    <span class="s7-num">03</span>
+                    <div class="s7-section-body">
+                      <h3>첫 콘텐츠 · 광고 소재 준비</h3>
+                      <p class="s7-summary">상품이 잘 보이는 대표 이미지 또는 영상을 준비하세요. 첫 화면 · 첫 문장에서 고객이 얻는 이점이 보여야 합니다.</p>
+                      <ul class="s7-checks">
+                        <li>썸네일 · 대표 이미지가 눈에 띄는지</li>
+                        <li>제목 · 첫 문장에서 이점이 바로 보이는지</li>
+                        <li>영상이라면 첫 3초 안에 핵심이 드러나는지</li>
+                        <li>다음에 무엇을 하면 되는지(CTA)가 분명한지</li>
+                      </ul>
+                      <p class="s7-note">같은 소재를 무작정 오래 유지하지 말고, 반응을 보고 비교하며 바꿔보세요.</p>
+                    </div>
+                  </li>
+
+                  <li class="s7-section">
+                    <span class="s7-num">04</span>
+                    <div class="s7-section-body">
+                      <h3>인스타그램 운영</h3>
+                      <p class="s7-summary">판매 글만 반복하기보다, 저장하거나 공유할 이유가 있는 콘텐츠를 함께 올려보세요 — 스타일링 팁, 활용법, 후기 요약, 실제 사용 장면 같은 것들입니다.</p>
+                      <div class="s7-cards">
+                        <div class="s7-card-item"><p class="s7-card-title">스토리</p><p>짧은 소식 · 투표 등 가벼운 소통</p></div>
+                        <div class="s7-card-item"><p class="s7-card-title">릴스</p><p>짧은 영상으로 새로운 사람에게 도달</p></div>
+                        <div class="s7-card-item"><p class="s7-card-title">피드</p><p>대표 이미지 · 후기처럼 프로필에 남는 콘텐츠</p></div>
+                        <div class="s7-card-item"><p class="s7-card-title">하이라이트</p><p>자주 묻는 질문 · 구매 방법 등을 정리해 고정</p></div>
+                      </div>
+                      <p class="s7-note">하루에 몇 개를 올려야 한다는 고정된 기준은 없습니다. 자료실에서 참고할 수 있는 개인적인 운영 예시를 볼 수 있어요.</p>
+                      <a class="s7-service" href="#/resources" data-resource-cat="marketing">
+                        <span class="s7-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span>
+                        <span class="s7-service-text"><b>인스타그램 운영 예시가 궁금하다면</b><small>자료실에서 개인적인 운영 예시를 볼 수 있어요</small></span>
+                        <svg class="s7-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                    </div>
+                  </li>
+
+                  <li class="s7-section">
+                    <span class="s7-num">05</span>
+                    <div class="s7-section-body">
+                      <h3>Meta 광고 시작 전 확인 <span class="s7-tag">선택</span></h3>
+                      <p class="s7-summary">광고를 집행할 계획이라면 시작 전에 아래를 먼저 확인하세요. 광고를 쓰지 않아도 이 STEP을 완료할 수 있습니다.</p>
+                      <ul class="s7-checks">
+                        <li>광고 목표(트래픽 · 전환 등)가 정해졌는지</li>
+                        <li>홍보할 상품과 소재(이미지 · 영상 · 문구)가 준비됐는지</li>
+                        <li>연결할 상세페이지가 정확한지</li>
+                        <li>장바구니 · 구매 같은 측정 이벤트가 연결돼 있는지</li>
+                      </ul>
+                      <div class="s7-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>광고비 · 기간 · CTR 기준은 업종과 상품마다 달라 모든 경우에 맞는 정답은 없습니다. 자료실의 사례는 개인적인 테스트 기록일 뿐, 같은 결과를 보장하지 않습니다.</p>
+                      </div>
+                      <a class="s7-service" href="#/resources" data-resource-cat="marketing">
+                        <span class="s7-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span>
+                        <span class="s7-service-text"><b>Meta 캠페인 만드는 방법이 궁금하다면</b><small>자료실에서 캠페인 생성 · 광고 지표 용어(CPM · CPC · CTR · CVR · ROAS)를 확인하세요</small></span>
+                        <svg class="s7-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                    </div>
+                  </li>
+
+                  <li class="s7-section">
+                    <span class="s7-num">06</span>
+                    <div class="s7-section-body">
+                      <h3>반응에 따라 다음 행동 결정</h3>
+                      <p class="s7-summary">클릭률(CTR) 하나만으로 원인을 단정하지 마세요. 지금 상황과 가장 가까운 것을 선택하면 점검할 것을 안내합니다.</p>
+                      <div class="diag s7-diag">
+                        <div class="diag-head">지금 상황과 가장 가까운 것을 선택하세요</div>
+                        <div class="diag-grid">
+                          <button class="diag-btn" type="button" data-result="a"><span class="dt">노출은 되지만 클릭이 적다</span><span class="dd">노출 → 클릭 단계</span></button>
+                          <button class="diag-btn" type="button" data-result="b"><span class="dt">클릭은 나오지만 장바구니가 적다</span><span class="dd">클릭 → 장바구니 단계</span></button>
+                          <button class="diag-btn" type="button" data-result="c"><span class="dt">장바구니는 있지만 구매가 적다</span><span class="dd">장바구니 → 구매 단계</span></button>
+                          <button class="diag-btn" type="button" data-result="d"><span class="dt">구매가 발생한다</span><span class="dd">지금 반응이 나오는 상태</span></button>
+                        </div>
+                        <div class="diag-result" data-result="a">
+                          <div class="dr-label">점검할 것</div>
+                          <p>노출 대비 클릭이 낮을 때는 소재의 첫인상을 먼저 점검합니다.</p>
+                          <ul><li>썸네일 · 영상 첫 장면이 눈에 띄는지</li><li>제목 · 후킹 문구가 이점을 바로 보여주는지</li></ul>
+                        </div>
+                        <div class="diag-result" data-result="b">
+                          <div class="dr-label">점검할 것</div>
+                          <p>클릭은 있는데 장바구니로 이어지지 않을 때는 기대와 실제가 맞는지를 봅니다.</p>
+                          <ul><li>광고 · 콘텐츠에서 보여준 내용과 상품 · 상세페이지가 일치하는지</li><li>상세페이지 첫 화면에서 상품을 바로 이해할 수 있는지</li></ul>
+                        </div>
+                        <div class="diag-result" data-result="c">
+                          <div class="dr-label">점검할 것</div>
+                          <p>장바구니는 있는데 구매로 이어지지 않을 때는 구매 직전 단계를 봅니다.</p>
+                          <ul><li>가격 · 배송비가 기대와 다르게 느껴지는지</li><li>리뷰 · 신뢰 요소가 부족한지</li><li>옵션 선택 · 결제 과정이 불편한지</li></ul>
+                        </div>
+                        <div class="diag-result" data-result="d">
+                          <div class="dr-label">점검할 것</div>
+                          <p>구매가 발생하고 있다면, 예산을 크게 올리기보다 소재 · 상품별 데이터를 기록하며 점진적으로 테스트해보세요.</p>
+                          <ul><li>지금 잘 되는 소재 · 상품을 기록해두기</li><li>예산은 한 번에 크게가 아니라 단계적으로 조정하기</li></ul>
+                        </div>
+                      </div>
+                      <p class="s7-note">위 네 가지는 참고용 방향입니다. 실제 원인은 상품 · 가격 · 리뷰 등 여러 요인이 함께 얽혀 있을 수 있습니다. 자료실에서 단계별로 더 자세한 진단을 볼 수 있어요.</p>
+                    </div>
+                  </li>
+
+                  <li class="s7-section">
+                    <span class="s7-num">07</span>
+                    <div class="s7-section-body">
+                      <h3>결과 기록하고 다음 테스트 정하기</h3>
+                      <p class="s7-summary">유입 · 클릭 · 장바구니 · 구매 · 광고비 · 매출을 기록해두면 다음에 무엇을 바꿀지 정하기 쉬워집니다.</p>
+                      <ul class="s7-checks">
+                        <li>유입 · 클릭 수</li>
+                        <li>장바구니 · 구매 수</li>
+                        <li>광고비 · 매출</li>
+                      </ul>
+                      <a class="s7-service" href="#/dashboard">
+                        <span class="s7-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14V8M9 14V4M15 14v-6"/></svg></span>
+                        <span class="s7-service-text"><b>광고 기록 · Meta 성과 확인하기</b><small>운영 현황에서 기록하고 다시 확인할 수 있어요</small></span>
+                        <svg class="s7-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                      <p class="s7-note">한 번의 결과로 상품의 성공 · 실패를 확정하지 마세요. 다음에 바꿀 요소(소재 · 상품페이지 · 가격 · 구매 과정 등)를 한 번에 하나씩 정해 다시 테스트해보세요.</p>
+                      <p class="s7-note"><a href="#/resources" data-resource-cat="analytics">첫 리뷰 확보 · 무료배송 전략 자료 보기 →</a></p>
+                    </div>
+                  </li>
+                </ol>
+
+                <div class="s7-guide-cta">
+                  <button type="button" class="s7-btn s7-btn-primary" id="s7GoChecklist">첫 홍보 체크리스트 확인하기 →</button>
+                </div>
+              </div>
+
+              <!-- ── 첫 홍보 체크리스트 탭 ── -->
+              <div class="tab-panel s7-panel s7-panel-cl" data-tab="checklist">
+                <!-- 비회원 안내 — body.is-authed(app.js renderAuthUI, 실제 인증 상태)면 CSS로 숨김.
+                     버튼은 기존 로그인 모달(window.launchdeskOpenLoginModal)만 연다. -->
+                <div class="s7-guest" id="s7Guest">
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                  <div class="s7-guest-body">
+                    <p>로그인하면 체크한 준비 상태를 계정에 저장하고 다른 기기에서도 이어갈 수 있어요.</p>
+                    <button type="button" class="s7-guest-btn" id="s7GuestLogin">로그인하고 저장하기</button>
                   </div>
-                </div></div>
+                </div>
+
+                <!-- 체크리스트 — 저장 구조 보존: .checklist-block[data-chapter] 안의 .cl-row input[type="checkbox"]
+                     정확히 2개, DOM 순서 0~1 = 저장 배열 인덱스(재설계 이전과 개수 · 순서 · 의미 동일, 문구만 다듬음). -->
+                <div class="checklist-block s7-checklist" data-chapter="/start/marketing">
+                  <div class="cl-head s7-cl-head">
+                    <div class="s7-cl-title">
+                      <h2 class="title" id="s7ChecklistTitle" tabindex="-1">첫 홍보 체크리스트</h2>
+                      <p>아래 2가지를 모두 체크하면 STEP 07이 완료돼요. 유료 광고를 쓰지 않아도 완료할 수 있어요.</p>
+                    </div>
+                    <span class="count">0 / 2</span>
+                  </div>
+                  <div class="cl-group s7-cl-group">
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">대표 상품으로 첫 홍보를 실제로 실행했다 (콘텐츠 게시 또는 광고 진행)</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">실행한 반응(노출 · 클릭 · 장바구니 · 구매 등)을 확인했다</span></label>
+                  </div>
+                  <div class="s7-cl-done" id="s7ClDone" hidden><span aria-hidden="true">✓</span><div><b>STEP 07 완료</b><p>반응을 계속 기록하며 다음 테스트를 정해보세요.</p></div></div>
+                  <div class="cl-note s7-cl-note">로그인 상태에서는 체크한 내용이 계정에 저장돼요. 로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</div>
+                </div>
               </div>
             </div>
 
-            <h2 class="section-h">구성 · 혜택 · 리뷰로 선택을 쉽게 만들기</h2>
-            <p>낱개 상품 하나보다 <strong>구성(묶음)으로 제안</strong>하면 고객이 선택하기 쉬워지고, 객단가도 오르는 경우가 많습니다.</p>
-            <div class="callout">
-              <p><strong>참고 사례</strong> — 한 수건 브랜드의 라이브 방송에서 약 500명이 시청하고 15건가량 주문이 발생했는데, 주문이 전부 10장 구성에 집중된 적이 있었습니다. "한두 장 체험"이 아니라 "한 번에 교체하려는 수요"가 있었던 사례입니다. 모든 상품군에 그대로 적용되는 정답은 아니며, 내 상품에 맞는 구성 단위를 직접 테스트해보는 게 핵심입니다.</p>
-            </div>
+            <!-- ── 오른쪽 열(large) / 한 열 순서 배치(medium·small) — 탭에 따라 표시 ── -->
+            <aside class="s7-side">
+              <section class="s7-card s7-side-guide" aria-labelledby="s7PrepTitle">
+                <h3 id="s7PrepTitle">이번 단계에서 실행할 것</h3>
+                <ol class="s7-prep">
+                  <li><span>01</span>첫 홍보 상품 정하기</li>
+                  <li><span>02</span>첫 유입 채널 정하기</li>
+                  <li><span>03</span>첫 콘텐츠 · 소재 준비</li>
+                  <li><span>04</span>인스타그램 운영</li>
+                  <li><span>05</span>Meta 광고 전 확인(선택)</li>
+                  <li><span>06</span>반응별 다음 행동 진단</li>
+                  <li><span>07</span>결과 기록 · 다음 테스트</li>
+                </ol>
+                <p class="s7-side-hint">가이드를 읽은 뒤 "첫 홍보 체크리스트"에서 실행 여부를 체크해보세요.</p>
+              </section>
 
-            <p style="margin-top:1.2rem;">단순히 가격을 낮추기보다, 지금 사야 할 이유를 만드는 것도 방법입니다.</p>
-            <ul class="trust-list">
-              <li>1+1 / 10+1, 일정 금액 이상 사은품, 쿠폰</li>
-              <li>기간 한정 증정, 세트 할인, 한정 구성</li>
-              <li>반응이 안 좋을 땐 유입 방법보다 상품 구성 · 혜택부터 먼저 점검합니다</li>
-            </ul>
+              <section class="s7-card s7-progress" id="s7Progress" aria-labelledby="s7ProgressTitle" aria-live="polite">
+                <div class="s7-progress-head">
+                  <h3 id="s7ProgressTitle">필수 진행 상태</h3>
+                  <span class="s7-progress-badge" id="s7ProgressBadge">0 / 2</span>
+                </div>
+                <div class="s7-progress-bar"><div class="s7-progress-fill" id="s7ProgressFill"></div></div>
+                <p class="s7-progress-text" id="s7ProgressText">첫 홍보 실행과 반응 확인을 모두 체크하면 완료돼요.</p>
+                <div class="s7-progress-done" id="s7ProgressDone" hidden>✓ STEP 07 완료</div>
+                <!-- 로그인 안내(게스트) / 저장 상태(회원) — 실제 인증 상태(body.is-authed)만 본다. 저장 완료 표시는 만들지 않는다. -->
+                <p class="s7-progress-foot s7-progress-guest">로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</p>
+                <p class="s7-progress-foot s7-progress-member">로그인 상태 · 체크한 내용은 계정에 저장돼요.</p>
+              </section>
 
-            <p>모든 상품에 리뷰를 쌓기보다, <strong>집중하고 있는 상품 · 채널부터 리뷰를 확보</strong>하는 편이 효율적입니다. 실제 구매자 리뷰 · 포토 · 영상 리뷰 · 체험단 · 크리에이터 후기 콘텐츠를 활용하되, 제품 제공이나 혜택을 줬다면 그 사실은 명확히 표시하세요.</p>
+              <section class="s7-card s7-resources" aria-labelledby="s7ResTitle">
+                <h3 id="s7ResTitle">관련 자료</h3>
+                <ul class="s7-res-list">
+                  <li><a href="#/resources" data-resource-cat="marketing"><span class="s7-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>인스타그램 운영 예시 자료</span><svg class="s7-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources" data-resource-cat="marketing"><span class="s7-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>Meta 캠페인 만들기 · 광고 지표 용어 자료</span><svg class="s7-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources" data-resource-cat="analytics"><span class="s7-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>CTR · 장바구니 · 구매 단계별 진단 자료</span><svg class="s7-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources" data-resource-cat="marketing"><span class="s7-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>네이버 캐러셀 · SEO · 첫 리뷰 · 무료배송 전략 자료</span><svg class="s7-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                </ul>
+              </section>
 
-            <div class="tbl-wrap"><table>
-              <thead><tr><th>채널</th><th>핵심 관점</th></tr></thead>
-              <tbody>
-                <tr><td><strong>인플루언서</strong></td><td>팔로워 수보다 "콘텐츠를 확보하는" 관점으로 접근</td></tr>
-                <tr><td><strong>블로그</strong></td><td>직접 매출보다 브랜드 검색 시 신뢰를 보완하는 역할</td></tr>
-                <tr><td><strong>인스타그램</strong></td><td>브랜드가 "살아있게" 보이는 공간이자 콘텐츠 테스트 공간</td></tr>
-                <tr><td><strong>공동구매</strong></td><td>상시 채널보다 신규 고객 확보 · 단기 대량 판매용 (수수료+할인+무료배송 겹치면 이익 감소)</td></tr>
-                <tr><td><strong>라이브커머스</strong></td><td>사전 모객 · 셀러 영향력 · 콘텐츠 · 알림이 함께 설계돼야 효과</td></tr>
-                <tr><td><strong>B2B</strong></td><td>기업 · 답례품 · 숙박업소 등은 가격 · 최소수량 · 납기 · 견적이 핵심 — 전용 페이지 필요</td></tr>
-                <tr><td><strong>SEO</strong></td><td>상품명 · Title · Description · 이미지 ALT · 사이트맵 — 상품 등록 시 함께 처리</td></tr>
-              </tbody>
-            </table></div>
+              <section class="s7-card s7-ops" aria-labelledby="s7OpsTitle">
+                <h3 id="s7OpsTitle">운영 현황</h3>
+                <p class="s7-ops-hint">기록한 유입 · 클릭 · 구매 · 광고비는 운영 현황에서 다시 확인할 수 있어요.</p>
+                <a class="s7-ops-link" href="#/dashboard"><span>광고 기록 · Meta 성과 확인하기</span><svg class="s7-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a>
+              </section>
 
-            <div class="accordion">
-              <div class="acc-item">
-                <button class="acc-head" type="button"><div><div class="at">유료 광고를 사용하는 경우</div><div class="as">광고를 집행한다면 참고할 실전 정보</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                <div class="acc-body"><div class="acc-body-inner">
-                  <h4 style="margin-bottom:.6rem;">채널 역할 나누기</h4>
-                  <div class="versus">
-                    <div class="side">
-                      <small>상품 테스트용 · 예시</small>
-                      <h4>오픈마켓 · 버티컬 플랫폼 광고</h4>
-                      <ul><li class="good">소액으로 여러 상품 반응 동시 확인</li><li class="bad">전체 상품을 타겟팅 광고에서 각각 광고하면 제작비 과다</li></ul>
-                    </div>
-                    <div class="vs">VS</div>
-                    <div class="side rec">
-                      <small>확장 실행용 · 예시</small>
-                      <h4>Meta 등 타겟팅 광고</h4>
-                      <ul><li class="good">반응 확인된 상품만 영상 소재로 집중 투입</li><li class="good">사진보다 사용 영상에서 성과가 좋은 경우가 많음</li></ul>
-                    </div>
-                  </div>
-                  <p style="font-size:.86rem; color:var(--ink-faint);">예: 네이버 쇼핑광고 · ADVoost 같은 데이터도 같은 "상품 테스트" 용도로 활용할 수 있습니다.</p>
+              <section class="desk-help s7-help" aria-labelledby="s7HelpTitle">
+                <h3 id="s7HelpTitle">첫 홍보 준비가 막혔나요?</h3>
+                <p>채널 연결 · 광고 세팅을 세팅 대행으로 도움받을 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg></a>
+              </section>
+            </aside>
 
-                  <h4 style="margin:1.4rem 0 .6rem;">CTR만으로 광고를 판단하지 않기</h4>
-                  <div class="callout">
-                    <p>"CTR 2% 미만이면 중단" 같은 기준은 절대적이지 않습니다. 아래는 CTR만 보면 낮아 보여도 실제로는 유지할 가치가 있었던 참고 사례입니다.</p>
-                  </div>
-                  <div class="tbl-wrap"><table>
-                    <thead><tr><th>지표</th><th class="num">값</th></tr></thead>
-                    <tbody>
-                      <tr><td>광고비</td><td class="num">약 9만원</td></tr>
-                      <tr><td>노출</td><td class="num">약 11,741회</td></tr>
-                      <tr><td>클릭 · CTR</td><td class="num">90회 · 0.77%</td></tr>
-                      <tr><td>CPC</td><td class="num">약 1,000원</td></tr>
-                      <tr><td>전환율</td><td class="num">약 5.56%</td></tr>
-                      <tr><td><strong>ROAS</strong></td><td class="num"><strong>약 522%</strong></td></tr>
-                    </tbody>
-                  </table></div>
-                  <p>CTR만 봤다면 실패한 광고처럼 보이지만, 실제 매출 기준으로는 유지할 가치가 있었습니다. 참고할 판단 순서는 <strong>실제 이익 → 구매 수 → CPA → ROAS → 장바구니/결제 진입 → CTR → CPC → CPM</strong> 입니다.</p>
-
-                  <h4 style="margin:1.4rem 0 .6rem;">내 광고, 어디가 문제일까 — 진단 도구</h4>
-                  <p>성과가 안 나온다고 항상 광고 자체가 문제는 아닙니다. 지금 상황과 가장 가까운 걸 눌러보세요.</p>
-                  <div class="diag">
-                    <div class="diag-head">현재 광고 상황을 선택하세요</div>
-                    <div class="diag-grid">
-                      <button class="diag-btn" type="button" data-result="a"><span class="dt">클릭은 많은데 구매가 없다</span><span class="dd">노출 · 클릭은 정상</span></button>
-                      <button class="diag-btn" type="button" data-result="b"><span class="dt">클릭도 적고 구매도 없다</span><span class="dd">반응 자체가 약함</span></button>
-                      <button class="diag-btn" type="button" data-result="c"><span class="dt">클릭률은 낮지만 전환율은 높다</span><span class="dd">들어온 사람은 산다</span></button>
-                      <button class="diag-btn" type="button" data-result="d"><span class="dt">클릭도 많고 구매도 많다</span><span class="dd">지금이 제일 좋은 상태</span></button>
-                    </div>
-                    <div class="diag-result" data-result="a">
-                      <div class="dr-label">진단</div>
-                      <p>상품 가격 · 상세페이지 · 리뷰 부족 · 배송비 · 옵션 선택 불편 · 결제 UX 중 하나일 가능성이 높습니다.</p>
-                      <ul><li>상세페이지 신뢰 요소(리뷰 · 스펙 · 필수 고지사항)부터 점검</li><li>결제 단계에서 이탈이 없는지 확인</li></ul>
-                    </div>
-                    <div class="diag-result" data-result="b">
-                      <div class="dr-label">진단</div>
-                      <p>광고 소재 · 썸네일 문제, 혹은 상품 자체의 매력 부족이나 타겟 불일치일 가능성이 높습니다.</p>
-                      <ul><li>썸네일 · 첫 3초 영상 컷부터 교체 테스트</li><li>타겟과 상품 컨셉이 맞는지 재점검</li></ul>
-                    </div>
-                    <div class="diag-result" data-result="c">
-                      <div class="dr-label">진단</div>
-                      <p>상품 자체에는 경쟁력이 있지만, 광고의 첫인상이 약한 상태입니다. 상품을 바꾸기보다 광고 표현을 먼저 수정합니다.</p>
-                      <ul><li>썸네일 · 광고 첫 장면 · 카피 · 가격 노출 방식 수정</li></ul>
-                    </div>
-                    <div class="diag-result" data-result="d">
-                      <div class="dr-label">진단</div>
-                      <p>가장 좋은 상태입니다. 광고비를 확대하고, 소재가 지치기 전에 새로운 영상을 계속 추가하세요.</p>
-                      <ul><li>같은 상품을 여러 소재로 반복 테스트</li></ul>
-                    </div>
-                  </div>
-
-                  <h4 style="margin:1.4rem 0 .6rem;">광고 기록 도구 연결</h4>
-                  <p>광고를 집행하고 있다면, 운영도구의 "광고 기록"에 소재 · 비용 · 성과를 남겨보세요. 기록해두면 어떤 소재가 반응이 좋은지 나중에 비교하기 쉬워집니다.</p>
-                  <div class="quick-row-list">
-                    <a class="quick-row" href="#/tools">
-                      <span class="qr-icon tone-b">🎯</span>
-                      <span class="qr-text"><span class="qr-title">광고 기록</span><span class="qr-sub">소재별 성과 기록하기</span></span>
-                      <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                    </a>
-                  </div>
-                </div></div>
+            <!-- 이전/다음 — 기존 경로(#/start/marketing-setup, #/start/wrapup) 그대로인 해시 링크(STEP_ROADMAP
+                 기준). 미완료 시 다음 이동은 step07.js가 confirm으로 한 번 묻는다(막지 않음). -->
+            <nav class="s7-nav" aria-label="STEP 이동">
+              <p class="s7-nav-status" id="s7NavStatus"><span id="s7NavText">필수 항목을 완료하면 STEP 07이 완료돼요.</span> <b id="s7NavCount">0 / 2</b></p>
+              <div class="s7-nav-btns">
+                <a class="s7-btn s7-btn-ghost s7-nav-prev" href="#/start/marketing-setup">← STEP 06 · 마케팅 인프라 연결하기</a>
+                <a class="s7-btn s7-btn-primary s7-nav-next" href="#/start/wrapup" id="s7Next">STEP 08 · 오픈 완료, 운영 시작하기 →</a>
               </div>
-            </div>
+            </nav>
 
-            <p style="font-size:.86rem; color:var(--ink-faint);">감으로 잘 팔릴 상품 · 채널을 맞히는 일이 아니라, 작은 테스트를 반복하며 반응으로 확인해가는 과정입니다.</p>
-
-            <h2 class="section-h">STEP 07 체크리스트</h2>
-            <div class="checklist-block" data-chapter="/start/marketing">
-              <div class="cl-head"><span class="title">첫 유입 · 반응 확인 체크리스트</span><span class="count" id="clCount6">0 / 2</span></div>
-              <div class="cl-group">
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">실제 유입 방법을 최소 1개 이상 실행했다</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">실제 방문자 반응을 확인했어요</span></label>
-              </div>
-              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 2개를 모두 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요. 유료 광고를 쓰지 않아도 완료할 수 있어요.</div>
-            </div>
-
-            <p style="font-size:.84rem;"><a href="#/resources" data-resource-cat="marketing" style="color:var(--accent-ink); font-weight:600;">마케팅 · 유입 관련 자료 보기 →</a></p>
-
-            <p style="font-size:.86rem; color:var(--ink-faint); margin-top:1.2rem;">이제 쇼핑몰 오픈 준비는 끝났습니다. 다음 STEP에서 운영 단계로 전환합니다.</p>
-
-            <div class="chapter-nav">
-              <a href="#/start/marketing-setup"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 06 · 마케팅 인프라 연결하기</span></a>
-              <a class="next" href="#/start/wrapup"><span class="cn-label">다음 STEP →</span><span class="cn-title">STEP 08 · 오픈 완료, 운영 시작하기</span></a>
-            </div>
           </div>
         </div>
       </section>
@@ -3864,6 +3965,7 @@
 <script src="step04.js"></script>
 <script src="step05.js"></script>
 <script src="step06.js"></script>
+<script src="step07.js"></script>
 <script src="plans.js"></script>
 <script src="admin.js"></script>
 </body>

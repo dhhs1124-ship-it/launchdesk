@@ -2733,3 +2733,243 @@
     #view-start-marketing-setup .s6-guide-cta .s6-btn, #view-start-marketing-setup .s6-nav-btns .s6-btn{width:100%;}
     #view-start-marketing-setup .s6-section{gap:10px;}
   }
+
+  /* =========================================================================
+     STEP 07(#/start/marketing) — 2026-09 UI 재설계 7차, STEP01~06 시각 구조
+     이식(피그마 시안 없음 — STEP06의 레이아웃 · grid/order 패턴 · --ld-* 토큰 ·
+     반응형 규칙을 그대로 재사용). 전부 #view-start-marketing 스코프라 다른
+     STEP은 그대로다. STEP01~06(.s1-*~.s6-*)와 같은 grid/order 패턴을 .s7-*
+     이름으로 따로 둔다(중복은 기술 부채로 보고, 이전 STEP 주석과 동일한 판단 —
+     여러 .sN-* 표기를 나열할 때는 "·"만 구분자로 쓴다. 슬래시를 쓰면 별표 바로
+     뒤에서 주석 종료 토큰이 만들어져 이 블록 주석이 조기 종료되고 이어지는
+     설명이 깨진 CSS로 파싱된다 — STEP04·05에서 실제로 겪은 문제).
+     레이아웃: large(≥1100) [본문 | 300px 우측 열], 미만은 한 열 — .s7-tabs/
+     .s7-panel-cl/.s7-side를 display:contents로 풀어 같은 grid 안에서 order로
+     배치한다(제목 → 탭 → 탭 콘텐츠 → 실행할 것 → 필수 진행 → 게스트 안내 →
+     체크리스트 → 관련 자료 → 운영 현황 → 도움 → 이전/다음). 같은 패널을 DOM에
+     두 번 두지 않는다. sticky·고정·내부 스크롤 없음(문서 스크롤만). 기존
+     .tabs/.tab-btn/.tab-panel · .checklist-block/.cl-* · .diag/.diag-* 전역
+     규칙은 이 스코프 안에서만 덮어쓴다(저장 구조 · 진단 위젯 동작은 그대로).
+     필수 체크리스트(.s7-checklist, data-chapter 1개, 2문항)만 있고 재설계
+     이전에 있던 참고용 채널 체크리스트(저장 안 됨)는 제거했다 — 완료 판정에
+     영향 없음. .s7-panel-cl에는 처음부터 order를 명시한다(STEP06에서 발견해
+     STEP01~05까지 바로잡은 "order 없으면 large에서 탭 전환 시 탭바 위로
+     올라가는" 버그를 이번엔 처음부터 만들지 않는다).
+     ========================================================================= */
+  #view-start-marketing .s7{display:grid; grid-template-columns:minmax(0,1fr); gap:16px; color:var(--ld-text);}
+  #view-start-marketing .s7 p{max-width:none;}
+  #view-start-marketing .s7-head{order:0;}
+  #view-start-marketing .s7-tabs{display:contents;}
+  #view-start-marketing .s7-tabbar{order:1;}
+  #view-start-marketing .s7-panel-guide{order:2;}
+  #view-start-marketing .s7-side{display:contents;}
+  #view-start-marketing .s7-side-guide{order:3;}
+  #view-start-marketing .s7-progress{order:4;}
+  #view-start-marketing .s7-panel-cl{order:2;}
+  #view-start-marketing .s7-panel-cl.active{display:contents;}
+  #view-start-marketing .s7-guest{order:5;}
+  #view-start-marketing .s7-checklist{order:6;}
+  #view-start-marketing .s7-resources{order:7;}
+  #view-start-marketing .s7-ops{order:8;}
+  /* .s7-help는 시작 데스크의 .desk-help 모양을 재사용한다 — 그 전역 규칙의
+     grid-area:help(데스크 grid용)가 이 grid에 암묵적 열을 만들지 않도록 되돌린다. */
+  #view-start-marketing .s7-help{order:9; grid-area:auto;}
+  #view-start-marketing .s7-nav{order:10;}
+  /* 탭에 따른 표시 — 가이드 탭: "실행할 것"·도움, 체크리스트 탭: 필수 진행·관련 자료·운영 현황·도움 */
+  #view-start-marketing .s7[data-tab="guide"] .s7-progress,
+  #view-start-marketing .s7[data-tab="guide"] .s7-resources,
+  #view-start-marketing .s7[data-tab="guide"] .s7-ops{display:none;}
+  #view-start-marketing .s7[data-tab="checklist"] .s7-side-guide{display:none;}
+  /* 비회원 안내 / 회원 상태 — 실제 인증 상태(app.js renderAuthUI가 body에 붙이는 .is-authed)만 본다 */
+  body.is-authed #view-start-marketing .s7-guest{display:none;}
+  #view-start-marketing .s7-progress-member{display:none;}
+  body.is-authed #view-start-marketing .s7-progress-member{display:block;}
+  body.is-authed #view-start-marketing .s7-progress-guest{display:none;}
+  @media (min-width:1100px){
+    #view-start-marketing .s7{grid-template-columns:minmax(0,1fr) var(--ld-right-w); gap:20px 24px; align-items:start; grid-template-areas:"head head" "main side" "nav nav";}
+    #view-start-marketing .s7-head{grid-area:head;}
+    #view-start-marketing .s7-tabs{display:flex; flex-direction:column; gap:16px; grid-area:main; min-width:0;}
+    #view-start-marketing .s7-panel-cl.active{display:flex; flex-direction:column; gap:16px;}
+    #view-start-marketing .s7-side{display:flex; flex-direction:column; gap:16px; grid-area:side; min-width:0;}
+    #view-start-marketing .s7-nav{grid-area:nav;}
+  }
+  /* 헤더 */
+  #view-start-marketing .s7-crumb{margin-bottom:10px; font-family:var(--f-body); font-size:12px; color:var(--ld-muted);}
+  #view-start-marketing .s7-crumb a{color:var(--ld-muted);}
+  #view-start-marketing .s7-crumb a:hover{color:var(--ld-accent);}
+  #view-start-marketing .s7-eyebrow{display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--ld-accent); background:var(--ld-accent-light); padding:3px 10px; border-radius:20px; margin-bottom:10px;}
+  #view-start-marketing .s7-head h1{font-size:23px; font-weight:700; letter-spacing:-.02em; line-height:1.25; margin:0 0 8px; color:var(--ld-text); word-break:keep-all;}
+  #view-start-marketing .s7-lead{font-size:14px; color:var(--ld-muted); line-height:1.72; max-width:560px; word-break:keep-all;}
+  /* 탭(기존 .tabs 전역 스타일 덮어쓰기) */
+  #view-start-marketing .tabs{border:none; border-radius:0; margin:0; overflow:visible; background:transparent;}
+  #view-start-marketing .tab-bar{display:flex; flex-wrap:nowrap; gap:0; background:transparent; border-bottom:1.5px solid var(--ld-border); padding:0 4px;}
+  #view-start-marketing .tab-btn{flex:0 0 auto; min-width:0; min-height:44px; padding:10px 18px; margin-bottom:-1.5px; border:none; border-bottom:2px solid transparent; background:transparent; font-size:14px; font-weight:500; color:var(--ld-muted); white-space:nowrap;}
+  #view-start-marketing .tab-btn:hover{color:var(--ld-text); background:transparent;}
+  #view-start-marketing .tab-btn.active{color:var(--ld-accent); font-weight:700; border-bottom-color:var(--ld-accent); background:transparent;}
+  #view-start-marketing .tab-panel{padding:0;}
+  #view-start-marketing .tab-panel p{font-size:13px; margin:0;}
+  /* 카드 공통 */
+  #view-start-marketing .s7-card, #view-start-marketing .s7-panel-guide, #view-start-marketing .checklist-block, #view-start-marketing .s7-nav{background:var(--ld-panel); border:1px solid var(--ld-border); border-radius:12px; min-width:0;}
+  #view-start-marketing .s7-card{padding:20px;}
+  #view-start-marketing .s7-card h3{font-size:13px; font-weight:600; margin:0 0 14px; color:var(--ld-text);}
+  /* 가이드 탭 */
+  #view-start-marketing .s7-panel-guide.active{display:block; padding:24px 28px;}
+  #view-start-marketing .s7-guide-intro{margin-bottom:24px;}
+  #view-start-marketing .s7-guide-intro h2{font-size:16px; font-weight:700; margin:0 0 6px; line-height:1.3; word-break:keep-all;}
+  #view-start-marketing .s7-guide-intro p{font-size:13px; color:var(--ld-muted); line-height:1.7; word-break:keep-all;}
+  #view-start-marketing .s7-guide-intro strong{color:var(--ld-text);}
+  #view-start-marketing .s7-sections{list-style:none; margin:0; padding:0; display:flex; flex-direction:column;}
+  #view-start-marketing .s7-section{display:flex; gap:14px; align-items:flex-start; padding:0 0 24px; margin:0 0 24px; border-bottom:1px solid var(--ld-border);}
+  #view-start-marketing .s7-section:last-child{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+  #view-start-marketing .s7-num{flex:0 0 24px; padding-top:3px; font-size:11px; font-weight:700; color:var(--ld-accent); letter-spacing:.04em;}
+  #view-start-marketing .s7-section-body{flex:1; min-width:0;}
+  #view-start-marketing .s7-section h3{font-size:15px; font-weight:700; margin:0 0 12px; line-height:1.3; word-break:keep-all; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  #view-start-marketing .s7-summary{font-size:13px; color:var(--ld-muted); line-height:1.68; margin:0 0 14px !important; word-break:keep-all;}
+  #view-start-marketing .s7-summary strong{color:var(--ld-text);}
+  #view-start-marketing .s7-note{font-size:12px !important; color:var(--ld-muted); line-height:1.65; margin-top:10px !important; word-break:keep-all;}
+  #view-start-marketing .s7-note a{color:var(--ld-accent); font-weight:600;}
+  /* 태그 — 섹션 제목 옆(선택 사항 표시용, STEP07엔 필수 배지 없음) */
+  #view-start-marketing .s7-tag{display:inline-flex; align-items:center; font-size:10px; font-weight:700; letter-spacing:.02em; color:var(--ld-muted); background:var(--ld-muted-bg); border:1px solid var(--ld-border); padding:2px 8px; border-radius:20px;}
+
+  /* 01 — 한 문장 정리 예시 카드 */
+  #view-start-marketing .s7-example{margin-top:4px; padding:12px 14px; border-radius:10px; background:var(--ld-accent-light); border:1px solid #C8D8BF;}
+  #view-start-marketing .s7-example-label{font-size:11px !important; font-weight:700; color:var(--ld-accent); margin:0 0 4px !important;}
+  #view-start-marketing .s7-example-body{font-size:13px !important; color:var(--ld-text); line-height:1.6; word-break:keep-all;}
+  #view-start-marketing .s7-example-body b{color:var(--ld-accent);}
+
+  /* 02/04 — 채널 · 인스타그램 카드 그리드 */
+  #view-start-marketing .s7-cards{display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;}
+  #view-start-marketing .s7-card-item{padding:14px 16px; border-radius:10px; background:var(--ld-muted-bg); border:1px solid var(--ld-border); min-width:0;}
+  #view-start-marketing .s7-card-title{font-size:13px !important; font-weight:600; color:var(--ld-text); margin:0 0 5px !important; line-height:1.4; word-break:keep-all;}
+  #view-start-marketing .s7-card-item p:not(.s7-card-title){color:var(--ld-muted); line-height:1.68; word-break:keep-all;}
+
+  /* 03/05/07 — 확인 목록 */
+  #view-start-marketing .s7-checks{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-start-marketing .s7-checks li{position:relative; padding-left:27px; font-size:13px; color:var(--ld-text); line-height:1.6; word-break:keep-all;}
+  #view-start-marketing .s7-checks li::before{content:"✓"; position:absolute; left:0; top:1px; width:18px; height:18px; border-radius:50%; background:var(--ld-accent-light); color:var(--ld-accent); font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+
+  /* 경고 안내 — 05(광고비 · CTR 기준 절대화 금지) */
+  #view-start-marketing .s7-warn{margin-top:12px; display:flex; gap:8px; align-items:flex-start; padding:10px 12px; border-radius:8px; background:#FFFBF0; border:1px solid #E8D478; color:#7A5E10;}
+  #view-start-marketing .s7-warn > svg{flex:0 0 auto; width:14px; height:14px; margin-top:2px; color:#C4A030;}
+  #view-start-marketing .s7-warn p{font-size:12px !important; color:#7A5E10; line-height:1.68; word-break:keep-all;}
+
+  /* 04/05/07 — 자료실 · 운영 현황 안내 링크(강조 카드) */
+  #view-start-marketing .s7-service{margin-top:12px; display:flex; align-items:center; gap:12px; min-height:44px; padding:12px 14px; border-radius:10px; border:1px solid var(--ld-border); background:var(--ld-muted-bg); color:var(--ld-text); transition:border-color .15s, background .15s;}
+  #view-start-marketing .s7-service:hover{border-color:var(--ld-accent-mid); background:var(--ld-accent-light);}
+  #view-start-marketing .s7-service-icon{width:34px; height:34px; border-radius:9px; background:var(--ld-panel); border:1px solid var(--ld-border); display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  #view-start-marketing .s7-service-icon svg{width:16px; height:16px;}
+  #view-start-marketing .s7-service-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+  #view-start-marketing .s7-service-text b{font-size:13px; font-weight:700; word-break:keep-all;}
+  #view-start-marketing .s7-service-text small{font-size:12px; color:var(--ld-muted); line-height:1.4; word-break:keep-all;}
+  #view-start-marketing .s7-link-chev{width:12px; height:12px; color:var(--ld-muted); flex:0 0 auto;}
+
+  /* 06 — 반응 진단(.diag 전역 컴포넌트를 이 스코프에서만 --ld-* 톤으로 재도장. 동작은 app.js 전역 위임 그대로) */
+  #view-start-marketing .diag{border-color:var(--ld-border); background:var(--ld-panel); margin:10px 0 0;}
+  #view-start-marketing .diag-head{background:var(--ld-muted-bg); border-color:var(--ld-border); color:var(--ld-muted); font-size:13px;}
+  #view-start-marketing .diag-grid{background:var(--ld-border);}
+  #view-start-marketing .diag-btn{background:var(--ld-panel);}
+  #view-start-marketing .diag-btn:hover{background:var(--ld-muted-bg);}
+  #view-start-marketing .diag-btn.active{background:var(--ld-accent-light);}
+  #view-start-marketing .diag-btn .dt{color:var(--ld-text); font-size:13px;}
+  #view-start-marketing .diag-btn .dd{color:var(--ld-muted); font-size:12px;}
+  #view-start-marketing .diag-result{background:var(--ld-accent-light); border-color:var(--ld-border);}
+  #view-start-marketing .diag-result .dr-label{color:var(--ld-accent);}
+  #view-start-marketing .diag-result p{font-size:13px; color:var(--ld-text);}
+  #view-start-marketing .diag-result li{font-size:12px; color:var(--ld-muted);}
+
+  #view-start-marketing .s7-guide-cta{margin-top:28px; padding-top:20px; border-top:1px solid var(--ld-border); display:flex; justify-content:flex-end;}
+  /* 버튼 */
+  #view-start-marketing .s7-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:10px 20px; border-radius:9px; font-family:var(--f-body); font-size:14px; font-weight:700; white-space:nowrap; cursor:pointer; border:1px solid transparent; transition:background .15s, border-color .15s, color .15s;}
+  #view-start-marketing .s7-btn-primary{background:var(--ld-accent); color:#fff;}
+  #view-start-marketing .s7-btn-primary:hover{background:var(--ld-accent-dark);}
+  #view-start-marketing .s7-btn-ghost{background:transparent; color:var(--ld-muted); border-color:var(--ld-border); font-weight:500;}
+  #view-start-marketing .s7-btn-ghost:hover{border-color:var(--ld-accent); color:var(--ld-accent);}
+  /* 비회원 안내 */
+  #view-start-marketing .s7-guest{display:flex; gap:10px; align-items:flex-start; padding:12px 16px; border-radius:10px; background:#FFFBF0; border:1px solid #E8D478; color:#7A5E10;}
+  #view-start-marketing .s7-guest > svg{flex:0 0 auto; width:14px; height:14px; margin-top:2px;}
+  #view-start-marketing .s7-guest-body{flex:1; min-width:0;}
+  #view-start-marketing .s7-guest-body p{font-size:12px; line-height:1.68; margin:0 0 8px; color:#7A5E10; word-break:keep-all;}
+  #view-start-marketing .s7-guest-btn{min-height:36px; padding:5px 12px; border-radius:6px; background:transparent; color:#7A5E10; border:1px solid #C4A030; font-family:var(--f-body); font-size:12px; font-weight:600; cursor:pointer;}
+  #view-start-marketing .s7-guest-btn:hover{background:#FFF4D6;}
+  /* 체크리스트(전역 .checklist-block/.cl-* 덮어쓰기 — 저장 구조는 그대로) */
+  #view-start-marketing .checklist-block{margin:0; overflow:visible; padding-bottom:0;}
+  #view-start-marketing .s7-checklist{margin-bottom:16px;}
+  #view-start-marketing .s7-checklist .cl-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:22px 28px 0; border-bottom:none; background:transparent;}
+  #view-start-marketing .s7-cl-title{flex:1; min-width:0;}
+  #view-start-marketing .s7-cl-title h2{font-family:var(--f-body); font-size:15px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--ld-text); margin:0 0 4px; line-height:1.35; outline:none; word-break:keep-all; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  #view-start-marketing .s7-cl-title p{font-size:13px; color:var(--ld-muted); line-height:1.65; word-break:keep-all;}
+  #view-start-marketing .s7-checklist .cl-head .count{font-family:var(--f-body); font-size:12px; font-weight:700; color:var(--ld-text); white-space:nowrap; padding-top:2px;}
+  #view-start-marketing .s7.is-complete .s7-checklist .cl-head .count{color:var(--ld-accent);}
+  #view-start-marketing .s7-checklist .cl-group{padding:16px 20px 6px; border-bottom:none;}
+  #view-start-marketing .cl-row{position:relative; display:flex; align-items:center; gap:12px; min-height:44px; padding:11px 12px; margin:0 0 2px; border-radius:9px; cursor:pointer; user-select:none; transition:background .15s;}
+  #view-start-marketing .cl-row:hover{background:var(--ld-muted-bg);}
+  #view-start-marketing .cl-row.done, #view-start-marketing .cl-row.done:hover{background:var(--ld-accent-light);}
+  #view-start-marketing .cl-row input{position:absolute; opacity:0; width:1px; height:1px; margin:0;}
+  #view-start-marketing .cl-box{width:22px; height:22px; border:1.5px solid #C0C8BC; border-radius:6px; background:#fff; flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:#fff; transition:background .18s, border-color .18s;}
+  #view-start-marketing .cl-box::after{display:none;}
+  #view-start-marketing .cl-box svg{width:11px; height:11px; display:none;}
+  #view-start-marketing .cl-row input:checked + .cl-box{border-color:var(--ld-accent); background:var(--ld-accent);}
+  #view-start-marketing .cl-row input:checked + .cl-box svg{display:block;}
+  #view-start-marketing .cl-row .label{font-size:14px; color:var(--ld-text); line-height:1.4; word-break:keep-all;}
+  #view-start-marketing .cl-row input:checked ~ .label{color:var(--ld-accent); font-weight:600; text-decoration:none;}
+  #view-start-marketing .cl-row:focus-within .cl-box{outline:2px solid var(--ld-accent); outline-offset:2px;}
+  #view-start-marketing .s7-cl-done{margin:6px 28px 0; padding:10px 14px; border-radius:9px; background:var(--ld-accent-light); border:1px solid #C8D8BF; display:flex; gap:8px; align-items:center;}
+  #view-start-marketing .s7-cl-done > span{color:var(--ld-accent); font-size:14px; flex:0 0 auto;}
+  #view-start-marketing .s7-cl-done b{display:block; font-size:13px; font-weight:700; color:var(--ld-accent);}
+  #view-start-marketing .s7-cl-done p{font-size:12px; color:var(--ld-accent); opacity:.85;}
+  #view-start-marketing .s7-checklist .cl-note{margin:14px 0 0; padding:12px 28px 14px; border-top:1px solid var(--ld-border); background:transparent; font-size:12px; color:var(--ld-muted); line-height:1.6; word-break:keep-all;}
+  /* 우측 열 카드 */
+  #view-start-marketing .s7-prep{list-style:none; margin:0 0 18px; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-start-marketing .s7-prep li{display:flex; gap:10px; align-items:flex-start; font-size:13px; font-weight:500; line-height:1.45; word-break:keep-all;}
+  #view-start-marketing .s7-prep li span{width:20px; text-align:right; font-size:11px; font-weight:700; color:var(--ld-accent); opacity:.7; flex:0 0 auto; padding-top:2px;}
+  #view-start-marketing .s7-side-hint{padding-top:14px; border-top:1px solid var(--ld-border); font-size:12px; color:var(--ld-muted); line-height:1.6; word-break:keep-all;}
+  #view-start-marketing .s7-progress-head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;}
+  #view-start-marketing .s7-progress-head h3{margin:0;}
+  #view-start-marketing .s7-progress-badge{font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; color:var(--ld-muted); background:var(--ld-muted-bg); white-space:nowrap;}
+  #view-start-marketing .s7-progress-badge.done{color:var(--ld-accent); background:var(--ld-accent-light);}
+  #view-start-marketing .s7-progress-bar{height:4px; border-radius:2px; background:var(--ld-muted-bg); overflow:hidden; margin-bottom:12px;}
+  #view-start-marketing .s7-progress-fill{height:100%; width:0; border-radius:2px; background:var(--ld-accent-mid); transition:width .35s ease;}
+  #view-start-marketing .s7-progress-fill.done{background:var(--ld-accent);}
+  #view-start-marketing .s7-progress-text{font-size:13px; color:var(--ld-muted); line-height:1.5; margin:0; word-break:keep-all;}
+  #view-start-marketing .s7-progress-done{margin-top:14px; padding:8px 12px; border-radius:8px; background:var(--ld-accent-light); border:1px solid #C8D8BF; font-size:12px; color:var(--ld-accent); font-weight:600; text-align:center;}
+  #view-start-marketing .s7-progress-foot{margin:14px 0 0; padding-top:12px; border-top:1px solid var(--ld-border); font-size:12px; color:var(--ld-muted); line-height:1.6; word-break:keep-all;}
+  #view-start-marketing .s7-resources h3{margin-bottom:10px;}
+  #view-start-marketing .s7-res-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  #view-start-marketing .s7-res-list a{display:flex; align-items:center; gap:10px; min-height:44px; padding:8px; border-radius:8px; color:var(--ld-text); font-size:13px; font-weight:500; line-height:1.4; word-break:keep-all; transition:background .13s;}
+  #view-start-marketing .s7-res-list a:hover{background:var(--ld-muted-bg);}
+  #view-start-marketing .s7-res-list a > span:nth-child(2){flex:1; min-width:0;}
+  #view-start-marketing .s7-link-icon{width:30px; height:30px; border-radius:7px; background:var(--ld-accent-light); color:var(--ld-accent); display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  #view-start-marketing .s7-link-icon svg{width:15px; height:15px;}
+  /* 운영 현황 카드 */
+  #view-start-marketing .s7-ops-hint{font-size:12px; color:var(--ld-muted); line-height:1.6; margin:0 0 12px; word-break:keep-all;}
+  #view-start-marketing .s7-ops-link{display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:44px; padding:10px 12px; border-radius:9px; background:var(--ld-accent-light); color:var(--ld-accent); font-size:13px; font-weight:700; word-break:keep-all; transition:background .13s;}
+  #view-start-marketing .s7-ops-link:hover{background:#DCE8D5;}
+  #view-start-marketing .s7-ops-link .s7-link-chev{color:var(--ld-accent);}
+  #view-start-marketing .s7-help h3{margin-bottom:6px;}
+  /* 이전/다음 — 해시 링크(기존 경로). 라벨이 길어 버튼 안에서 줄바꿈 허용 */
+  #view-start-marketing .s7-nav{padding:18px 24px;}
+  #view-start-marketing .s7-nav-status{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; padding:9px 12px; border-radius:8px; background:var(--ld-muted-bg); font-size:12px; color:var(--ld-muted); line-height:1.5;}
+  #view-start-marketing .s7-nav-status b{color:var(--ld-accent); font-weight:600;}
+  #view-start-marketing .s7-nav-status.done{background:var(--ld-accent-light); border:1px solid #C8D8BF; color:var(--ld-accent); font-weight:600;}
+  #view-start-marketing .s7-nav-btns{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+  #view-start-marketing .s7-nav-btns .s7-btn{white-space:normal; text-align:center; line-height:1.35; padding:9px 16px; font-size:13px; word-break:keep-all;}
+  #view-start-marketing .s7:not(.is-complete) .s7-nav-next{background:var(--ld-accent-mid);}
+  #view-start-marketing .s7:not(.is-complete) .s7-nav-next:hover{background:#7A9B6E;}
+  /* medium(640~1099) · small(<640) */
+  @media (max-width:1099px){
+    #view-start-marketing .s7-panel-guide.active{padding:20px 22px;}
+    #view-start-marketing .s7-checklist .cl-head{padding:18px 20px 0;}
+    #view-start-marketing .s7-cl-done{margin:6px 20px 0;}
+    #view-start-marketing .s7-checklist .cl-note{padding:12px 20px 14px;}
+  }
+  @media (max-width:639px){
+    #view-start-marketing .s7-head h1{font-size:20px;}
+    #view-start-marketing .s7-panel-guide.active{padding:16px;}
+    #view-start-marketing .s7-checklist .cl-head{padding:16px 16px 0;}
+    #view-start-marketing .s7-checklist .cl-group{padding:12px 12px 6px;}
+    #view-start-marketing .s7-cl-done{margin:6px 16px 0;}
+    #view-start-marketing .s7-checklist .cl-note{padding:12px 16px 14px;}
+    #view-start-marketing .s7-nav{padding:14px 16px;}
+    #view-start-marketing .s7-guide-cta .s7-btn, #view-start-marketing .s7-nav-btns .s7-btn{width:100%;}
+    #view-start-marketing .s7-section{gap:10px;}
+  }
