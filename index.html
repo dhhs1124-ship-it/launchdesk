@@ -824,99 +824,277 @@
 
       <!-- ============ VIEW: STEP 01 · 무엇을, 누구에게 팔지 정하기 ============ -->
       <section class="view" id="view-start-prepare" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 01</span></div>
-          <span class="eyebrow">STEP 01 · 방향 결정</span>
-          <div class="page-head">
-            <h1>무엇을, 누구에게 팔지 정하기</h1>
-            <p class="page-lead">쇼핑몰을 만들기 전에 상품과 고객의 방향부터 정하면, 이후 공급처 · 가격 · 상세페이지 · 마케팅 판단이 훨씬 쉬워집니다.</p>
-          </div>
-          <div class="chapter-body">
-            <div class="callout">
-              <p><strong>사업자 등록이나 공급처를 정하기보다 먼저, 내가 가진 예산과 목표에 맞는 방향을 정합니다.</strong></p>
-              <p>방향이 흔들리면 상품도, 가격도, 마케팅도 함께 흔들립니다. 이 STEP은 특정 업종을 전제하지 않으며, 무엇을 팔든 같은 방식으로 정리할 수 있습니다.</p>
-            </div>
+        <!-- STEP 01 (2026-09 UI 재설계 2차, 피그마 Step01.tsx 시각 구조 이식) —
+             정적 마크업 + step01.js(진행 상태·탭 부가 동작만). 저장·완료 판정은 기존
+             app.js 워크시트 컨트롤러(.worksheet[data-chapter] · .worksheet-input 5개,
+             DOM 순서 = 저장 인덱스 0~4, input/blur 이벤트, setChapterDone/worksheetAllFilled)
+             가 그대로 담당한다. 탭은 기존 .tabs > .tab-bar > .tab-btn / .tab-panel 위임
+             (app.js)을 재사용하고, 1100px 미만에서는 CSS display:contents + order로
+             한 열 순서(제목 → 탭 → 탭 콘텐츠 → 진행 → 게스트 안내 → 워크시트 → 도움 →
+             이전/다음)를 만든다 — 같은 정보를 DOM에 두 번 두지 않는다. 스타일은 전부
+             #view-start-prepare 스코프(--ld-* 올리브 토큰), 다른 STEP은 그대로다. -->
+        <div class="content">
+          <div class="s1" id="step01Root" data-tab="guide">
 
-            <h2 class="section-h">타겟 고객 — 누구에게 팔 것인가</h2>
-            <p>나이 · 성별만 정하고 넘어가지 마세요. 아래 세 가지에 답할 수 있어야 이후 판단이 쉬워집니다.</p>
-            <div class="info-grid">
-              <div class="info-card"><h4>누구인가?</h4><p>인구통계보다 실제 특성을 적어보세요. <em>예: 반려묘를 키우는 30대 자취생 / 아침이 바쁜 직장인</em></p></div>
-              <div class="info-card"><h4>어떤 상황에서 필요한가?</h4><p>언제, 어떤 상황에서 이 상품이 필요해지는지 구체적으로 떠올려보세요.</p></div>
-              <div class="info-card"><h4>왜 내 상품이어야 하는가?</h4><p>이미 비슷한 상품이 많은 시장에서, 굳이 내 쇼핑몰을 골라야 할 이유가 있어야 합니다.</p></div>
-              <div class="info-card"><h4>운영자 팁 <span class="tag">참고</span></h4><p>같은 상품이라도 사진 · 설명 · 후기 구성에 따라 다르게 보입니다. 초반엔 가격 경쟁보다 신뢰를 쌓는 데 집중하세요.</p></div>
-            </div>
-            <div class="pull-quote"><p>가격보다 이미지와 신뢰가, 쇼핑몰 초반엔 더 중요한 무기입니다.</p></div>
+            <header class="s1-head">
+              <div class="breadcrumb s1-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 01</span></div>
+              <span class="s1-eyebrow">STEP 01 · 방향 정하기</span>
+              <h1>무엇을, 누구에게 팔지 정하기</h1>
+              <p class="s1-lead">판매할 상품과 고객, 시작 예산을 정리합니다. 여기에서 정한 내용은 이후 상품과 쇼핑몰을 준비할 때 판단 기준으로 사용됩니다.</p>
+            </header>
 
-            <h2 class="section-h">판매 카테고리 · 상품군 — 무엇을 팔 것인가</h2>
-            <p>패션 · 뷰티 · 식품 · 생활용품 · 잡화 · 반려동물용품 등 어떤 카테고리든 상관없습니다. 지금은 큰 방향만 정하면 됩니다 — 구체적인 공급처나 상품별 마진 계산은 STEP 03에서 다룹니다.</p>
+            <div class="tabs s1-tabs">
+              <div class="tab-bar s1-tabbar">
+                <button class="tab-btn active" type="button" data-tab="guide">가이드</button>
+                <button class="tab-btn" type="button" data-tab="worksheet">내 방향 정리</button>
+              </div>
 
-            <h2 class="section-h">초기 예산 — 얼마가 필요한가</h2>
-            <div class="callout">
-              <p>완전한 무자본 창업은 현실적으로 어렵습니다. 다만 필요한 금액은 업종 · 규모에 따라 크게 달라지므로, 특정 금액을 정답으로 두기보다 아래 항목별로 얼마가 필요할지 먼저 가늠해보세요.</p>
-            </div>
-            <div class="tbl-wrap"><table>
-              <thead><tr><th>항목</th><th>생각해볼 것</th></tr></thead>
-              <tbody>
-                <tr><td><strong>상품 · 샘플</strong></td><td>초도 물량, 샘플 구매 · 테스트 비용</td></tr>
-                <tr><td><strong>쇼핑몰 · 도메인</strong></td><td>플랫폼 이용료, 도메인, 테마 비용</td></tr>
-                <tr><td><strong>촬영 · 콘텐츠</strong></td><td>사진 · 영상 촬영, 상세페이지 제작</td></tr>
-                <tr><td><strong>포장 · 배송</strong></td><td>포장재, 택배 계약</td></tr>
-                <tr><td><strong>광고 · 마케팅</strong></td><td>초기 테스트 광고비</td></tr>
-                <tr><td><strong>예비비</strong></td><td>예상하지 못한 지출 대비</td></tr>
-              </tbody>
-            </table></div>
+              <!-- ── 가이드 탭: 기존 STEP 01 안내 내용을 카드·아코디언으로 재배치(내용 삭제 없음) ── -->
+              <div class="tab-panel s1-panel s1-panel-guide active" data-tab="guide">
+                <div class="s1-guide-intro">
+                  <h2>먼저 방향을 정하는 기준을 살펴보세요.</h2>
+                  <p><strong>사업자 등록이나 공급처를 정하기보다 먼저, 내가 가진 예산과 목표에 맞는 방향을 정합니다.</strong> 방향이 흔들리면 상품도, 가격도, 마케팅도 함께 흔들립니다. 이 STEP은 특정 업종을 전제하지 않으며, 무엇을 팔든 같은 방식으로 정리할 수 있습니다.</p>
+                </div>
 
-            <h2 class="section-h">브랜드 · 쇼핑몰 이름</h2>
-            <ul class="trust-list">
-              <li>예쁜 이름보다 검색이 먼저입니다 — 검색했을 때 내 브랜드가 잘 보여야 합니다</li>
-              <li>발음이 쉽고 기억나는 이름이어야 공유가 됩니다</li>
-            </ul>
-            <p style="font-size:.86rem; color:var(--ink-faint);">이름을 완벽하게 만드는 데 이 단계에서 너무 오래 머물 필요는 없습니다. 우선 정하고 나중에 다듬어도 됩니다. 슬로건은 필수가 아니에요 — 필요하다면 "누구에게 + 어떤 가치"를 담은 한 줄 정도로만 가볍게 생각해두세요.</p>
+                <ol class="s1-sections">
+                  <li class="s1-section">
+                    <span class="s1-num">01</span>
+                    <div class="s1-section-body">
+                      <h3>타겟 고객 — 누구에게 팔 것인가</h3>
+                      <p class="s1-summary">나이 · 성별만 정하고 넘어가지 마세요. 아래 세 가지에 답할 수 있어야 이후 판단이 쉬워집니다.</p>
+                      <ul class="s1-q">
+                        <li><b>누구인가?</b> 인구통계보다 실제 특성을 적어보세요. <em>예: 반려묘를 키우는 30대 자취생 / 아침이 바쁜 직장인</em></li>
+                        <li><b>어떤 상황에서 필요한가?</b> 언제, 어떤 상황에서 이 상품이 필요해지는지 구체적으로 떠올려보세요.</li>
+                        <li><b>왜 내 상품이어야 하는가?</b> 이미 비슷한 상품이 많은 시장에서, 굳이 내 쇼핑몰을 골라야 할 이유가 있어야 합니다.</li>
+                      </ul>
+                      <details class="s1-more">
+                        <summary>더 자세히 보기</summary>
+                        <div class="s1-more-body">
+                          <p><b>운영자 팁</b> 같은 상품이라도 사진 · 설명 · 후기 구성에 따라 다르게 보입니다. 초반엔 가격 경쟁보다 신뢰를 쌓는 데 집중하세요.</p>
+                          <p class="s1-quote">가격보다 이미지와 신뢰가, 쇼핑몰 초반엔 더 중요한 무기입니다.</p>
+                        </div>
+                      </details>
+                    </div>
+                  </li>
+                  <li class="s1-section">
+                    <span class="s1-num">02</span>
+                    <div class="s1-section-body">
+                      <h3>판매 카테고리 · 상품군 — 무엇을 팔 것인가</h3>
+                      <p class="s1-summary">패션 · 뷰티 · 식품 · 생활용품 · 잡화 · 반려동물용품 등 어떤 카테고리든 상관없습니다. 지금은 큰 방향만 정하면 됩니다.</p>
+                      <p class="s1-note">구체적인 공급처나 상품별 마진 계산은 STEP 03에서 다룹니다.</p>
+                    </div>
+                  </li>
+                  <li class="s1-section">
+                    <span class="s1-num">03</span>
+                    <div class="s1-section-body">
+                      <h3>초기 예산 — 얼마가 필요한가</h3>
+                      <p class="s1-summary">완전한 무자본 창업은 현실적으로 어렵습니다. 필요한 금액은 업종 · 규모에 따라 크게 달라지므로, 특정 금액을 정답으로 두기보다 아래 항목별로 얼마가 필요할지 먼저 가늠해보세요.</p>
+                      <dl class="s1-budget">
+                        <div><dt>상품 · 샘플</dt><dd>초도 물량, 샘플 구매 · 테스트 비용</dd></div>
+                        <div><dt>쇼핑몰 · 도메인</dt><dd>플랫폼 이용료, 도메인, 테마 비용</dd></div>
+                        <div><dt>촬영 · 콘텐츠</dt><dd>사진 · 영상 촬영, 상세페이지 제작</dd></div>
+                        <div><dt>포장 · 배송</dt><dd>포장재, 택배 계약</dd></div>
+                        <div><dt>광고 · 마케팅</dt><dd>초기 테스트 광고비</dd></div>
+                        <div><dt>예비비</dt><dd>예상하지 못한 지출 대비</dd></div>
+                      </dl>
+                    </div>
+                  </li>
+                  <li class="s1-section">
+                    <span class="s1-num">04</span>
+                    <div class="s1-section-body">
+                      <h3>브랜드 · 쇼핑몰 이름</h3>
+                      <ul class="s1-q s1-check">
+                        <li>예쁜 이름보다 검색이 먼저입니다 — 검색했을 때 내 브랜드가 잘 보여야 합니다.</li>
+                        <li>발음이 쉽고 기억나는 이름이어야 공유가 됩니다.</li>
+                      </ul>
+                      <details class="s1-more">
+                        <summary>더 자세히 보기</summary>
+                        <div class="s1-more-body">
+                          <p>이름을 완벽하게 만드는 데 이 단계에서 너무 오래 머물 필요는 없습니다. 우선 정하고 나중에 다듬어도 됩니다. 슬로건은 필수가 아니에요 — 필요하다면 "누구에게 + 어떤 가치"를 담은 한 줄 정도로만 가볍게 생각해두세요.</p>
+                        </div>
+                      </details>
+                    </div>
+                  </li>
+                  <li class="s1-section">
+                    <span class="s1-num">05</span>
+                    <div class="s1-section-body">
+                      <h3>벤치마킹 — 어떤 쇼핑몰을 참고할 것인가</h3>
+                      <ul class="s1-q s1-check">
+                        <li>너무 큰 1위 브랜드만 보지 않습니다 — 대부분 자체제작 · 자체공장을 갖춘 대형 브랜드라 구조를 따라가기 어렵습니다.</li>
+                        <li>내 규모와 비슷하거나 한 단계 앞선 쇼핑몰을 봅니다.</li>
+                        <li>상품 구성 · 가격 · 상세페이지 · 혜택 · 후기 · 배송정책을 관찰합니다.</li>
+                      </ul>
+                      <p class="s1-quote">벤치마킹은 복붙이 아니라 해석입니다.</p>
+                    </div>
+                  </li>
+                </ol>
 
-            <h2 class="section-h">벤치마킹 — 어떤 쇼핑몰을 참고할 것인가</h2>
-            <ul class="trust-list">
-              <li>너무 큰 1위 브랜드만 보지 않습니다 — 대부분 자체제작 · 자체공장을 갖춘 대형 브랜드라 구조를 따라가기 어렵습니다</li>
-              <li>내 규모와 비슷하거나 한 단계 앞선 쇼핑몰을 봅니다</li>
-              <li>상품 구성 · 가격 · 상세페이지 · 혜택 · 후기 · 배송정책을 관찰합니다</li>
-            </ul>
-            <div class="pull-quote"><p>벤치마킹은 복붙이 아니라 해석입니다.</p></div>
-
-            <div class="accordion">
-              <div class="acc-item">
-                <button class="acc-head" type="button"><div><div class="at">업종별 예시 보기</div><div class="as">패션 · 뷰티 · 식품 · 생활용품·잡화 · 반려동물용품</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                <div class="acc-body"><div class="acc-body-inner">
-                  <div class="info-grid">
-                    <div class="info-card"><h4>패션</h4><p>지그재그 · 에이블리처럼 랭킹 탭이 있는 버티컬 플랫폼의 베스트 리스트를 참고합니다.</p></div>
-                    <div class="info-card"><h4>뷰티</h4><p>같은 방식으로, 뷰티 카테고리 오픈마켓 · 버티컬 앱의 랭킹 · 베스트 탭에서 비슷한 규모의 브랜드를 찾아보세요.</p></div>
-                    <div class="info-card"><h4>식품</h4><p>식품 전문 플랫폼이나 오픈마켓의 카테고리별 베스트 상품 목록에서 비슷한 규모를 찾아보세요.</p></div>
-                    <div class="info-card"><h4>생활용품 · 잡화</h4><p>종합몰 · 오픈마켓의 카테고리 랭킹에서 상품 구성과 가격대가 비슷한 곳을 찾아보세요.</p></div>
-                    <div class="info-card"><h4>반려동물용품</h4><p>반려동물 전문몰이나 오픈마켓의 카테고리 베스트에서 비슷한 규모를 찾아보세요.</p></div>
+                <!-- 업종별 예시 — 기존 .accordion/.acc-item/.acc-head 위임(app.js) 재사용, 내용은 기존 그대로 -->
+                <div class="accordion s1-industry">
+                  <div class="s1-industry-head">
+                    <h3>업종별 예시</h3>
+                    <p>내 업종과 비슷한 예시를 펼쳐서 참고해보세요. 예시는 참고 방법을 설명한 것이며 특정 결과를 보장하지 않습니다.</p>
                   </div>
-                </div></div>
+                  <div class="acc-item">
+                    <button class="acc-head" type="button"><div class="at">패션</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <div class="acc-body"><div class="acc-body-inner"><p>지그재그 · 에이블리처럼 랭킹 탭이 있는 버티컬 플랫폼의 베스트 리스트를 참고합니다.</p></div></div>
+                  </div>
+                  <div class="acc-item">
+                    <button class="acc-head" type="button"><div class="at">뷰티</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <div class="acc-body"><div class="acc-body-inner"><p>같은 방식으로, 뷰티 카테고리 오픈마켓 · 버티컬 앱의 랭킹 · 베스트 탭에서 비슷한 규모의 브랜드를 찾아보세요.</p></div></div>
+                  </div>
+                  <div class="acc-item">
+                    <button class="acc-head" type="button"><div class="at">식품</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <div class="acc-body"><div class="acc-body-inner"><p>식품 전문 플랫폼이나 오픈마켓의 카테고리별 베스트 상품 목록에서 비슷한 규모를 찾아보세요.</p></div></div>
+                  </div>
+                  <div class="acc-item">
+                    <button class="acc-head" type="button"><div class="at">생활용품 · 잡화</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <div class="acc-body"><div class="acc-body-inner"><p>종합몰 · 오픈마켓의 카테고리 랭킹에서 상품 구성과 가격대가 비슷한 곳을 찾아보세요.</p></div></div>
+                  </div>
+                  <div class="acc-item">
+                    <button class="acc-head" type="button"><div class="at">반려동물용품</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                    <div class="acc-body"><div class="acc-body-inner"><p>반려동물 전문몰이나 오픈마켓의 카테고리 베스트에서 비슷한 규모를 찾아보세요.</p></div></div>
+                  </div>
+                </div>
+
+                <section class="s1-miss" aria-labelledby="s1MissTitle">
+                  <h3 id="s1MissTitle">초보자가 자주 놓치는 점</h3>
+                  <ul>
+                    <li>나이 · 성별만 정하고 타겟을 넘어가는 것 — 어떤 상황에서, 왜 내 상품이어야 하는지까지 적어야 이후 판단이 쉬워집니다.</li>
+                    <li>무자본으로 시작할 수 있다고 보는 것 — 상품 · 촬영 · 포장 · 예비비까지 항목별로 먼저 가늠해보세요.</li>
+                    <li>이름을 완벽하게 정하느라 이 단계에 오래 머무는 것 — 우선 정하고 나중에 다듬어도 됩니다.</li>
+                    <li>1위 대형 브랜드만 벤치마킹하는 것 — 내 규모와 비슷하거나 한 단계 앞선 쇼핑몰을 보세요.</li>
+                    <li>벤치마킹을 그대로 따라 하는 것 — 복붙이 아니라 해석이 목적입니다.</li>
+                  </ul>
+                </section>
+
+                <div class="s1-guide-cta">
+                  <button type="button" class="s1-btn s1-btn-primary" id="s1GoWorksheet">내 쇼핑몰 방향 정리하기 →</button>
+                </div>
+              </div>
+
+              <!-- ── 내 방향 정리 탭 ── -->
+              <div class="tab-panel s1-panel s1-panel-ws" data-tab="worksheet">
+                <!-- 비회원 안내 — body.is-authed(app.js renderAuthUI, 실제 인증 상태)면 CSS로 숨김.
+                     버튼은 기존 로그인 모달(window.launchdeskOpenLoginModal)만 연다. -->
+                <div class="s1-guest" id="s1Guest">
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                  <div class="s1-guest-body">
+                    <p>로그인하면 작성한 내용을 계정에 저장하고 다른 기기에서도 이어갈 수 있어요.</p>
+                    <button type="button" class="s1-guest-btn" id="s1GuestLogin">로그인하고 저장하기</button>
+                  </div>
+                </div>
+
+                <!-- 워크시트 — 저장 구조 보존: .worksheet[data-chapter] 안의 .worksheet-input 정확히 5개,
+                     DOM 순서 0~4 = 저장 객체 인덱스. placeholder는 예시일 뿐 저장값이 아니다. -->
+                <div class="worksheet s1-worksheet" data-chapter="/start/prepare">
+                  <div class="s1-ws-head">
+                    <h2 id="s1WorksheetTitle" tabindex="-1">내 쇼핑몰 방향 정리하기</h2>
+                    <p>정답을 찾기보다 지금 생각하는 내용을 적어보세요. 나중에 다시 수정할 수 있어요.</p>
+                  </div>
+                  <ol class="s1-ws-list">
+                    <li class="s1-ws-item">
+                      <span class="s1-ws-mark" aria-hidden="true"><span class="s1-ws-mark-num">01</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>
+                      <div class="s1-ws-body">
+                        <label for="s1Target">누구에게 판매하고 싶나요? <small>타겟 고객</small></label>
+                        <p class="s1-ws-help">연령만 적기보다 생활 방식과 상품을 찾는 상황을 함께 적어보세요.</p>
+                        <textarea id="s1Target" class="worksheet-input" rows="3" placeholder="예: 반려묘를 키우는 30대 자취생"></textarea>
+                      </div>
+                    </li>
+                    <li class="s1-ws-item">
+                      <span class="s1-ws-mark" aria-hidden="true"><span class="s1-ws-mark-num">02</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>
+                      <div class="s1-ws-body">
+                        <label for="s1Product">어떤 상품을 판매할 예정인가요? <small>카테고리 · 상품군</small></label>
+                        <p class="s1-ws-help">처음부터 너무 많은 상품을 적기보다 시작할 상품군을 중심으로 적어보세요.</p>
+                        <textarea id="s1Product" class="worksheet-input" rows="3" placeholder="예: 프리미엄 수건, 반려동물 간식"></textarea>
+                      </div>
+                    </li>
+                    <li class="s1-ws-item">
+                      <span class="s1-ws-mark" aria-hidden="true"><span class="s1-ws-mark-num">03</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>
+                      <div class="s1-ws-body">
+                        <label for="s1Budget">시작에 사용할 수 있는 예산은 얼마인가요? <small>초기 예산</small></label>
+                        <p class="s1-ws-help">상품 준비, 촬영, 쇼핑몰 설정, 포장 등 시작에 쓸 전체 금액을 기준으로 적어보세요.</p>
+                        <div class="s1-ws-budget"><input id="s1Budget" class="worksheet-input" type="text" inputmode="numeric" placeholder="예: 5000000"><span class="s1-ws-unit">원</span></div>
+                      </div>
+                    </li>
+                    <li class="s1-ws-item">
+                      <span class="s1-ws-mark" aria-hidden="true"><span class="s1-ws-mark-num">04</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>
+                      <div class="s1-ws-body">
+                        <label for="s1Brand">브랜드 또는 쇼핑몰 이름은 무엇인가요? <small>브랜드 · 쇼핑몰 이름</small></label>
+                        <p class="s1-ws-help">아직 확정하지 않았다면 후보 이름을 적어도 괜찮아요.</p>
+                        <input id="s1Brand" class="worksheet-input" type="text" placeholder="예: 구상 중인 이름">
+                      </div>
+                    </li>
+                    <li class="s1-ws-item">
+                      <span class="s1-ws-mark" aria-hidden="true"><span class="s1-ws-mark-num">05</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>
+                      <div class="s1-ws-body">
+                        <label for="s1Benchmark">참고하고 싶은 쇼핑몰이나 브랜드가 있나요? <small>벤치마킹 대상</small></label>
+                        <p class="s1-ws-help">규모가 큰 유명 브랜드뿐 아니라, 내 상품과 고객이 비슷한 곳을 적어보세요.</p>
+                        <textarea id="s1Benchmark" class="worksheet-input" rows="3" placeholder="예: 브랜드명 또는 쇼핑몰 주소"></textarea>
+                      </div>
+                    </li>
+                  </ol>
+                  <p class="s1-ws-note">로그인 상태에서는 입력이 계정에 저장돼요. 로그인 전에는 새로고침하거나 창을 닫으면 작성 내용이 사라질 수 있어요.</p>
+                </div>
               </div>
             </div>
 
-            <div class="worksheet" data-chapter="/start/prepare">
-              <div class="worksheet-head">
-                <div class="at">내 쇼핑몰 워크시트</div>
-                <div class="as">직접 적어보면서 정해보세요 — 5칸을 모두 채우면 이 STEP이 완료로 표시돼요</div>
-              </div>
-              <div class="worksheet-body">
-                <div class="ws-field"><label>타겟 고객</label><input type="text" class="worksheet-input" placeholder="예: 반려묘를 키우는 30대 자취생"></div>
-                <div class="ws-field"><label>판매 카테고리 · 상품군</label><input type="text" class="worksheet-input" placeholder="예: 프리미엄 수건, 반려동물 간식 등"></div>
-                <div class="ws-field"><label>초기 예산</label><input type="text" class="worksheet-input" placeholder="예: 500만원"></div>
-                <div class="ws-field"><label>브랜드 · 쇼핑몰 이름</label><input type="text" class="worksheet-input" placeholder="예: (구상 중인 이름)"></div>
-                <div class="ws-field"><label>벤치마킹 대상</label><input type="text" class="worksheet-input" placeholder="예: OOO, OOO"></div>
-              </div>
-              <div class="worksheet-note">입력한 내용은 이 브라우저에 저장돼요</div>
-            </div>
+            <!-- ── 오른쪽 열(large) / 한 열 순서 배치(medium·small) — 탭에 따라 표시 ── -->
+            <aside class="s1-side">
+              <section class="s1-card s1-side-guide" aria-labelledby="s1DecideTitle">
+                <h3 id="s1DecideTitle">이번 단계에서 정할 것</h3>
+                <ol class="s1-decide">
+                  <li><span>01</span>타겟 고객</li>
+                  <li><span>02</span>상품군</li>
+                  <li><span>03</span>초기 예산</li>
+                  <li><span>04</span>쇼핑몰 이름</li>
+                  <li><span>05</span>벤치마킹 대상</li>
+                </ol>
+                <p class="s1-side-hint">가이드를 읽은 뒤 "내 쇼핑몰 방향 정리하기"에서 직접 적어보세요.</p>
+              </section>
 
-            <p style="font-size:.86rem; color:var(--ink-faint);">방향을 정했다면, 다음 STEP에서는 실제 사업자 등록과 쇼핑몰 플랫폼을 준비합니다.</p>
+              <section class="s1-card s1-progress" id="s1Progress" aria-labelledby="s1ProgressTitle" aria-live="polite">
+                <div class="s1-progress-head">
+                  <h3 id="s1ProgressTitle">STEP 01 진행 상태</h3>
+                  <span class="s1-progress-badge" id="s1ProgressBadge">필수 0 / 5</span>
+                </div>
+                <div class="s1-progress-bar"><div class="s1-progress-fill" id="s1ProgressFill"></div></div>
+                <ul class="s1-progress-items" id="s1ProgressItems">
+                  <li data-ws-index="0"><span class="s1-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>타겟 고객</li>
+                  <li data-ws-index="1"><span class="s1-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>판매 상품</li>
+                  <li data-ws-index="2"><span class="s1-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>초기 예산</li>
+                  <li data-ws-index="3"><span class="s1-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>쇼핑몰 이름</li>
+                  <li data-ws-index="4"><span class="s1-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>벤치마킹 대상</li>
+                </ul>
+                <div class="s1-progress-done" id="s1ProgressDone" hidden>✓ STEP 01 준비 완료</div>
+              </section>
 
-            <div class="chapter-nav">
-              <a href="#/start/intro"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 00 · 오픈 로드맵 확인하기</span></a>
-              <a class="next" href="#/start/setup"><span class="cn-label">다음 STEP →</span><span class="cn-title">STEP 02 · 사업자 등록하고 쇼핑몰 플랫폼 만들기</span></a>
-            </div>
+              <section class="s1-card s1-tips" aria-labelledby="s1TipsTitle">
+                <h3 id="s1TipsTitle"><span class="s1-tips-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2a5 5 0 0 1 3.5 8.5L12 13H6l-.5-2.5A5 5 0 0 1 9 2Z"/><line x1="6.5" y1="15" x2="11.5" y2="15"/><line x1="7.5" y1="17" x2="10.5" y2="17"/></svg></span>작성이 막힐 때</h3>
+                <ol class="s1-tips-list">
+                  <li><span>1</span>내가 판매하려는 상품을 누가 가장 필요로 할까요?</li>
+                  <li><span>2</span>그 사람은 언제 이 상품을 찾을까요?</li>
+                  <li><span>3</span>처음부터 감당할 수 있는 범위는 어디까지일까요?</li>
+                </ol>
+              </section>
+
+              <section class="desk-help s1-help" aria-labelledby="s1HelpTitle">
+                <h3 id="s1HelpTitle">방향을 정하기 어렵나요?</h3>
+                <p>지금 생각을 정리하는 것부터 함께 확인할 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a>
+              </section>
+            </aside>
+
+            <!-- 이전/다음 — 기존 경로(#/start/intro, #/start/setup) 그대로인 해시 링크. 미완료 시
+                 다음 이동은 step01.js가 confirm으로 한 번 묻는다(막지 않음). -->
+            <nav class="s1-nav" aria-label="STEP 이동">
+              <p class="s1-nav-status" id="s1NavStatus"><span id="s1NavText">필수 항목 5개를 작성하면 STEP 01이 완료돼요.</span> <b id="s1NavCount">0 / 5</b></p>
+              <div class="s1-nav-btns">
+                <a class="s1-btn s1-btn-ghost s1-nav-prev" href="#/start/intro">← STEP 00 · 오픈 로드맵 확인하기</a>
+                <a class="s1-btn s1-btn-primary s1-nav-next" href="#/start/setup" id="s1Next">STEP 02로 이동 →</a>
+              </div>
+            </nav>
+
           </div>
         </div>
       </section>
@@ -2902,6 +3080,7 @@
 <script src="wholesalers.js"></script>
 <script src="home-dashboard.js"></script>
 <script src="desk.js"></script>
+<script src="step01.js"></script>
 <script src="plans.js"></script>
 <script src="admin.js"></script>
 </body>
