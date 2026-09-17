@@ -215,9 +215,11 @@
          id/data 속성(#profileCard #profileAvatarLetter #profileName #profileDay
          #adminSidebarLink, a[data-match])은 app.js/
          admin.js가 그대로 쓰므로 유지. 메뉴 순서·라벨만 시안대로 바꿨고, "마진
-         계산기"는 기존 #/tools + data-tools-target="calc"(tools.js 탭 자동 전환)로
-         연결한다 — /tools의 다른 탭·기능은 그대로다. 게스트 카드 ↔ 프로필 카드
-         전환은 body.is-authed(app.js renderAuthUI) 기준 CSS로만 한다. -->
+         계산기"는 기존 #/tools + data-tools-target="calc"로 연결한다 — /tools는
+         정보구조 정리(2026-09 3차) 이후 마진 계산기 화면 자체이므로 탭 전환 없이
+         바로 보인다(data-tools-target="calc" 클릭 시 tools.js가 안전하게 아무
+         동작도 하지 않는다). 게스트 카드 ↔ 프로필 카드 전환은 body.is-authed
+         (app.js renderAuthUI) 기준 CSS로만 한다. -->
     <div class="sidebar-head">
       <a class="logo" href="#/">
         <span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="6" height="6" rx="1"/><rect x="10" y="2" width="6" height="6" rx="1"/><rect x="2" y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/></svg></span>
@@ -573,6 +575,57 @@
                 <div class="dash-panel-head"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M8 9.5 6.5 8a3 3 0 1 1 4.2-4.2L12 5"/><path d="M15 14.5l1.5 1.5a3 3 0 1 1-4.2 4.2L11 19"/></svg></span>연결 상태</div>
                 <div class="opsdash-connection-list" id="opsdashConnectionStatus"></div>
                 <div id="opsdashNextAction"></div>
+              </div>
+            </div>
+
+            <!-- 광고 기록 (2026-09 정보구조 정리 3차) — 예전 #/tools 탭
+                 바의 "🎯 광고 기록" 탭을 그대로 이 화면으로 옮겨왔다. DOM
+                 id·저장 로직(tools.js renderAdlog/store.js tool_type=
+                 'ad_log', 비회원 메모리 · 회원별 Supabase 분리)·이벤트
+                 핸들러(app.js 전역 클릭 위임: .adlog-chan-btn, #adlogAddBtn,
+                 #adlogCancelBtn, .adlog-del)는 전혀 바뀌지 않았다 — 위치만
+                 옮겼다. 위 "광고 상태"(#opsdashAdState)는 Meta 계정을
+                 연결하면 자동으로 채워지는 실제 집계이고, 이 섹션은 그와
+                 별개로 사용자가 소재별로 직접 입력·관리하는 수동 기록이다
+                 — 제목·설명에서 "자동 연동"과 "수동 기록"을 분명히
+                 구분한다(요구사항). -->
+            <div class="dash-panel" id="adlogPanel" style="margin-top:.9rem;">
+              <div class="dash-panel-head adlog-head">
+                <span>광고 기록 <span style="font-weight:500; color:var(--ink-faint); font-size:.78rem;">· 소재별 성과 수동 기록</span></span>
+                <button type="button" class="btn btn-primary btn-sm" id="adlogAddBtn">+ 기록 추가</button>
+              </div>
+              <p style="padding:.9rem 1.1rem 0; margin:0; font-size:.8rem; color:var(--ink-faint);">위 "광고 상태"는 연결된 Meta 계정에서 자동으로 가져온 값이고, 이 기록은 소재 · 채널별 성과를 직접 입력해 비교하기 위한 별도 기록이에요.</p>
+              <div id="adlogFormWrap" hidden style="padding:.9rem 1.1rem 0;">
+                <form class="adlog-form" id="adlogForm" style="margin-bottom:0;">
+                  <div class="ws-field"><label for="adlogDate">날짜</label><input id="adlogDate" type="text" placeholder="03.20" required></div>
+                  <div class="ws-field"><label for="adlogName">소재명</label><input id="adlogName" type="text" placeholder="봄 룩북 릴스" required></div>
+                  <div class="ws-field"><label for="adlogSpend">지출 (원)</label><input id="adlogSpend" type="number" min="0" placeholder="50000" required></div>
+                  <div class="ws-field"><label for="adlogRevenue">전환 매출 (원)</label><input id="adlogRevenue" type="number" min="0" placeholder="200000" required></div>
+                  <div class="ws-field" style="grid-column:1/-1;">
+                    <label>채널</label>
+                    <div class="adlog-channel-picker" id="adlogChannelPicker">
+                      <button type="button" class="adlog-chan-btn active" data-channel="메타">메타</button>
+                      <button type="button" class="adlog-chan-btn" data-channel="네이버">네이버</button>
+                      <button type="button" class="adlog-chan-btn" data-channel="카카오">카카오</button>
+                      <button type="button" class="adlog-chan-btn" data-channel="인스타">인스타</button>
+                    </div>
+                  </div>
+                  <div class="adlog-form-actions">
+                    <button type="submit" class="btn btn-primary">저장하기</button>
+                    <button type="button" class="btn btn-ghost" id="adlogCancelBtn">취소</button>
+                  </div>
+                </form>
+              </div>
+              <div class="tbl-wrap" style="margin:1.1rem 1.1rem 0;">
+                <table>
+                  <thead><tr><th>날짜</th><th>채널</th><th>소재명</th><th class="num">지출</th><th class="num">전환매출</th><th class="num">ROAS</th><th></th></tr></thead>
+                  <tbody id="adlogTbody"></tbody>
+                </table>
+              </div>
+              <div class="adlog-summary" style="margin:1.1rem; margin-top:1rem;">
+                <div class="adlog-sum-card"><div class="al-label">총 광고 지출</div><div class="al-value" id="adlogSumSpend">₩0</div></div>
+                <div class="adlog-sum-card"><div class="al-label">평균 ROAS</div><div class="al-value" id="adlogSumRoas">0x</div></div>
+                <div class="adlog-sum-card"><div class="al-label">최고 소재</div><div class="al-value" id="adlogSumBest" style="font-size:1rem;">—</div></div>
               </div>
             </div>
           </div>
@@ -2401,7 +2454,7 @@
                 <div><div class="co-label">마진율</div><div class="co-value muted" id="calcRate">—</div></div>
               </div>
             </div>
-            <p style="font-size:.78rem; color:var(--ink-faint); margin-top:-.6rem;">이건 "최소 2배 마진 법칙"만 빠르게 확인하는 간단 버전이에요. 수수료 · 배송비까지 반영한 정밀 계산은 <a href="#/tools" data-tools-target="calc" style="color:var(--accent-ink); font-weight:600;">운영 도구의 마진 계산기</a>를 이용하세요.</p>
+            <p style="font-size:.78rem; color:var(--ink-faint); margin-top:-.6rem;">이건 "최소 2배 마진 법칙"만 빠르게 확인하는 간단 버전이에요. 수수료 · 배송비까지 반영한 정밀 계산은 <a href="#/tools" data-tools-target="calc" style="color:var(--accent-ink); font-weight:600;">마진 계산기</a>를 이용하세요.</p>
 
             <div class="tbl-wrap"><table>
               <thead><tr><th>마진을 올리는 방법</th><th>특징</th><th>한계</th></tr></thead>
@@ -2446,15 +2499,14 @@
       <!-- ============ VIEW: 운영 도구 ============ -->
   <section class="view" id="view-tools" hidden>
     <div class="content">
-      <span class="eyebrow">운영 도구</span>
+      <span class="eyebrow">마진 계산기</span>
       <div class="page-head">
-        <h1>운영 도구</h1>
-        <p class="page-lead">마진 · 매출 · 광고 · 주문을 한 곳에서 확인하세요.</p>
+        <h1>마진 계산기</h1>
+        <p class="page-lead">이 상품을 팔면 얼마가 남는지, 광고비까지 반영해 바로 계산해보세요.</p>
       </div>
 
       <div class="callout">
-        <p><strong>아래 매출 · 광고 · 주문 데이터는 전부 예시입니다.</strong> 실제 판매처 · 광고 계정 연동은 준비 중이며, 연동되면 실제 데이터로 자동 교체될 예정이에요.</p>
-        <p><strong>마진 계산기 · 수익 시뮬레이터 · 광고 기록은 지금 바로 실제로 계산 · 저장됩니다.</strong></p>
+        <p><strong>마진 계산기는 지금 바로 실제로 계산 · 저장됩니다.</strong> 계산 결과 저장 · 불러오기, 이 조건으로 계획 만들기까지 그대로 이용할 수 있어요.</p>
       </div>
 
       <!-- 쇼핑몰 운영 현황 — 연결된 Cafe24 쇼핑몰의 실제 orders 데이터.
@@ -2547,28 +2599,6 @@
         </div>
       </div>
 
-      <div class="tools-tab-bar" id="toolsTabBar">
-        <button class="tools-tab-btn active" type="button" data-tools-tab="dashboard">🖥️ 대시보드</button>
-        <button class="tools-tab-btn" type="button" data-tools-tab="calc">🧾 마진 계산기</button>
-        <button class="tools-tab-btn" type="button" data-tools-tab="simulator">🧮 수익 시뮬레이터</button>
-        <button class="tools-tab-btn" type="button" data-tools-tab="adlog">🎯 광고 기록</button>
-      </div>
-
-      <div class="tools-pane active" data-tools-tab="dashboard">
-        <!-- 분석 대시보드 — 판매/광고 채널 연동이 더 갖춰지면 확장할
-             자리. 위 "쇼핑몰 운영 현황"과 달리 아직 실제 데이터가 없으므로
-             가짜 숫자/차트 대신 이 안내만 둔다(혼동 방지). 마진 계산기는
-             이 탭의 사이드바에서 "🧾 마진 계산기" 탭으로 옮겼다. -->
-        <div class="dash-panel">
-          <div class="dash-panel-head">분석 대시보드</div>
-          <div class="empty-state" style="padding:2.6rem 1.3rem;">
-            <div class="es-icon">📊</div>
-            <p>판매 채널과 광고 채널 연결이 완료되면<br>매출 추이, 광고 효율, 채널별 성과를 한곳에서 확인할 수 있어요.</p>
-            <span style="display:inline-flex; align-items:center; font-size:.76rem; font-weight:700; padding:.3rem .8rem; border-radius:99px; background:var(--surface-hover); color:var(--ink-faint);">준비 중</span>
-          </div>
-        </div>
-      </div>
-
       <!-- ============ 마진 계산기 — 주문 1건 기준 ============
            계산은 margin-calc.js(순수 함수), 화면 제어는 tools.js.
            "간편 입력 / 상세 입력"은 같은 폼·같은 입력 DOM을 공유하는 표시
@@ -2576,8 +2606,29 @@
            붙은 필드는 상세 입력에서만 보이고, 숨겨져도 값은 그대로 유지되어
            계산에 반영된다(모드 전환이 값을 지우거나 계산에서 빼지 않는다).
            "순이익"/"세후 마진"이라는 말은 쓰지 않는다 — 여기서 나오는 값은
-           부가세 납부액 · 소득세 · 미입력 고정비 반영 전의 "예상 잔액"이다. -->
-      <div class="tools-pane" data-tools-tab="calc">
+           부가세 납부액 · 소득세 · 미입력 고정비 반영 전의 "예상 잔액"이다.
+
+           2026-09 정보구조 정리(3차): #/tools는 이제 이 마진 계산기 화면
+           자체다 — 예전 탭 바(대시보드 placeholder/마진계산기/수익
+           시뮬레이터/광고기록)를 없애고 이 탭 콘텐츠 하나만 남겼다.
+           tools.js의 mcRoot 셀렉터(.tools-pane[data-tools-tab="calc"])가
+           바뀌지 않도록 이 div와 data-tools-tab 속성은 그대로 두고
+           class="active"만 고정으로 붙여 항상 보이게 한다(styles.css의
+           .tools-pane.active{display:block} 그대로 재사용, 탭 클릭으로
+           active를 토글하던 app.js 핸들러는 제거했다). data-tools-target
+           ="calc" 딥링크(사이드바 · 홈 · STEP03 등)는 tools.js의
+           mcActivateTab()이 이제 존재하지 않는 탭 버튼을 찾지 못해 그냥
+           아무 것도 안 하고 끝나므로 안전하다 — #/tools로 이동하는 것
+           자체가 곧 계산기로 이동하는 것이라 탭 활성화가 더 필요 없다.
+
+           수익 시뮬레이터(예전 data-tools-tab="simulator")는 베타
+           화면에서 제거했다 — 관련 DOM · JS(tools.js)를 지웠지만 DB에는
+           애초에 저장하지 않는 기능이라 지울 데이터가 없다. 광고 기록
+           (예전 data-tools-tab="adlog")은 #/dashboard 운영 현황
+           (#view-dashboard)의 "광고 기록" 섹션으로 그대로 옮겼다 — DOM id·
+           저장 로직(store.js tool_type='ad_log')·이벤트 핸들러(app.js
+           전역 위임)는 전부 그대로라 여기서는 안 보일 뿐 코드는 안 바뀌었다. -->
+      <div class="tools-pane active" data-tools-tab="calc">
 
         <div class="mc-hero">
           <h2>이 상품을 팔면 얼마가 남을까요?</h2>
@@ -2926,81 +2977,6 @@
       </div>
 
 
-      <div class="tools-pane" data-tools-tab="simulator">
-        <div class="sim-grid">
-          <div class="dash-panel">
-            <div class="dash-panel-head">🎯 목표 설정</div>
-            <div class="sim-panel">
-              <div class="ws-field" style="margin-bottom:.9rem;"><label for="simQty">월 목표 판매량 (개)</label><input id="simQty" type="number" min="0" value="50"></div>
-              <div class="ws-field" style="margin-bottom:.9rem;"><label for="simPrice">상품 판매가 (원)</label><input id="simPrice" type="number" min="0" value="59000"></div>
-              <div class="ws-field" style="margin-bottom:.9rem;"><label for="simCostRate">원가율 (%)</label><input id="simCostRate" type="number" min="0" max="100" value="40"></div>
-              <div class="ws-field"><label for="simAdRate">광고비율 (%)</label><input id="simAdRate" type="number" min="0" max="100" value="15"></div>
-            </div>
-          </div>
-          <div class="dash-panel">
-            <div class="dash-panel-head">📊 예상 결과</div>
-            <div class="sim-out-list">
-              <div class="sim-out-row"><span>월 예상 매출</span><b id="simRevenue">₩0</b></div>
-              <div class="sim-out-row warn"><span>월 광고비</span><b id="simAdCost">₩0</b></div>
-              <div class="sim-out-row warn"><span>원가 합계</span><b id="simCostTotal">₩0</b></div>
-              <div class="sim-out-row"><span>손익분기점</span><b id="simBreakeven">0개</b></div>
-            </div>
-            <div class="sim-result-box">
-              <div class="srl">예상 순이익</div>
-              <div class="srv" id="simProfit">₩0</div>
-              <div class="srs" id="simMarginRate">마진율 0%</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="dash-panel-head" style="border:none; padding-left:0; margin-top:1.8rem;">🗓️ 단계별 로드맵</div>
-        <div class="sim-roadmap" id="simRoadmap">
-          <div class="sim-road-card"><div class="src-month">1개월차</div><div class="src-goal" id="simRoad1Goal">15개 판매</div><div class="src-desc">상품 등록 · 첫 광고 테스트</div><div class="src-budget" id="simRoad1Budget">광고예산 ₩0</div></div>
-          <div class="sim-road-card"><div class="src-month">2개월차</div><div class="src-goal" id="simRoad2Goal">30개 판매</div><div class="src-desc">전환율 최적화 · 리뷰 확보</div><div class="src-budget" id="simRoad2Budget">광고예산 ₩0</div></div>
-          <div class="sim-road-card"><div class="src-month">3개월차</div><div class="src-goal" id="simRoad3Goal">50개 판매</div><div class="src-desc">스케일업 · 채널 다각화</div><div class="src-budget" id="simRoad3Budget">광고예산 ₩0</div></div>
-        </div>
-      </div>
-
-      <div class="tools-pane" data-tools-tab="adlog">
-        <div class="dash-panel">
-          <div class="dash-panel-head adlog-head">
-            <span>광고 소재별 성과 기록</span>
-            <button type="button" class="btn btn-primary btn-sm" id="adlogAddBtn">+ 기록 추가</button>
-          </div>
-          <div id="adlogFormWrap" hidden>
-            <form class="adlog-form" id="adlogForm">
-              <div class="ws-field"><label for="adlogDate">날짜</label><input id="adlogDate" type="text" placeholder="03.20" required></div>
-              <div class="ws-field"><label for="adlogName">소재명</label><input id="adlogName" type="text" placeholder="봄 룩북 릴스" required></div>
-              <div class="ws-field"><label for="adlogSpend">지출 (원)</label><input id="adlogSpend" type="number" min="0" placeholder="50000" required></div>
-              <div class="ws-field"><label for="adlogRevenue">전환 매출 (원)</label><input id="adlogRevenue" type="number" min="0" placeholder="200000" required></div>
-              <div class="ws-field" style="grid-column:1/-1;">
-                <label>채널</label>
-                <div class="adlog-channel-picker" id="adlogChannelPicker">
-                  <button type="button" class="adlog-chan-btn active" data-channel="메타">메타</button>
-                  <button type="button" class="adlog-chan-btn" data-channel="네이버">네이버</button>
-                  <button type="button" class="adlog-chan-btn" data-channel="카카오">카카오</button>
-                  <button type="button" class="adlog-chan-btn" data-channel="인스타">인스타</button>
-                </div>
-              </div>
-              <div class="adlog-form-actions">
-                <button type="submit" class="btn btn-primary">저장하기</button>
-                <button type="button" class="btn btn-ghost" id="adlogCancelBtn">취소</button>
-              </div>
-            </form>
-          </div>
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>날짜</th><th>채널</th><th>소재명</th><th class="num">지출</th><th class="num">전환매출</th><th class="num">ROAS</th><th></th></tr></thead>
-              <tbody id="adlogTbody"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="adlog-summary">
-          <div class="adlog-sum-card"><div class="al-label">총 광고 지출</div><div class="al-value" id="adlogSumSpend">₩0</div></div>
-          <div class="adlog-sum-card"><div class="al-label">평균 ROAS</div><div class="al-value" id="adlogSumRoas">0x</div></div>
-          <div class="adlog-sum-card"><div class="al-label">최고 소재</div><div class="al-value" id="adlogSumBest" style="font-size:1rem;">—</div></div>
-        </div>
-      </div>
     </div>
   </section>
 

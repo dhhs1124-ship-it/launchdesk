@@ -23,7 +23,7 @@
     });
   }
 
-  /* ===================== 마진 계산기 (/tools "마진 계산기" 탭) =====================
+  /* ===================== 마진 계산기 (#/tools 화면 자체) =====================
      계산은 전부 margin-calc.js(window.launchdeskMarginCalc, 순수 함수)가 하고,
      이 파일은 입력 읽기 → validate/compute → 결과 · 계산 과정 그리기 →
      예시 모드 → 저장/불러오기만 담당한다. 계산 규칙 자체는 margin-calc.js와
@@ -693,33 +693,23 @@
     });
 
     /* "마진 계산기" 링크(홈 · 챕터03 등의 data-tools-target="calc")로 들어오면
-       /tools 의 기본 탭(대시보드)이 아니라 이 탭을 바로 연다. 탭 전환 자체는
-       app.js 의 .tools-tab-btn 클릭 핸들러가 담당하므로 그 버튼을 눌러줄 뿐. */
-    function mcActivateTab(){
-      var btn = document.querySelector('.tools-tab-btn[data-tools-tab="calc"]');
-      if(btn && !btn.classList.contains('active')) btn.click();
-    }
-    var mcPendingTab = false;
+       #/tools로 이동한다. 2026-09 정보구조 정리(3차) 이후 /tools는 이 계산기
+       화면 자체라 탭 활성화가 필요 없다 — hashchange 시 화면 전환·스크롤은
+       app.js render()가 항상 처리하므로, 이미 /tools에 있을 때(hashchange가
+       일어나지 않는 경우)만 이 자리에서 스크롤을 올려준다. */
     function onToolsRoute(){ return (location.hash.replace(/^#/, '') || '/') === '/tools'; }
     document.addEventListener('click', function(e){
       var a = e.target.closest('a[data-tools-target="calc"]');
-      if(!a) return;
-      if(onToolsRoute()){ mcActivateTab(); window.scrollTo(0, 0); }
-      else mcPendingTab = true;
-    });
-    window.addEventListener('hashchange', function(){
-      if(!mcPendingTab) return;
-      mcPendingTab = false;
-      if(onToolsRoute()) mcActivateTab();
+      if(a && onToolsRoute()) window.scrollTo(0, 0);
     });
     function mcGoToCalc(){
-      if(onToolsRoute()){ mcActivateTab(); window.scrollTo(0, 0); }
-      else { mcPendingTab = true; location.hash = '#/tools'; }
+      if(onToolsRoute()) window.scrollTo(0, 0);
+      else location.hash = '#/tools';
     }
 
     /* plans.js(계획 만들기 · 계산기로 열기)가 쓰는 최소 진입점. 계산 로직·
        저장 로직은 전혀 바뀌지 않고, 이미 있는 함수(mcBuildRecord/
-       mcLoadRecord/탭 활성화)를 그대로 노출만 한다.
+       mcLoadRecord/화면 이동)를 그대로 노출만 한다.
        - buildCurrentRecord(): 지금 입력으로 유효한 계산이 있으면 v2 저장
          레코드(새 객체)를 돌려준다. 예시 모드/미계산/오류면 null — 그 상태에서는
          계획을 만들 수 없다. */
@@ -757,69 +747,15 @@
      not a random fake number — removed for now since the top banner no
      longer claims a purchase/discount, only that the preview is free. */
 
-  /* 수익 시뮬레이터 — genuinely computed from the 4 inputs, not fake.
-     손익분기점 = 광고비를 회수하는 데 필요한 판매량
-     (광고비 ÷ 개당 판매가-원가 마진), 로드맵은 목표 판매량/광고비의
-     30%·60%·100% 지점으로 3단계를 나눈다. */
-  var simInputs = ['simQty','simPrice','simCostRate','simAdRate'].map(function(id){ return document.getElementById(id); });
-  if(simInputs[0]){
-    var fmtWon = function(n){ return '₩' + Math.round(n).toLocaleString('ko-KR'); };
-    var computeSimulator = function(){
-      var qty = parseFloat(document.getElementById('simQty').value) || 0;
-      var price = parseFloat(document.getElementById('simPrice').value) || 0;
-      var costRate = parseFloat(document.getElementById('simCostRate').value) || 0;
-      var adRate = parseFloat(document.getElementById('simAdRate').value) || 0;
-
-      var revenue = qty * price;
-      var costTotal = revenue * costRate / 100;
-      var adCost = revenue * adRate / 100;
-      var profit = revenue - costTotal - adCost;
-      var marginRate = revenue > 0 ? Math.round(profit / revenue * 100) : 0;
-      var unitMargin = price - (price * costRate / 100);
-      var breakeven = unitMargin > 0 ? Math.ceil(adCost / unitMargin) : 0;
-
-      document.getElementById('simRevenue').textContent = fmtWon(revenue);
-      document.getElementById('simAdCost').textContent = fmtWon(adCost);
-      document.getElementById('simCostTotal').textContent = fmtWon(costTotal);
-      document.getElementById('simBreakeven').textContent = breakeven + '개';
-      document.getElementById('simProfit').textContent = fmtWon(profit);
-      document.getElementById('simMarginRate').textContent = '마진율 ' + marginRate + '%';
-
-      var stageFractions = [.3, .6, 1];
-      for(var i = 0; i < 3; i++){
-        var goal = Math.max(1, Math.round(qty * stageFractions[i]));
-        var budget = adCost * stageFractions[i];
-        document.getElementById('simRoad' + (i + 1) + 'Goal').textContent = goal + '개 판매';
-        document.getElementById('simRoad' + (i + 1) + 'Budget').textContent = '광고예산 ' + fmtWon(budget);
-      }
-    };
-    simInputs.forEach(function(el){ el.addEventListener('input', computeSimulator); });
-    computeSimulator();
-
-    /* GA4 profit_simulator_use — debounced separately from computeSimulator
-       above (that one still fires on every keystroke for the live display;
-       this one waits 1.5s after the last input before firing, once, so
-       typing doesn't spam GA4). Only fires once 판매 수량/판매가 — the two
-       inputs a meaningful result actually depends on — are both filled in.
-       No revenue/cost/ad-spend/profit/margin numbers here on purpose —
-       those are the seller's own business figures, not needed just to know
-       the tool got used. */
-    var simTrackTimer = null;
-    function trackSimulatorUse(){
-      var qty = parseFloat(document.getElementById('simQty').value) || 0;
-      var price = parseFloat(document.getElementById('simPrice').value) || 0;
-      if(qty <= 0 || price <= 0) return;
-      if(typeof gtag === 'function'){
-        gtag('event', 'profit_simulator_use', { tool_name: 'profit_simulator' });
-      }
-    }
-    simInputs.forEach(function(el){
-      el.addEventListener('input', function(){
-        clearTimeout(simTrackTimer);
-        simTrackTimer = setTimeout(trackSimulatorUse, 1500);
-      });
-    });
-  }
+  /* 수익 시뮬레이터(예전 /tools "🧮 수익 시뮬레이터" 탭)는 2026-09
+     정보구조 정리(3차)로 베타 화면·메뉴에서 제거했다. 이 기능은 애초에
+     아무것도 저장하지 않고 매 입력마다 즉석에서 계산만 하던 순수 프론트
+     로직이라(#simQty 등 DOM과 함께 있어야만 동작), DOM이 없어지면서 이
+     블록도 함께 지웠다 — DB에 지울 데이터가 없고, 다른 기능이 이 코드를
+     참조하지 않는다(margin-calc.js/계산기와는 완전히 별개 로직이었다).
+     "목표 수익 역산 도구"로 다시 만들 때는 이 커밋 이전 히스토리에서
+     계산식(손익분기점 = 광고비 ÷ 개당 판매가-원가 마진, 30·60·100%
+     3단계 로드맵)을 참고하면 된다. */
 
   /* 광고 기록 — 비회원은 launchdeskStore 메모리에만(새로고침하면 사라짐),
      회원은 Supabase(tool_records, tool_type='ad_log')에도 반영된다. 각

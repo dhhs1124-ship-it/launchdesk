@@ -46,7 +46,7 @@
     '/dashboard':        '운영 현황',
     '/start':            '쇼핑몰 시작하기',
     '/start/intro':      '챕터 00 · 시작하기 전에',
-    '/tools':            '운영 도구',
+    '/tools':            '마진 계산기',
     '/resources':        '자료실',
     '/wholesale':        '도매처 찾기',
     '/services/setup':   '대행 서비스',
@@ -260,10 +260,11 @@
     /* internal product event: dashboard_viewed — "사용자가 실제 운영
        대시보드에 진입했을 때"를 /tools 진입 시점으로 정의한다. /tools는
        상단에 ops-overview.js가 그리는 "쇼핑몰 운영 현황" 패널(연결된
-       Cafe24 쇼핑몰의 실제 orders 집계)을 항상 포함하는, 이 저장소에서
-       유일하게 실제 데이터를 보여주는 운영 대시보드다(그 아래 시뮬레이터/
-       광고기록 탭과 달리 "분석 대시보드" 탭은 아직 예시 데이터라 별도
-       화면으로 취급하지 않는다 — 전부 같은 /tools 라우트 안에 있다).
+       Cafe24 쇼핑몰의 실제 orders 집계)과 Meta 광고 성과 패널을 항상
+       포함하고, 그 아래 마진 계산기가 이어지는 화면이다(2026-09 정보구조
+       정리 3차로 예전 탭 바의 수익 시뮬레이터/광고기록/분석 대시보드
+       placeholder 탭은 없앴거나 #/dashboard로 옮겼다 — 이벤트 정의·발생
+       시점은 그대로 /tools 진입 기준이라 바뀌지 않는다).
        lastDashboardViewedPath 가드로 같은 라우트에서 render()가 반복
        호출돼도 중복 기록하지 않지만(요구사항 6 — render마다 기록 금지),
        /tools를 벗어났다가 다른 날 다시 들어오면(hashchange가 다시 발생)
@@ -1436,13 +1437,6 @@
       var wasOpen = card.classList.contains('open');
       document.querySelectorAll('.guide-card.open').forEach(function(c){ if(c !== card) c.classList.remove('open'); });
       card.classList.toggle('open', !wasOpen);
-      return;
-    }
-    var toolsTabBtn = e.target.closest('.tools-tab-btn');
-    if(toolsTabBtn){
-      var ttKey = toolsTabBtn.getAttribute('data-tools-tab');
-      toolsTabBtn.parentElement.querySelectorAll('.tools-tab-btn').forEach(function(b){ b.classList.toggle('active', b === toolsTabBtn); });
-      document.querySelectorAll('.tools-pane').forEach(function(p){ p.classList.toggle('active', p.getAttribute('data-tools-tab') === ttKey); });
       return;
     }
     var chanBtn = e.target.closest('.adlog-chan-btn');
