@@ -2373,125 +2373,267 @@
 
       <!-- ============ VIEW: STEP 03 · 판매할 상품과 공급처, 가격 확정하기 ============ -->
       <section class="view" id="view-start-sourcing" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 03</span></div>
-          <span class="eyebrow">STEP 03 · 상품 · 가격</span>
-          <div class="page-head">
-            <h1>판매할 상품과 공급처, 가격 확정하기</h1>
-            <p class="page-lead">좋아 보이는 상품을 찾는 것보다, 어디서 공급받고 얼마에 들여와 얼마에 팔 것인지 실제로 계산할 수 있어야 판매를 시작할 수 있습니다.</p>
-          </div>
-          <div class="chapter-body">
-            <div class="callout">
-              <p><strong>처음부터 많은 상품을 갖출 필요는 없습니다.</strong></p>
-              <p>대표 상품(또는 우선 판매할 상품 몇 가지)을 먼저 확정하고, 공급 방식 · 원가 · 판매가를 계산할 수 있는 상태를 만드는 게 이 STEP의 목표입니다. 특정 업종을 전제하지 않으며, 무엇을 팔든 같은 순서로 정리할 수 있습니다.</p>
-            </div>
+        <!-- STEP 03 (2026-09 UI 재설계 3차, STEP01·02 시각 구조 이식 — 피그마 시안 없음, STEP01·02
+             레이아웃·토큰·반응형 규칙을 그대로 재사용) — 정적 마크업 + step03.js(진행 상태·탭 부가
+             동작만). 저장·완료 판정은 기존 app.js 체크리스트 컨트롤러(.checklist-block[data-chapter]
+             안의 .cl-row input[type="checkbox"] 6개, DOM 순서 = 저장 인덱스 0~5, change 이벤트,
+             setChapterDone/checklistAllChecked)가 그대로 담당한다 — 체크박스 개수 · DOM 순서 ·
+             data-chapter · 저장 인덱스는 재설계 이전과 동일하며(문구만 개선), 기존 저장 데이터와
+             호환된다. 탭은 기존 .tabs > .tab-bar > .tab-btn / .tab-panel 위임(app.js)을 재사용하고,
+             1100px 미만에서는 CSS display:contents + order로 한 열 순서(제목 → 탭 → 탭 콘텐츠 →
+             진행 → 게스트 안내 → 체크리스트 → 도구 → 도움 → 이전/다음)를 만든다 — 같은 패널을
+             DOM에 두 번 두지 않는다. 이 STEP은 상세 계산 도구가 아니라 다음 단계로 넘어가기 위한
+             방향 확인 화면이므로, 원가/판매가를 직접 계산하는 입력창은 두지 않고 정밀 계산은
+             마진 계산기(#/tools, data-tools-target="calc")로 안내한다. 스타일은 전부
+             #view-start-sourcing 스코프(--ld-* 올리브 토큰), 다른 STEP은 그대로다. -->
+        <div class="content">
+          <div class="s3" id="step03Root" data-tab="guide">
 
-            <h2 class="section-h">대표 상품 확정</h2>
-            <p>처음부터 상품을 넓게 갖추기보다, 대표 상품 또는 우선 판매할 상품을 먼저 확정하고 반응을 테스트한 뒤 넓혀가는 편이 안전합니다.</p>
-            <div class="info-grid">
-              <div class="info-card"><h4>대표 옵션 먼저 테스트</h4><p>색상 · 용량 · 맛 · 사이즈 · 구성처럼 상품에 옵션이 있다면, 모든 옵션을 한 번에 준비하지 말고 대표 옵션 하나로 먼저 반응을 확인한 뒤 나머지를 추가하세요.</p></div>
-              <div class="info-card"><h4>부가 상품 소량 준비</h4><p>객단가를 높이는 저관여 부가 상품(소모품 · 액세서리 · 굿즈 등)을 소량 함께 준비하면 도움이 됩니다.</p></div>
-              <div class="info-card"><h4>스테디셀러 우선</h4><p>특정 시즌 · 유행을 타지 않는 상품군을 먼저 확보하면 매출을 오래 지탱하기 쉽습니다.</p></div>
-              <div class="info-card"><h4>입점 심사 기준 확인 <span class="tag">참고</span></h4><p>판매 채널에 따라 최소 등록 상품 수 같은 입점 심사 기준이 있을 수 있습니다. 사용하려는 채널의 기준을 미리 확인하세요.</p></div>
-            </div>
+            <header class="s3-head">
+              <div class="breadcrumb s3-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 03</span></div>
+              <span class="s3-eyebrow">STEP 03 · 상품 · 공급처 · 가격</span>
+              <h1>판매할 상품과 공급처, 가격 확정하기</h1>
+              <p class="s3-lead">얼마나 좋아 보이는 상품인지보다, 어디서 어떤 조건으로 공급받고 얼마에 팔 것인지를 먼저 확인해야 합니다. 정확한 수익 계산은 마진 계산기에서 따로 확인하고, 여기서는 상품과 공급 조건을 정리합니다.</p>
+            </header>
 
-            <h2 class="section-h">공급 방식 정하기</h2>
-            <p>한 가지 방식이 정답은 아닙니다. 아래 기준으로 내 상품에 맞는 방식을 골라보세요.</p>
-            <div class="tbl-wrap"><table>
-              <thead><tr><th>공급 방식</th><th>장점</th><th>단점</th></tr></thead>
-              <tbody>
-                <tr><td><strong>도매 · 총판 매입</strong></td><td>빠르게 시작 가능, 재고 확인이 쉬움</td><td>차별화가 어렵고 최소 주문수량이 있을 수 있음</td></tr>
-                <tr><td><strong>제조사 · OEM · ODM</strong></td><td>브랜드 차별화 가능</td><td>최소 수량이 크고 초기 비용 · 리드타임이 김</td></tr>
-                <tr><td><strong>해외 소싱</strong></td><td>단가가 낮은 경우가 많음</td><td>배송 기간이 길고 품질 편차 · 통관 이슈</td></tr>
-                <tr><td><strong>위탁판매</strong></td><td>재고 부담 없이 진입장벽이 낮음</td><td>마진이 낮고 배송 · 품질 통제가 어려움</td></tr>
-                <tr><td><strong>직접 제작</strong></td><td>완전한 차별화 가능</td><td>초기 투자 · 리스크가 크고 생산 경험 필요</td></tr>
-                <tr><td>기타 <span class="tag">협업 · 구독형 등</span></td><td>상황에 맞게 유연하게 조합 가능</td><td>케이스마다 조건이 크게 다름</td></tr>
-              </tbody>
-            </table></div>
+            <div class="tabs s3-tabs">
+              <div class="tab-bar s3-tabbar">
+                <button class="tab-btn active" type="button" data-tab="guide">가이드</button>
+                <button class="tab-btn" type="button" data-tab="checklist">상품 확정 체크리스트</button>
+              </div>
 
-            <h2 class="section-h">공급처 평가 기준</h2>
-            <p>공급처를 정할 때는 아래 기준으로 비교해보세요. 특정 공급처나 서비스가 모든 사용자에게 정답은 아닙니다.</p>
-            <ul class="trust-list">
-              <li>최소 주문수량(MOQ)</li>
-              <li>단가</li>
-              <li>배송 · 납기</li>
-              <li>불량 · 교환 기준</li>
-              <li>샘플 구매 가능 여부</li>
-              <li>세금계산서 · 거래 조건</li>
-              <li>상품 정보(이미지 · 상세정보) 제공 범위</li>
-            </ul>
+              <!-- ── 가이드 탭: 기존 STEP 03 안내 내용을 5단계 순서로 재배치(원가 계산 입력창 제거, 내용 삭제 없음) ── -->
+              <div class="tab-panel s3-panel s3-panel-guide active" data-tab="guide">
+                <div class="s3-guide-intro">
+                  <h2>상품을 정하기 전에, 확인할 순서를 살펴보세요.</h2>
+                  <p><strong>대표 상품을 먼저 확정하고, 공급처 후보를 비교한 뒤, 조건과 샘플까지 확인하고 나서 판매가를 정합니다.</strong> 특정 업종 · 공급처 · 플랫폼을 전제하지 않으며, 무엇을 팔든 같은 순서로 준비할 수 있습니다.</p>
+                </div>
 
-            <div class="accordion">
-              <div class="acc-item">
-                <button class="acc-head" type="button"><div><div class="at">업종별 예시 보기</div><div class="as">패션 · 뷰티 · 식품 · 생활용품·잡화 · 반려동물용품</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                <div class="acc-body"><div class="acc-body-inner">
-                  <div class="info-grid">
-                    <div class="info-card"><h4>패션</h4><p>신상마켓 같은 동대문 도매 전용 앱으로 사입하거나, 셀러오션 카페 등에서 구인하는 '사입삼촌'(대행)을 활용합니다. 디오트 · 남평화 · 동원(저가), APM · APM플레이스(고급) 등 지역별로 시세가 다르고, 목 · 금요일에 물량이 몰립니다. 첫 거래는 대부분 직접 구매(샘플 반납은 2주 이내)로 시작합니다.</p></div>
-                    <div class="info-card"><h4>뷰티</h4><p>OEM · ODM 화장품 제조사와 협업하거나, 뷰티 카테고리 도매 플랫폼에서 공급처를 찾아보세요.</p></div>
-                    <div class="info-card"><h4>식품</h4><p>위생 · 유통기한 관리가 중요한 만큼, 제조 · 유통 인허가를 갖춘 공급처인지부터 확인하세요.</p></div>
-                    <div class="info-card"><h4>생활용품 · 잡화</h4><p>국내 도매 플랫폼이나 해외 소싱 플랫폼에서 여러 공급처의 단가 · 조건을 비교해보세요.</p></div>
-                    <div class="info-card"><h4>반려동물용품</h4><p>반려동물 전문 제조 · 유통 업체나 관련 도매 플랫폼에서 공급처를 찾아보세요.</p></div>
+                <ol class="s3-sections">
+                  <li class="s3-section">
+                    <span class="s3-num">01</span>
+                    <div class="s3-section-body">
+                      <h3>상품 후보 정하기</h3>
+                      <p class="s3-summary">무엇을 팔지 한 문장으로 먼저 정리해보세요. 처음부터 상품을 넓게 갖추기보다, 대표 상품(또는 우선 판매할 상품 몇 가지)을 먼저 확정하고 반응을 테스트한 뒤 넓혀가는 편이 안전합니다.</p>
+                      <div class="s3-cards">
+                        <div class="s3-card-item"><p class="s3-card-title">대표 옵션 먼저 테스트</p><p>색상 · 용량 · 맛 · 사이즈 · 구성처럼 상품에 옵션이 있다면, 모든 옵션을 한 번에 준비하지 말고 대표 옵션 하나로 먼저 반응을 확인한 뒤 나머지를 추가하세요.</p></div>
+                        <div class="s3-card-item"><p class="s3-card-title">부가 상품 소량 준비</p><p>객단가를 높이는 저관여 부가 상품(소모품 · 액세서리 · 굿즈 등)을 소량 함께 준비하면 도움이 됩니다.</p></div>
+                        <div class="s3-card-item"><p class="s3-card-title">스테디셀러 우선</p><p>특정 시즌 · 유행을 타지 않는 상품군을 먼저 확보하면 매출을 오래 지탱하기 쉽습니다.</p></div>
+                        <div class="s3-card-item"><p class="s3-card-title">입점 심사 기준 확인 <span class="s3-tag">참고</span></p><p>판매 채널에 따라 최소 등록 상품 수 같은 입점 심사 기준이 있을 수 있습니다. 사용하려는 채널의 기준을 미리 확인하세요.</p></div>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="s3-section">
+                    <span class="s3-num">02</span>
+                    <div class="s3-section-body">
+                      <h3>공급처 후보 찾기</h3>
+                      <p class="s3-summary">공급 방식부터 정하면 후보를 좁히기 쉽습니다. 한 가지 방식이 정답은 아니니, 아래 기준으로 내 상품에 맞는 방식을 먼저 살펴보세요.</p>
+                      <div class="s3-methods">
+                        <div class="s3-method"><p class="s3-method-name">도매 · 총판 매입</p><p class="s3-m-good">빠르게 시작 가능, 재고 확인이 쉬움</p><p class="s3-m-limit">차별화가 어렵고 최소 주문수량이 있을 수 있음</p></div>
+                        <div class="s3-method"><p class="s3-method-name">제조사 · OEM · ODM</p><p class="s3-m-good">브랜드 차별화 가능</p><p class="s3-m-limit">최소 수량이 크고 초기 비용 · 리드타임이 김</p></div>
+                        <div class="s3-method"><p class="s3-method-name">해외 소싱</p><p class="s3-m-good">단가가 낮은 경우가 많음</p><p class="s3-m-limit">배송 기간이 길고 품질 편차 · 통관 이슈</p></div>
+                        <div class="s3-method"><p class="s3-method-name">위탁판매</p><p class="s3-m-good">재고 부담 없이 진입장벽이 낮음</p><p class="s3-m-limit">마진이 낮고 배송 · 품질 통제가 어려움</p></div>
+                        <div class="s3-method"><p class="s3-method-name">직접 제작</p><p class="s3-m-good">완전한 차별화 가능</p><p class="s3-m-limit">초기 투자 · 리스크가 크고 생산 경험 필요</p></div>
+                        <div class="s3-method"><p class="s3-method-name">기타 <span class="s3-tag">협업 · 구독형 등</span></p><p class="s3-m-good">상황에 맞게 유연하게 조합 가능</p><p class="s3-m-limit">케이스마다 조건이 크게 다름</p></div>
+                      </div>
+                      <p class="s3-note">공급처 후보는 한 곳만 보지 말고 <strong>최소 2~3곳을 비교</strong>하세요. 단가 · 조건이 비슷해 보여도 배송 · 대응 속도에서 차이가 큰 경우가 많습니다.</p>
+
+                      <div class="accordion s3-industry">
+                        <div class="s3-industry-head">
+                          <h4>업종별 예시</h4>
+                          <p>내 업종과 비슷한 예시를 펼쳐서 참고해보세요. 예시는 참고 방법을 설명한 것이며 특정 결과를 보장하지 않습니다.</p>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">패션</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>신상마켓 같은 동대문 도매 전용 앱으로 사입하거나, 셀러오션 카페 등에서 구인하는 '사입삼촌'(대행)을 활용합니다. 디오트 · 남평화 · 동원(저가), APM · APM플레이스(고급) 등 지역별로 시세가 다르고, 목 · 금요일에 물량이 몰립니다. 첫 거래는 대부분 직접 구매(샘플 반납은 2주 이내)로 시작합니다.</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">뷰티</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>OEM · ODM 화장품 제조사와 협업하거나, 뷰티 카테고리 도매 플랫폼에서 공급처를 찾아보세요.</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">식품</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>위생 · 유통기한 관리가 중요한 만큼, 제조 · 유통 인허가를 갖춘 공급처인지부터 확인하세요.</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">생활용품 · 잡화</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>국내 도매 플랫폼이나 해외 소싱 플랫폼에서 여러 공급처의 단가 · 조건을 비교해보세요.</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">반려동물용품</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>반려동물 전문 제조 · 유통 업체나 관련 도매 플랫폼에서 공급처를 찾아보세요.</p></div></div>
+                        </div>
+                      </div>
+
+                      <a class="s3-service" href="#/wholesale">
+                        <span class="s3-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h14M2 7l1.5-4h11L16 7M2 7v8h14V7"/><path d="M6 15v-4h6v4"/><path d="M2 7a3 3 0 0 0 6 0M8 7a3 3 0 0 0 6 0"/></svg></span>
+                        <span class="s3-service-text"><b>아직 공급처를 정하지 못했다면</b><small>도매처 찾기에서 후보를 살펴보세요</small></span>
+                        <svg class="s3-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                      <p class="s3-note">특정 도매처나 플랫폼이 모든 사용자에게 정답은 아닙니다. 여러 후보를 직접 비교하고 판단하세요.</p>
+                    </div>
+                  </li>
+
+                  <li class="s3-section">
+                    <span class="s3-num">03</span>
+                    <div class="s3-section-body">
+                      <h3>공급 조건 확인하기</h3>
+                      <p class="s3-summary">공급처를 정할 때는 가격 하나만 보지 말고 아래 조건을 함께 확인하세요. 나중에 조건 차이 때문에 마진이 크게 달라질 수 있습니다.</p>
+                      <ul class="s3-checks">
+                        <li>사입가 또는 공급가 (부가세 포함 여부까지 확인)</li>
+                        <li>배송비와 배송 조건(택배사 · 리드타임)</li>
+                        <li>최소 주문수량(MOQ)</li>
+                        <li>반품 · 교환 조건</li>
+                        <li>품절 시 대응 방식(재입고 일정, 대체 상품 여부)</li>
+                        <li>세금계산서 발행 가능 여부</li>
+                        <li>상품 정보(이미지 · 상세정보) 제공 범위</li>
+                      </ul>
+                    </div>
+                  </li>
+
+                  <li class="s3-section">
+                    <span class="s3-num">04</span>
+                    <div class="s3-section-body">
+                      <h3>판매 가격 기준 정하기</h3>
+                      <p class="s3-summary">원가의 2배로 팔아도 실제로 남는 돈은 그보다 훨씬 적을 수 있습니다. 플랫폼 수수료 · 결제 수수료 · 배송비 · 포장비 · 할인 · 반품 비용 · 광고비를 빼고 나면 이익이 거의 없거나 적자가 되는 경우도 많습니다. 판매가는 경쟁사 가격만 보고 따라 정하지 말고, 이 비용을 모두 반영해 마진 계산기에서 실제로 남는 금액을 확인한 뒤 정하세요.</p>
+                      <ul class="s3-checks">
+                        <li>비슷한 상품의 판매가 범위를 먼저 확인하세요.</li>
+                        <li>리뷰에서 반복되는 불만(배송 지연 · 사이즈 오차 · 포장 파손 등)을 확인하고, 내 공급 조건에서 피할 수 있는지 점검하세요.</li>
+                      </ul>
+                      <a class="s3-service s3-service-accent" href="#/tools" data-tools-target="calc">
+                        <span class="s3-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="12" height="14" rx="2"/><rect x="5.5" y="4" width="7" height="3" rx="0.5"/><circle cx="5.5" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="12.5" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="5.5" cy="13" r="0.7" fill="currentColor" stroke="none"/><circle cx="9" cy="13" r="0.7" fill="currentColor" stroke="none"/><circle cx="12.5" cy="13" r="0.7" fill="currentColor" stroke="none"/></svg></span>
+                        <span class="s3-service-text"><b>가격은 경쟁사만 따라 정하지 마세요</b><small>수수료 · 배송비 · 포장비 · 광고비까지 반영한 실제 순이익은 마진 계산기에서 확인하세요</small></span>
+                        <svg class="s3-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                      <p class="s3-note">가격을 올리는 것만이 답은 아닙니다. 공급가 재협상 · 묶음(번들) 구성 · 배송 조건 · 객단가(부가 상품)를 함께 조정하는 방법도 있습니다. 어떤 조합이 실제로 남는지는 마진 계산기로 확인하세요.</p>
+                    </div>
+                  </li>
+
+                  <li class="s3-section">
+                    <span class="s3-num">05</span>
+                    <div class="s3-section-body">
+                      <h3>샘플 확인 후 최종 상품 결정하기</h3>
+                      <p class="s3-summary">사진과 설명만으로는 실제 품질을 알 수 없습니다. 샘플을 직접 받아본 뒤 최종 상품을 결정하세요.</p>
+                      <ul class="s3-checks">
+                        <li>품질(마감 · 내구성 · 소재)이 설명과 일치하는지 확인</li>
+                        <li>색상이 화면에서 본 것과 실제로 차이가 없는지 확인</li>
+                        <li>사이즈 · 용량이 표기와 일치하는지 확인</li>
+                        <li>포장 상태(파손 위험, 포장재 품질)를 확인</li>
+                      </ul>
+                      <p class="s3-note">샘플에서 문제가 발견되면 공급처와 조건을 다시 조율하거나, 다른 후보로 바꾸는 것도 방법입니다.</p>
+                      <p class="s3-note"><a href="#/resources" data-resource-cat="product">상품 · 소싱 · 마진 관련 자료 보기 →</a></p>
+                    </div>
+                  </li>
+                </ol>
+
+                <div class="s3-guide-cta">
+                  <button type="button" class="s3-btn s3-btn-primary" id="s3GoChecklist">상품 확정 체크리스트 확인하기 →</button>
+                </div>
+              </div>
+
+              <!-- ── 상품 확정 체크리스트 탭 ── -->
+              <div class="tab-panel s3-panel s3-panel-cl" data-tab="checklist">
+                <!-- 비회원 안내 — body.is-authed(app.js renderAuthUI, 실제 인증 상태)면 CSS로 숨김.
+                     버튼은 기존 로그인 모달(window.launchdeskOpenLoginModal)만 연다. -->
+                <div class="s3-guest" id="s3Guest">
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                  <div class="s3-guest-body">
+                    <p>로그인하면 체크한 준비 상태를 계정에 저장하고 다른 기기에서도 이어갈 수 있어요.</p>
+                    <button type="button" class="s3-guest-btn" id="s3GuestLogin">로그인하고 저장하기</button>
                   </div>
-                </div></div>
+                </div>
+
+                <!-- 체크리스트 — 저장 구조 보존: .checklist-block[data-chapter] 안의 .cl-row input[type="checkbox"]
+                     정확히 6개, DOM 순서 0~5 = 저장 배열 인덱스(재설계 이전과 동일). .count는 app.js가 갱신한다. -->
+                <div class="checklist-block s3-checklist" data-chapter="/start/sourcing">
+                  <div class="cl-head s3-cl-head">
+                    <div class="s3-cl-title">
+                      <h2 class="title" id="s3ChecklistTitle" tabindex="-1">상품 확정 체크리스트</h2>
+                      <p>실제로 확인한 항목만 체크하세요. 6개를 모두 확인하면 STEP 03이 완료돼요.</p>
+                    </div>
+                    <span class="count">0 / 6</span>
+                  </div>
+                  <div class="s3-cl-bar" aria-hidden="true"><div class="s3-cl-fill" id="s3ClFill"></div></div>
+                  <div class="cl-group s3-cl-group">
+                    <div class="g-label">상품 · 공급처</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">판매할 대표 상품 확정</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">공급처 후보 2~3곳 비교</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">공급가 · 최소주문수량 · 배송조건 확인</span></label>
+                  </div>
+                  <div class="cl-group s3-cl-group">
+                    <div class="g-label">샘플 · 가격</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">샘플로 품질 · 색상 · 사이즈 확인</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">판매가 확정</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">마진 계산기로 예상 수익 확인</span></label>
+                  </div>
+                  <div class="s3-cl-done" id="s3ClDone" hidden><span aria-hidden="true">✓</span><div><b>STEP 03 준비 완료</b><p>상품 · 공급처 · 가격 확정 항목을 모두 확인했어요.</p></div></div>
+                  <div class="cl-note s3-cl-note">로그인 상태에서는 체크한 내용이 계정에 저장돼요. 로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</div>
+                </div>
               </div>
             </div>
 
-            <h2 class="section-h">판매가 · 마진 확인</h2>
-            <div class="callout">
-              <p>초반엔 원가의 1.6~1.7배로 경쟁하려는 유혹이 크지만 오래가지 못합니다. 세금 · 광고비 · 수수료 · 배송비가 늘어나는 구조를 버티려면 <strong>최소 2배 마진</strong>을 기준으로 잡는 걸 권장합니다. 다만 적정 배수는 업종 · 상품군에 따라 크게 달라질 수 있습니다.</p>
-            </div>
-            <div class="pull-quote"><p>실제 사례 — 원가 23,000원 상품을 49,900원에, 무료배송 조건 없이도 판매 채널 베스트 목록에 올린 적이 있습니다.</p></div>
+            <!-- ── 오른쪽 열(large) / 한 열 순서 배치(medium·small) — 탭에 따라 표시 ── -->
+            <aside class="s3-side">
+              <section class="s3-card s3-side-guide" aria-labelledby="s3DecideTitle">
+                <h3 id="s3DecideTitle">이번 단계에서 확인할 것</h3>
+                <ol class="s3-decide">
+                  <li><span>01</span>대표 상품 후보</li>
+                  <li><span>02</span>공급처 후보 비교</li>
+                  <li><span>03</span>공급 조건 확인</li>
+                  <li><span>04</span>판매 가격 기준</li>
+                  <li><span>05</span>샘플 확인</li>
+                </ol>
+                <p class="s3-side-hint">가이드를 읽은 뒤 "상품 확정 체크리스트"에서 직접 확인해보세요.</p>
+              </section>
 
-            <p>원가만 입력하면 2배 마진 기준 판매가를 바로 계산합니다.</p>
-            <div class="calc-box">
-              <div class="calc-in">
-                <label for="calcCost">원가</label>
-                <div class="calc-field"><input id="calcCost" type="number" inputmode="decimal" placeholder="23000" min="0"><span class="calc-unit">원</span></div>
+              <section class="s3-card s3-progress" id="s3Progress" aria-labelledby="s3ProgressTitle" aria-live="polite">
+                <div class="s3-progress-head">
+                  <h3 id="s3ProgressTitle">STEP 03 진행 상태</h3>
+                  <span class="s3-progress-badge" id="s3ProgressBadge">필수 0 / 6</span>
+                </div>
+                <div class="s3-progress-bar"><div class="s3-progress-fill" id="s3ProgressFill"></div></div>
+                <ul class="s3-progress-items" id="s3ProgressItems">
+                  <li class="s3-progress-group"><span>상품 · 공급처</span><b data-cl-range="0-2">0 / 3</b></li>
+                  <li data-cl-index="0"><span class="s3-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>대표 상품 확정</li>
+                  <li data-cl-index="1"><span class="s3-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>공급처 후보 비교</li>
+                  <li data-cl-index="2"><span class="s3-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>공급 조건 확인</li>
+                  <li class="s3-progress-group"><span>샘플 · 가격</span><b data-cl-range="3-5">0 / 3</b></li>
+                  <li data-cl-index="3"><span class="s3-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>샘플 확인</li>
+                  <li data-cl-index="4"><span class="s3-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>판매가 확정</li>
+                  <li data-cl-index="5"><span class="s3-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>마진 계산기 확인</li>
+                </ul>
+                <div class="s3-progress-done" id="s3ProgressDone" hidden>✓ STEP 03 준비 완료</div>
+                <!-- 로그인 안내(게스트) / 저장 상태(회원) — 실제 인증 상태(body.is-authed)만 본다. 저장 완료 표시는 만들지 않는다. -->
+                <p class="s3-progress-foot s3-progress-guest">로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</p>
+                <p class="s3-progress-foot s3-progress-member">로그인 상태 · 체크한 내용은 계정에 저장돼요.</p>
+              </section>
+
+              <section class="s3-card s3-tools" aria-labelledby="s3ToolsTitle">
+                <h3 id="s3ToolsTitle">관련 도구</h3>
+                <ul class="s3-tool-list">
+                  <li><a href="#/wholesale"><span class="s3-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 7h14M2 7l1.5-4h11L16 7M2 7v8h14V7"/><path d="M6 15v-4h6v4"/><path d="M2 7a3 3 0 0 0 6 0M8 7a3 3 0 0 0 6 0"/></svg></span><span><b>도매처 찾기</b><small>공급처 후보 살펴보기</small></span><svg class="s3-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/tools" data-tools-target="calc"><span class="s3-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2" width="12" height="14" rx="2"/><rect x="5.5" y="4" width="7" height="3" rx="0.5"/><circle cx="5.5" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="12.5" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="5.5" cy="13" r="0.7" fill="currentColor" stroke="none"/><circle cx="9" cy="13" r="0.7" fill="currentColor" stroke="none"/><circle cx="12.5" cy="13" r="0.7" fill="currentColor" stroke="none"/></svg></span><span><b>마진 계산기</b><small>수수료 · 배송비까지 반영해 확인</small></span><svg class="s3-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                </ul>
+              </section>
+
+              <section class="desk-help s3-help" aria-labelledby="s3HelpTitle">
+                <h3 id="s3HelpTitle">공급처 조건 확인이 막혔나요?</h3>
+                <p>상품 · 공급처 준비를 세팅 대행으로 도움받을 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg></a>
+              </section>
+            </aside>
+
+            <!-- 이전/다음 — 기존 경로(#/start/setup, #/start/content) 그대로인 해시 링크. 미완료 시
+                 다음 이동은 step03.js가 confirm으로 한 번 묻는다(막지 않음). -->
+            <nav class="s3-nav" aria-label="STEP 이동">
+              <p class="s3-nav-status" id="s3NavStatus"><span id="s3NavText">체크 항목 6개를 완료하면 STEP 03이 완료돼요.</span> <b id="s3NavCount">0 / 6</b></p>
+              <div class="s3-nav-btns">
+                <a class="s3-btn s3-btn-ghost s3-nav-prev" href="#/start/setup">← STEP 02 · 사업자 등록하고 쇼핑몰 플랫폼 만들기</a>
+                <a class="s3-btn s3-btn-primary s3-nav-next" href="#/start/content" id="s3Next">STEP 04 · 상품 상세페이지 완성하기 →</a>
               </div>
-              <div class="calc-out">
-                <div><div class="co-label">추천 판매가 (2배)</div><div class="co-value muted" id="calcPrice">—</div></div>
-                <div><div class="co-label">마진액</div><div class="co-value muted" id="calcMargin">—</div></div>
-                <div><div class="co-label">마진율</div><div class="co-value muted" id="calcRate">—</div></div>
-              </div>
-            </div>
-            <p style="font-size:.78rem; color:var(--ink-faint); margin-top:-.6rem;">이건 "최소 2배 마진 법칙"만 빠르게 확인하는 간단 버전이에요. 수수료 · 배송비까지 반영한 정밀 계산은 <a href="#/tools" data-tools-target="calc" style="color:var(--accent-ink); font-weight:600;">마진 계산기</a>를 이용하세요.</p>
+            </nav>
 
-            <div class="tbl-wrap"><table>
-              <thead><tr><th>마진을 올리는 방법</th><th>특징</th><th>한계</th></tr></thead>
-              <tbody>
-                <tr><td><strong>판매가를 올린다</strong></td><td>이익 상승</td><td>전환율 하락</td></tr>
-                <tr><td><strong>원가를 낮춘다</strong></td><td>이익 유지 + 전환율 유지</td><td>직접 제작 · 해외 소싱 등은 난이도 상승</td></tr>
-              </tbody>
-            </table></div>
-
-            <p style="font-size:.9rem;">매출은 한 번에 오르지 않습니다. 히트 상품 1~2개로 시작해, 스테디셀러가 점차 쌓이는 흐름으로 성장하는 경우가 많습니다.</p>
-
-            <h2 class="section-h">STEP 03 체크리스트</h2>
-            <div class="checklist-block" data-chapter="/start/sourcing">
-              <div class="cl-head"><span class="title">상품 · 가격 확정 체크리스트</span><span class="count" id="clCount3">0 / 6</span></div>
-              <div class="cl-group">
-                <div class="g-label">📦 상품 · 공급</div>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">대표 판매 상품 확정</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">공급 방식 확정</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">공급처 후보 확보</span></label>
-              </div>
-              <div class="cl-group">
-                <div class="g-label">💰 가격 · 마진</div>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">원가 확인</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">판매가 확정</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">기본 마진 구조 확인</span></label>
-              </div>
-              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 6개를 모두 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요.</div>
-            </div>
-
-            <p style="font-size:.84rem;"><a href="#/resources" data-resource-cat="product" style="color:var(--accent-ink); font-weight:600;">상품 · 소싱 · 마진 관련 자료 보기 →</a></p>
-
-            <p style="font-size:.86rem; color:var(--ink-faint); margin-top:1.2rem;">상품과 가격을 확정했다면, 다음 STEP에서는 상품 상세페이지를 완성합니다.</p>
-
-            <div class="chapter-nav">
-              <a href="#/start/setup"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 02 · 사업자 등록하고 쇼핑몰 플랫폼 만들기</span></a>
-              <a class="next" href="#/start/content"><span class="cn-label">다음 STEP →</span><span class="cn-title">STEP 04 · 상품 상세페이지 완성하기</span></a>
-            </div>
           </div>
         </div>
       </section>
@@ -3223,6 +3365,7 @@
 <script src="desk.js"></script>
 <script src="step01.js"></script>
 <script src="step02.js"></script>
+<script src="step03.js"></script>
 <script src="plans.js"></script>
 <script src="admin.js"></script>
 </body>

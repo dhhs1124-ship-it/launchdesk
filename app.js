@@ -1573,28 +1573,6 @@
     countUpEls.forEach(function(el){ countUpObserver.observe(el); });
   }
 
-  /* 2x-margin calculator (ch03) — pure client-side, nothing stored */
-  var calcCost = document.getElementById('calcCost');
-  if(calcCost){
-    var calcPrice = document.getElementById('calcPrice');
-    var calcMargin = document.getElementById('calcMargin');
-    var calcRate = document.getElementById('calcRate');
-    var fmt = function(n){ return Math.round(n).toLocaleString('ko-KR') + '원'; };
-    calcCost.addEventListener('input', function(){
-      var cost = parseFloat(calcCost.value);
-      if(!cost || cost <= 0){
-        calcPrice.textContent = '—'; calcMargin.textContent = '—'; calcRate.textContent = '—';
-        calcPrice.classList.add('muted'); calcMargin.classList.add('muted'); calcRate.classList.add('muted');
-        return;
-      }
-      var price = cost * 2;
-      calcPrice.textContent = fmt(price);
-      calcMargin.textContent = fmt(price - cost);
-      calcRate.textContent = '50%';
-      calcPrice.classList.remove('muted'); calcMargin.classList.remove('muted'); calcRate.classList.remove('muted');
-    });
-  }
-
   /* checklist counters — one independent count per .checklist-block
      (a page can have more than one). Deliberately NOT persisted — these
      are the "선택/참고용" checklists that never counted toward progress
