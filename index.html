@@ -213,7 +213,7 @@
   <aside class="sidebar" id="sidebar">
     <!-- 2026-09 UI 재설계 1차: 피그마 Make 시안의 사이드바를 기존 마크업 위에 옮김.
          id/data 속성(#profileCard #profileAvatarLetter #profileName #profileDay
-         #progressPct #progressFillSide #adminSidebarLink, a[data-match])은 app.js/
+         #adminSidebarLink, a[data-match])은 app.js/
          admin.js가 그대로 쓰므로 유지. 메뉴 순서·라벨만 시안대로 바꿨고, "마진
          계산기"는 기존 #/tools + data-tools-target="calc"(tools.js 탭 자동 전환)로
          연결한다 — /tools의 다른 탭·기능은 그대로다. 게스트 카드 ↔ 프로필 카드
@@ -280,10 +280,6 @@
         <div class="profile-day" id="profileDay">진행상황을 저장하고 다른 기기에서도 이어볼 수 있어요.</div>
       </div>
     </div>
-    <div class="progress-mini">
-      <div class="pm-head"><span>창업 준비</span><b id="progressPct">0%</b></div>
-      <div class="pm-bar"><div class="pm-fill" id="progressFillSide"></div></div>
-    </div>
     <div class="side-nav-foot">
       <div class="sidebar-links"><a href="#/guide">이용 안내</a><a href="#/contact">문의하기</a></div>
       <p class="sidebar-tagline">좋은 시작이<br>좋은 판매로.<br><b>LaunchDesk</b></p>
@@ -314,22 +310,21 @@
 
     <main>
 
-      <!-- ============ VIEW: 홈 — 운영 대시보드 ============
-           2026-09 리뉴얼: 실제 Cafe24/Meta 운영 데이터 중심의 대시보드로
-           재구성했다(home-dashboard.js). 아래 로드맵 배너/체크리스트는
-           기존 그대로 유지 — home-dashboard.js는 이 섹션의 DOM/로직을
-           전혀 건드리지 않는다(app.js의 renderHomeDashboard()가 계속
-           담당). Cafe24/Meta 실제 데이터는 새 계산 없이 ops-overview.js가
-           이미 계산해둔 값을 window.launchdeskOpsSnapshot으로 구독만
-           한다(중복 조회/중복 로직 없음). -->
+      <!-- ============ VIEW: 홈 — 시작 데스크 ============
+           2026-09 UI 재설계: 홈은 시작 데스크(desk.js) + 운영 현황 안내 카드 +
+           내 계획(plans.js #ldPlanPanel) + "이어서 준비하기" 카드(app.js
+           renderHomeResumeCard)로 구성된다. 운영 대시보드(#opsdashRoot,
+           home-dashboard.js)는 #/dashboard(#view-dashboard)로 옮겼고, 예전
+           로드맵 패널(퍼센트·원형 그래프·진행 바·STEP 00~08 목록)은 2차에서
+           제거했다. -->
       <section class="view" id="view-home" hidden>
         <div class="content">
           <!-- ============ 시작 데스크 (2026-09 UI 재설계 1차, desk.js) ============
                피그마 Make 시안의 홈을 정적 마크업으로 옮긴 것. 상황 선택(A~D)은
                진짜 radio + label이고, 선택 결과는 desk.js가 #deskRec/#deskDecideList에
                createElement로 그린다(저장 없음). 링크는 전부 app.js BUILT에 이미 있는
-               해시 라우트만 쓴다. 기존 내 계획(#ldPlanPanel) · 운영 대시보드
-               (#opsdashRoot) · 로드맵 패널은 이 블록 아래에 그대로 남아 있다(id 중복
+               해시 라우트만 쓴다. 이 블록 아래에는 운영 현황 안내 카드 · 내 계획
+               (#ldPlanPanel) · "이어서 준비하기" 카드(#deskResume)가 이어진다(id 중복
                없음, 기존 모듈 연결 유지). -->
           <div class="desk" id="deskRoot">
             <section class="desk-hero" aria-labelledby="deskHeroTitle">
@@ -467,125 +462,21 @@
             </div>
           </div>
 
-          <!-- 쇼핑몰 오픈 로드맵 — 압축형(요구사항 12). resume-banner(현재
-               진행률 요약)는 항상 보이고, STEP 00~08 상세 체크리스트만
-               네이티브 details 요소로 접는다. details는 닫혀 있어도
-               콘텐츠가 DOM에 그대로 남아 있어 data-chapter/.gp-row 등
-               기존 selector가 열림/닫힘과 무관하게 항상 정상 동작한다. -->
-          <div class="dash-panel opsdash-roadmap-panel">
-            <div class="dash-panel-head">쇼핑몰 오픈 로드맵</div>
-            <p class="opsdash-roadmap-lead">쇼핑몰 시작을 위한 단계를 확인하고, 지금 바로 시작해보세요.</p>
-
-            <div class="resume-banner">
-            <div>
-              <div class="rb-label">지금 해야 할 STEP</div>
-              <h2 id="resumeTitle">STEP 00 · 오픈 로드맵 확인하기</h2>
-              <p class="rb-sub" id="resumeSub">7단계 중 0단계 완료</p>
-              <div class="rb-bar"><div class="rb-bar-fill" id="rbBarFill"></div></div>
+          <!-- 이어서 준비하기(2026-09 UI 재설계 2차) — 예전 "쇼핑몰 오픈 로드맵" 패널
+               (퍼센트·원형 그래프·진행 바·STEP 00~08 목록·운영 도구 링크·오늘의 팁)을 이
+               작은 카드 하나로 대체했다. 내용은 app.js renderHomeResumeCard()가
+               computeStepProgress()(STEP_ROADMAP/GATED_STEPS · user_step_progress 기준,
+               변경 없음)로 채운다. 위 4단계 요약(.desk-roadmap)은 안내용이라 이 카드의
+               데이터와 연결하지 않는다. 아래 기본 텍스트는 완료 0 상태와 같다. -->
+          <section class="desk-resume" id="deskResume" aria-labelledby="deskResumeTitle">
+            <div class="desk-resume-text">
+              <p class="desk-resume-eyebrow" id="deskResumeEyebrow">이어서 준비하기</p>
+              <h2 id="deskResumeTitle"><span class="desk-resume-step" id="deskResumeStep">STEP 01</span><span id="deskResumeLabel">무엇을, 누구에게 팔지 정하기</span></h2>
+              <p class="desk-resume-desc" id="deskResumeDesc">첫 단계부터 차근차근 시작해보세요.</p>
+              <p class="desk-resume-note" id="deskResumeNote" hidden>로그인하면 진행 상황을 다른 기기에서도 이어갈 수 있어요.</p>
             </div>
-            <div class="rb-right">
-              <div class="rb-ring">
-                <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="6"/><circle id="rbRingArc" cx="32" cy="32" r="28" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="175.9" style="transition:stroke-dashoffset .4s ease"/></svg>
-                <span id="rbPct">0%</span>
-              </div>
-              <a class="btn btn-primary" id="resumeLink" href="#/start/intro">이어서 하기 →</a>
-            </div>
-            </div>
-
-            <details class="opsdash-roadmap-details">
-              <summary>
-                전체 단계 보기
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-              </summary>
-
-          <div class="dash-grid">
-            <div class="dash-panel">
-              <div class="dash-panel-head">오픈 로드맵 · STEP 00~08</div>
-              <div class="guide-preview-list" id="homeRoadmapList">
-                <a class="gp-row" href="#/start/intro" data-chapter="/start/intro">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">🧭</span>
-                  <span class="gp-text"><span class="gp-title">STEP 00 오픈 로드맵 확인하기</span><span class="gp-time">오리엔테이션</span></span>
-                </a>
-                <a class="gp-row" href="#/start/prepare" data-chapter="/start/prepare">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">🎯</span>
-                  <span class="gp-text"><span class="gp-title">STEP 01 무엇을, 누구에게 팔지 정하기</span><span class="gp-time">방향 결정</span></span>
-                </a>
-                <a class="gp-row" href="#/start/setup" data-chapter="/start/setup">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">🏢</span>
-                  <span class="gp-text"><span class="gp-title">STEP 02 사업자 등록하고 쇼핑몰 플랫폼 만들기</span><span class="gp-time">사업자 · 플랫폼</span></span>
-                </a>
-                <a class="gp-row" href="#/start/sourcing" data-chapter="/start/sourcing">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">📦</span>
-                  <span class="gp-text"><span class="gp-title">STEP 03 판매할 상품과 공급처, 가격 확정하기</span><span class="gp-time">상품 · 가격</span></span>
-                </a>
-                <a class="gp-row" href="#/start/content" data-chapter="/start/content">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">🖼️</span>
-                  <span class="gp-text"><span class="gp-title">STEP 04 상품 상세페이지 완성하기</span><span class="gp-time">상세페이지</span></span>
-                </a>
-                <a class="gp-row" href="#/start/orders" data-chapter="/start/orders">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">🚚</span>
-                  <span class="gp-text"><span class="gp-title">STEP 05 배송·CS 정책 정하고 오픈 준비 마치기</span><span class="gp-time">배송 · CS · 오픈</span></span>
-                </a>
-                <a class="gp-row" href="#/start/marketing-setup" data-chapter="/start/marketing-setup">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">🔗</span>
-                  <span class="gp-text"><span class="gp-title">STEP 06 마케팅 인프라 연결하기</span><span class="gp-time">결제 · 추적 연동</span></span>
-                </a>
-                <a class="gp-row" href="#/start/marketing" data-chapter="/start/marketing">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">📣</span>
-                  <span class="gp-text"><span class="gp-title">STEP 07 첫 유입 만들고 반응 테스트하기</span><span class="gp-time">유입 테스트</span></span>
-                </a>
-                <a class="gp-row" href="#/start/wrapup" data-chapter="/start/wrapup">
-                  <span class="gp-check" data-check><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
-                  <span class="gp-icon">🏁</span>
-                  <span class="gp-text"><span class="gp-title">STEP 08 오픈 완료, 운영 시작하기</span><span class="gp-time">운영 전환</span></span>
-                </a>
-              </div>
-              <a class="gp-see-all" href="#/start">전체 로드맵 자세히 보기 →</a>
-            </div>
-
-            <div style="display:flex; flex-direction:column; gap:1rem;">
-              <div>
-                <div class="dash-panel-head" style="padding:0 0 .7rem; border:none;">운영 도구</div>
-                <div class="quick-row-list">
-                  <a class="quick-row" href="#/tools" data-tools-target="calc">
-                    <span class="qr-icon tone-b">🧮</span>
-                    <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가 · 판매가 · 마진율 계산</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/tools">
-                    <span class="qr-icon tone-b">📈</span>
-                    <span class="qr-text"><span class="qr-title">수익 시뮬레이터</span><span class="qr-sub">목표 매출 · 손익분기 확인</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/tools">
-                    <span class="qr-icon tone-b">🎯</span>
-                    <span class="qr-text"><span class="qr-title">광고 기록</span><span class="qr-sub">소재별 성과 기록</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/resources">
-                    <span class="qr-icon tone-c">📚</span>
-                    <span class="qr-text"><span class="qr-title">자료실</span><span class="qr-sub">설정 가이드 · 공급처 · 앱 모음</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                </div>
-              </div>
-
-              <div class="tip-box">
-                <div class="tb-label">✨ 오늘의 팁</div>
-                <p>상세페이지는 고객이 상품을 이해하고 구매 여부를 판단하는 핵심 화면입니다. 첫 스크롤 안에 핵심 메시지를 담으세요.</p>
-              </div>
-            </div>
-          </div>
-            </details>
-          </div>
+            <a class="desk-resume-btn" id="deskResumeLink" href="#/start/prepare">계속하기 →</a>
+          </section>
 
         </div>
       </section>
@@ -612,38 +503,6 @@
               </button>
             </div>
 
-            <!-- 통합 검색은 이번 배포에 포함하지 않는다 — 작동하지 않는
-                 입력창을 사용자에게 보여주지 않기 위해, 실제 검색 기능을
-                 구현할 수 있을 때까지 UI 자체를 만들지 않는다(후속 기능).
-                 opsdash-search 관련 CSS도 styles.css에서 함께 제거했다. -->
-
-            <!-- Hero — compact brand panel. 실제 사진/스톡 이미지를 새로
-                 가져오지 않고, 이 화면에서 이미 쓰는 색 토큰만으로 그린
-                 인라인 SVG 일러스트(박스+메모카드+식물 모티프)로 브랜드
-                 무드를 표현한다. -->
-            <div class="opsdash-hero">
-              <div class="opsdash-hero-text">
-                <p>오늘의 운영 상태를 확인해보세요</p>
-                <h2>LaunchDesk가 쇼핑몰과 광고 데이터를 함께 정리해드립니다.</h2>
-              </div>
-              <div class="opsdash-hero-visual" aria-hidden="true">
-                <svg viewBox="0 0 200 120">
-                  <rect x="6" y="58" width="62" height="52" rx="5" fill="var(--op-accent-soft)"/>
-                  <rect x="18" y="40" width="38" height="24" rx="4" fill="#fff" stroke="var(--border-strong)"/>
-                  <rect x="80" y="16" width="70" height="94" rx="7" fill="#fff" stroke="var(--border-strong)"/>
-                  <line x1="94" y1="36" x2="136" y2="36" stroke="var(--op-accent)" stroke-width="3.5" stroke-linecap="round"/>
-                  <line x1="94" y1="50" x2="136" y2="50" stroke="var(--ink-faint)" stroke-width="3.5" stroke-linecap="round"/>
-                  <line x1="94" y1="64" x2="118" y2="64" stroke="var(--ink-faint)" stroke-width="3.5" stroke-linecap="round"/>
-                  <circle cx="94" cy="86" r="7" fill="var(--op-accent-soft)" stroke="var(--op-accent)" stroke-width="2"/>
-                  <path d="M91 82c4-4 8-1 8 3s-4 6-8 3" fill="none" stroke="var(--op-accent)" stroke-width="1.4"/>
-                  <circle cx="172" cy="76" r="20" fill="var(--op-accent-soft)"/>
-                  <path d="M172 62c-7 5-7 13 0 20c7-7 7-15 0-20z" fill="var(--op-accent)"/>
-                  <path d="M172 68v18" stroke="#fff" stroke-width="1.4" opacity=".5"/>
-                </svg>
-                <span class="opsdash-hero-mark">Launch Together</span>
-              </div>
-            </div>
-
             <!-- 오늘 핵심 숫자 — 실제 Cafe24 주문/Meta 광고 데이터만 표시.
                  가짜 증감률(▲12% 등)은 절대 넣지 않는다(요구사항 6). -->
             <div class="opsdash-kpis" id="opsdashKpis">
@@ -665,55 +524,27 @@
               </div>
             </div>
 
-            <!-- 2:1 메인 grid — 왼쪽 "쇼핑몰 운영 현황"(브리핑+광고상태+
-                 월간현황을 한 패널로 통합, 카드 안에 카드를 만들지 않고
-                 서브 타이틀/divider로만 구분) + 오른쪽 "지금 무엇을
-                 시작할까요"(요구사항 5·6). -->
-            <div class="opsdash-row">
-              <div class="dash-panel">
-                <div class="dash-panel-head">쇼핑몰 운영 현황</div>
-                <div class="opsdash-ops-body">
-                  <div class="opsdash-ops-split">
-                    <div class="opsdash-ops-col">
-                      <div class="opsdash-subhead"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><line x1="9.5" y1="12" x2="14.5" y2="12"/><line x1="9.5" y1="15" x2="14.5" y2="15"/></svg></span>오늘의 운영 브리핑</div>
-                      <div class="opsdash-brief-list" id="opsdashBriefList"></div>
-                    </div>
-                    <div class="opsdash-ops-divider"></div>
-                    <div class="opsdash-ops-col">
-                      <div class="opsdash-subhead"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg></span>광고 상태</div>
-                      <div class="opsdash-adstate" id="opsdashAdState"></div>
-                    </div>
+            <!-- 쇼핑몰 운영 현황 — 브리핑+광고 상태+월간 현황을 한 패널로 통합(카드 안에
+                 카드를 만들지 않고 서브 타이틀/divider로만 구분). 예전 오른쪽 "지금,
+                 무엇을 시작할까요" 퀵 액션 패널과 2:1 grid 래퍼는 2026-09 UI 재설계
+                 2차에서 제거했다(빈 래퍼 없이 이 패널 하나가 전체 폭). -->
+            <div class="dash-panel opsdash-ops-panel">
+              <div class="dash-panel-head">쇼핑몰 운영 현황</div>
+              <div class="opsdash-ops-body">
+                <div class="opsdash-ops-split">
+                  <div class="opsdash-ops-col">
+                    <div class="opsdash-subhead"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><line x1="9.5" y1="12" x2="14.5" y2="12"/><line x1="9.5" y1="15" x2="14.5" y2="15"/></svg></span>오늘의 운영 브리핑</div>
+                    <div class="opsdash-brief-list" id="opsdashBriefList"></div>
                   </div>
-                  <div class="opsdash-ops-hr"></div>
-                  <div class="opsdash-subhead">이번 달 운영 현황</div>
-                  <div class="opsdash-summary" id="opsdashMonthSummary"></div>
+                  <div class="opsdash-ops-divider"></div>
+                  <div class="opsdash-ops-col">
+                    <div class="opsdash-subhead"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg></span>광고 상태</div>
+                    <div class="opsdash-adstate" id="opsdashAdState"></div>
+                  </div>
                 </div>
-              </div>
-              <div class="dash-panel">
-                <div class="dash-panel-head" style="padding:1.05rem 1.3rem .5rem; border:none;">지금, 무엇을 시작할까요?</div>
-                <p style="margin:0; padding:0 1.3rem .6rem; font-size:.8rem; color:var(--ink-faint);">LaunchDesk에서 바로 할 수 있는 일을 모았습니다.</p>
-                <div class="quick-row-list" style="border:none;" id="opsdashQuickActions">
-                  <a class="quick-row" href="#/wholesale">
-                    <span class="qr-icon tone-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></svg></span>
-                    <span class="qr-text"><span class="qr-title">도매처 찾기</span><span class="qr-sub">검증된 도매처를 둘러보세요</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/resources">
-                    <span class="qr-icon tone-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5c-2-1.2-5-1.5-8-1v14c3-.5 6-.2 8 1c2-1.2 5-1.5 8-1V4c-3-.5-6-.2-8 1z"/><line x1="12" y1="5" x2="12" y2="19"/></svg></span>
-                    <span class="qr-text"><span class="qr-title">운영 가이드 보기</span><span class="qr-sub">처음이라도 하나씩 따라가며 시작해보세요</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/tools" data-tools-target="calc">
-                    <span class="qr-icon tone-b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><circle cx="8.5" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="8.5" cy="16" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r=".6" fill="currentColor" stroke="none"/><circle cx="15.5" cy="16" r=".6" fill="currentColor" stroke="none"/></svg></span>
-                    <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가와 판매가를 기준으로 마진을 확인하세요</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/services/setup">
-                    <span class="qr-icon tone-d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="4.5" y1="7.5" x2="19.5" y2="7.5"/><circle cx="9.5" cy="7.5" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="12" x2="19.5" y2="12"/><circle cx="15" cy="12" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="16.5" x2="19.5" y2="16.5"/><circle cx="11.5" cy="16.5" r="1.7" fill="currentColor" stroke="none"/></svg></span>
-                    <span class="qr-text"><span class="qr-title">세팅 대행 문의</span><span class="qr-sub">쇼핑몰 세팅을 도움받아보세요</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                </div>
+                <div class="opsdash-ops-hr"></div>
+                <div class="opsdash-subhead">이번 달 운영 현황</div>
+                <div class="opsdash-summary" id="opsdashMonthSummary"></div>
               </div>
             </div>
 
@@ -808,19 +639,18 @@
             <h1>처음부터 차근차근, 쇼핑몰 시작 가이드</h1>
             <p class="page-lead">준비 단계부터 오픈, 운영 시작까지 STEP 00~08 순서 그대로 따라오세요.</p>
           </div>
-          <div class="start-stats">
-            <div><div class="ss-label">전체 구성</div><div class="ss-value">STEP 00~08</div></div>
-            <div><div class="ss-label">이용 방식</div><div class="ss-value">전체 무료</div></div>
-            <div><div class="ss-label">내 진행률</div><div class="ss-value" id="ssProgress">0/7 완료</div></div>
-          </div>
-
-          <div class="progress-detail">
-            <div class="pd-head"><span>나의 진행률</span><b id="pdPct">0%</b></div>
-            <div class="pd-bar"><div class="pd-fill" id="pdFill"></div></div>
-            <div class="pd-legend">
-              <span><i class="pd-dot done"></i>완료 <b id="pdDone">0</b>개</span>
-              <span><i class="pd-dot left"></i>남은 <b id="pdLeft">7</b>개</span>
+          <!-- 진행 표시 단순화(2026-09 UI 재설계 2차): 통계 3칸·퍼센트·진행 바·범례
+               대신 "완료 N / 7 · 다음 단계 · 이어서 준비하기"만 남긴다. 값은 app.js
+               recomputeProgress()가 computeStepProgress()로 채운다(저장 구조·완료 판정
+               변경 없음). STEP 00·08은 게이트 없는 안내 화면이라 완료 집계 대상이
+               아니므로 분모는 STEP 01~07의 7이다. -->
+          <div class="start-status" id="startStatus">
+            <div class="start-status-text">
+              <p class="start-status-label">쇼핑몰 준비 로드맵</p>
+              <p class="start-status-count">완료 <b id="startStatusDone">0</b> / <span id="startStatusTotal">7</span> <span class="start-status-scope">STEP 01~07 기준</span></p>
+              <h2 class="start-status-next" id="startStatusNext">STEP 01 · 무엇을, 누구에게 팔지 정하기</h2>
             </div>
+            <a class="start-status-btn" id="startStatusLink" href="#/start/prepare">이어서 준비하기 →</a>
           </div>
 
           <div class="card-grid" id="chapterGrid">
@@ -837,7 +667,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/prepare" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">01</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">01</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
                 <h2>STEP 01 무엇을, 누구에게 팔지 정하기</h2><p>상품과 타겟 고객의 방향을 먼저 정하면 이후 판단이 훨씬 쉬워집니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -848,7 +678,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/setup" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">02</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">02</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
                 <h2>STEP 02 사업자 등록하고 쇼핑몰 플랫폼 만들기</h2><p>사업자 · 쇼핑몰 · 결제 환경을 실제 거래 가능한 상태로 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -859,7 +689,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/sourcing" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">03</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">03</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
                 <h2>STEP 03 판매할 상품과 공급처, 가격 확정하기</h2><p>어디서 공급받고 얼마에 들여와 얼마에 팔지 계산해 판매를 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -870,7 +700,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/content" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">04</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">04</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
                 <h2>STEP 04 상품 상세페이지 완성하기</h2><p>이미지와 설명만으로 상품의 특징과 차이를 이해할 수 있게 만듭니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -881,7 +711,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/orders" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">05</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">05</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
                 <h2>STEP 05 배송·CS 정책 정하고 오픈 준비 마치기</h2><p>주문을 실제로 처리할 수 있는 배송 · CS 체계를 갖춰 오픈을 마무리합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -892,7 +722,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/marketing-setup" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">06</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">06</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
                 <h2>STEP 06 마케팅 인프라 연결하기</h2><p>광고를 시작하기 전에 유입과 구매를 추적할 수 있는 환경부터 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -903,7 +733,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/marketing" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">07</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">07</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
                 <h2>STEP 07 첫 유입 만들고 반응 테스트하기</h2><p>최소 하나의 방법으로 실제 방문자를 만들어보고 반응을 확인합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>

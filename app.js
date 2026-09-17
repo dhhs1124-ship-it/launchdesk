@@ -176,6 +176,13 @@
     window.scrollTo(0, 0);
     closeSidebar();
 
+    /* 로드맵 진행 표시(2026-09 UI 재설계 2차): 홈 "이어서 준비하기" 카드와 /start
+       상태·카드 라벨(완료/진행 중/시작 전)은 저장된 data를 읽어 그리므로, 그 두
+       화면에 들어올 때 한 번 다시 그려 STEP 화면에서 방금 입력한 부분 진행이 바로
+       반영되게 한다. recomputeProgress()는 DOM만 다시 칠하고 저장·완료 판정은
+       하지 않는다(setChapterDone/STEP_EVALUATORS와 무관). */
+    if(path === '/' || path === '/start') recomputeProgress();
+
     /* STEP02~07의 "OO 관련 자료 보기" 링크가 남겨둔 카테고리를 자료실
        도착 시 한 번만 적용 — 새 라우팅을 추가하지 않고, 자료실 자체의
        필터 탭 클릭 메커니즘을 그대로 재사용한다(아래 filter-tab 클릭
@@ -620,8 +627,6 @@
     '/start/prepare':         'ld-worksheet-start-prepare-v2',
     '/start/marketing-setup': 'ld-checklist-start-marketing-setup-v2'
   };
-  var progressFillEls = document.querySelectorAll('#progressFillSide, #progressFillRow');
-  var progressPctEls = document.querySelectorAll('#progressPct');
 
   function checklistAllChecked(path){
     var block = document.querySelector('.checklist-block[data-chapter="' + path + '"]');
@@ -694,36 +699,49 @@
   function recomputeProgress(){
     var completed = getCompleted();
     var prog = computeStepProgress(completed);
-    var pct = prog.pct;
-    progressFillEls.forEach(function(el){ el.style.width = pct + '%'; });
-    progressPctEls.forEach(function(el){ el.textContent = pct + '%'; });
+    // (사이드바 "창업 준비 N%" 미니 진행 바(#progressPct/#progressFillSide)는 2026-09
+    //  UI 재설계 2차에서 제거 — 진행 정보는 /start와 홈 카드에서만 보여준다.)
 
-    // /start index page extras: stat row, detail bar, per-card checkmarks
-    var ssProgress = document.getElementById('ssProgress');
-    if(ssProgress) ssProgress.textContent = prog.done + '/' + prog.total + ' 완료';
-    var pdPct = document.getElementById('pdPct');
-    if(pdPct) pdPct.textContent = pct + '%';
-    var pdFill = document.getElementById('pdFill');
-    if(pdFill) pdFill.style.width = pct + '%';
-    var pdDone = document.getElementById('pdDone');
-    if(pdDone) pdDone.textContent = prog.done;
-    var pdLeft = document.getElementById('pdLeft');
-    if(pdLeft) pdLeft.textContent = prog.total - prog.done;
+    // /start 상단 상태(2026-09 UI 재설계 2차) — 퍼센트·진행 바·범례 대신
+    // "완료 N / 7 · 다음 단계 · 이어서 준비하기"만. 요소가 없어도 조용히 지나간다.
+    var ssDone = document.getElementById('startStatusDone');
+    if(ssDone) ssDone.textContent = prog.done;
+    var ssTotal = document.getElementById('startStatusTotal');
+    if(ssTotal) ssTotal.textContent = prog.total;
+    var ssNext = document.getElementById('startStatusNext');
+    var ssLink = document.getElementById('startStatusLink');
+    if(prog.next){
+      if(ssNext) ssNext.textContent = 'STEP ' + prog.next.num + ' · ' + prog.next.label;
+      if(ssLink){ ssLink.href = '#' + prog.next.route; ssLink.textContent = '이어서 준비하기 →'; }
+    } else {
+      if(ssNext) ssNext.textContent = 'STEP 01~07을 모두 완료했어요';
+      if(ssLink){ ssLink.href = '#/start/wrapup'; ssLink.textContent = '오픈 완료 확인하기 →'; }
+    }
     document.querySelectorAll('.guide-card[data-chapter]').forEach(function(card){
-      var isDone = completed.indexOf(card.getAttribute('data-chapter')) !== -1;
+      var path = card.getAttribute('data-chapter');
+      var isDone = completed.indexOf(path) !== -1;
       var check = card.querySelector('.cc-check');
       if(check) check.hidden = !isDone;
       var link = card.querySelector('.gc-link');
       if(link && isDone && card.getAttribute('data-tier') === 'free'){ link.textContent = '다시 보기 →'; }
+      /* 상태 라벨(완료 / 진행 중 / 시작 전) — 게이트가 있는 STEP 01~07만.
+         "진행 중"은 저장된 data에 실제 입력(체크된 항목·채운 칸)이 있는지로만
+         판정한다(stepEntryHasContent — 게스트 병합과 같은 기준, 새 판정 규칙
+         없음). STEP 00·08은 저장 데이터가 없는 안내 화면이라 라벨을 붙이지 않는다. */
+      var statusEl = card.querySelector('.cc-status');
+      if(statusEl){
+        if(!STEP_EVALUATORS[path]){ statusEl.hidden = true; }
+        else {
+          var hasInput = !isDone && stepEntryHasContent({ data: launchdeskStore.getStepData(path), isCompleted: false });
+          var state = isDone ? 'done' : (hasInput ? 'active' : 'todo');
+          statusEl.hidden = false;
+          statusEl.className = 'cc-status ' + state;
+          statusEl.textContent = state === 'done' ? '완료' : (state === 'active' ? '진행 중' : '시작 전');
+        }
+      }
     });
 
-    // home page's compact guide-preview rows (same completed[] source)
-    document.querySelectorAll('.gp-row[data-chapter]').forEach(function(row){
-      var isDone = completed.indexOf(row.getAttribute('data-chapter')) !== -1;
-      row.querySelector('.gp-check').classList.toggle('done', isDone);
-    });
-
-    renderHomeDashboard(completed, prog);
+    renderHomeResumeCard(prog);
     renderWrapupState(completed, prog);
   }
 
@@ -747,31 +765,46 @@
     {num:'08', route:'/start/wrapup',          label:'오픈 완료, 운영 시작하기',          gated:false}
   ];
   var GATED_STEPS = STEP_ROADMAP.filter(function(s){ return s.gated; });
-  var RESUME_RING_CIRC = 175.9;
-  function renderHomeDashboard(completed, prog){
-    var titleEl = document.getElementById('resumeTitle');
-    if(!titleEl) return; // home markup not present on this build
-
-    prog = prog || computeStepProgress(completed);
-    var pct = prog.pct;
-
-    var pctEl = document.getElementById('rbPct');
-    if(pctEl) pctEl.textContent = pct + '%';
-    var arc = document.getElementById('rbRingArc');
-    if(arc) arc.style.strokeDashoffset = (RESUME_RING_CIRC * (1 - pct / 100)).toFixed(1);
-    var barEl = document.getElementById('rbBarFill');
-    if(barEl) barEl.style.width = pct + '%';
-    var subEl = document.getElementById('resumeSub');
-    if(subEl) subEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 완료';
-
-    var linkEl = document.getElementById('resumeLink');
+  /* 홈 "이어서 준비하기" 카드(2026-09 UI 재설계 2차) — 예전 로드맵 패널의
+     퍼센트/원형 그래프/진행 바/STEP 00~08 목록(#resumeTitle·#rbPct·#rbRingArc·
+     #rbBarFill·#resumeSub·#resumeLink·.gp-row·.gp-check)은 제거했고, 이 함수만
+     computeStepProgress() 결과로 카드 하나를 채운다. 완료 판정·저장 구조는
+     건드리지 않는다. 홈 마크업이 없는 화면(또는 요소 일부가 없는 경우)에서도
+     예외 없이 끝난다. */
+  function renderHomeResumeCard(prog){
+    var card = document.getElementById('deskResume');
+    if(!card || !prog) return;
+    var eyebrowEl = document.getElementById('deskResumeEyebrow');
+    var stepEl = document.getElementById('deskResumeStep');
+    var labelEl = document.getElementById('deskResumeLabel');
+    var descEl = document.getElementById('deskResumeDesc');
+    var noteEl = document.getElementById('deskResumeNote');
+    var linkEl = document.getElementById('deskResumeLink');
+    var isGuest = !(window.launchdeskStore && launchdeskStore.isAuthed());
     if(prog.next){
-      titleEl.textContent = 'STEP ' + prog.next.num + ' · ' + prog.next.label;
-      if(linkEl){ linkEl.href = '#' + prog.next.route; linkEl.textContent = '이어서 하기 →'; }
+      if(eyebrowEl) eyebrowEl.textContent = '이어서 준비하기';
+      if(stepEl){ stepEl.textContent = 'STEP ' + prog.next.num; stepEl.hidden = false; }
+      if(labelEl) labelEl.textContent = prog.next.label;
+      // 완료한 단계가 아직 없으면 "마지막으로 준비하던 단계"가 없으므로 첫 단계 안내로 쓴다.
+      if(descEl) descEl.textContent = prog.done === 0 ? '첫 단계부터 차근차근 시작해보세요.' : '마지막으로 준비하던 단계부터 계속해보세요.';
+      if(linkEl){ linkEl.href = '#' + prog.next.route; linkEl.textContent = '계속하기 →'; }
     } else {
-      titleEl.textContent = prog.total + '단계를 모두 완료했어요 🎉';
-      if(linkEl){ linkEl.href = '#/start/wrapup'; linkEl.textContent = '오픈 완료 확인하기 →'; }
+      if(eyebrowEl) eyebrowEl.textContent = '준비 완료';
+      if(stepEl){ stepEl.textContent = ''; stepEl.hidden = true; }
+      if(labelEl) labelEl.textContent = '쇼핑몰 준비 기본 단계를 완료했어요';
+      if(descEl) descEl.textContent = '운영 현황에서 주문과 광고 상태를 확인해보세요.';
+      if(linkEl){ linkEl.href = '#/dashboard'; linkEl.textContent = '운영 현황 보기 →'; }
     }
+    // 비회원에게는 진행 상태와 무관하게 항상 저장 안내를 보여준다(실제 인증 상태
+    // launchdeskStore.isAuthed() 기준 — hydrate/resetToGuest와 함께 바뀌고, 이
+    // 함수는 그 onChange 경로에서 다시 불린다). 회원에게는 표시하지 않는다.
+    if(noteEl){
+      noteEl.textContent = prog.next
+        ? '로그인하면 진행 상황을 다른 기기에서도 이어갈 수 있어요.'
+        : '로그인하면 완료한 준비 상태를 계정에 저장할 수 있어요.';
+      noteEl.hidden = !isGuest;
+    }
+    card.classList.toggle('is-complete', !prog.next);
   }
 
   /* ---- STEP08 운영 전환 화면 — computeStepProgress()의 결과를 그대로

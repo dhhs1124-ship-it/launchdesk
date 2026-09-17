@@ -144,11 +144,6 @@
   .profile-name{font-size:13px; font-weight:600; color:var(--ld-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .profile-day{font-size:12px; color:var(--ld-muted); margin-top:2px; line-height:1.5;}
   .profile-day a{color:var(--ld-accent); font-weight:600;}
-  .progress-mini{padding:12px 8px 0;}
-  .pm-head{display:flex; justify-content:space-between; font-size:12px; color:var(--ld-muted); margin-bottom:6px;}
-  .pm-head b{font-weight:700; color:var(--sidebar-accent);}
-  .pm-bar{height:4px; border-radius:2px; background:var(--ld-muted-bg); overflow:hidden;}
-  .pm-fill{height:100%; width:0%; background:var(--ld-accent); border-radius:2px; transition:width .35s ease;}
 
   .side-nav-foot{margin-top:auto; padding:16px 8px 0; display:flex; flex-direction:column; gap:10px;}
   .sidebar-links{display:flex; justify-content:center; gap:14px;}
@@ -234,8 +229,6 @@
   .dash-head h1{font-size:clamp(1.5rem,3.2vw,1.95rem);}
   .dash-head p{margin-top:.55rem; font-size:.98rem;}
 
-  .dash-grid{display:grid; grid-template-columns:1.7fr 1fr; gap:1.3rem; margin-top:1.9rem; align-items:stretch;}
-  @media (max-width:860px){ .dash-grid{grid-template-columns:1fr;} }
 
   .dash-panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;}
   .dash-panel-head{padding:1.05rem 1.3rem; font-size:.96rem; font-weight:700; border-bottom:1px solid var(--border);}
@@ -289,23 +282,6 @@
   .gc-link{display:inline-block; margin-top:.75rem; font-size:.85rem; font-weight:700; color:var(--accent-ink);}
   .guide-card:hover .gc-link{color:var(--accent);}
 
-  .start-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; margin:1.7rem 0 1.2rem;}
-  @media (max-width:640px){ .start-stats{grid-template-columns:1fr;} }
-  .start-stats div{background:var(--surface); padding:.9rem 1rem;}
-  .start-stats .ss-label{font-size:.71rem; color:var(--ink-faint); margin-bottom:.3rem;}
-  .start-stats .ss-value{font-family:var(--f-mono); font-weight:700; font-size:1.08rem; color:var(--ink);}
-
-  .progress-detail{border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem 1.3rem; margin-bottom:1.5rem; background:var(--surface);}
-  .pd-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:.65rem;}
-  .pd-head span{font-size:.92rem; font-weight:700; color:var(--ink);}
-  .pd-head b{font-family:var(--f-mono); font-size:1.08rem; color:var(--accent);}
-  .pd-bar{height:8px; border-radius:99px; background:var(--border); overflow:hidden;}
-  .pd-fill{height:100%; width:0%; background:var(--gradient); border-radius:99px; transition:width .35s ease;}
-  .pd-legend{display:flex; gap:1.2rem; margin-top:.65rem; font-size:.78rem; color:var(--ink-soft);}
-  .pd-legend span{display:inline-flex; align-items:center; gap:.4rem;}
-  .pd-dot{width:7px; height:7px; border-radius:50%; display:inline-block;}
-  .pd-dot.done{background:var(--badge-c);}
-  .pd-dot.left{background:var(--border-strong);}
 
   .filter-tabs{display:flex; gap:.5rem; margin-bottom:1.3rem;}
   .filter-tab{padding:.5rem 1.05rem; border-radius:99px; border:1px solid var(--border-strong); background:var(--surface); font-family:var(--f-body); font-size:.84rem; font-weight:600; color:var(--ink-soft); cursor:pointer; transition:background .15s, color .15s, border-color .15s;}
@@ -862,17 +838,6 @@
   .footer-meta{font-size:.75rem; color:var(--ink-faint); margin-top:.8rem; line-height:1.8;}
 
   /* ---------------- resume banner (home) ---------------- */
-  .resume-banner{display:flex; align-items:center; justify-content:space-between; gap:1.6rem; flex-wrap:wrap; background:var(--ink); color:#fff; border-radius:var(--radius); padding:1.5rem 1.7rem; margin-bottom:1.4rem;}
-  .rb-label{font-family:var(--f-mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.55); margin-bottom:.4rem;}
-  .resume-banner h2{color:#fff; font-size:1.28rem; margin-bottom:.35rem;}
-  .rb-sub{font-size:.85rem; color:rgba(255,255,255,.65); margin-bottom:.7rem;}
-  .rb-bar{width:100%; max-width:320px; height:6px; border-radius:99px; background:rgba(255,255,255,.15); overflow:hidden;}
-  .rb-bar-fill{height:100%; width:0%; background:var(--accent); border-radius:99px; transition:width .35s ease;}
-  .rb-right{display:flex; align-items:center; gap:1.3rem; flex:0 0 auto;}
-  .rb-ring{position:relative; width:64px; height:64px; flex:0 0 auto;}
-  .rb-ring svg{width:100%; height:100%; transform:rotate(-90deg);}
-  .rb-ring span{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--f-mono); font-weight:700; font-size:.86rem; color:#fff;}
-  @media (max-width:640px){ .resume-banner{flex-direction:column; align-items:stretch;} .rb-right{justify-content:space-between;} }
 
   /* ---------------- home: highlighted service + preview list ---------------- */
   .service-highlight{position:relative; display:block; background:var(--accent-soft); border:1px solid var(--badge-a-bg); border-radius:var(--radius); padding:1.3rem 1.4rem; margin:1.1rem 1.3rem 0;}
@@ -884,18 +849,6 @@
   .sh-link{font-size:.84rem; font-weight:700; color:var(--accent-ink); display:inline-block; margin-top:.55rem;}
   .service-highlight:hover .sh-link{color:var(--accent);}
 
-  .guide-preview-list{display:flex; flex-direction:column; padding:.5rem 1.3rem 0;}
-  .gp-row{display:flex; align-items:center; gap:.8rem; padding:.75rem 0; border-bottom:1px solid var(--border);}
-  .gp-row:last-child{border-bottom:none;}
-  .gp-check{width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:0 0 auto; background:var(--border); color:transparent;}
-  .gp-check.done{background:var(--badge-c); color:#fff;}
-  .gp-check svg{width:12px; height:12px;}
-  .gp-icon{font-size:1.1rem; flex:0 0 auto;}
-  .gp-text{flex:1; min-width:0;}
-  .gp-text .gp-title{font-size:.9rem; font-weight:600; color:var(--ink);}
-  .gp-text .gp-time{font-size:.74rem; color:var(--ink-faint); margin-top:.1rem;}
-  .gp-see-all{display:block; text-align:center; padding:.9rem 1.3rem 1.2rem; font-size:.85rem; font-weight:600; color:var(--accent-ink);}
-  .gp-see-all:hover{color:var(--accent);}
 
   /* ---------------- home: right column ---------------- */
   .quick-row-list{display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;}
@@ -912,9 +865,6 @@
   .quick-row .qr-sub{display:block; font-size:.75rem; color:var(--ink-faint); margin-top:.2rem; line-height:1.4;}
   .quick-row .qr-chev{color:var(--ink-faint); flex:0 0 auto;}
 
-  .tip-box{background:var(--ink); color:#fff; border-radius:var(--radius); padding:1.1rem 1.2rem;}
-  .tip-box .tb-label{font-family:var(--f-mono); font-size:.68rem; letter-spacing:.06em; color:#ffd27a; margin-bottom:.5rem; display:flex; align-items:center; gap:.4rem;}
-  .tip-box p{color:rgba(255,255,255,.82); font-size:.85rem; margin:0;}
 
   .quick-access{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;}
   .qa-head{padding:.9rem 1.1rem .5rem; font-size:.78rem; font-weight:700; color:var(--ink-faint);}
@@ -1038,7 +988,7 @@
      15~18px, KPI 숫자 24~30px, body 13~15px, muted 12~14px 범위를
      지키면서 padding/margin/레이아웃 재구성으로 밀도를 올린다(폰트를
      과하게 줄여 hierarchy를 해치지 않는다). */
-  .opsdash .dash-panel-head, .opsdash-roadmap-panel > .dash-panel-head{padding:.8rem 1.1rem; font-size:.94rem;}
+  .opsdash .dash-panel-head{padding:.8rem 1.1rem; font-size:.94rem;}
 
   .opsdash-header{display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:.9rem;}
   .opsdash-header h1, .opsdash-header h2{font-size:1.85rem;}
@@ -1057,6 +1007,8 @@
   .opsdash-row{display:grid; grid-template-columns:2fr 1fr; gap:.9rem; margin-bottom:.9rem; align-items:stretch;}
   .opsdash-row.even{grid-template-columns:1fr 1fr;}
   .opsdash-row.triple{grid-template-columns:1fr 1fr 1.2fr;}
+  /* 쇼핑몰 운영 현황 패널 — 2:1 row 래퍼 없이 단독 전체 폭(2026-09 UI 재설계 2차) */
+  .opsdash-ops-panel{margin-bottom:.9rem;}
   @media (max-width:1000px){ .opsdash-row.triple{grid-template-columns:1fr;} }
   @media (max-width:860px){ .opsdash-row, .opsdash-row.even{grid-template-columns:1fr;} }
 
@@ -1169,13 +1121,6 @@
   /* Hero — compact brand panel. 실제 사진/스톡 이미지를 새로 가져오지
      않고, 이 파일이 이미 쓰는 색 토큰만으로 그린 인라인 SVG 일러스트(박스
      +문서+식물 모티프)로 "브랜드 무드"를 표현한다(요구사항 1). */
-  .opsdash-hero{display:flex; align-items:center; justify-content:space-between; gap:1.4rem; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:1.1rem 1.4rem; margin-bottom:1rem; min-height:132px;}
-  .opsdash-hero-text p{margin:0 0 .35rem; font-size:.78rem; font-weight:700; color:var(--op-accent-ink); text-transform:uppercase; letter-spacing:.03em;}
-  .opsdash-hero-text h2{font-size:1.15rem; font-weight:700; color:var(--ink); line-height:1.4; max-width:34ch;}
-  .opsdash-hero-visual{flex:0 0 auto; width:190px; display:flex; flex-direction:column; align-items:center; gap:.4rem;}
-  .opsdash-hero-visual svg{width:100%; height:auto; display:block;}
-  .opsdash-hero-mark{font-family:var(--f-display); font-weight:700; font-style:italic; font-size:.86rem; color:var(--op-accent-ink);}
-  @media (max-width:700px){ .opsdash-hero{flex-direction:column; align-items:stretch; text-align:left;} .opsdash-hero-visual{align-self:flex-start;} }
 
   /* 패널/서브헤드 라인 아이콘 공통 — 이모지 대신 이 파일에서 직접 그린
      24x24 line icon만 쓴다(요구사항 7). 새 아이콘 라이브러리 설치 없음,
@@ -1203,25 +1148,13 @@
   .opsdash-service-name{color:var(--ink);}
   .opsdash-service-tier{font-family:var(--f-mono); font-size:.7rem; font-weight:700; color:var(--op-accent-ink); background:var(--op-accent-soft); padding:.15rem .5rem; border-radius:99px; flex:0 0 auto;}
 
-  /* 홈 대시보드/압축 로드맵 안에서만 primary 버튼을 모스그린으로 —
+  /* 운영 현황(.opsdash) 안에서만 primary 버튼을 모스그린으로 —
      전역 .btn-primary(벽돌색)는 그대로 두고 다른 화면은 바뀌지 않는다. */
-  .opsdash .btn-primary, .opsdash-roadmap-panel .btn-primary{background:var(--op-accent);}
-  .opsdash .btn-primary:hover, .opsdash-roadmap-panel .btn-primary:hover{background:var(--op-accent-ink);}
-  .opsdash .btn-ghost:hover, .opsdash-roadmap-panel .btn-ghost:hover{border-color:var(--op-accent); color:var(--op-accent-ink); background:var(--op-accent-soft);}
-  .opsdash .btn:hover, .opsdash-roadmap-panel .btn:hover{box-shadow:0 10px 22px -14px rgba(76,107,73,.25);}
+  .opsdash .btn-primary{background:var(--op-accent);}
+  .opsdash .btn-primary:hover{background:var(--op-accent-ink);}
+  .opsdash .btn-ghost:hover{border-color:var(--op-accent); color:var(--op-accent-ink); background:var(--op-accent-soft);}
+  .opsdash .btn:hover{box-shadow:0 10px 22px -14px rgba(76,107,73,.25);}
 
-  /* 로드맵 압축 — <details>/<summary>는 네이티브 토글이라 별도 JS 없이도
-     열림/닫힘과 무관하게 기존 체크리스트(.gp-row[data-chapter] 등)가
-     DOM에 항상 존재한다 — app.js의 selector가 그대로 동작한다(요구사항
-     12·17). */
-  .opsdash-roadmap-panel{margin-top:1.5rem; margin-bottom:1.6rem;}
-  .opsdash-roadmap-lead{margin:0; padding:.9rem 1.1rem 0; font-size:.83rem; color:var(--ink-soft);}
-  .opsdash-roadmap-panel .resume-banner{margin:1rem 1.1rem 1.1rem;}
-  .opsdash-roadmap-details summary{list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:flex-end; gap:.4rem; padding:.8rem 1.1rem; font-size:.83rem; font-weight:600; color:var(--op-accent-ink); border-top:1px solid var(--border);}
-  .opsdash-roadmap-details summary::-webkit-details-marker{display:none;}
-  .opsdash-roadmap-details summary svg{transition:transform .15s ease;}
-  .opsdash-roadmap-details[open] summary svg{transform:rotate(180deg);}
-  .opsdash-roadmap-details .dash-grid{padding:0 1.1rem 1.2rem; margin-top:0;}
 
   /* =========================================================================
      시작 데스크(#view-home 상단, desk.js) — 2026-09 UI 재설계 1차.
@@ -1359,3 +1292,35 @@
   .desk-ops-card-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:9px 16px; border-radius:9px; border:1px solid var(--ld-border); background:var(--ld-panel); color:var(--ld-accent); font-size:13px; font-weight:600; white-space:nowrap; flex:0 0 auto; transition:background .15s, border-color .15s;}
   .desk-ops-card-btn:hover{border-color:var(--ld-accent); background:var(--ld-accent-light);}
   @media (max-width:639px){ .desk-ops-card{padding:16px 18px;} .desk-ops-card-btn{width:100%;} }
+
+  /* 이어서 준비하기 카드(홈, 2026-09 UI 재설계 2차) — 예전 로드맵 패널(퍼센트·원형
+     그래프·진행 바·STEP 00~08 목록·오늘의 팁) 대신 다음 행동 하나만 보여준다.
+     시작 데스크와 같은 --ld-* 토큰만 쓴다. 버튼은 모바일 터치 영역 44px 이상. */
+  .desk-resume{display:flex; align-items:center; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin:0 0 24px; padding:20px 24px; border-radius:12px; background:var(--ld-accent-light); border:1px solid #d0dbc9; min-width:0;}
+  .desk-resume-text{flex:1 1 260px; min-width:0; word-break:keep-all;}
+  .desk-resume-eyebrow{margin:0 0 6px; max-width:none; font-size:12px; font-weight:600; color:var(--ld-accent); letter-spacing:.02em;}
+  .desk-resume h2{display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 4px; font-size:16px; font-weight:700; letter-spacing:-.01em; color:var(--ld-text); line-height:1.4;}
+  .desk-resume-step{font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--ld-panel); color:var(--ld-accent); border:1px solid #d0dbc9; flex:0 0 auto;}
+  .desk-resume-desc{margin:0; max-width:none; font-size:13px; color:var(--ld-muted); line-height:1.6;}
+  .desk-resume-note{margin:8px 0 0; max-width:none; font-size:12px; color:var(--ld-muted); line-height:1.5;}
+  .desk-resume-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:10px 18px; border-radius:9px; background:var(--ld-accent); color:#fff; font-size:13px; font-weight:700; white-space:nowrap; flex:0 0 auto; transition:background .15s;}
+  .desk-resume-btn:hover{background:var(--ld-accent-dark);}
+  .desk-resume.is-complete{background:var(--ld-panel); border-color:var(--ld-border);}
+  @media (max-width:639px){ .desk-resume{padding:18px;} .desk-resume-btn{width:100%;} }
+
+  /* /start 상단 진행 상태(2026-09 UI 재설계 2차) — 통계 3칸·퍼센트·진행 바·범례 제거,
+     "완료 N / 7 · 다음 단계 · 이어서 준비하기"만. */
+  .start-status{display:flex; align-items:center; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin:1.6rem 0 1.4rem; padding:18px 24px; border-radius:12px; background:var(--ld-panel); border:1px solid var(--ld-border); min-width:0;}
+  .start-status-text{flex:1 1 260px; min-width:0; word-break:keep-all;}
+  .start-status-label{margin:0 0 4px; max-width:none; font-size:12px; font-weight:600; color:var(--ld-accent); letter-spacing:.02em;}
+  .start-status-count{margin:0 0 6px; max-width:none; font-size:13px; color:var(--ld-muted); line-height:1.5;}
+  .start-status-count b{font-size:18px; font-weight:700; color:var(--ld-text); font-variant-numeric:tabular-nums;}
+  .start-status-scope{font-size:11px; color:var(--ld-muted); margin-left:6px;}
+  .start-status-next{margin:0; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--ld-text); line-height:1.4;}
+  .start-status-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:10px 18px; border-radius:9px; background:var(--ld-accent); color:#fff; font-size:13px; font-weight:700; white-space:nowrap; flex:0 0 auto; transition:background .15s;}
+  .start-status-btn:hover{background:var(--ld-accent-dark);}
+  @media (max-width:639px){ .start-status{padding:16px 18px;} .start-status-btn{width:100%;} }
+  /* STEP 카드 상태 라벨(완료 / 진행 중 / 시작 전) — 기존 완료 체크(.cc-check) 옆, STEP 01~07만 */
+  .cc-status{font-size:.66rem; font-weight:700; letter-spacing:.02em; padding:.2rem .5rem; border-radius:99px; white-space:nowrap; background:var(--surface-hover); color:var(--ink-faint);}
+  .cc-status.active{background:var(--ld-accent-light); color:var(--ld-accent);}
+  .cc-status.done{background:var(--badge-c-bg); color:var(--badge-c);}
