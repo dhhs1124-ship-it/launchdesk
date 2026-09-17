@@ -247,6 +247,10 @@
         자료실
       </a>
       <span class="side-nav-divider" role="separator" aria-hidden="true"></span>
+      <a data-match="/dashboard" href="#/dashboard">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="14" height="10" rx="1.5"/><polyline points="5,10 8,7 10.5,9.5 13,6"/><line x1="7" y1="16" x2="11" y2="16"/></svg>
+        운영 현황
+      </a>
       <a data-match="/services" href="#/services/setup">
         <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg>
         세팅 도움받기
@@ -439,6 +443,17 @@
             </aside>
           </div>
 
+          <!-- 이미 운영 중인 사장님 안내(2026-09 UI 재설계 2차) — 운영 대시보드는
+               #/dashboard(운영 현황, #view-dashboard)로 분리했다. 홈에는 이 작은 링크
+               카드 하나만 남기고 #opsdashRoot 계열 id는 홈에 두지 않는다(중복 없음). -->
+          <section class="desk-ops-card" aria-labelledby="deskOpsCardTitle">
+            <div class="desk-ops-card-text">
+              <h2 id="deskOpsCardTitle">이미 쇼핑몰을 운영 중이신가요?</h2>
+              <p>주문 · 광고 · 연결 상태를 운영 현황에서 확인할 수 있어요.</p>
+            </div>
+            <a class="desk-ops-card-btn" href="#/dashboard">운영 현황 보기 →</a>
+          </section>
+
           <!-- 내 계획 — 마진 계산기에서 만든 계획을 재확인일 순으로(지난 날짜·
                오늘 → 예정, 완료는 분리) 보여준다. 내용 렌더링·저장은 전부
                plans.js(public.plans, RLS 본인 행만). 로그인 전에는 안내만.
@@ -449,152 +464,6 @@
               <div class="dash-panel-head">내 계획 <span class="ldplan-head-note" id="ldPlanHeadNote"></span></div>
               <div class="ldplan-draft" id="ldPlanDraftNotice" hidden></div>
               <div id="ldPlanBody"></div>
-            </div>
-          </div>
-
-          <div class="opsdash" id="opsdashRoot">
-            <div class="opsdash-header">
-              <div>
-                <h2 id="opsdashTitle">운영 대시보드</h2>
-                <p id="opsdashSubtitle">오늘 쇼핑몰과 광고 상태를 한눈에 확인하세요.</p>
-              </div>
-              <button type="button" class="btn btn-ghost btn-sm" id="opsdashRefreshBtn">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:.35rem; vertical-align:-2px;"><path d="M20 11A8 8 0 1 0 19 15"/><polyline points="20 4 20 11 13 11"/></svg>
-                새로고침
-              </button>
-            </div>
-
-            <!-- 통합 검색은 이번 배포에 포함하지 않는다 — 작동하지 않는
-                 입력창을 사용자에게 보여주지 않기 위해, 실제 검색 기능을
-                 구현할 수 있을 때까지 UI 자체를 만들지 않는다(후속 기능).
-                 opsdash-search 관련 CSS도 styles.css에서 함께 제거했다. -->
-
-            <!-- Hero — compact brand panel. 실제 사진/스톡 이미지를 새로
-                 가져오지 않고, 이 화면에서 이미 쓰는 색 토큰만으로 그린
-                 인라인 SVG 일러스트(박스+메모카드+식물 모티프)로 브랜드
-                 무드를 표현한다. -->
-            <div class="opsdash-hero">
-              <div class="opsdash-hero-text">
-                <p>오늘의 운영 상태를 확인해보세요</p>
-                <h2>LaunchDesk가 쇼핑몰과 광고 데이터를 함께 정리해드립니다.</h2>
-              </div>
-              <div class="opsdash-hero-visual" aria-hidden="true">
-                <svg viewBox="0 0 200 120">
-                  <rect x="6" y="58" width="62" height="52" rx="5" fill="var(--op-accent-soft)"/>
-                  <rect x="18" y="40" width="38" height="24" rx="4" fill="#fff" stroke="var(--border-strong)"/>
-                  <rect x="80" y="16" width="70" height="94" rx="7" fill="#fff" stroke="var(--border-strong)"/>
-                  <line x1="94" y1="36" x2="136" y2="36" stroke="var(--op-accent)" stroke-width="3.5" stroke-linecap="round"/>
-                  <line x1="94" y1="50" x2="136" y2="50" stroke="var(--ink-faint)" stroke-width="3.5" stroke-linecap="round"/>
-                  <line x1="94" y1="64" x2="118" y2="64" stroke="var(--ink-faint)" stroke-width="3.5" stroke-linecap="round"/>
-                  <circle cx="94" cy="86" r="7" fill="var(--op-accent-soft)" stroke="var(--op-accent)" stroke-width="2"/>
-                  <path d="M91 82c4-4 8-1 8 3s-4 6-8 3" fill="none" stroke="var(--op-accent)" stroke-width="1.4"/>
-                  <circle cx="172" cy="76" r="20" fill="var(--op-accent-soft)"/>
-                  <path d="M172 62c-7 5-7 13 0 20c7-7 7-15 0-20z" fill="var(--op-accent)"/>
-                  <path d="M172 68v18" stroke="#fff" stroke-width="1.4" opacity=".5"/>
-                </svg>
-                <span class="opsdash-hero-mark">Launch Together</span>
-              </div>
-            </div>
-
-            <!-- 오늘 핵심 숫자 — 실제 Cafe24 주문/Meta 광고 데이터만 표시.
-                 가짜 증감률(▲12% 등)은 절대 넣지 않는다(요구사항 6). -->
-            <div class="opsdash-kpis" id="opsdashKpis">
-              <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">오늘 주문</div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-</div></div>
-                <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.68 12.39A2 2 0 0 0 9.64 18H18a2 2 0 0 0 1.95-1.57L21 9H6"/><circle cx="9.5" cy="20.5" r="1"/><circle cx="17.5" cy="20.5" r="1"/></svg></div>
-              </div>
-              <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">오늘 결제금액</div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-</div></div>
-                <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-              </div>
-              <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Meta 광고비</div><div class="opsdash-kpi-value" id="opsdashKpiSpend">-</div></div>
-                <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg></div>
-              </div>
-              <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">ROAS</div><div class="opsdash-kpi-value" id="opsdashKpiRoas">-</div><div class="opsdash-kpi-note" id="opsdashKpiRoasNote"></div></div>
-                <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg></div>
-              </div>
-            </div>
-
-            <!-- 2:1 메인 grid — 왼쪽 "쇼핑몰 운영 현황"(브리핑+광고상태+
-                 월간현황을 한 패널로 통합, 카드 안에 카드를 만들지 않고
-                 서브 타이틀/divider로만 구분) + 오른쪽 "지금 무엇을
-                 시작할까요"(요구사항 5·6). -->
-            <div class="opsdash-row">
-              <div class="dash-panel">
-                <div class="dash-panel-head">쇼핑몰 운영 현황</div>
-                <div class="opsdash-ops-body">
-                  <div class="opsdash-ops-split">
-                    <div class="opsdash-ops-col">
-                      <div class="opsdash-subhead"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><line x1="9.5" y1="12" x2="14.5" y2="12"/><line x1="9.5" y1="15" x2="14.5" y2="15"/></svg></span>오늘의 운영 브리핑</div>
-                      <div class="opsdash-brief-list" id="opsdashBriefList"></div>
-                    </div>
-                    <div class="opsdash-ops-divider"></div>
-                    <div class="opsdash-ops-col">
-                      <div class="opsdash-subhead"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg></span>광고 상태</div>
-                      <div class="opsdash-adstate" id="opsdashAdState"></div>
-                    </div>
-                  </div>
-                  <div class="opsdash-ops-hr"></div>
-                  <div class="opsdash-subhead">이번 달 운영 현황</div>
-                  <div class="opsdash-summary" id="opsdashMonthSummary"></div>
-                </div>
-              </div>
-              <div class="dash-panel">
-                <div class="dash-panel-head" style="padding:1.05rem 1.3rem .5rem; border:none;">지금, 무엇을 시작할까요?</div>
-                <p style="margin:0; padding:0 1.3rem .6rem; font-size:.8rem; color:var(--ink-faint);">LaunchDesk에서 바로 할 수 있는 일을 모았습니다.</p>
-                <div class="quick-row-list" style="border:none;" id="opsdashQuickActions">
-                  <a class="quick-row" href="#/wholesale">
-                    <span class="qr-icon tone-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></svg></span>
-                    <span class="qr-text"><span class="qr-title">도매처 찾기</span><span class="qr-sub">검증된 도매처를 둘러보세요</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/resources">
-                    <span class="qr-icon tone-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5c-2-1.2-5-1.5-8-1v14c3-.5 6-.2 8 1c2-1.2 5-1.5 8-1V4c-3-.5-6-.2-8 1z"/><line x1="12" y1="5" x2="12" y2="19"/></svg></span>
-                    <span class="qr-text"><span class="qr-title">운영 가이드 보기</span><span class="qr-sub">처음이라도 하나씩 따라가며 시작해보세요</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/tools" data-tools-target="calc">
-                    <span class="qr-icon tone-b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><circle cx="8.5" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="8.5" cy="16" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r=".6" fill="currentColor" stroke="none"/><circle cx="15.5" cy="16" r=".6" fill="currentColor" stroke="none"/></svg></span>
-                    <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가와 판매가를 기준으로 마진을 확인하세요</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                  <a class="quick-row" href="#/services/setup">
-                    <span class="qr-icon tone-d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="4.5" y1="7.5" x2="19.5" y2="7.5"/><circle cx="9.5" cy="7.5" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="12" x2="19.5" y2="12"/><circle cx="15" cy="12" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="16.5" x2="19.5" y2="16.5"/><circle cx="11.5" cy="16.5" r="1.7" fill="currentColor" stroke="none"/></svg></span>
-                    <span class="qr-text"><span class="qr-title">세팅 대행 문의</span><span class="qr-sub">쇼핑몰 세팅을 도움받아보세요</span></span>
-                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <!-- (내 계획 #ldPlanPanel은 2026-09 UI 재설계 1차에서 시작 데스크 바로
-                 아래로 옮겼다 — 이 안에는 더 이상 없다. id 중복 방지.) -->
-
-            <!-- 하단 3열 — 도매처 / 세팅 대행 / 연결 상태(+다음 할 일)
-                 (요구사항 8). 세팅 대행은 실제 플랜 이름(#view-services-setup
-                 data-plan과 동일)에 등급 라벨만 보조로 붙였다 — 문의 조회
-                 기능은 만들지 않는다. -->
-            <div class="opsdash-row triple">
-              <div class="dash-panel">
-                <div class="dash-panel-head"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="M4 7l8 4 8-4"/><path d="M12 11v10"/></svg></span>도매처</div>
-                <div id="opsdashWholesalers"></div>
-              </div>
-              <div class="dash-panel">
-                <div class="dash-panel-head"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="4.5" y1="7.5" x2="19.5" y2="7.5"/><circle cx="9.5" cy="7.5" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="12" x2="19.5" y2="12"/><circle cx="15" cy="12" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="16.5" x2="19.5" y2="16.5"/><circle cx="11.5" cy="16.5" r="1.7" fill="currentColor" stroke="none"/></svg></span>세팅 대행</div>
-                <div class="opsdash-service-list">
-                  <div class="opsdash-service-row"><span class="opsdash-service-name">기본 쇼핑몰 세팅</span><span class="opsdash-service-tier">Basic</span></div>
-                  <div class="opsdash-service-row"><span class="opsdash-service-name">연동·추적 세팅</span><span class="opsdash-service-tier">Standard</span></div>
-                  <div class="opsdash-service-row"><span class="opsdash-service-name">전체 초기 세팅</span><span class="opsdash-service-tier">Premium</span></div>
-                </div>
-                <div class="opsdash-inquiry" id="opsdashSetupInquiry"></div>
-              </div>
-              <div class="dash-panel">
-                <div class="dash-panel-head"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M8 9.5 6.5 8a3 3 0 1 1 4.2-4.2L12 5"/><path d="M15 14.5l1.5 1.5a3 3 0 1 1-4.2 4.2L11 19"/></svg></span>연결 상태</div>
-                <div class="opsdash-connection-list" id="opsdashConnectionStatus"></div>
-                <div id="opsdashNextAction"></div>
-              </div>
             </div>
           </div>
 
@@ -718,6 +587,164 @@
             </details>
           </div>
 
+        </div>
+      </section>
+
+      <!-- ============ VIEW: 운영 현황 (#/dashboard) ============
+           2026-09 UI 재설계 2차: 홈 하단에 있던 운영 대시보드(#opsdashRoot 이하 전체 —
+           KPI · 브리핑 · 광고 상태 · 월간 현황 · 퀵 액션 · 도매처 · 세팅 대행 · 연결 상태 ·
+           새로고침)를 이 전용 화면으로 "이동"했다. DOM을 복제하지 않고 마크업 자체를
+           옮겼으므로 home-dashboard.js / ops-overview.js / wholesalers.js가 id로 잡는
+           요소와 launchdeskOpsSnapshot 구독은 그대로다(스크립트는 화면 표시 여부와
+           무관하게 로드 시 id로 요소를 잡고 계속 갱신한다). 홈(#/)에는 이 id들이
+           더 이상 없다. -->
+      <section class="view" id="view-dashboard" hidden>
+        <div class="content">
+          <div class="opsdash" id="opsdashRoot">
+            <div class="opsdash-header">
+              <div>
+                <h1 id="opsdashTitle">운영 현황</h1>
+                <p id="opsdashSubtitle">오늘 쇼핑몰과 광고 상태를 한눈에 확인하세요.</p>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" id="opsdashRefreshBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:.35rem; vertical-align:-2px;"><path d="M20 11A8 8 0 1 0 19 15"/><polyline points="20 4 20 11 13 11"/></svg>
+                새로고침
+              </button>
+            </div>
+
+            <!-- 통합 검색은 이번 배포에 포함하지 않는다 — 작동하지 않는
+                 입력창을 사용자에게 보여주지 않기 위해, 실제 검색 기능을
+                 구현할 수 있을 때까지 UI 자체를 만들지 않는다(후속 기능).
+                 opsdash-search 관련 CSS도 styles.css에서 함께 제거했다. -->
+
+            <!-- Hero — compact brand panel. 실제 사진/스톡 이미지를 새로
+                 가져오지 않고, 이 화면에서 이미 쓰는 색 토큰만으로 그린
+                 인라인 SVG 일러스트(박스+메모카드+식물 모티프)로 브랜드
+                 무드를 표현한다. -->
+            <div class="opsdash-hero">
+              <div class="opsdash-hero-text">
+                <p>오늘의 운영 상태를 확인해보세요</p>
+                <h2>LaunchDesk가 쇼핑몰과 광고 데이터를 함께 정리해드립니다.</h2>
+              </div>
+              <div class="opsdash-hero-visual" aria-hidden="true">
+                <svg viewBox="0 0 200 120">
+                  <rect x="6" y="58" width="62" height="52" rx="5" fill="var(--op-accent-soft)"/>
+                  <rect x="18" y="40" width="38" height="24" rx="4" fill="#fff" stroke="var(--border-strong)"/>
+                  <rect x="80" y="16" width="70" height="94" rx="7" fill="#fff" stroke="var(--border-strong)"/>
+                  <line x1="94" y1="36" x2="136" y2="36" stroke="var(--op-accent)" stroke-width="3.5" stroke-linecap="round"/>
+                  <line x1="94" y1="50" x2="136" y2="50" stroke="var(--ink-faint)" stroke-width="3.5" stroke-linecap="round"/>
+                  <line x1="94" y1="64" x2="118" y2="64" stroke="var(--ink-faint)" stroke-width="3.5" stroke-linecap="round"/>
+                  <circle cx="94" cy="86" r="7" fill="var(--op-accent-soft)" stroke="var(--op-accent)" stroke-width="2"/>
+                  <path d="M91 82c4-4 8-1 8 3s-4 6-8 3" fill="none" stroke="var(--op-accent)" stroke-width="1.4"/>
+                  <circle cx="172" cy="76" r="20" fill="var(--op-accent-soft)"/>
+                  <path d="M172 62c-7 5-7 13 0 20c7-7 7-15 0-20z" fill="var(--op-accent)"/>
+                  <path d="M172 68v18" stroke="#fff" stroke-width="1.4" opacity=".5"/>
+                </svg>
+                <span class="opsdash-hero-mark">Launch Together</span>
+              </div>
+            </div>
+
+            <!-- 오늘 핵심 숫자 — 실제 Cafe24 주문/Meta 광고 데이터만 표시.
+                 가짜 증감률(▲12% 등)은 절대 넣지 않는다(요구사항 6). -->
+            <div class="opsdash-kpis" id="opsdashKpis">
+              <div class="opsdash-kpi">
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">오늘 주문</div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-</div></div>
+                <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.68 12.39A2 2 0 0 0 9.64 18H18a2 2 0 0 0 1.95-1.57L21 9H6"/><circle cx="9.5" cy="20.5" r="1"/><circle cx="17.5" cy="20.5" r="1"/></svg></div>
+              </div>
+              <div class="opsdash-kpi">
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">오늘 결제금액</div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-</div></div>
+                <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+              </div>
+              <div class="opsdash-kpi">
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Meta 광고비</div><div class="opsdash-kpi-value" id="opsdashKpiSpend">-</div></div>
+                <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg></div>
+              </div>
+              <div class="opsdash-kpi">
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">ROAS</div><div class="opsdash-kpi-value" id="opsdashKpiRoas">-</div><div class="opsdash-kpi-note" id="opsdashKpiRoasNote"></div></div>
+                <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg></div>
+              </div>
+            </div>
+
+            <!-- 2:1 메인 grid — 왼쪽 "쇼핑몰 운영 현황"(브리핑+광고상태+
+                 월간현황을 한 패널로 통합, 카드 안에 카드를 만들지 않고
+                 서브 타이틀/divider로만 구분) + 오른쪽 "지금 무엇을
+                 시작할까요"(요구사항 5·6). -->
+            <div class="opsdash-row">
+              <div class="dash-panel">
+                <div class="dash-panel-head">쇼핑몰 운영 현황</div>
+                <div class="opsdash-ops-body">
+                  <div class="opsdash-ops-split">
+                    <div class="opsdash-ops-col">
+                      <div class="opsdash-subhead"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><line x1="9.5" y1="12" x2="14.5" y2="12"/><line x1="9.5" y1="15" x2="14.5" y2="15"/></svg></span>오늘의 운영 브리핑</div>
+                      <div class="opsdash-brief-list" id="opsdashBriefList"></div>
+                    </div>
+                    <div class="opsdash-ops-divider"></div>
+                    <div class="opsdash-ops-col">
+                      <div class="opsdash-subhead"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg></span>광고 상태</div>
+                      <div class="opsdash-adstate" id="opsdashAdState"></div>
+                    </div>
+                  </div>
+                  <div class="opsdash-ops-hr"></div>
+                  <div class="opsdash-subhead">이번 달 운영 현황</div>
+                  <div class="opsdash-summary" id="opsdashMonthSummary"></div>
+                </div>
+              </div>
+              <div class="dash-panel">
+                <div class="dash-panel-head" style="padding:1.05rem 1.3rem .5rem; border:none;">지금, 무엇을 시작할까요?</div>
+                <p style="margin:0; padding:0 1.3rem .6rem; font-size:.8rem; color:var(--ink-faint);">LaunchDesk에서 바로 할 수 있는 일을 모았습니다.</p>
+                <div class="quick-row-list" style="border:none;" id="opsdashQuickActions">
+                  <a class="quick-row" href="#/wholesale">
+                    <span class="qr-icon tone-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></svg></span>
+                    <span class="qr-text"><span class="qr-title">도매처 찾기</span><span class="qr-sub">검증된 도매처를 둘러보세요</span></span>
+                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                  </a>
+                  <a class="quick-row" href="#/resources">
+                    <span class="qr-icon tone-c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5c-2-1.2-5-1.5-8-1v14c3-.5 6-.2 8 1c2-1.2 5-1.5 8-1V4c-3-.5-6-.2-8 1z"/><line x1="12" y1="5" x2="12" y2="19"/></svg></span>
+                    <span class="qr-text"><span class="qr-title">운영 가이드 보기</span><span class="qr-sub">처음이라도 하나씩 따라가며 시작해보세요</span></span>
+                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                  </a>
+                  <a class="quick-row" href="#/tools" data-tools-target="calc">
+                    <span class="qr-icon tone-b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><circle cx="8.5" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12.2" r=".6" fill="currentColor" stroke="none"/><circle cx="8.5" cy="16" r=".6" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r=".6" fill="currentColor" stroke="none"/><circle cx="15.5" cy="16" r=".6" fill="currentColor" stroke="none"/></svg></span>
+                    <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가와 판매가를 기준으로 마진을 확인하세요</span></span>
+                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                  </a>
+                  <a class="quick-row" href="#/services/setup">
+                    <span class="qr-icon tone-d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="4.5" y1="7.5" x2="19.5" y2="7.5"/><circle cx="9.5" cy="7.5" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="12" x2="19.5" y2="12"/><circle cx="15" cy="12" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="16.5" x2="19.5" y2="16.5"/><circle cx="11.5" cy="16.5" r="1.7" fill="currentColor" stroke="none"/></svg></span>
+                    <span class="qr-text"><span class="qr-title">세팅 대행 문의</span><span class="qr-sub">쇼핑몰 세팅을 도움받아보세요</span></span>
+                    <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- (내 계획 #ldPlanPanel은 홈(#/)의 시작 데스크 아래에 있다 — 이 화면으로
+                 옮기지 않았다. id 중복 없음.) -->
+
+            <!-- 하단 3열 — 도매처 / 세팅 대행 / 연결 상태(+다음 할 일)
+                 (요구사항 8). 세팅 대행은 실제 플랜 이름(#view-services-setup
+                 data-plan과 동일)에 등급 라벨만 보조로 붙였다 — 문의 조회
+                 기능은 만들지 않는다. -->
+            <div class="opsdash-row triple">
+              <div class="dash-panel">
+                <div class="dash-panel-head"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="M4 7l8 4 8-4"/><path d="M12 11v10"/></svg></span>도매처</div>
+                <div id="opsdashWholesalers"></div>
+              </div>
+              <div class="dash-panel">
+                <div class="dash-panel-head"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="4.5" y1="7.5" x2="19.5" y2="7.5"/><circle cx="9.5" cy="7.5" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="12" x2="19.5" y2="12"/><circle cx="15" cy="12" r="1.7" fill="currentColor" stroke="none"/><line x1="4.5" y1="16.5" x2="19.5" y2="16.5"/><circle cx="11.5" cy="16.5" r="1.7" fill="currentColor" stroke="none"/></svg></span>세팅 대행</div>
+                <div class="opsdash-service-list">
+                  <div class="opsdash-service-row"><span class="opsdash-service-name">기본 쇼핑몰 세팅</span><span class="opsdash-service-tier">Basic</span></div>
+                  <div class="opsdash-service-row"><span class="opsdash-service-name">연동·추적 세팅</span><span class="opsdash-service-tier">Standard</span></div>
+                  <div class="opsdash-service-row"><span class="opsdash-service-name">전체 초기 세팅</span><span class="opsdash-service-tier">Premium</span></div>
+                </div>
+                <div class="opsdash-inquiry" id="opsdashSetupInquiry"></div>
+              </div>
+              <div class="dash-panel">
+                <div class="dash-panel-head"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M8 9.5 6.5 8a3 3 0 1 1 4.2-4.2L12 5"/><path d="M15 14.5l1.5 1.5a3 3 0 1 1-4.2 4.2L11 19"/></svg></span>연결 상태</div>
+                <div class="opsdash-connection-list" id="opsdashConnectionStatus"></div>
+                <div id="opsdashNextAction"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

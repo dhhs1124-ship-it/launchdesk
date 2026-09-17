@@ -20,6 +20,7 @@
      link pointing at it starts working immediately. */
   var BUILT = {
     '/':              'view-home',
+    '/dashboard':     'view-dashboard',
     '/tools':         'view-tools',
     '/start':         'view-start',
     '/start/intro':   'view-start-intro',
@@ -42,6 +43,7 @@
      BUILT) on the "coming soon" placeholder. */
   var TITLES = {
     '/':                 '홈',
+    '/dashboard':        '운영 현황',
     '/start':            '쇼핑몰 시작하기',
     '/start/intro':      '챕터 00 · 시작하기 전에',
     '/tools':            '운영 도구',
@@ -293,6 +295,23 @@
   });
   sidebar.addEventListener('click', function(e){
     if(e.target.closest('a[href]')) closeSidebar();
+  });
+  /* 같은 해시 경로 재클릭(2026-09 UI 재설계 2차) — 사이드바·본문의 내부 링크가
+     지금 보고 있는 경로(#/dashboard 등)를 다시 가리키면 hashchange가 발생하지
+     않아 render()의 scrollTo(0,0)/closeSidebar()가 돌지 않는다. 그 경우만 여기서
+     같은 두 동작을 직접 한다. 범위는 '#/'로 시작하는 해시 라우트 링크뿐이다 —
+     로그인 모달 링크(#/login, 아래 전용 위임 핸들러가 preventDefault로 처리)와
+     외부/일반 앵커 링크, 새 탭 클릭(수정키·가운데 버튼)은 건드리지 않는다. */
+  document.addEventListener('click', function(e){
+    if(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var link = e.target.closest('a[href^="#/"]');
+    if(!link || link.getAttribute('target') === '_blank') return;
+    var href = link.getAttribute('href');
+    if(href === '#/login') return;
+    var linkPath = href.replace(/^#/, '') || '/';
+    if(linkPath !== currentPath()) return; // 경로가 바뀌면 hashchange → render()가 처리
+    window.scrollTo(0, 0);
+    closeSidebar();
   });
 
   /* photo lightbox — event-delegated so it works across every view */

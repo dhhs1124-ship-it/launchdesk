@@ -569,8 +569,14 @@
   function isToolsRoute(){
     return (location.hash.replace(/^#/, '') || '/') === '/tools';
   }
+  // 운영 현황(#/dashboard, home-dashboard.js가 이 파일의 스냅샷을 구독해 그리는
+  // 화면 — 2026-09 UI 재설계 2차로 홈에서 분리)에 들어올 때도 같은 이유로 연결
+  // 쇼핑몰 목록을 다시 확인한다. 조회·집계 로직은 그대로이고 진입 경로만 하나 더 본다.
+  function isDashboardRoute(){
+    return (location.hash.replace(/^#/, '') || '/') === '/dashboard';
+  }
   window.addEventListener('hashchange', function(){
-    if(!isToolsRoute() || !currentUserId) return;
+    if(!(isToolsRoute() || isDashboardRoute()) || !currentUserId) return;
     seq += 1;
     loadEligibleCafe24Stores(currentUserId, seq);
   });

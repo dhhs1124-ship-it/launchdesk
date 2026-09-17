@@ -1343,3 +1343,14 @@
      둔다 — .ldplan-* 규칙이 .opsdash 스코프의 --op-accent 토큰과 .opsdash
      .btn-primary 색을 그대로 쓰기 때문이다(id는 옮겼을 뿐 중복 없음). */
   .desk-plans{margin-bottom:1.5rem;}
+
+  /* 이미 운영 중인 사장님 안내 카드(홈, 시작 데스크 바로 아래) — 운영 대시보드를
+     #/dashboard(운영 현황)로 분리한 자리에 남기는 작은 링크 카드(2026-09 UI
+     재설계 2차). 시작 데스크와 같은 --ld-* 토큰·모서리·간격만 쓴다. */
+  .desk-ops-card{display:flex; align-items:center; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin:0 0 24px; padding:18px 24px; border-radius:12px; background:var(--ld-panel); border:1px solid var(--ld-border); min-width:0;}
+  .desk-ops-card-text{flex:1 1 240px; min-width:0; word-break:keep-all;}
+  .desk-ops-card h2{margin:0 0 4px; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--ld-text); line-height:1.4;}
+  .desk-ops-card p{margin:0; max-width:none; font-size:13px; color:var(--ld-muted); line-height:1.6;}
+  .desk-ops-card-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:9px 16px; border-radius:9px; border:1px solid var(--ld-border); background:var(--ld-panel); color:var(--ld-accent); font-size:13px; font-weight:600; white-space:nowrap; flex:0 0 auto; transition:background .15s, border-color .15s;}
+  .desk-ops-card-btn:hover{border-color:var(--ld-accent); background:var(--ld-accent-light);}
+  @media (max-width:639px){ .desk-ops-card{padding:16px 18px;} .desk-ops-card-btn{width:100%;} }
