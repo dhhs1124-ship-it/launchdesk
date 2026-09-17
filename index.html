@@ -1101,102 +1101,267 @@
 
       <!-- ============ VIEW: STEP 02 · 사업자 등록하고 쇼핑몰 플랫폼 만들기 ============ -->
       <section class="view" id="view-start-setup" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 02</span></div>
-          <span class="eyebrow">STEP 02 · 사업자 · 플랫폼</span>
-          <div class="page-head">
-            <h1>사업자 등록하고 쇼핑몰 플랫폼 만들기</h1>
-            <p class="page-lead">상품을 판매하려면 사업자 · 쇼핑몰 · 결제 환경부터 실제 거래 가능한 상태로 준비해야 합니다. 마케팅용 인프라(네이버페이 · SNS · 메타 픽셀)는 STEP 06에서 따로 다룹니다.</p>
-          </div>
-          <div class="chapter-body">
-            <div class="callout">
-              <p><strong>대부분 한 번은 거쳐야 하는 절차지만, 순서를 미리 알아두면 실수 없이 빠르게 끝낼 수 있습니다.</strong></p>
-              <p>사업자 등록, 통신판매업 신고(필요한 경우), 쇼핑몰 플랫폼 개설 — 이 세 가지가 가장 먼저입니다.</p>
-            </div>
+        <!-- STEP 02 (2026-09 UI 재설계, 피그마 Step02.tsx 시각 구조 이식) —
+             정적 마크업 + step02.js(진행 상태·탭 부가 동작만). 저장·완료 판정은 기존
+             app.js 체크리스트 컨트롤러(.checklist-block[data-chapter] 안의
+             .cl-row input[type="checkbox"] 7개, DOM 순서 = 저장 인덱스 0~6, change 이벤트,
+             setChapterDone/checklistAllChecked)가 그대로 담당한다. 탭은 기존
+             .tabs > .tab-bar > .tab-btn / .tab-panel 위임(app.js)을 재사용하고, 1100px
+             미만에서는 CSS display:contents + order로 한 열 순서(제목 → 탭 → 탭 콘텐츠 →
+             진행 → 게스트 안내 → 체크리스트 → 관련 자료 → 도움 → 이전/다음)를 만든다 —
+             같은 패널을 DOM에 두 번 두지 않는다. 스타일은 전부 #view-start-setup 스코프
+             (--ld-* 올리브 토큰), 다른 STEP은 그대로다. -->
+        <div class="content">
+          <div class="s2" id="step02Root" data-tab="guide">
 
-            <h2 class="section-h">사업자등록 & 통신판매업 신고</h2>
-            <div class="info-grid cols-2">
-              <div class="info-card"><h4>개인사업자 등록 <span class="tag">홈택스</span></h4><p>민원 신청 → 사업자등록 신청. 취급하는 상품과 실제 사업 형태에 맞는 업종 · 업태를 확인하고, 대표자 정보 · 사업장 주소를 입력해 등록증을 PDF로 저장해 둡니다.</p></div>
-              <div class="info-card"><h4>통신판매업 신고 <span class="tag">정부24</span></h4><p>대부분의 온라인 판매자에게 필요합니다. 필요서류는 사업자등록증 · 사업장 주소 확인서류이며, 면제 요건에 해당하는지는 정부24 · 관할 구청에서 확인하세요.</p></div>
-            </div>
-            <p style="font-size:.82rem; color:var(--ink-faint);">업종코드 · 신고 대상 여부는 사업 형태에 따라 달라질 수 있습니다. 정확한 판단은 국세청 · 세무사 등 전문가 확인을 거치는 걸 권장합니다.</p>
+            <header class="s2-head">
+              <div class="breadcrumb s2-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 02</span></div>
+              <span class="s2-eyebrow">STEP 02 · 사업자 · 플랫폼</span>
+              <h1>사업자 등록하고 쇼핑몰 플랫폼 만들기</h1>
+              <p class="s2-lead">상품을 판매하려면 사업자 · 쇼핑몰 · 결제 환경부터 실제 거래 가능한 상태로 준비해야 합니다. 마케팅용 인프라는 STEP 06에서 따로 준비합니다.</p>
+            </header>
 
-            <h2 class="section-h">쇼핑몰 플랫폼 선택</h2>
-            <p>쇼핑몰 플랫폼은 크게 <strong>오픈마켓 입점형</strong>(스마트스토어 · 쿠팡 등)과 <strong>자사몰 구축형</strong>(카페24 · 고도몰 · 식스샵 등)으로 나뉩니다. 오픈마켓형은 진입장벽이 낮고 기존 트래픽을 바로 활용할 수 있지만 가격 경쟁 · 노출 알고리즘에 좌우되기 쉽고, 자사몰형은 디자인 · 기능 · 데이터를 자유롭게 다룰 수 있지만 초기 트래픽은 직접 만들어야 합니다. 정답은 없고, STEP 01에서 정한 방향에 맞는 쪽을 고르면 됩니다.</p>
-            <p style="font-size:.82rem; color:var(--ink-faint);">아래는 자사몰형 대 오픈마켓형 비교의 한 예시입니다 — 어떤 플랫폼을 고르든 이후 STEP은 동일하게 진행됩니다.</p>
-            <div class="versus">
-              <div class="side">
-                <small>진입 장벽 낮음 · 예시</small>
-                <h4>오픈마켓형 (예: 스마트스토어)</h4>
-                <ul><li class="bad">노출 알고리즘 · 가격 경쟁 중심</li><li class="bad">픽셀 설치 · 행동 추적 · 자동화 제한적인 경우가 많음</li></ul>
+            <div class="tabs s2-tabs">
+              <div class="tab-bar s2-tabbar">
+                <button class="tab-btn active" type="button" data-tab="guide">가이드</button>
+                <button class="tab-btn" type="button" data-tab="checklist">오픈 체크리스트</button>
               </div>
-              <div class="vs">VS</div>
-              <div class="side rec">
-                <small>브랜드 구축형 · 예시</small>
-                <h4>자사몰형 (예: 카페24)</h4>
-                <ul><li class="good">디자인 · 기능 · 구조 자유 커스터마이징</li><li class="good">GA · 메타 픽셀 등 분석 툴 자유 삽입</li><li class="good">도메인 직접 연결로 브랜드 정체성 강조</li></ul>
+
+              <!-- ── 가이드 탭: 기존 STEP 02 안내 내용을 카드·비교·체크 목록으로 재배치(내용 삭제 없음) ── -->
+              <div class="tab-panel s2-panel s2-panel-guide active" data-tab="guide">
+                <div class="s2-guide-intro">
+                  <h2>먼저 판매 가능한 환경을 준비해요.</h2>
+                  <p><strong>대부분 한 번은 거쳐야 하는 절차지만, 순서를 미리 알아두면 실수 없이 빠르게 끝낼 수 있습니다.</strong> 사업자 등록, 통신판매업 신고(필요한 경우), 쇼핑몰 플랫폼 개설 — 이 세 가지가 가장 먼저입니다.</p>
+                </div>
+
+                <ol class="s2-sections">
+                  <li class="s2-section">
+                    <span class="s2-num">01</span>
+                    <div class="s2-section-body">
+                      <h3>사업자등록과 통신판매업 신고</h3>
+                      <div class="s2-cards">
+                        <div class="s2-card-item">
+                          <p class="s2-card-title">개인사업자 등록 <span class="s2-tag">홈택스</span></p>
+                          <p>민원 신청 → 사업자등록 신청. 취급하는 상품과 실제 사업 형태에 맞는 업종 · 업태를 확인하고, 대표자 정보 · 사업장 주소를 입력해 등록증을 PDF로 저장해 둡니다.</p>
+                        </div>
+                        <div class="s2-card-item">
+                          <p class="s2-card-title">통신판매업 신고 <span class="s2-tag">정부24</span></p>
+                          <p>온라인으로 상품을 판매하면 신고 대상이 되는 경우가 많습니다. 필요서류는 사업자등록증 · 사업장 주소 확인서류이며, 신고 대상인지 · 면제 요건에 해당하는지는 정부24 · 관할 구청에서 확인하세요.</p>
+                        </div>
+                      </div>
+                      <div class="s2-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>업종코드 · 신고 대상 여부는 사업 형태에 따라 달라질 수 있습니다. 정확한 판단은 국세청 · 정부24 · 관할 기관이나 세무사 등 전문가 확인을 거치는 걸 권장합니다.</p>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="s2-section">
+                    <span class="s2-num">02</span>
+                    <div class="s2-section-body">
+                      <h3>쇼핑몰 플랫폼 선택</h3>
+                      <p class="s2-summary">쇼핑몰 플랫폼은 크게 <strong>오픈마켓 입점형</strong>(스마트스토어 · 쿠팡 등)과 <strong>자사몰 구축형</strong>(카페24 · 고도몰 · 식스샵 등)으로 나뉩니다. 두 방식의 차이를 살펴보고 STEP 01에서 정한 방향에 맞는 쪽을 고르면 됩니다 — 정답은 없습니다.</p>
+                      <div class="s2-compare">
+                        <div class="s2-compare-card">
+                          <small>진입 장벽 낮음 · 예시</small>
+                          <h4>오픈마켓형</h4>
+                          <p class="s2-compare-ex">예: 스마트스토어 · 쿠팡</p>
+                          <ul>
+                            <li class="good">진입장벽이 낮고 플랫폼의 기존 트래픽을 바로 활용할 수 있음</li>
+                            <li class="limit">가격 경쟁 · 노출 알고리즘에 좌우되기 쉬움</li>
+                            <li class="limit">픽셀 설치 · 행동 추적 · 자동화가 제한적인 경우가 많음</li>
+                          </ul>
+                        </div>
+                        <div class="s2-compare-card">
+                          <small>브랜드 구축형 · 예시</small>
+                          <h4>자사몰형</h4>
+                          <p class="s2-compare-ex">예: 카페24 · 고도몰 · 식스샵</p>
+                          <ul>
+                            <li class="good">디자인 · 기능 · 구조를 자유롭게 커스터마이징할 수 있음</li>
+                            <li class="good">GA · 메타 픽셀 등 분석 툴을 자유롭게 삽입할 수 있음</li>
+                            <li class="good">도메인 직접 연결로 브랜드 정체성을 강조할 수 있음</li>
+                            <li class="limit">초기 트래픽은 직접 만들어야 함</li>
+                          </ul>
+                        </div>
+                      </div>
+                      <p class="s2-note s2-center">위 비교는 한 예시입니다. 판매 방식과 목표에 따라 선택이 달라지며, 어떤 플랫폼을 고르든 이후 STEP은 동일하게 진행됩니다.</p>
+                    </div>
+                  </li>
+
+                  <li class="s2-section">
+                    <span class="s2-num">03</span>
+                    <div class="s2-section-body">
+                      <h3>도메인 · SSL · SEO 기본 설정</h3>
+                      <p class="s2-summary">목표는 <strong>"내 쇼핑몰 주소가 정상적으로 열리고, 기본 검색 정보가 설정되어 있는 상태"</strong>입니다. 아래 항목이 그 상태를 만드는 최소 기준입니다.</p>
+                      <ul class="s2-checks">
+                        <li>도메인을 연결하고, HTTPS/SSL 인증서가 정상 적용되어 있는지 확인</li>
+                        <li>쇼핑몰 기본정보에 사업자등록증 · 통신판매업 신고번호(신고한 경우) 등 사업자 정보 입력</li>
+                        <li>제목 · 설명 · 키워드 등 기본 SEO 정보를 현재 플랫폼 기준으로 설정 — 검색 노출의 최소 조건입니다</li>
+                        <li>현재 플랫폼에서 지원하는 사이트맵 설정 확인</li>
+                      </ul>
+                    </div>
+                  </li>
+
+                  <li class="s2-section">
+                    <span class="s2-num">04</span>
+                    <div class="s2-section-body">
+                      <h3>결제수단 · PG 준비</h3>
+                      <p class="s2-summary">PG(Payment Gateway)는 고객이 카드 · 계좌이체 등으로 결제할 수 있게 해주는 결제 대행 서비스입니다. 결제수단이 연결되어 있어야 실제 주문을 받을 수 있습니다.</p>
+                      <div class="s2-rows">
+                        <div class="s2-row"><span class="s2-pill">자사몰형</span><p>대부분 별도로 PG를 신청 · 연동해야 합니다. 사용하는 플랫폼에서 지원하는 PG사 · 결제수단 목록을 확인하고 신청하세요.</p></div>
+                        <div class="s2-row"><span class="s2-pill">오픈마켓형</span><p>플랫폼 자체 결제 시스템을 그대로 씁니다. 플랫폼에서 제공하는 결제 시스템의 설정 상태를 확인하세요.</p></div>
+                      </div>
+                      <p class="s2-note">지원 결제수단 · 심사 기간 · 비용은 플랫폼과 PG사에 따라 달라지므로 현재 안내를 직접 확인해 비교하세요. 특정 PG사가 모든 사용자에게 정답은 아닙니다.</p>
+                    </div>
+                  </li>
+
+                  <li class="s2-section">
+                    <span class="s2-num">05</span>
+                    <div class="s2-section-body">
+                      <h3>플랫폼 부가 기능</h3>
+                      <span class="s2-badge">카페24를 사용하는 경우의 참고 예시</span>
+                      <div class="s2-features">
+                        <div class="s2-feature"><div class="s2-feature-head"><b>리뷰 수집 · 관리</b><span>알파리뷰</span></div><p>리뷰 자동 수집 + 스태프 리뷰 기능. 1초 회원가입(네이버 · 카카오) 연동도 됩니다.</p></div>
+                        <div class="s2-feature"><div class="s2-feature-head"><b>회원가입과 로그인 편의</b><span>킵그로우</span></div><p>가입 전환율 최적화에 특화. "구매보다 회원가입을 먼저 올리고 싶다"면 적합합니다.</p></div>
+                        <div class="s2-feature"><div class="s2-feature-head"><b>실시간 상담과 자동응답</b><span>채널톡</span></div><p>실시간 상담 · 자동응답. 톤을 운영자 감도로 맞추면 전환율에 도움이 됩니다.</p></div>
+                      </div>
+                      <div class="s2-tip">
+                        <b>공통 팁</b>
+                        <p>전부 설치하기보다, 가장 필요한 1~2개부터 빠르게 테스트하고 데이터로 판단하세요. 다른 플랫폼을 쓴다면 비슷한 기능(리뷰 자동화 · 가입전환 최적화 · 실시간 상담)을 제공하는 자체 앱스토어 · 부가서비스를 찾아보세요.</p>
+                      </div>
+                      <p class="s2-note">앱의 제공 여부 · 가격 · 기능은 바뀔 수 있어요. 설치 전에 사용하는 플랫폼의 앱스토어에서 현재 정보를 다시 확인하세요.</p>
+                    </div>
+                  </li>
+
+                  <li class="s2-section">
+                    <span class="s2-num">06</span>
+                    <div class="s2-section-body">
+                      <h3>자료실과 세팅 도움</h3>
+                      <p class="s2-summary">클릭 단위 세팅 스텝은 자료실에 정리되어 있어요. 직접 하기 어려운 설정은 세팅 대행으로 도움받을 수 있어요.</p>
+                      <ul class="s2-links">
+                        <li><a href="#/resources"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>자료실에서 도메인 연결 · SEO 세팅 클릭 단위 스텝 보기</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                        <li><a href="#/resources"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>자료실에서 PG 신청 스텝 보기</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                        <li><a href="#/resources" data-resource-cat="business"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>사업자 · 플랫폼 관련 자료 보기</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                      </ul>
+                      <a class="s2-service" href="#/services/setup">
+                        <span class="s2-service-icon" aria-hidden="true">🛠️</span>
+                        <span class="s2-service-text"><b>도메인 · SSL · 기본 설정이 막혔다면</b><small>기본 쇼핑몰 세팅으로 도움받을 수 있어요</small></span>
+                        <svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                      <p class="s2-note">쇼핑몰이 열렸다면, 다음 STEP에서는 판매할 상품, 공급처, 가격을 확정합니다.</p>
+                    </div>
+                  </li>
+                </ol>
+
+                <div class="s2-guide-cta">
+                  <button type="button" class="s2-btn s2-btn-primary" id="s2GoChecklist">오픈 체크리스트 확인하기 →</button>
+                </div>
+              </div>
+
+              <!-- ── 오픈 체크리스트 탭 ── -->
+              <div class="tab-panel s2-panel s2-panel-cl" data-tab="checklist">
+                <!-- 비회원 안내 — body.is-authed(app.js renderAuthUI, 실제 인증 상태)면 CSS로 숨김.
+                     버튼은 기존 로그인 모달(window.launchdeskOpenLoginModal)만 연다. -->
+                <div class="s2-guest" id="s2Guest">
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                  <div class="s2-guest-body">
+                    <p>로그인하면 체크한 준비 상태를 계정에 저장하고 다른 기기에서도 이어갈 수 있어요.</p>
+                    <button type="button" class="s2-guest-btn" id="s2GuestLogin">로그인하고 저장하기</button>
+                  </div>
+                </div>
+
+                <!-- 체크리스트 — 저장 구조 보존: .checklist-block[data-chapter] 안의 .cl-row input[type="checkbox"]
+                     정확히 7개, DOM 순서 0~6 = 저장 배열 인덱스. .count는 app.js가 갱신한다. -->
+                <div class="checklist-block s2-checklist" data-chapter="/start/setup">
+                  <div class="cl-head s2-cl-head">
+                    <div class="s2-cl-title">
+                      <h2 class="title" id="s2ChecklistTitle" tabindex="-1">오픈 전 기본 인프라 체크리스트</h2>
+                      <p>실제로 완료한 항목만 체크하세요. 7개를 모두 확인하면 STEP 02가 완료돼요.</p>
+                    </div>
+                    <span class="count">0 / 7</span>
+                  </div>
+                  <div class="s2-cl-bar" aria-hidden="true"><div class="s2-cl-fill" id="s2ClFill"></div></div>
+                  <div class="cl-group s2-cl-group">
+                    <div class="g-label">사업자 · 통신판매업</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">사업자등록 완료</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">필요한 경우 통신판매업 신고 완료</span></label>
+                  </div>
+                  <div class="cl-group s2-cl-group">
+                    <div class="g-label">쇼핑몰 · 도메인</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">쇼핑몰 플랫폼 계정 · 스토어 개설</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">도메인 연결 및 HTTPS/SSL 확인</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">검색 노출을 위한 기본 SEO 정보 설정</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">기본 테마 · 레이아웃 적용</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">PG 신청 또는 결제수단 설정 진행</span></label>
+                  </div>
+                  <div class="s2-cl-done" id="s2ClDone" hidden><span aria-hidden="true">✓</span><div><b>STEP 02 준비 완료</b><p>기본 판매 환경 준비 항목을 모두 확인했어요.</p></div></div>
+                  <div class="cl-note s2-cl-note">로그인 상태에서는 체크한 내용이 계정에 저장돼요. 로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</div>
+                </div>
               </div>
             </div>
 
-            <h2 class="section-h">도메인 · SSL · SEO 기본 세팅</h2>
-            <p>목표는 <strong>"내 쇼핑몰 주소가 정상적으로 열리고, 기본 검색 정보가 설정되어 있는 상태"</strong>입니다. 아래 항목이 그 상태를 만드는 최소 기준입니다.</p>
-            <ul class="trust-list">
-              <li>도메인 연결 후 HTTPS/SSL 인증서가 정상 적용되어 있는지 확인</li>
-              <li>쇼핑몰 기본정보에 사업자등록증 · 통신판매신고번호 입력</li>
-              <li>제목 · 설명 · 키워드 등 기본 SEO 정보와 사이트맵을 현재 플랫폼 기준으로 설정 — 검색 노출의 최소 조건입니다</li>
-            </ul>
-            <p style="font-size:.84rem;"><a href="#/resources" style="color:var(--accent-ink); font-weight:600;">자료실에서 도메인 연결 · SEO 세팅 클릭 단위 스텝 보기 →</a></p>
+            <!-- ── 오른쪽 열(large) / 한 열 순서 배치(medium·small) — 탭에 따라 표시 ── -->
+            <aside class="s2-side">
+              <section class="s2-card s2-side-guide" aria-labelledby="s2PrepTitle">
+                <h3 id="s2PrepTitle">이번 단계에서 준비할 것</h3>
+                <ol class="s2-prep">
+                  <li><span>01</span>사업자 등록 · 통신판매업 신고(필요한 경우)</li>
+                  <li><span>02</span>쇼핑몰 플랫폼 선택 · 스토어 개설</li>
+                  <li><span>03</span>도메인 · SSL · 기본 SEO 설정</li>
+                  <li><span>04</span>결제수단 · PG 준비</li>
+                </ol>
+                <p class="s2-side-hint">정확한 신고 대상 · 업종코드는 국세청 · 정부24 · 관할 기관에서 확인하세요. 가이드를 읽은 뒤 "오픈 체크리스트"에서 준비 상태를 직접 체크해보세요.</p>
+              </section>
 
-            <h2 class="section-h">결제수단 · PG 준비</h2>
-            <div class="callout">
-              <p>PG(Payment Gateway)는 고객이 카드 · 계좌이체 등으로 결제할 수 있게 해주는 결제 대행 서비스입니다. 결제수단이 연결되어 있어야 실제 주문을 받을 수 있습니다.</p>
-              <p>자사몰형 플랫폼은 대부분 별도로 PG를 신청 · 연동해야 하고, 오픈마켓형은 플랫폼 자체 결제 시스템을 그대로 씁니다. 사용 중인 플랫폼에서 지원하는 PG사 · 결제수단 목록과 심사 기간 · 비용을 비교해 진행하세요. 특정 PG사가 모든 사용자에게 정답은 아닙니다.</p>
-            </div>
-            <p style="font-size:.84rem;"><a href="#/resources" style="color:var(--accent-ink); font-weight:600;">자료실에서 PG 신청 스텝 보기 →</a></p>
+              <section class="s2-card s2-progress" id="s2Progress" aria-labelledby="s2ProgressTitle" aria-live="polite">
+                <div class="s2-progress-head">
+                  <h3 id="s2ProgressTitle">STEP 02 진행 상태</h3>
+                  <span class="s2-progress-badge" id="s2ProgressBadge">필수 0 / 7</span>
+                </div>
+                <div class="s2-progress-bar"><div class="s2-progress-fill" id="s2ProgressFill"></div></div>
+                <ul class="s2-progress-items" id="s2ProgressItems">
+                  <li class="s2-progress-group"><span>사업자 · 통신판매업</span><b data-cl-range="0-1">0 / 2</b></li>
+                  <li data-cl-index="0"><span class="s2-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>사업자등록</li>
+                  <li data-cl-index="1"><span class="s2-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>통신판매업 신고(필요한 경우)</li>
+                  <li class="s2-progress-group"><span>쇼핑몰 · 도메인</span><b data-cl-range="2-6">0 / 5</b></li>
+                  <li data-cl-index="2"><span class="s2-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>플랫폼 계정 · 스토어 개설</li>
+                  <li data-cl-index="3"><span class="s2-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>도메인 연결 · HTTPS/SSL</li>
+                  <li data-cl-index="4"><span class="s2-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>기본 SEO 정보</li>
+                  <li data-cl-index="5"><span class="s2-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>기본 테마 · 레이아웃</li>
+                  <li data-cl-index="6"><span class="s2-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>PG 신청 · 결제수단</li>
+                </ul>
+                <div class="s2-progress-done" id="s2ProgressDone" hidden>✓ STEP 02 준비 완료</div>
+                <!-- 로그인 안내(게스트) / 저장 상태(회원) — 실제 인증 상태(body.is-authed)만 본다. 저장 완료 표시는 만들지 않는다. -->
+                <p class="s2-progress-foot s2-progress-guest">로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</p>
+                <p class="s2-progress-foot s2-progress-member">로그인 상태 · 체크한 내용은 계정에 저장돼요.</p>
+              </section>
 
-            <h2 class="section-h">플랫폼 부가 기능 <span class="tag">카페24를 쓴다면 · 예시</span></h2>
-            <div class="info-grid cols-2">
-              <div class="info-card"><h4>알파리뷰</h4><p>리뷰 자동 수집 + 스태프 리뷰 기능. 1초 회원가입(네이버 · 카카오) 연동도 됩니다.</p></div>
-              <div class="info-card"><h4>킵그로우</h4><p>가입 전환율 최적화에 특화. "구매보다 회원가입을 먼저 올리고 싶다"면 적합합니다.</p></div>
-              <div class="info-card"><h4>채널톡</h4><p>실시간 상담 · 자동응답. 톤을 운영자 감도로 맞추면 전환율에 도움이 됩니다.</p></div>
-              <div class="info-card"><h4>공통 팁</h4><p>전부 설치하기보다, 가장 필요한 1~2개부터 빠르게 테스트하고 데이터로 판단하세요. 다른 플랫폼을 쓴다면 비슷한 기능(리뷰 자동화 · 가입전환 최적화 · 실시간 상담)을 제공하는 자체 앱스토어 · 부가서비스를 찾아보세요.</p></div>
-            </div>
+              <section class="s2-card s2-resources" aria-labelledby="s2ResTitle">
+                <h3 id="s2ResTitle">관련 자료</h3>
+                <ul class="s2-res-list">
+                  <li><a href="#/resources"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>도메인 · SEO 설정</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>PG 신청</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources" data-resource-cat="business"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>사업자 · 플랫폼 자료</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                </ul>
+              </section>
 
-            <h2 class="section-h">오픈 전 체크리스트</h2>
-            <div class="checklist-block" data-chapter="/start/setup">
-              <div class="cl-head"><span class="title">오픈 전 기본 인프라 체크리스트</span><span class="count" id="clCount">0 / 7</span></div>
-              <div class="cl-group">
-                <div class="g-label">🧾 사업자 · 통신판매업</div>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">사업자등록 완료</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">필요한 경우 통신판매업 신고 완료</span></label>
+              <section class="desk-help s2-help" aria-labelledby="s2HelpTitle">
+                <h3 id="s2HelpTitle">도메인 · SSL · 기본 설정이 막혔나요?</h3>
+                <p>기본 쇼핑몰 세팅으로 필요한 설정만 도움받을 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg></a>
+              </section>
+            </aside>
+
+            <!-- 이전/다음 — 기존 경로(#/start/prepare, #/start/sourcing) 그대로인 해시 링크. 미완료 시
+                 다음 이동은 step02.js가 confirm으로 한 번 묻는다(막지 않음). -->
+            <nav class="s2-nav" aria-label="STEP 이동">
+              <p class="s2-nav-status" id="s2NavStatus"><span id="s2NavText">체크 항목 7개를 완료하면 STEP 02가 완료돼요.</span> <b id="s2NavCount">0 / 7</b></p>
+              <div class="s2-nav-btns">
+                <a class="s2-btn s2-btn-ghost s2-nav-prev" href="#/start/prepare">← STEP 01 · 무엇을, 누구에게 팔지 정하기</a>
+                <a class="s2-btn s2-btn-primary s2-nav-next" href="#/start/sourcing" id="s2Next">STEP 03 · 판매할 상품과 공급처, 가격 확정하기 →</a>
               </div>
-              <div class="cl-group">
-                <div class="g-label">🏪 쇼핑몰 · 도메인</div>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">쇼핑몰 플랫폼 계정 · 스토어 개설</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">도메인 연결 및 HTTPS/SSL 확인</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">검색 노출을 위한 기본 SEO 정보 설정</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">기본 테마 · 레이아웃 적용</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">PG 신청 또는 결제수단 설정 진행</span></label>
-              </div>
-              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 7개를 모두 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요.</div>
-            </div>
+            </nav>
 
-            <p style="font-size:.84rem;"><a href="#/resources" data-resource-cat="business" style="color:var(--accent-ink); font-weight:600;">사업자 · 플랫폼 관련 자료 보기 →</a></p>
-
-            <div class="quick-row-list" style="margin-top:1.3rem;">
-              <a class="quick-row" href="#/services/setup">
-                <span class="qr-icon tone-d">🛠️</span>
-                <span class="qr-text"><span class="qr-title">도메인 · SSL · 기본 설정이 막혔다면</span><span class="qr-sub">기본 쇼핑몰 세팅으로 도움받을 수 있어요</span></span>
-                <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-              </a>
-            </div>
-
-            <p style="font-size:.86rem; color:var(--ink-faint); margin-top:1.2rem;">쇼핑몰이 열렸다면, 다음 STEP에서는 판매할 상품, 공급처, 가격을 확정합니다.</p>
-
-            <div class="chapter-nav">
-              <a href="#/start/prepare"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 01 · 무엇을, 누구에게 팔지 정하기</span></a>
-              <a class="next" href="#/start/sourcing"><span class="cn-label">다음 STEP →</span><span class="cn-title">STEP 03 · 판매할 상품과 공급처, 가격 확정하기</span></a>
-            </div>
           </div>
         </div>
       </section>
@@ -3081,6 +3246,7 @@
 <script src="home-dashboard.js"></script>
 <script src="desk.js"></script>
 <script src="step01.js"></script>
+<script src="step02.js"></script>
 <script src="plans.js"></script>
 <script src="admin.js"></script>
 </body>

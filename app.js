@@ -57,7 +57,7 @@
     '/business-info':    '사업자 정보',
     '/guide':            '이용 안내',
     '/start/prepare':    '01 · 방향 정하기',
-    '/start/setup':      '02 · 사업자 · 플랫폼 기본',
+    '/start/setup':      '02 · 사업자 · 플랫폼',
     '/start/sourcing':   '03 · 상품 기획',
     '/start/content':    '04 · 촬영 & 상세페이지',
     '/start/marketing-setup': '05 · 마케팅 인프라 세팅',
