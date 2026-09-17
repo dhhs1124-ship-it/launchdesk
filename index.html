@@ -1514,176 +1514,298 @@
       </section>
 
       <!-- ============ VIEW: STEP 04 · 상품 상세페이지 완성하기 ============ -->
+      <!-- STEP 04 (2026-09 UI 재설계 4차, STEP01~03 시각 구조 이식 — 피그마 시안 없음, STEP01~03
+           레이아웃·토큰·반응형 규칙을 그대로 재사용) — 정적 마크업 + step04.js(진행 상태·탭 부가
+           동작만). 저장·완료 판정은 기존 app.js 체크리스트 컨트롤러(.checklist-block[data-chapter]
+           안의 .cl-row input[type="checkbox"] 5개, DOM 순서 = 저장 인덱스 0~4, change 이벤트,
+           setChapterDone/checklistAllChecked)가 그대로 담당한다. 재설계 이전에는 체크박스가 4개
+           (인덱스 0~3)였고, 이번에 5개(촬영 목록 준비 · 상품 이미지 확보 · 상세페이지 구성 ·
+           필수 상품정보 입력 · 모바일 최종 확인)로 늘었다 — 개수가 바뀌므로 기존에 4/4를 완료했던
+           사용자는 재설계 이후 다시 완료 처리하기 전까지 이 STEP이 "미완료"로 재평가된다(사용자
+           확인 후 진행한 의도된 변경, 저장값 자체는 그대로 두고 항목 정의만 바꿈). 탭은 기존
+           .tabs > .tab-bar > .tab-btn / .tab-panel 위임(app.js)을 재사용하고, 1100px 미만에서는
+           CSS display:contents + order로 한 열 순서(제목 → 탭 → 탭 콘텐츠 → 진행 → 게스트 안내 →
+           체크리스트 → 자료 → 도움 → 이전/다음)를 만든다. 촬영 전략은 STEP01에서 제외했던 내용을
+           이 단계로 옮긴 것이며, 특정 모델 섭외 비용 · 시세를 고정된 사실처럼 표시하지 않는다.
+           인스타그램 · 메타광고 운영 · 광고 진단 · 네이버 캐러셀 세팅 · 긴 SEO 강의는 STEP06~07 ·
+           자료실 영역이라 여기 넣지 않는다. 스타일은 전부 #view-start-content 스코프(--ld-* 토큰),
+           다른 STEP은 그대로다. -->
       <section class="view" id="view-start-content" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 04</span></div>
-          <span class="eyebrow">STEP 04 · 상세페이지</span>
-          <div class="page-head">
-            <h1>상품 상세페이지 완성하기</h1>
-            <p class="page-lead">고객은 상품을 직접 만져볼 수 없기 때문에, 이미지와 설명만으로 특징 · 크기 · 사용방법 · 차이를 이해할 수 있어야 합니다.</p>
-          </div>
-          <div class="chapter-body">
-            <div class="callout">
-              <p><strong>사진 한 장으로는 부족합니다.</strong></p>
-              <p>이미지 · 설명, 그리고 필요하다면 영상까지 갖춰야 고객이 상품을 이해하고 구매를 결정할 수 있습니다. 특정 업종의 촬영 방식을 기본값으로 전제하지 않으며, 아래 구조는 업종과 관계없이 적용할 수 있습니다.</p>
-            </div>
+        <div class="content">
+          <div class="s4" id="step04Root" data-tab="guide">
 
-            <h2 class="section-h">상품 이미지 구조</h2>
-            <p>아래 네 가지 유형을 기준으로 준비하면, 업종과 관계없이 상품을 이해시키는 데 필요한 이미지를 빠짐없이 갖출 수 있습니다.</p>
-            <div class="info-grid">
-              <div class="info-card"><h4>대표컷</h4><p>상품을 한눈에 보여주는 이미지입니다. 상세페이지 최상단에서 첫인상을 결정합니다.</p></div>
-              <div class="info-card"><h4>디테일컷</h4><p>소재 · 마감 · 구조 · 특징을 확대해서 보여주는 이미지입니다. 신뢰를 높입니다.</p></div>
-              <div class="info-card"><h4>비교컷</h4><p>크기 · 용량 · 구성 · 옵션 차이를 한눈에 이해시키는 이미지입니다.</p></div>
-              <div class="info-card"><h4>맥락컷</h4><p>실제 사용 환경이나 사용 장면을 보여주는 이미지입니다. 구매 후 모습을 상상하게 합니다.</p></div>
-            </div>
-            <p style="font-size:.86rem; color:var(--ink-faint);">공급처가 제공하는 상품 이미지가 있다면 우선 활용하고, 없다면 위 네 가지 기준으로 직접 촬영하세요.</p>
+            <header class="s4-head">
+              <div class="breadcrumb s4-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 04</span></div>
+              <span class="s4-eyebrow">STEP 04 · 촬영 · 상세페이지 · 상품 등록</span>
+              <h1>상품 상세페이지 완성하기</h1>
+              <p class="s4-lead">고객은 상품을 직접 만져볼 수 없기 때문에, 이미지와 설명만으로 특징 · 크기 · 사용방법을 이해할 수 있어야 합니다. 촬영 → 이미지 선별 → 상세페이지 구성 → 상품 정보 입력까지 마치면 실제 판매를 시작할 수 있는 상태가 됩니다.</p>
+            </header>
 
-            <div class="accordion">
-              <div class="acc-item">
-                <button class="acc-head" type="button"><div><div class="at">업종별 예시 보기</div><div class="as">패션 · 뷰티 · 식품 · 생활용품·잡화 · 반려동물용품</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                <div class="acc-body"><div class="acc-body-inner">
-                  <div class="info-grid">
-                    <div class="info-card"><h4>패션</h4><p>전체 정면컷(대표) · 원단 · 마감 확대컷(디테일) · 사이즈 실측 비교컷(비교) · 착용 무드컷(맥락, 인물 촬영이 필요하다면 아래 팁 참고)</p></div>
-                    <div class="info-card"><h4>뷰티</h4><p>제품 자체컷(대표) · 텍스처 · 발림 확대컷(디테일) · 용량 비교컷(비교) · 실제 사용 장면(맥락)</p></div>
-                    <div class="info-card"><h4>식품</h4><p>완성된 플레이팅컷(대표) · 원재료 · 조리 확대컷(디테일) · 중량 · 구성 비교컷(비교) · 실제 먹는 장면(맥락)</p></div>
-                    <div class="info-card"><h4>생활용품 · 잡화</h4><p>제품 전체컷(대표) · 소재 · 마감 확대컷(디테일) · 사이즈 · 구성 비교컷(비교) · 실제 사용 장면(맥락)</p></div>
-                    <div class="info-card"><h4>반려동물용품</h4><p>제품 전체컷(대표) · 소재 · 마감 확대컷(디테일) · 크기 · 구성 비교컷(비교) · 반려동물이 사용하는 장면(맥락)</p></div>
-                  </div>
-                </div></div>
+            <div class="tabs s4-tabs">
+              <div class="tab-bar s4-tabbar">
+                <button class="tab-btn active" type="button" data-tab="guide">가이드</button>
+                <button class="tab-btn" type="button" data-tab="checklist">상품 등록 체크리스트</button>
               </div>
-              <div class="acc-item">
-                <button class="acc-head" type="button"><div><div class="at">해당 업종만 보기 — 인물 촬영이 필요하다면</div><div class="as">패션 · 뷰티 등 착용 · 사용 모습을 인물로 보여줘야 하는 경우</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                <div class="acc-body"><div class="acc-body-inner">
-                  <p>의류 · 신발 · 액세서리, 일부 뷰티 상품처럼 인물이 착용 · 사용하는 모습을 보여줘야 하는 경우에만 해당합니다.</p>
 
-                  <h4 style="margin:1rem 0 .6rem;">촬영 장소</h4>
-                  <div class="info-grid">
-                    <div class="info-card">
-                      <h4>호리존 <span class="tag">스튜디오</span></h4><p>깔끔하고 정제된 흰 배경.</p>
-                      <ul><li class="good">상품 부각 · 상세컷 위주</li><li class="good">조명 · 카메라 대부분 내부 구비</li></ul>
-                      <button class="photo-chip" type="button" data-img="/_blob/7edea2e1c47dec108d8334a43c223e12" data-alt="호리존 스튜디오 예시"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-2h7l1 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.5" r="3.3"/></svg>사진 보기</button>
+              <!-- ── 가이드 탭: 5단계 순서(촬영 목록 → 촬영 방식 → 상세페이지 순서 → 상품정보 등록 → 모바일 최종 확인) ── -->
+              <div class="tab-panel s4-panel s4-panel-guide active" data-tab="guide">
+                <div class="s4-guide-intro">
+                  <h2>상품을 촬영하기 전에, 순서를 확인하세요.</h2>
+                  <p><strong>어떤 이미지가 필요한지 먼저 정하고, 촬영 방식을 고른 뒤, 상세페이지 순서에 맞춰 정보를 채우고, 실제 판매 가능한 상태로 등록합니다.</strong> 상세 촬영 강의 · 마케팅 운영법은 다루지 않으며, 필요한 부분은 아래 링크로 자료실에서 더 볼 수 있습니다.</p>
+                </div>
+
+                <ol class="s4-sections">
+                  <li class="s4-section">
+                    <span class="s4-num">01</span>
+                    <div class="s4-section-body">
+                      <h3>필요한 이미지 목록 정하기</h3>
+                      <p class="s4-summary">촬영을 시작하기 전에 아래 다섯 가지 유형을 기준으로 무엇을 찍을지 먼저 정하세요. 업종과 관계없이 적용할 수 있고, 공급처가 제공하는 이미지가 있다면 먼저 활용하고 없는 항목만 직접 촬영하면 됩니다.</p>
+                      <div class="s4-cards">
+                        <div class="s4-card-item"><p class="s4-card-title">대표 썸네일</p><p>상품을 한눈에 보여주는 이미지. 상세페이지 최상단에서 첫인상을 결정합니다.</p></div>
+                        <div class="s4-card-item"><p class="s4-card-title">정면 · 후면</p><p>상품 전체 모습을 앞뒤로 보여줘 형태를 정확히 전달합니다.</p></div>
+                        <div class="s4-card-item"><p class="s4-card-title">소재 · 마감 · 디테일</p><p>재질 · 마감 · 구조를 확대해서 보여줘 신뢰를 높입니다.</p></div>
+                        <div class="s4-card-item"><p class="s4-card-title">크기 · 사이즈</p><p>실측 비교 등으로 크기 · 용량 · 구성 차이를 한눈에 이해시킵니다.</p></div>
+                        <div class="s4-card-item"><p class="s4-card-title">실제 사용 장면</p><p>사용 환경이나 착용 모습을 보여줘 구매 후를 상상하게 합니다.</p></div>
+                      </div>
+                      <p class="s4-note">공급처가 제공한 이미지도 사용 가능 범위를 먼저 확인하세요. 사용 허가 없이 복사한 이미지나 실제 상품과 다른 AI 이미지는 저작권 · 오인 표시 문제가 생길 수 있습니다.</p>
+
+                      <div class="accordion s4-industry">
+                        <div class="s4-industry-head">
+                          <h4>업종별 예시</h4>
+                          <p>내 업종과 비슷한 예시를 펼쳐서 참고해보세요.</p>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">패션</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>전체 정면 · 후면컷(대표) · 원단 · 마감 확대컷(디테일) · 사이즈 실측 비교컷 · 착용 무드컷(인물 촬영이 필요하다면 02 촬영 방식 참고)</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">뷰티</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>제품 자체컷(대표) · 텍스처 · 발림 확대컷(디테일) · 용량 비교컷 · 실제 사용 장면</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">식품</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>완성된 플레이팅컷(대표) · 원재료 · 조리 확대컷(디테일) · 중량 · 구성 비교컷 · 실제 먹는 장면</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">생활용품 · 잡화</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>제품 전체컷(대표) · 소재 · 마감 확대컷(디테일) · 사이즈 · 구성 비교컷 · 실제 사용 장면</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">반려동물용품</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>제품 전체컷(대표) · 소재 · 마감 확대컷(디테일) · 크기 · 구성 비교컷 · 반려동물이 사용하는 장면</p></div></div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="info-card">
-                      <h4>카페 / 인테리어 <span class="tag">무드</span></h4><p>실제 공간에서 감성 연출.</p>
-                      <ul><li class="good">SNS · 릴스 · 썸네일에 최적</li><li class="caution">스튜디오 비용 · 자연광 사전 확인 필요</li></ul>
-                      <button class="photo-chip" type="button" data-img="/_blob/e5a6aea17361d426d0262ecdb8427d12" data-alt="카페 · 인테리어 스튜디오 예시"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-2h7l1 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.5" r="3.3"/></svg>사진 보기</button>
+                  </li>
+
+                  <li class="s4-section">
+                    <span class="s4-num">02</span>
+                    <div class="s4-section-body">
+                      <h3>촬영 방식 정하기</h3>
+                      <p class="s4-summary">누가, 어떻게 촬영할지 정하면 준비할 게 명확해집니다. 아래 세 가지 방식의 차이를 보고 내 상품 · 예산에 맞는 방식을 고르세요.</p>
+                      <div class="s4-methods">
+                        <div class="s4-method"><p class="s4-method-name">직접 촬영</p><p class="s4-m-good">비용 부담이 적고 바로 시작 가능</p><p class="s4-m-limit">결과물 퀄리티가 촬영자 역량에 좌우됨</p></div>
+                        <div class="s4-method"><p class="s4-method-name">모델 촬영</p><p class="s4-m-good">착용 · 사용 모습을 자연스럽게 전달</p><p class="s4-m-limit">인물이 필요한 업종(패션 · 일부 뷰티 등)에 한정, 섭외 비용 발생</p></div>
+                        <div class="s4-method"><p class="s4-method-name">촬영 대행</p><p class="s4-m-good">전문 장비 · 편집까지 한 번에 해결</p><p class="s4-m-limit">외주 비용이 들고 일정 조율이 필요</p></div>
+                      </div>
+                      <p class="s4-note">모델 · 촬영 대행 비용은 지역 · 경력 · 촬영 규모에 따라 차이가 커서 여기서는 특정 금액을 기준으로 안내하지 않습니다. 실제 진행 전 여러 곳의 견적을 비교하고, 짧은 테스트 촬영으로 결과물을 먼저 확인하세요.</p>
+                      <p class="s4-note">사진만으로 부족하다고 느껴진다면 5~10초 정도의 짧은 사용 장면 영상을 함께 준비하는 것도 방법입니다 — 모든 상품에 꼭 필요한 것은 아닙니다.</p>
+                      <a class="s4-service" href="#/resources" data-resource-cat="detail">
+                        <span class="s4-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5h2l1-2h5l1 2h2A1.5 1.5 0 0 1 16 6.5v7A1.5 1.5 0 0 1 14.5 15h-11A1.5 1.5 0 0 1 2 13.5z"/><circle cx="9" cy="10" r="2.6"/></svg></span>
+                        <span class="s4-service-text"><b>촬영 대행을 찾고 있다면</b><small>자료실에서 촬영 · 상세페이지 관련 자료를 확인하세요</small></span>
+                        <svg class="s4-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
                     </div>
-                    <div class="info-card">
-                      <h4>셀카존 <span class="tag">셀프</span></h4><p>벽 + 전신거울만 있는 공간.</p>
-                      <ul><li class="good">자연광 있으면 집에서도 가능</li><li class="caution">퀄리티가 모델 · 컨셉에 좌우</li></ul>
-                      <button class="photo-chip" type="button" data-img="/_blob/415a26d6a8e6f198f992334e514f209b" data-alt="셀카존 예시"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-2h7l1 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.5" r="3.3"/></svg>사진 보기</button>
+                  </li>
+
+                  <li class="s4-section">
+                    <span class="s4-num">03</span>
+                    <div class="s4-section-body">
+                      <h3>상세페이지 순서 정하기</h3>
+                      <p class="s4-summary">업종과 관계없이, 고객이 아래 순서로 정보를 확인할 수 있으면 이해하고 구매를 결정하기 쉬워집니다.</p>
+                      <ul class="s4-checks">
+                        <li>고객 문제 · 핵심 장점 — 이 상품이 무엇이고 누구에게 필요한지</li>
+                        <li>실제 상품 이미지 — 01에서 준비한 이미지</li>
+                        <li>상세 스펙 — 크기 · 용량 · 소재 등 주요 정보</li>
+                        <li>옵션 · 사이즈 — 선택 가능한 구성</li>
+                        <li>배송 · 교환 · 반품 안내</li>
+                      </ul>
+                      <div class="callout s4-callout">
+                        <p>과장광고 문구나 근거 없는 효능 표현은 피하세요.</p>
+                      </div>
+                      <p class="s4-note">상품마다 처음부터 새로 만들기보다, 초반엔 공용 인트로 문구로 시작하고 반응이 좋은 상품만 공들여 리디자인하는 편이 효율적입니다.</p>
+
+                      <div class="accordion s4-industry">
+                        <div class="s4-industry-head">
+                          <h4>업종별 필수 고지사항</h4>
+                          <p>상품군마다 반드시 안내해야 하는 정보가 다릅니다. 판매 전 확인하세요.</p>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">패션</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>소재, 세탁 · 취급방법 등 (예: 린넨 → 세탁 시 줄어듦)</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">뷰티</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>전성분, 사용기한, 주의사항 등</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">식품</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>원재료, 알레르기, 유통 · 소비기한 등</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">생활용품 · 잡화</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>재질, 규격, 안전 · 인증 관련 정보 등</p></div></div>
+                        </div>
+                        <div class="acc-item">
+                          <button class="acc-head" type="button"><div class="at">반려동물용품</div><svg class="acc-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+                          <div class="acc-body"><div class="acc-body-inner"><p>대상, 사용방법, 주의사항 등</p></div></div>
+                        </div>
+                      </div>
+                      <p class="s4-note">위 예시는 참고용입니다. 정확한 법적 표시사항은 상품군과 판매 시점의 관련 기준에 따라 달라지므로, 실제 등록 전 관련 법령 · 플랫폼 정책을 확인하세요.</p>
                     </div>
-                    <div class="info-card">
-                      <h4>야외 <span class="tag">자연광</span></h4><p>골목 · 거리 · 공원에서 촬영.</p>
-                      <ul><li class="good">비용 없이 자유로운 무드</li><li class="caution">날씨 변수 · 장소 리서치 필요</li></ul>
-                      <button class="photo-chip" type="button" data-img="/_blob/fc83dd61822b4de1f878dd21631adaea" data-alt="야외 촬영 예시"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-2h7l1 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="12.5" r="3.3"/></svg>사진 보기</button>
+                  </li>
+
+                  <li class="s4-section">
+                    <span class="s4-num">04</span>
+                    <div class="s4-section-body">
+                      <h3>상품 정보 등록하기</h3>
+                      <p class="s4-summary">상세페이지 이미지 · 설명이 준비됐다면, 판매 채널의 상품 등록 화면에서 아래 정보를 빠짐없이 입력하세요.</p>
+                      <ul class="s4-checks">
+                        <li>상품명</li>
+                        <li>가격</li>
+                        <li>옵션(색상 · 사이즈 · 용량 등)</li>
+                        <li>재고 수량</li>
+                        <li>배송 조건(배송비 · 배송 방법)</li>
+                        <li>교환 · 반품 정보</li>
+                      </ul>
                     </div>
+                  </li>
+
+                  <li class="s4-section">
+                    <span class="s4-num">05</span>
+                    <div class="s4-section-body">
+                      <h3>모바일에서 최종 확인하기</h3>
+                      <p class="s4-summary">대부분의 고객은 모바일로 구매를 결정합니다. 등록을 마친 뒤 실제 모바일 화면에서 아래 항목을 확인하세요.</p>
+                      <ul class="s4-checks">
+                        <li>글자 크기 — 잘리거나 너무 작지 않은지</li>
+                        <li>이미지 품질 — 흐리거나 깨져 보이지 않는지</li>
+                        <li>옵션 선택 — 정상적으로 선택 · 조합되는지</li>
+                        <li>구매 버튼 — 눌리는 위치와 동작이 정상인지</li>
+                        <li>과장 · 오해를 줄 수 있는 표현이 남아있지 않은지</li>
+                      </ul>
+                      <p class="s4-note"><a href="#/resources" data-resource-cat="detail">상세페이지 관련 자료 보기 →</a></p>
+                    </div>
+                  </li>
+                </ol>
+
+                <div class="s4-guide-cta">
+                  <button type="button" class="s4-btn s4-btn-primary" id="s4GoChecklist">상품 등록 체크리스트 확인하기 →</button>
+                </div>
+              </div>
+
+              <!-- ── 상품 등록 체크리스트 탭 ── -->
+              <div class="tab-panel s4-panel s4-panel-cl" data-tab="checklist">
+                <!-- 비회원 안내 — body.is-authed(app.js renderAuthUI, 실제 인증 상태)면 CSS로 숨김.
+                     버튼은 기존 로그인 모달(window.launchdeskOpenLoginModal)만 연다. -->
+                <div class="s4-guest" id="s4Guest">
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                  <div class="s4-guest-body">
+                    <p>로그인하면 체크한 준비 상태를 계정에 저장하고 다른 기기에서도 이어갈 수 있어요.</p>
+                    <button type="button" class="s4-guest-btn" id="s4GuestLogin">로그인하고 저장하기</button>
                   </div>
+                </div>
 
-                  <h4 style="margin:1.4rem 0 .6rem;">각도별 촬영</h4>
-                  <div class="tabs">
-                    <div class="tab-bar">
-                      <button class="tab-btn active" type="button" data-tab="front">정면</button>
-                      <button class="tab-btn" type="button" data-tab="side">측면</button>
-                      <button class="tab-btn" type="button" data-tab="detail">디테일</button>
-                      <button class="tab-btn" type="button" data-tab="mood">무드</button>
+                <!-- 체크리스트 — 저장 구조 보존: .checklist-block[data-chapter] 안의 .cl-row input[type="checkbox"]
+                     정확히 5개, DOM 순서 0~4 = 저장 배열 인덱스. -->
+                <div class="checklist-block s4-checklist" data-chapter="/start/content">
+                  <div class="cl-head s4-cl-head">
+                    <div class="s4-cl-title">
+                      <h2 class="title" id="s4ChecklistTitle" tabindex="-1">상품 등록 체크리스트</h2>
+                      <p>실제로 확인한 항목만 체크하세요. 5개를 모두 확인하면 STEP 04가 완료돼요.</p>
                     </div>
-                    <div class="tab-panel active" data-tab="front">
-                      <img src="/_blob/c233b28e384c72fc38b8410f5cb6652e" alt="정면 컷 예시">
-                      <div class="img-note">※ AI로 생성한 연출 예시 이미지입니다. 실제 촬영 결과와는 다를 수 있어요.</div>
-                      <h4>정면 컷</h4><p>상세페이지 대표 이미지. 상품 전체 핏이 한눈에 들어와야 합니다.</p>
-                    </div>
-                    <div class="tab-panel" data-tab="side">
-                      <img src="/_blob/b0b6a56511d069bdd371fda04c59d580" alt="측면 컷 예시">
-                      <div class="img-note">※ AI로 생성한 연출 예시 이미지입니다. 실제 촬영 결과와는 다를 수 있어요.</div>
-                      <h4>측면 컷</h4><p>실루엣과 두께감을 보여줍니다. 특히 아우터 · 팬츠류는 측면 컷이 있어야 구매 확신이 올라갑니다.</p>
-                    </div>
-                    <div class="tab-panel" data-tab="detail">
-                      <img src="/_blob/69dc17fb4a5fafe18098359b849a1a7f" alt="디테일 컷 예시">
-                      <div class="img-note">※ AI로 생성한 연출 예시 이미지입니다. 실제 촬영 결과와는 다를 수 있어요.</div>
-                      <h4>디테일 컷</h4><p>원단 질감, 마감, 로고, 자수 등 확대컷입니다.</p>
-                    </div>
-                    <div class="tab-panel" data-tab="mood">
-                      <img src="/_blob/7b44ff0272b9b2d387d43a20412fd012" alt="무드 컷 예시">
-                      <div class="img-note">※ AI로 생성한 연출 예시 이미지입니다. 실제 촬영 결과와는 다를 수 있어요.</div>
-                      <h4>무드 컷</h4><p>카페 · 자연광 · 셀카존에서의 분위기 컷. SNS · 릴스 · 썸네일에 재활용할 수 있어 촬영 효율이 좋습니다.</p>
-                    </div>
+                    <span class="count">0 / 5</span>
                   </div>
-
-                  <h4 style="margin:1.4rem 0 .6rem;">모델 섭외가 필요하다면</h4>
-                  <div class="tbl-wrap"><table>
-                    <thead><tr><th>조건</th><th class="num">시간당 가격</th><th>비고</th></tr></thead>
-                    <tbody>
-                      <tr><td>최저</td><td class="num">₩30,000</td><td>포즈 미숙 · 결과물 편차 큼</td></tr>
-                      <tr><td><strong>평균 (추천)</strong></td><td class="num">₩50,000–80,000</td><td>가성비와 끼의 균형 지점</td></tr>
-                      <tr><td>상위</td><td class="num">₩100,000–150,000</td><td>인스타 팔로워 · 외모 스펙 높은 경우</td></tr>
-                    </tbody>
-                  </table></div>
-                  <p style="font-size:.86rem;">서울 · 경기 · 부산은 모델나라 카페, 그 외 지역은 사업자 등록 후 잡코리아 · 알바몬에 직접 공고합니다. 실제 촬영 전 10–30분 테스트 촬영은 필수입니다.</p>
-                </div></div>
+                  <div class="s4-cl-bar" aria-hidden="true"><div class="s4-cl-fill" id="s4ClFill"></div></div>
+                  <div class="cl-group s4-cl-group">
+                    <div class="g-label">촬영 · 이미지</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">필요한 이미지 목록(촬영 목록) 정하기</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">상품 이미지 확보(촬영 또는 공급처 이미지)</span></label>
+                  </div>
+                  <div class="cl-group s4-cl-group">
+                    <div class="g-label">상세페이지 · 등록</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">대표 상품 상세페이지 최소 1개 구성</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">필수 상품정보 입력(상품명 · 가격 · 옵션 · 재고 · 배송 · 교환반품)</span></label>
+                  </div>
+                  <div class="cl-group s4-cl-group">
+                    <div class="g-label">최종 확인</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">모바일에서 최종 확인 후 실제 판매 가능한 상태로 등록</span></label>
+                  </div>
+                  <div class="s4-cl-done" id="s4ClDone" hidden><span aria-hidden="true">✓</span><div><b>STEP 04 준비 완료</b><p>촬영 · 상세페이지 · 상품 등록 항목을 모두 확인했어요.</p></div></div>
+                  <div class="cl-note s4-cl-note">로그인 상태에서는 체크한 내용이 계정에 저장돼요. 로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</div>
+                </div>
               </div>
             </div>
 
-            <h2 class="section-h">영상 (선택)</h2>
-            <div class="callout">
-              <p>사진만으로 부족하다고 느껴진다면, 사용 장면을 보여주는 짧은 영상을 함께 준비하세요. 모든 상품에 영상이 꼭 필요한 것은 아니지만, 같은 예산이면 이미지보다 영상의 클릭률 · 구매 전환율이 높은 경우가 많습니다.</p>
-              <p>5~10초면 충분합니다. 편집 없이도 되는 자연스러운 사용 장면이면 OK입니다.</p>
-            </div>
+            <!-- ── 오른쪽 열(large) / 한 열 순서 배치(medium·small) — 탭에 따라 표시 ── -->
+            <aside class="s4-side">
+              <section class="s4-card s4-side-guide" aria-labelledby="s4DecideTitle">
+                <h3 id="s4DecideTitle">이번 단계에서 준비할 것</h3>
+                <ol class="s4-decide">
+                  <li><span>01</span>필요한 이미지 목록</li>
+                  <li><span>02</span>촬영 방식</li>
+                  <li><span>03</span>상세페이지 순서</li>
+                  <li><span>04</span>상품 정보 등록</li>
+                  <li><span>05</span>모바일 최종 확인</li>
+                </ol>
+                <p class="s4-side-hint">가이드를 읽은 뒤 "상품 등록 체크리스트"에서 직접 확인해보세요.</p>
+              </section>
 
-            <h2 class="section-h">상세페이지 기본 구성</h2>
-            <p>업종과 관계없이, 고객이 상세페이지에서 최소한 아래 내용을 확인할 수 있어야 합니다.</p>
-            <ul class="trust-list">
-              <li>상품이 무엇인지</li>
-              <li>누구에게 필요한지</li>
-              <li>핵심 특징 · 장점</li>
-              <li>옵션 · 구성</li>
-              <li>크기 · 용량 · 수량 등 주요 스펙</li>
-              <li>사용방법 또는 사용 시 주의사항</li>
-              <li>배송 · 교환에 필요한 기본 정보</li>
-            </ul>
-            <div class="callout">
-              <p>과장광고 문구나 근거 없는 효능 표현은 피하세요.</p>
-            </div>
-            <p style="font-size:.86rem; color:var(--ink-faint);">상품마다 처음부터 새로 만들기보다, 초반엔 공용 인트로 문구로 시작하고 반응이 좋은 상품만 공들여 리디자인하는 편이 효율적입니다.</p>
+              <section class="s4-card s4-progress" id="s4Progress" aria-labelledby="s4ProgressTitle" aria-live="polite">
+                <div class="s4-progress-head">
+                  <h3 id="s4ProgressTitle">STEP 04 진행 상태</h3>
+                  <span class="s4-progress-badge" id="s4ProgressBadge">필수 0 / 5</span>
+                </div>
+                <div class="s4-progress-bar"><div class="s4-progress-fill" id="s4ProgressFill"></div></div>
+                <ul class="s4-progress-items" id="s4ProgressItems">
+                  <li class="s4-progress-group"><span>촬영 · 이미지</span><b data-cl-range="0-1">0 / 2</b></li>
+                  <li data-cl-index="0"><span class="s4-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>촬영 목록 정하기</li>
+                  <li data-cl-index="1"><span class="s4-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>상품 이미지 확보</li>
+                  <li class="s4-progress-group"><span>상세페이지 · 등록</span><b data-cl-range="2-3">0 / 2</b></li>
+                  <li data-cl-index="2"><span class="s4-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>상세페이지 구성</li>
+                  <li data-cl-index="3"><span class="s4-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>필수 상품정보 입력</li>
+                  <li class="s4-progress-group"><span>최종 확인</span><b data-cl-range="4-4">0 / 1</b></li>
+                  <li data-cl-index="4"><span class="s4-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>모바일 최종 확인</li>
+                </ul>
+                <div class="s4-progress-done" id="s4ProgressDone" hidden>✓ STEP 04 준비 완료</div>
+                <!-- 로그인 안내(게스트) / 저장 상태(회원) — 실제 인증 상태(body.is-authed)만 본다. 저장 완료 표시는 만들지 않는다. -->
+                <p class="s4-progress-foot s4-progress-guest">로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</p>
+                <p class="s4-progress-foot s4-progress-member">로그인 상태 · 체크한 내용은 계정에 저장돼요.</p>
+              </section>
 
-            <h2 class="section-h">업종별 필수 고지사항</h2>
-            <p>상품군마다 반드시 안내해야 하는 정보가 다릅니다. 판매 전 해당 상품의 필수 표시사항을 확인하세요.</p>
-            <div class="accordion">
-              <div class="acc-item">
-                <button class="acc-head" type="button"><div><div class="at">업종별 예시 보기</div><div class="as">패션 · 뷰티 · 식품 · 생활용품·잡화 · 반려동물용품</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-                <div class="acc-body"><div class="acc-body-inner">
-                  <div class="info-grid">
-                    <div class="info-card"><h4>패션</h4><p>소재, 세탁 · 취급방법 등 (예: 린넨 → 세탁 시 줄어듦)</p></div>
-                    <div class="info-card"><h4>뷰티</h4><p>전성분, 사용기한, 주의사항 등</p></div>
-                    <div class="info-card"><h4>식품</h4><p>원재료, 알레르기, 유통 · 소비기한 등</p></div>
-                    <div class="info-card"><h4>생활용품 · 잡화</h4><p>재질, 규격, 안전 · 인증 관련 정보 등</p></div>
-                    <div class="info-card"><h4>반려동물용품</h4><p>대상, 사용방법, 주의사항 등</p></div>
-                  </div>
-                </div></div>
+              <section class="s4-card s4-tools" aria-labelledby="s4ToolsTitle">
+                <h3 id="s4ToolsTitle">관련 자료</h3>
+                <ul class="s4-tool-list">
+                  <li><a href="#/resources" data-resource-cat="detail"><span class="s4-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5h2l1-2h5l1 2h2A1.5 1.5 0 0 1 16 6.5v7A1.5 1.5 0 0 1 14.5 15h-11A1.5 1.5 0 0 1 2 13.5z"/><circle cx="9" cy="10" r="2.6"/></svg></span><span><b>촬영 · 상세페이지 자료</b><small>촬영 대행 · 상세페이지 기획 템플릿</small></span><svg class="s4-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                </ul>
+              </section>
+
+              <section class="desk-help s4-help" aria-labelledby="s4HelpTitle">
+                <h3 id="s4HelpTitle">상세페이지 준비가 막혔나요?</h3>
+                <p>촬영 · 상세페이지 · 상품 등록을 세팅 대행으로 도움받을 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg></a>
+              </section>
+            </aside>
+
+            <!-- 이전/다음 — 기존 경로(#/start/sourcing, #/start/orders) 그대로인 해시 링크. 미완료 시
+                 다음 이동은 step04.js가 confirm으로 한 번 묻는다(막지 않음). -->
+            <nav class="s4-nav" aria-label="STEP 이동">
+              <p class="s4-nav-status" id="s4NavStatus"><span id="s4NavText">체크 항목 5개를 완료하면 STEP 04가 완료돼요.</span> <b id="s4NavCount">0 / 5</b></p>
+              <div class="s4-nav-btns">
+                <a class="s4-btn s4-btn-ghost s4-nav-prev" href="#/start/sourcing">← STEP 03 · 판매할 상품과 공급처, 가격 확정하기</a>
+                <a class="s4-btn s4-btn-primary s4-nav-next" href="#/start/orders" id="s4Next">STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기 →</a>
               </div>
-            </div>
-            <p style="font-size:.82rem; color:var(--ink-faint);">위 예시는 참고용입니다. 정확한 법적 표시사항은 상품군과 판매 시점의 관련 기준에 따라 달라지므로, 실제 등록 전 관련 법령 · 플랫폼 정책을 확인하세요.</p>
+            </nav>
 
-            <h2 class="section-h">STEP 04 체크리스트</h2>
-            <div class="checklist-block" data-chapter="/start/content">
-              <div class="cl-head"><span class="title">상세페이지 완성 체크리스트</span><span class="count" id="clCount4">0 / 4</span></div>
-              <div class="cl-group">
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">대표 상품 상세페이지 최소 1개 완성</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">상품 이미지 · 설명 반영</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">업종별 필수 고지사항 확인</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">실제 판매 가능한 상태로 상품 등록</span></label>
-              </div>
-              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 4개를 모두 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요.</div>
-            </div>
-
-            <p style="font-size:.84rem;"><a href="#/resources" data-resource-cat="detail" style="color:var(--accent-ink); font-weight:600;">상세페이지 관련 자료 보기 →</a></p>
-
-            <p style="font-size:.86rem; color:var(--ink-faint); margin-top:1.2rem;">다음 STEP에서는 주문이 들어왔을 때 실제로 처리할 수 있도록 배송 · CS · 결제 흐름을 준비합니다.</p>
-
-            <div class="chapter-nav">
-              <a href="#/start/sourcing"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 03 · 판매할 상품과 공급처, 가격 확정하기</span></a>
-              <a class="next" href="#/start/orders"><span class="cn-label">다음 STEP →</span><span class="cn-title">STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기</span></a>
-            </div>
           </div>
         </div>
       </section>
@@ -3366,6 +3488,7 @@
 <script src="step01.js"></script>
 <script src="step02.js"></script>
 <script src="step03.js"></script>
+<script src="step04.js"></script>
 <script src="plans.js"></script>
 <script src="admin.js"></script>
 </body>
