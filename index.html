@@ -1420,95 +1420,275 @@
       </section>
 
       <!-- ============ VIEW: STEP 06 · 마케팅 인프라 연결하기 ============ -->
+      <!-- STEP 06 (2026-09 UI 재설계 6차, STEP01~05 시각 구조 이식 — 피그마 시안 없음, STEP01~05
+           레이아웃·토큰·반응형 규칙을 그대로 재사용) — 정적 마크업 + step06.js(진행 상태·탭 부가
+           동작만). 저장·완료 판정은 기존 app.js 체크리스트 컨트롤러(.checklist-block[data-chapter]
+           안의 .cl-row input[type="checkbox"] 1개, DOM 순서 = 저장 인덱스 0, change 이벤트,
+           setChapterDone/checklistAllChecked)가 그대로 담당한다 — 체크박스 개수 · DOM 순서 ·
+           data-chapter · 저장 인덱스 · 라벨 문구는 재설계 이전과 완전히 동일하며, 기존 저장
+           데이터와 구조적·의미적으로 모두 호환된다(재설계 이전에도 "기본 방문·전환 확인 수단
+           최소 1개"만 필수였다 — 개수·의미 변경 없음). "선택 연결" 체크리스트(9개, data-chapter
+           없음)는 app.js의 전역 "checklist counters" 핸들러가 개수만 세고 저장하지 않는다 —
+           완료 판정과 무관하다(재설계 이전과 동일하게 네이버·카카오 5개 + SNS·메타 4개, 라벨도
+           그대로). Meta Pixel·네이버/카카오 등 실제 SDK·OAuth 연동 코드는 다루지 않으며,
+           인스타그램 운영 팁·광고 캠페인 운영법·CTR 진단·네이버 캐러셀 세팅은 본문에 넣지 않고
+           자료실(marketing/analytics 카테고리)로만 안내한다. 스타일은 전부
+           #view-start-marketing-setup 스코프(--ld-* 올리브 토큰), 다른 STEP은 그대로다. -->
       <section class="view" id="view-start-marketing-setup" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 06</span></div>
-          <span class="eyebrow">STEP 06 · 추적 · 채널 연결</span>
-          <div class="page-head">
-            <h1>마케팅 인프라 연결하기</h1>
-            <p class="page-lead">광고를 시작하기 전에 먼저, 사람이 어디서 들어왔고 구매가 일어났는지 확인할 수 있는 환경을 준비해야 합니다.</p>
-          </div>
-          <div class="chapter-body">
-            <div class="callout">
-              <p><strong>이 STEP에서 반드시 필요한 건, 기본적인 방문 · 전환 확인 수단 최소 1개뿐입니다.</strong></p>
-              <p>네이버페이 · 카카오 · Meta 픽셀 · SNS 같은 채널은 필요한 사용자만 선택적으로 연결하면 됩니다. 특정 광고 플랫폼이나 채널을 반드시 써야 하는 건 아닙니다.</p>
-            </div>
+        <div class="content">
+          <div class="s6" id="step06Root" data-tab="guide">
 
-            <h2 class="section-h">필수 — 기본 추적 환경 <span class="tag">1개만 있으면 완료</span></h2>
-            <p>방문자와 구매가 발생했을 때, 최소한 그 결과를 확인할 수 있어야 합니다. 아래 중 이미 쓰고 있는 게 있다면 그것으로 충분합니다.</p>
-            <div class="info-grid">
-              <div class="info-card"><h4>GA4</h4><p>방문 · 페이지 이동 · 주요 행동을 확인할 수 있습니다. 유일한 정답은 아닙니다.</p></div>
-              <div class="info-card"><h4>쇼핑몰 플랫폼 기본 통계</h4><p>카페24 등 플랫폼 자체 통계만으로도 충분히 시작할 수 있습니다.</p></div>
-              <div class="info-card"><h4>주문 · 유입 분석 기능</h4><p>판매 채널 · 오픈마켓이 기본 제공하는 유입 · 주문 통계도 해당합니다.</p></div>
-              <div class="info-card"><h4>기타 분석 도구</h4><p>이미 쓰고 있는 다른 분석 도구가 있다면 그것으로도 충분합니다.</p></div>
-            </div>
+            <header class="s6-head">
+              <div class="breadcrumb s6-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 06</span></div>
+              <span class="s6-eyebrow">STEP 06 · 추적 · 채널 연결</span>
+              <h1>마케팅 인프라 연결하기</h1>
+              <p class="s6-lead">광고를 시작하기 전에 먼저, 사람이 어디서 들어왔고 무엇을 했는지 확인할 수 있는 최소한의 환경을 준비해야 합니다. 홍보 운영법을 배우는 단계가 아니라, 측정할 기반을 연결하는 단계입니다.</p>
+            </header>
 
-            <div class="checklist-block" data-chapter="/start/marketing-setup">
-              <div class="cl-head"><span class="title">필수 체크</span><span class="count" id="clCount2">0 / 1</span></div>
-              <div class="cl-group">
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">기본 방문 · 전환 확인 수단을 최소 1개 연결했다 (GA4 · 플랫폼 기본 통계 · 기타 분석 도구 등)</span></label>
+            <div class="tabs s6-tabs">
+              <div class="tab-bar s6-tabbar">
+                <button class="tab-btn active" type="button" data-tab="guide">가이드</button>
+                <button class="tab-btn" type="button" data-tab="checklist">연결 체크리스트</button>
               </div>
-              <div class="cl-note">이 항목 하나만 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요. 아래 선택 항목은 체크하지 않아도 완료에 영향이 없어요.</div>
-            </div>
 
-            <h2 class="section-h">선택 — 채널별 마케팅 인프라 <span class="tag">필요한 사용자만</span></h2>
-            <p>아래는 광고를 집행하거나 특정 채널을 쓰기로 한 경우에만 연결하면 됩니다. 하나도 연결하지 않아도 STEP06을 완료하는 데는 영향이 없습니다. 연결한다면, 상품 · 상세페이지가 준비된 지금 시점이 적당합니다 — 네이버페이는 심사 시 사업자정보 · 고객센터가 사이트에 있어야 승인되고, 메타 픽셀은 실제로 광고를 돌리기 직전에 필요하기 때문입니다.</p>
+              <!-- ── 가이드 탭: 측정할 행동 → 기본 분석 도구(필수) → 광고 추적(선택) → 검색·채널(선택) → 개인정보·동의 → 테스트 순서 ── -->
+              <div class="tab-panel s6-panel s6-panel-guide active" data-tab="guide">
+                <div class="s6-guide-intro">
+                  <h2>광고를 시작하기 전에, 무엇을 측정할지 먼저 정하세요.</h2>
+                  <p><strong>어디서 방문자가 들어오고 무엇을 했는지 확인할 수 있어야 광고와 콘텐츠의 효과를 판단할 수 있습니다.</strong> 모든 채널을 다 연결할 필요는 없으며, 지금 쇼핑몰에 필요한 것부터 준비하면 됩니다.</p>
+                </div>
 
-            <h3 style="font-size:1rem; margin:1.2rem 0 .6rem;">네이버페이 · 카카오 연동 <span class="tag">선택</span></h3>
-            <div class="info-grid cols-2">
-              <div class="info-card"><h4>네이버페이</h4><p>신청 → 승인(1~3일) → 네이버 공통 인증키 · 페이센터 ID · 가맹점 ID · 버튼 인증키 4가지를 연동합니다. 결제 버튼 하나로 전환율이 오르는 경우가 많습니다.</p></div>
-              <div class="info-card"><h4>카카오 싱크 · 톡체크아웃</h4><p>카카오톡 채널 개설 후 쇼핑몰 플랫폼과 연동하면 카카오페이 바로결제(톡체크아웃)가 가능해져, 결제 허들이 낮아집니다.</p></div>
-            </div>
-            <p style="font-size:.84rem;"><a href="#/resources" style="color:var(--accent-ink); font-weight:600;">자료실에서 네이버페이 · 카카오 연동 클릭 단위 스텝 보기 →</a></p>
+                <ol class="s6-sections">
+                  <li class="s6-section">
+                    <span class="s6-num">01</span>
+                    <div class="s6-section-body">
+                      <h3>측정할 행동 먼저 정하기</h3>
+                      <p class="s6-summary">아래 다섯 가지는 대표적으로 확인하는 행동입니다. 전부 수집해야 하는 것은 아니며, 지금 쇼핑몰에 필요한 항목부터 확인하세요.</p>
+                      <div class="s6-cards">
+                        <div class="s6-card-item"><p class="s6-card-title">상품 조회</p><p>고객이 상품 상세페이지를 확인했는지</p></div>
+                        <div class="s6-card-item"><p class="s6-card-title">장바구니</p><p>상품을 장바구니에 담았는지</p></div>
+                        <div class="s6-card-item"><p class="s6-card-title">결제 시작</p><p>결제 단계로 진입했는지</p></div>
+                        <div class="s6-card-item"><p class="s6-card-title">구매 완료</p><p>실제로 결제가 완료됐는지</p></div>
+                        <div class="s6-card-item"><p class="s6-card-title">문의</p><p>구매 전 질문 · 상담이 있었는지</p></div>
+                      </div>
+                      <p class="s6-note">처음에는 "방문이 얼마나 있었는지"와 "구매까지 이어졌는지" 두 가지만 확인해도 충분합니다.</p>
+                    </div>
+                  </li>
 
-            <h3 style="font-size:1rem; margin:1.6rem 0 .6rem;">SNS & 전환 추적(Meta Pixel 등) <span class="tag">선택</span></h3>
-            <p>광고를 사용할 계획이라면 아래 인프라를 연결하면 도움이 됩니다. 광고를 하지 않는다면 연결하지 않아도 됩니다.</p>
-            <div class="tbl-wrap"><table>
-              <thead><tr><th>플랫폼</th><th>목적</th><th>비고</th></tr></thead>
-              <tbody>
-                <tr><td><strong>인스타그램</strong></td><td>감성 이미지, 릴스 중심</td><td>브랜드 감도 · 이미지 전달</td></tr>
-                <tr><td><strong>페이스북 페이지</strong></td><td>광고 계정 · 픽셀 연동용</td><td>Meta 광고를 쓸 경우 인스타와 연동 필요</td></tr>
-                <tr><td>틱톡 <span class="tag">선택</span></td><td>바이럴 콘텐츠 확장</td><td>브랜드 톤에 따라 선택</td></tr>
-                <tr><td>유튜브 <span class="tag">선택</span></td><td>추후 유튜브 쇼핑 입점</td><td>필요할 때 고려</td></tr>
-              </tbody>
-            </table></div>
-            <p>Meta 픽셀 연결은 <strong>광고 계정 생성 → 픽셀 생성 → 쇼핑몰 플랫폼 ↔ Meta 채널 연동</strong> 3단계로 진행합니다. 광고를 사용하는 경우에만 해당하며, 완료되면 픽셀 데이터 기반으로 전환을 추적할 수 있고 인스타그램 쇼핑 태그도 활성화됩니다.</p>
-            <p style="font-size:.84rem;"><a href="#/resources" style="color:var(--accent-ink); font-weight:600;">자료실에서 메타 픽셀 연동 클릭 단위 스텝 보기 →</a></p>
+                  <li class="s6-section">
+                    <span class="s6-num">02</span>
+                    <div class="s6-section-body">
+                      <h3>기본 분석 도구 확인 <span class="s6-tag s6-tag-required">필수</span></h3>
+                      <p class="s6-summary">모든 쇼핑몰에 공통으로 필요한 건 방문과 주요 행동을 확인할 수 있는 도구 최소 1개입니다. 아래 중 이미 쓰고 있는 게 있다면 그것으로 충분합니다.</p>
+                      <div class="s6-cards">
+                        <div class="s6-card-item"><p class="s6-card-title">GA4</p><p>방문 · 페이지 이동 · 주요 행동을 확인할 수 있습니다. 유일한 정답은 아닙니다.</p></div>
+                        <div class="s6-card-item"><p class="s6-card-title">쇼핑몰 플랫폼 기본 통계</p><p>카페24 등 플랫폼 자체 통계만으로도 충분히 시작할 수 있습니다.</p></div>
+                        <div class="s6-card-item"><p class="s6-card-title">주문 · 유입 분석 기능</p><p>판매 채널 · 오픈마켓이 기본 제공하는 유입 · 주문 통계도 해당합니다.</p></div>
+                        <div class="s6-card-item"><p class="s6-card-title">기타 분석 도구</p><p>이미 쓰고 있는 다른 분석 도구가 있다면 그것으로도 충분합니다.</p></div>
+                      </div>
+                      <div class="s6-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>설치 여부보다 실제 방문과 주요 이벤트가 잡히는지 확인하세요. 실시간 보고서에 숫자가 보인다고 전체 연동이 정상이라고 단정하지 말고, 하루 이상 지난 뒤 정식 리포트에서 다시 확인하는 것이 안전합니다.</p>
+                      </div>
+                    </div>
+                  </li>
 
-            <div class="checklist-block">
-              <div class="cl-head"><span class="title">선택 설정 체크리스트</span><span class="count">0 / 9</span></div>
-              <div class="cl-group">
-                <div class="g-label">🟩 네이버 · 카카오</div>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">네이버페이 신청 · 승인</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">네이버페이 세팅 (4개 키 연동)</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">네이버 서치어드바이저 등록</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">카카오톡 채널 생성</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">카카오 싱크 · 톡체크아웃 연동</span></label>
+                  <li class="s6-section">
+                    <span class="s6-num">03</span>
+                    <div class="s6-section-body">
+                      <h3>광고 추적 도구 연결 <span class="s6-tag">선택</span></h3>
+                      <p class="s6-summary">Meta 광고를 사용할 계획이라면 Meta Pixel · Conversions API 같은 광고 추적 도구를 연결하면 도움이 됩니다. 광고를 하지 않는다면 연결하지 않아도 됩니다.</p>
+                      <ul class="s6-checks">
+                        <li>쇼핑몰 플랫폼의 공식 앱 · 연동 기능을 먼저 확인하세요 — 직접 코드를 넣는 방식보다 오류가 적습니다.</li>
+                        <li>이미 연결된 픽셀이 있는지 먼저 확인하세요.</li>
+                      </ul>
+                      <div class="s6-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>픽셀을 중복 설치하면 같은 이벤트가 두 번 집계될 수 있습니다. 새로 연결하기 전에 기존 연결 여부를 확인하세요. 실제 SDK 설치나 OAuth 연동은 이 화면에서 진행하지 않으며, 사용하는 플랫폼의 공식 가이드를 따라야 합니다.</p>
+                      </div>
+                      <a class="s6-service" href="#/resources" data-resource-cat="marketing">
+                        <span class="s6-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span>
+                        <span class="s6-service-text"><b>메타 픽셀 연동 방법이 궁금하다면</b><small>자료실에서 연결 절차를 더 자세히 볼 수 있어요</small></span>
+                        <svg class="s6-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                    </div>
+                  </li>
+
+                  <li class="s6-section">
+                    <span class="s6-num">04</span>
+                    <div class="s6-section-body">
+                      <h3>검색 · 채널 기반 준비 <span class="s6-tag">선택</span></h3>
+                      <p class="s6-summary">검색 유입을 운영할 계획이라면 서치어드바이저 · Search Console 같은 도구를 등록하고, 인스타그램 · 카카오채널 등은 실제로 쓸 채널부터 준비하세요. 채널을 전부 만드는 것이 이 단계의 목표는 아닙니다.</p>
+                      <ul class="s6-checks">
+                        <li>네이버 서치어드바이저 — 검색 유입을 운영할 경우</li>
+                        <li>Google Search Console — 검색 유입을 운영할 경우</li>
+                        <li>인스타그램 · 카카오채널 — 실제 사용할 채널만</li>
+                      </ul>
+                      <a class="s6-service" href="#/resources" data-resource-cat="marketing">
+                        <span class="s6-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span>
+                        <span class="s6-service-text"><b>네이버페이 · 카카오 연동 방법이 궁금하다면</b><small>자료실에서 연결 절차를 더 자세히 볼 수 있어요</small></span>
+                        <svg class="s6-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                    </div>
+                  </li>
+
+                  <li class="s6-section">
+                    <span class="s6-num">05</span>
+                    <div class="s6-section-body">
+                      <h3>개인정보 · 동의 확인</h3>
+                      <p class="s6-summary">분석 · 광고 도구는 쿠키와 방문자 데이터를 처리할 수 있습니다.</p>
+                      <div class="s6-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>이용약관 · 개인정보처리방침 · 쿠키 동의 설정은 사용 중인 플랫폼의 안내와 관련 법령을 확인하세요. 이 내용은 법률 자문이 아니며, 정확한 기준은 플랫폼 공지나 전문가를 통해 확인하는 것이 안전합니다.</p>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="s6-section">
+                    <span class="s6-num">06</span>
+                    <div class="s6-section-body">
+                      <h3>테스트하기</h3>
+                      <p class="s6-summary">도구를 연결했다면 실제로 확인해보세요.</p>
+                      <ul class="s6-checks">
+                        <li>직접 사이트에 방문하기</li>
+                        <li>상품을 조회해보기</li>
+                        <li>장바구니에 담거나 테스트 구매해보기</li>
+                        <li>분석 도구에서 방금 한 행동이 이벤트로 잡히는지 확인하기</li>
+                      </ul>
+                      <p class="s6-note">광고 관리자에 표시되는 구매 수와 쇼핑몰 주문 데이터가 완전히 같은 숫자로 일치하지 않을 수 있습니다. 집계 방식과 시점 차이 때문이며, 정상적인 범위의 오차입니다.</p>
+                      <p class="s6-note"><a href="#/resources" data-resource-cat="analytics">분석 · 연동 관련 자료 보기 →</a></p>
+                    </div>
+                  </li>
+                </ol>
+
+                <div class="s6-guide-cta">
+                  <button type="button" class="s6-btn s6-btn-primary" id="s6GoChecklist">연결 체크리스트 확인하기 →</button>
+                </div>
               </div>
-              <div class="cl-group">
-                <div class="g-label">📱 SNS · 메타</div>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">인스타그램 브랜드 계정 생성</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">페이스북 페이지 생성</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">메타 광고 계정 · 픽셀 생성</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">쇼핑몰 플랫폼 ↔ Meta 채널 연동</span></label>
+
+              <!-- ── 연결 체크리스트 탭 ── -->
+              <div class="tab-panel s6-panel s6-panel-cl" data-tab="checklist">
+                <!-- 비회원 안내 — body.is-authed(app.js renderAuthUI, 실제 인증 상태)면 CSS로 숨김.
+                     버튼은 기존 로그인 모달(window.launchdeskOpenLoginModal)만 연다. -->
+                <div class="s6-guest" id="s6Guest">
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                  <div class="s6-guest-body">
+                    <p>로그인하면 체크한 준비 상태를 계정에 저장하고 다른 기기에서도 이어갈 수 있어요.</p>
+                    <button type="button" class="s6-guest-btn" id="s6GuestLogin">로그인하고 저장하기</button>
+                  </div>
+                </div>
+
+                <!-- 필수 체크리스트 — 저장 구조 보존: .checklist-block[data-chapter] 안의 .cl-row input[type="checkbox"]
+                     정확히 1개, DOM 순서 0 = 저장 배열 인덱스(재설계 이전과 완전히 동일, 라벨도 그대로).
+                     .count는 app.js가 갱신한다. -->
+                <div class="checklist-block s6-checklist" data-chapter="/start/marketing-setup">
+                  <div class="cl-head s6-cl-head">
+                    <div class="s6-cl-title">
+                      <h2 class="title" id="s6ChecklistTitle" tabindex="-1">필수 — 기본 추적 환경</h2>
+                      <p>아래 항목 하나만 체크하면 STEP 06이 완료돼요. 이미 쓰고 있는 분석 도구가 있다면 그것으로 충분합니다.</p>
+                    </div>
+                    <span class="count">0 / 1</span>
+                  </div>
+                  <div class="cl-group s6-cl-group">
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">기본 방문 · 전환 확인 수단을 최소 1개 연결했다 (GA4 · 플랫폼 기본 통계 · 기타 분석 도구 등)</span></label>
+                  </div>
+                  <div class="s6-cl-done" id="s6ClDone" hidden><span aria-hidden="true">✓</span><div><b>STEP 06 준비 완료</b><p>기본 추적 환경을 확인했어요.</p></div></div>
+                  <div class="cl-note s6-cl-note">로그인 상태에서는 체크한 내용이 계정에 저장돼요. 로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</div>
+                </div>
+
+                <!-- 선택 체크리스트 — data-chapter 없음(참고용, 완료 판정과 무관). app.js의 전역
+                     checklist counters 핸들러가 개수만 센다. 9개(네이버·카카오 5 + SNS·메타 4),
+                     DOM 순서 · 라벨은 재설계 이전과 동일. -->
+                <div class="checklist-block s6-ref-checklist">
+                  <div class="cl-head s6-ref-head">
+                    <div class="s6-cl-title">
+                      <h2 class="title">선택 — 채널별 연결 <span class="s6-tag">필요한 경우만</span></h2>
+                      <p>광고를 집행하거나 특정 채널을 쓰기로 한 경우에만 연결하세요. 하나도 연결하지 않아도 STEP06 완료에는 영향이 없어요.</p>
+                    </div>
+                    <span class="count">0 / 9</span>
+                  </div>
+                  <div class="cl-group s6-cl-group">
+                    <div class="g-label">네이버 · 카카오</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">네이버페이 신청 · 승인</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">네이버페이 세팅 (4개 키 연동)</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">네이버 서치어드바이저 등록</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">카카오톡 채널 생성</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">카카오 싱크 · 톡체크아웃 연동</span></label>
+                  </div>
+                  <div class="cl-group s6-cl-group">
+                    <div class="g-label">SNS · 메타</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">인스타그램 브랜드 계정 생성</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">페이스북 페이지 생성</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">메타 광고 계정 · 픽셀 생성</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">쇼핑몰 플랫폼 ↔ Meta 채널 연동</span></label>
+                  </div>
+                  <div class="cl-note s6-ref-note">체크는 참고용이에요 — 진행률에는 반영되지 않고, 새로고침하면 초기화돼요. 필요한 항목만 골라 진행하세요.</div>
+                </div>
               </div>
-              <div class="cl-note">체크는 참고용이에요 — 진행률에는 반영되지 않아요. 필요한 항목만 골라 진행하세요.</div>
             </div>
 
-            <div class="quick-row-list" style="margin-top:1.3rem;">
-              <a class="quick-row" href="#/services/setup">
-                <span class="qr-icon tone-d">🛠️</span>
-                <span class="qr-text"><span class="qr-title">GA4 · Meta 픽셀 · 네이버/카카오 연결이 어렵다면</span><span class="qr-sub">연동·추적 세팅을 이용할 수 있어요</span></span>
-                <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-              </a>
-            </div>
+            <!-- ── 오른쪽 열(large) / 한 열 순서 배치(medium·small) — 탭에 따라 표시 ── -->
+            <aside class="s6-side">
+              <section class="s6-card s6-side-guide" aria-labelledby="s6PrepTitle">
+                <h3 id="s6PrepTitle">이번 단계에서 준비할 것</h3>
+                <ol class="s6-prep">
+                  <li><span>01</span>측정할 행동 정하기</li>
+                  <li><span>02</span>기본 분석 도구 확인</li>
+                  <li><span>03</span>광고 추적 도구 연결(선택)</li>
+                  <li><span>04</span>검색 · 채널 기반 준비(선택)</li>
+                  <li><span>05</span>개인정보 · 동의 확인</li>
+                  <li><span>06</span>테스트로 확인하기</li>
+                </ol>
+                <p class="s6-side-hint">가이드를 읽은 뒤 "연결 체크리스트"에서 준비 상태를 직접 체크해보세요.</p>
+              </section>
 
-            <p style="font-size:.86rem; color:var(--ink-faint); margin-top:1.2rem;">다음 STEP에서는 실제 방문자를 만들고 어떤 반응이 나오는지 확인합니다.</p>
+              <section class="s6-card s6-progress" id="s6Progress" aria-labelledby="s6ProgressTitle" aria-live="polite">
+                <div class="s6-progress-head">
+                  <h3 id="s6ProgressTitle">필수 진행 상태</h3>
+                  <span class="s6-progress-badge" id="s6ProgressBadge">0 / 1</span>
+                </div>
+                <div class="s6-progress-bar"><div class="s6-progress-fill" id="s6ProgressFill"></div></div>
+                <p class="s6-progress-text" id="s6ProgressText">기본 방문 · 전환 확인 수단을 최소 1개 연결하면 완료돼요.</p>
+                <div class="s6-progress-done" id="s6ProgressDone" hidden>✓ STEP 06 준비 완료</div>
+                <!-- 로그인 안내(게스트) / 저장 상태(회원) — 실제 인증 상태(body.is-authed)만 본다. 저장 완료 표시는 만들지 않는다. -->
+                <p class="s6-progress-foot s6-progress-guest">로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</p>
+                <p class="s6-progress-foot s6-progress-member">로그인 상태 · 체크한 내용은 계정에 저장돼요.</p>
+              </section>
 
-            <div class="chapter-nav">
-              <a href="#/start/orders"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기</span></a>
-              <a class="next" href="#/start/marketing"><span class="cn-label">다음 STEP →</span><span class="cn-title">STEP 07 · 첫 유입 만들고 반응 테스트하기</span></a>
-            </div>
+              <section class="s6-card s6-optional" aria-labelledby="s6OptTitle">
+                <div class="s6-optional-head">
+                  <h3 id="s6OptTitle">선택 연결</h3>
+                  <span class="s6-optional-badge" id="s6OptBadge">0 / 9 · 참고용</span>
+                </div>
+                <p class="s6-optional-hint">진행률에는 반영되지 않아요 — 필요한 채널만 골라 연결하세요.</p>
+              </section>
+
+              <section class="s6-card s6-resources" aria-labelledby="s6ResTitle">
+                <h3 id="s6ResTitle">관련 자료</h3>
+                <ul class="s6-res-list">
+                  <li><a href="#/resources" data-resource-cat="analytics"><span class="s6-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>GA4 · 분석 도구 설치 자료</span><svg class="s6-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources" data-resource-cat="marketing"><span class="s6-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>메타 픽셀 · 네이버 · 카카오 연동 자료</span><svg class="s6-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources" data-resource-cat="analytics"><span class="s6-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>분석 · 연동 전체 자료 보기</span><svg class="s6-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                </ul>
+              </section>
+
+              <section class="desk-help s6-help" aria-labelledby="s6HelpTitle">
+                <h3 id="s6HelpTitle">추적 · 연동이 막혔나요?</h3>
+                <p>GA4 · Meta 픽셀 · 네이버/카카오 연결을 세팅 대행으로 도움받을 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg></a>
+              </section>
+            </aside>
+
+            <!-- 이전/다음 — 기존 경로(#/start/orders, #/start/marketing) 그대로인 해시 링크. 미완료 시
+                 다음 이동은 step06.js가 confirm으로 한 번 묻는다(막지 않음). -->
+            <nav class="s6-nav" aria-label="STEP 이동">
+              <p class="s6-nav-status" id="s6NavStatus"><span id="s6NavText">필수 항목을 완료하면 STEP 06이 완료돼요.</span> <b id="s6NavCount">0 / 1</b></p>
+              <div class="s6-nav-btns">
+                <a class="s6-btn s6-btn-ghost s6-nav-prev" href="#/start/orders">← STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기</a>
+                <a class="s6-btn s6-btn-primary s6-nav-next" href="#/start/marketing" id="s6Next">STEP 07 · 첫 유입 만들고 반응 테스트하기 →</a>
+              </div>
+            </nav>
+
           </div>
         </div>
       </section>
@@ -3683,6 +3863,7 @@
 <script src="step03.js"></script>
 <script src="step04.js"></script>
 <script src="step05.js"></script>
+<script src="step06.js"></script>
 <script src="plans.js"></script>
 <script src="admin.js"></script>
 </body>
