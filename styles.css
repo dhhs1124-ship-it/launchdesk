@@ -25,14 +25,19 @@
     --sidebar-w:      220px;   /* 2026-09 UI 재설계 1차 — large(≥1100) 고정 사이드바 */
     --topbar-h:        56px;
     --maxw-narrow:    720px;
-    --f-display:'Space Grotesk','IBM Plex Sans KR',sans-serif;
-    --f-body:'IBM Plex Sans KR',-apple-system,'Malgun Gothic',sans-serif;
-    --f-mono:'JetBrains Mono','SFMono-Regular',monospace;
+    /* 글꼴(2026-09 UI 재설계 2차): 피그마 시안과 동일하게 Noto Sans KR 하나만
+       쓴다 — index.html의 Google Fonts 링크도 이 한 가족(400/500/600/700)만
+       불러온다. 예전 --f-display(Space Grotesk)·--f-mono(JetBrains Mono)는 더
+       이상 로드하지 않으므로 세 토큰 모두 같은 글꼴을 가리킨다. 숫자 정렬은
+       기존 font-variant-numeric:tabular-nums 선언이 그대로 담당한다. */
+    --f-display:'Noto Sans KR',-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    --f-body:'Noto Sans KR',-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    --f-mono:'Noto Sans KR',-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
 
     /* ---- 2026-09 UI 재설계 1차 토큰(피그마 Make 시안, 올리브 계열) ----
        새 셸(사이드바·상단바·서랍)과 시작 데스크(.desk) 범위에서만 참조한다.
-       전역 --accent(벽돌색)와 기존 화면의 스타일은 그대로다. 폰트는 기존
-       --f-body(IBM Plex Sans KR)를 유지한다. */
+       전역 --accent(벽돌색)와 기존 화면의 스타일은 그대로다. 폰트는
+       --f-body(Noto Sans KR)를 그대로 쓴다. */
     --ld-bg:          #F5F4F0;
     --ld-panel:       #FFFFFF;
     --ld-text:        #252925;
