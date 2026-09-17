@@ -1992,7 +1992,7 @@
      STEP 04(#/start/content) — 2026-09 UI 재설계 4차, STEP01~03 시각 구조 이식
      (피그마 시안 없음 — STEP01~03의 레이아웃 · grid/order 패턴 · --ld-* 토큰 ·
      반응형 규칙을 그대로 재사용). 전부 #view-start-content 스코프라 다른
-     STEP은 그대로다. STEP01~03(.s1-*/.s2-*/.s3-*)와 같은 grid/order 패턴을
+     STEP은 그대로다. STEP01~03(.s1-*·.s2-*·.s3-*)와 같은 grid/order 패턴을
      .s4-* 이름으로 따로 둔다(중복은 기술 부채로 보고, 이전 STEP 주석과 동일한
      판단). 레이아웃: large(≥1100) [본문 | 300px 우측 열], 미만은 한 열 —
      .s4-tabs/.s4-panel-cl/.s4-side를 display:contents로 풀어 같은 grid 안에서
@@ -2234,7 +2234,7 @@
      STEP 05(#/start/orders) — 2026-09 UI 재설계 5차, STEP01~04 시각 구조 이식
      (피그마 시안 없음 — STEP01~04의 레이아웃 · grid/order 패턴 · --ld-* 토큰 ·
      반응형 규칙을 그대로 재사용). 전부 #view-start-orders 스코프라 다른 STEP은
-     그대로다. STEP01~04(.s1-*/.s2-*/.s3-*/.s4-*)와 같은 grid/order 패턴을
+     그대로다. STEP01~04(.s1-*·.s2-*·.s3-*·.s4-*)와 같은 grid/order 패턴을
      .s5-* 이름으로 따로 둔다(중복은 기술 부채로 보고, 이전 STEP 주석과 동일한
      판단). 레이아웃: large(≥1100) [본문 | 300px 우측 열], 미만은 한 열 —
      .s5-tabs/.s5-panel-cl/.s5-side를 display:contents로 풀어 같은 grid 안에서
@@ -2247,12 +2247,6 @@
      끼운 작은 카드) 덮어쓴다.
      ========================================================================= */
   #view-start-orders .s5{display:grid; grid-template-columns:minmax(0,1fr); gap:16px; color:var(--ld-text);}
-  /* 아래 줄은 위 규칙과 값이 같아 보이지만 지우면 안 된다 — 테스트 중,
-     미디어 쿼리 없는 무조건 규칙의 display 값만 실제 렌더링에 간헐적으로
-     반영되지 않는 현상을 확인했다(같은 선택자 구조의 STEP01~03에서는
-     재현되지 않았고 원인은 특정하지 못함). @media로 감싼 동일 선언은
-     항상 안정적으로 반영되어 방어적으로 중복 선언했다 — 의미 변화 없음. */
-  @media (min-width:0){ #view-start-orders .s5{display:grid;} }
   #view-start-orders .s5 p{max-width:none;}
   #view-start-orders .s5-head{order:0;}
   #view-start-orders .s5-tabs{display:contents;}
