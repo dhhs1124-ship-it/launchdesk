@@ -2011,113 +2011,306 @@
       </section>
 
       <!-- ============ VIEW: STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기 ============ -->
+      <!-- STEP 05 (2026-09 UI 재설계 5차, STEP01~04 시각 구조 이식 — 피그마 시안 없음, STEP01~04
+           레이아웃·토큰·반응형 규칙을 그대로 재사용) — 정적 마크업 + step05.js(진행 상태·탭 부가
+           동작만). 저장·완료 판정은 기존 app.js 체크리스트 컨트롤러(.checklist-block[data-chapter]
+           안의 .cl-row input[type="checkbox"] 4개, DOM 순서 = 저장 인덱스 0~3, change 이벤트,
+           setChapterDone/checklistAllChecked)가 그대로 담당한다 — 체크박스 개수 · DOM 순서 ·
+           data-chapter · 저장 인덱스 · 라벨 문구는 재설계 이전과 완전히 동일하며, 기존 저장
+           데이터와 구조적·의미적으로 모두 호환된다(문구조차 바꾸지 않았다). 가이드 탭 안의
+           "테스트 주문 점검" 체크리스트는 data-chapter가 없는 참고용(app.js의 전역 "checklist
+           counters" 핸들러가 개수만 세고 저장하지 않음) — 완료 판정과 무관하다. 탭은 기존
+           .tabs > .tab-bar > .tab-btn / .tab-panel 위임(app.js)을 재사용하고, 1100px 미만에서는
+           CSS display:contents + order로 한 열 순서(제목 → 탭 → 탭 콘텐츠 → 진행 → 게스트 안내 →
+           체크리스트 → 자료 → 도움 → 이전/다음)를 만든다 — 같은 패널을 DOM에 두 번 두지 않는다.
+           택배 계약 상세 절차 · CS 응대 문구 모음 · 교환환불 법률 템플릿은 자료실(cs 카테고리)로
+           안내만 하고 본문에 넣지 않았다. 특정 택배단가 · 수수료 · 법률 기준을 고정 사실처럼 쓰지
+           않았고, 지역별 택배기사 연결은 이후 별도 기능이라 이번 STEP에 넣지 않았다. 스타일은 전부
+           #view-start-orders 스코프(--ld-* 올리브 토큰), 다른 STEP은 그대로다. -->
       <section class="view" id="view-start-orders" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 05</span></div>
-          <span class="eyebrow">STEP 05 · 오픈 준비</span>
-          <div class="page-head">
-            <h1>배송·CS 정책 정하고 오픈 준비 마치기</h1>
-            <p class="page-lead">상품이 등록되어 있어도, 주문을 실제로 처리할 준비가 되어 있지 않으면 오픈했다고 보기 어렵습니다.</p>
-          </div>
-          <div class="chapter-body">
-            <div class="callout">
-              <p><strong>이 STEP의 목표는 주문이 들어온 뒤 결제 → 확인 → 출고 → 문의 대응 흐름이 실제로 돌아가는 상태를 만드는 것입니다.</strong></p>
-              <p>특정 업종을 전제하지 않으며, 무엇을 팔든 같은 흐름으로 준비할 수 있습니다.</p>
-            </div>
+        <div class="content">
+          <div class="s5" id="step05Root" data-tab="guide">
 
-            <h2 class="section-h">배송정책 정하기</h2>
-            <p>무료배송이 무조건 유리하거나 유료배송이 무조건 유리한 것은 아닙니다. 내 상품 · 객단가에 맞는 기준을 정하세요.</p>
-            <div class="versus">
-              <div class="side">
-                <small>구매 장벽 낮음</small>
-                <h4>무료배송</h4>
-                <ul><li class="good">저가 상품일수록 전환율 ↑</li><li class="bad">한 개만 사는 비율 ↑ → 객단가 하락</li></ul>
+            <header class="s5-head">
+              <div class="breadcrumb s5-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 05</span></div>
+              <span class="s5-eyebrow">STEP 05 · 배송 · CS · 오픈 준비</span>
+              <h1>배송·CS 정책 정하고 오픈 준비 마치기</h1>
+              <p class="s5-lead">상품이 등록되어 있어도, 주문을 실제로 처리할 준비가 되어 있지 않으면 오픈했다고 보기 어렵습니다. 배송 정책과 CS 기준을 정하고, 실제 테스트 주문까지 마치면 오픈 준비가 끝납니다.</p>
+            </header>
+
+            <div class="tabs s5-tabs">
+              <div class="tab-bar s5-tabbar">
+                <button class="tab-btn active" type="button" data-tab="guide">가이드</button>
+                <button class="tab-btn" type="button" data-tab="checklist">오픈 전 체크리스트</button>
               </div>
-              <div class="vs">VS</div>
-              <div class="side rec">
-                <small>객단가 우선</small>
-                <h4>조건부 무료배송</h4>
-                <ul><li class="good">일정 금액 이상 무료 기준을 맞추려 상품을 추가 → 객단가 상승</li><li class="good">배송비 채우기용 저관여 상품을 함께 구성</li></ul>
+
+              <!-- ── 가이드 탭: 주문 흐름 이해 → 배송정책 → 택배발송 → 포장·송장 → 교환·반품·CS → 테스트 주문 순서(내용 삭제 없음, 재배치) ── -->
+              <div class="tab-panel s5-panel s5-panel-guide active" data-tab="guide">
+                <div class="s5-guide-intro">
+                  <h2>오픈 전, 주문이 들어왔을 때 흐름을 먼저 확인하세요.</h2>
+                  <p><strong>주문 접수부터 배송 완료, 교환·반품 대응까지 한 번은 전체 흐름을 이해해야 실제 문제가 생겼을 때 당황하지 않습니다.</strong> 특정 업종을 전제하지 않으며, 무엇을 팔든 같은 흐름으로 준비할 수 있습니다.</p>
+                </div>
+
+                <ol class="s5-sections">
+                  <li class="s5-section">
+                    <span class="s5-num">01</span>
+                    <div class="s5-section-body">
+                      <h3>주문 처리 흐름 이해하기</h3>
+                      <p class="s5-summary">아래 여섯 단계를 거치면 하나의 주문이 마무리됩니다. 처음에는 이 흐름을 손으로 직접 처리해도 충분합니다.</p>
+                      <ol class="s5-flow">
+                        <li class="s5-flow-item"><span class="s5-flow-num">1</span><div class="s5-flow-body"><h4>주문 접수</h4><p>고객이 결제를 완료하면 주문이 들어옵니다.</p></div></li>
+                        <li class="s5-flow-item"><span class="s5-flow-num">2</span><div class="s5-flow-body"><h4>결제 확인</h4><p>실제 결제 · 입금이 정상 처리됐는지 확인합니다.</p></div></li>
+                        <li class="s5-flow-item"><span class="s5-flow-num">3</span><div class="s5-flow-body"><h4>상품 준비</h4><p>재고를 확인하고 포장을 준비합니다.</p></div></li>
+                        <li class="s5-flow-item"><span class="s5-flow-num">4</span><div class="s5-flow-body"><h4>송장 등록과 발송</h4><p>운송장 번호를 등록하고 택배로 발송합니다.</p></div></li>
+                        <li class="s5-flow-item"><span class="s5-flow-num">5</span><div class="s5-flow-body"><h4>배송 완료</h4><p>고객에게 상품이 도착합니다.</p></div></li>
+                        <li class="s5-flow-item"><span class="s5-flow-num">6</span><div class="s5-flow-body"><h4>교환 · 반품 대응</h4><p>문의가 오면 정해둔 기준대로 응대합니다.</p></div></li>
+                      </ol>
+                      <p class="s5-note">예: 주문 · 배송 건이 늘어나 직접 처리가 버거워지면, 이지어드민 같은 멀티채널 주문관리 도구로 주문 수집 · 송장 발행 · 재고 동기화를 자동화하는 것도 방법입니다. 그 전까지는 직접 처리하는 편이 오히려 효율적인 경우가 많습니다.</p>
+                    </div>
+                  </li>
+
+                  <li class="s5-section">
+                    <span class="s5-num">02</span>
+                    <div class="s5-section-body">
+                      <h3>배송 정책 정하기</h3>
+                      <p class="s5-summary">무료배송이 무조건 유리하거나 유료배송이 무조건 유리한 것은 아닙니다. 내 상품 · 객단가에 맞는 기준을 정하세요.</p>
+                      <div class="s5-compare">
+                        <div class="s5-compare-card">
+                          <small>구매 장벽 낮음</small>
+                          <h4>무료배송</h4>
+                          <ul>
+                            <li class="good">저가 상품일수록 전환율에 유리할 수 있음</li>
+                            <li class="limit">한 개만 구매하는 비율이 늘어 객단가가 낮아질 수 있음</li>
+                          </ul>
+                        </div>
+                        <div class="s5-compare-card">
+                          <small>객단가 우선</small>
+                          <h4>조건부 무료배송</h4>
+                          <ul>
+                            <li class="good">기준 금액을 채우려 상품을 추가해 객단가가 오를 수 있음</li>
+                            <li class="good">배송비를 채우는 저관여 상품을 함께 구성할 수 있음</li>
+                            <li class="limit">기준 금액을 어떻게 정하느냐에 따라 결과가 달라질 수 있음</li>
+                          </ul>
+                        </div>
+                      </div>
+                      <p class="s5-note s5-center">특정 금액이 정답은 아니며, 아래 항목을 내 상품 구조에 맞게 직접 정하면 됩니다.</p>
+                      <ul class="s5-checks">
+                        <li>기본 배송비</li>
+                        <li>무료배송 또는 조건부 무료배송 기준</li>
+                        <li>제주 · 도서산간 등 지역 추가 배송비</li>
+                        <li>주문 마감 시간</li>
+                        <li>평균 출고 소요 기간</li>
+                        <li>품절 · 입고 지연 시 안내 방식</li>
+                      </ul>
+                    </div>
+                  </li>
+
+                  <li class="s5-section">
+                    <span class="s5-num">03</span>
+                    <div class="s5-section-body">
+                      <h3>택배 발송 방식 준비하기</h3>
+                      <p class="s5-summary">초기 물량이 적다면 처음부터 정식 계약택배를 이용하지 않아도 됩니다. 물량에 맞는 발송 방식을 먼저 살펴보세요.</p>
+                      <div class="s5-methods">
+                        <div class="s5-method"><p class="s5-method-name">편의점 택배</p><p class="s5-m-good">별도 계약 없이 바로 이용 가능</p><p class="s5-m-limit">건당 단가가 상대적으로 높고 방문 접수가 필요</p></div>
+                        <div class="s5-method"><p class="s5-method-name">우체국 소포</p><p class="s5-m-good">전국 어디서나 접수 가능</p><p class="s5-m-limit">물량이 많아지면 처리에 시간이 걸릴 수 있음</p></div>
+                        <div class="s5-method"><p class="s5-method-name">택배사 정식 계약</p><p class="s5-m-good">수거 대행 · 단가 협상이 가능</p><p class="s5-m-limit">최소 물량 등 계약 조건이 있을 수 있음</p></div>
+                      </div>
+                      <p class="s5-note">물량이 늘어나면 정식 계약택배로 전환하는 경우가 많습니다. 어떤 방식이 맞는지는 지금 물량과 예산에 따라 다릅니다.</p>
+                      <p class="s5-subhead">계약 시 확인할 항목</p>
+                      <ul class="s5-checks">
+                        <li>기본 단가</li>
+                        <li>수거 가능 지역 · 시간</li>
+                        <li>최소 물량 조건</li>
+                        <li>반품 회수 가능 여부</li>
+                        <li>도서산간 등 추가 요금</li>
+                        <li>송장 출력 방식</li>
+                      </ul>
+                      <div class="s5-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>택배기사 연락처나 특정 지역의 최저가 정보는 시점 · 지역마다 달라 여기서는 제공하지 않습니다. 지역별 택배기사를 연결해주는 기능은 이후 추가될 수 있는 별도 기능이며, 아직 제공되지 않습니다.</p>
+                      </div>
+                      <a class="s5-service" href="#/resources" data-resource-cat="cs">
+                        <span class="s5-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h14M2 7l1.5-4h11L16 7M2 7v8h14V7"/><path d="M6 15v-4h6v4"/><path d="M2 7a3 3 0 0 0 6 0M8 7a3 3 0 0 0 6 0"/></svg></span>
+                        <span class="s5-service-text"><b>택배 계약 방법이 궁금하다면</b><small>자료실에서 계약 절차 · 확인 항목을 더 자세히 볼 수 있어요</small></span>
+                        <svg class="s5-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                    </div>
+                  </li>
+
+                  <li class="s5-section">
+                    <span class="s5-num">04</span>
+                    <div class="s5-section-body">
+                      <h3>포장과 송장 준비</h3>
+                      <p class="s5-summary">포장과 송장은 사소해 보이지만, 문제가 생기면 CS로 바로 이어지는 부분입니다.</p>
+                      <ul class="s5-checks">
+                        <li>파손 · 오염을 막을 수 있는 포장재 준비</li>
+                        <li>포장 전 구성품 누락 여부 확인</li>
+                        <li>송장 출력 또는 판매 플랫폼과의 자동 연동 확인</li>
+                        <li>택배 인계 전 최종 확인 절차</li>
+                      </ul>
+                      <div class="s5-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>이름 · 연락처 · 주소가 적힌 송장이나 주문서를 그대로 버리지 마세요. 개인정보가 노출되지 않도록 파쇄하거나 식별 정보를 가린 뒤 폐기하세요.</p>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="s5-section">
+                    <span class="s5-num">05</span>
+                    <div class="s5-section-body">
+                      <h3>교환 · 반품 · 환불 및 CS 기준 정하기</h3>
+                      <p class="s5-summary">배송 전에 교환 · 반품 기준을 미리 정해두면 문의가 줄어듭니다. 다만 정확한 법률 기준은 LaunchDesk가 대신 확정해줄 수 없습니다.</p>
+                      <ul class="s5-checks">
+                        <li>문의 채널과 운영 시간</li>
+                        <li>단순 변심과 상품 하자를 구분하는 대응 기준</li>
+                        <li>반품 배송비를 누가 부담하는지 안내 방식</li>
+                        <li>품절 · 지연 · 오배송 상황의 안내 문구</li>
+                      </ul>
+                      <div class="s5-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>교환 · 반품의 정확한 법률 기준은 전자상거래법과 이용 중인 판매 플랫폼의 정책을 함께 확인하세요. 판매하는 상품 · 판매 형태에 따라 예외가 있을 수 있습니다.</p>
+                      </div>
+                      <div class="s5-tip">
+                        <b>응대 팁</b>
+                        <p>교환 · 반품 문의는 감정적으로 대응하지 말고, 정해둔 기준대로 차분히 안내하세요. 다만 운영에 도움이 되는 피드백은 반영해 정책을 조금씩 개선해나가면 됩니다.</p>
+                      </div>
+                      <a class="s5-service" href="#/resources" data-resource-cat="cs">
+                        <span class="s5-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span>
+                        <span class="s5-service-text"><b>CS 문구 · 법률 템플릿이 필요하다면</b><small>자료실에서 응대 스크립트와 관련 자료를 확인하세요</small></span>
+                        <svg class="s5-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                    </div>
+                  </li>
+
+                  <li class="s5-section">
+                    <span class="s5-num">06</span>
+                    <div class="s5-section-body">
+                      <h3>실제 테스트 주문하기</h3>
+                      <p class="s5-summary">오픈 전 최소 한 번은 고객 입장에서 실제로 주문해보고, 관리자 화면에서도 확인하세요. 특정 결제 수단이나 판매 채널을 전제하지 않으며, 지금 쓰는 환경 기준으로 확인하면 됩니다.</p>
+                      <div class="checklist-block s5-ref-checklist">
+                        <div class="cl-head"><span class="s5-ref-title">테스트 주문 점검</span><span class="count">0 / 7</span></div>
+                        <div class="cl-group">
+                          <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">모바일에서 상품을 선택하고 장바구니에 담기</span></label>
+                          <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">옵션 · 쿠폰 · 배송비가 의도한 대로 계산되는지 확인</span></label>
+                          <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">실제 결제를 진행하기</span></label>
+                          <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">주문 알림이 정상적으로 도착하는지 확인</span></label>
+                          <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">운송장 번호를 등록하기</span></label>
+                          <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">배송 조회가 정상적으로 되는지 확인</span></label>
+                          <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">주문 취소 또는 환불을 처리해보기</span></label>
+                        </div>
+                        <div class="cl-note">체크는 지금 화면에서만 표시돼요 · 새로고침하면 초기화되고 진행률에는 반영되지 않아요 — 고객 화면과 관리자 화면을 모두 오가며 확인하세요. 최종 완료는 "오픈 전 체크리스트" 탭에서 표시하세요.</div>
+                      </div>
+                      <p class="s5-note"><a href="#/resources" data-resource-cat="cs">배송 · CS 관련 자료 보기 →</a></p>
+                    </div>
+                  </li>
+                </ol>
+
+                <div class="s5-guide-cta">
+                  <button type="button" class="s5-btn s5-btn-primary" id="s5GoChecklist">오픈 전 체크리스트 확인하기 →</button>
+                </div>
+              </div>
+
+              <!-- ── 오픈 전 체크리스트 탭 ── -->
+              <div class="tab-panel s5-panel s5-panel-cl" data-tab="checklist">
+                <!-- 비회원 안내 — body.is-authed(app.js renderAuthUI, 실제 인증 상태)면 CSS로 숨김.
+                     버튼은 기존 로그인 모달(window.launchdeskOpenLoginModal)만 연다. -->
+                <div class="s5-guest" id="s5Guest">
+                  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                  <div class="s5-guest-body">
+                    <p>로그인하면 체크한 준비 상태를 계정에 저장하고 다른 기기에서도 이어갈 수 있어요.</p>
+                    <button type="button" class="s5-guest-btn" id="s5GuestLogin">로그인하고 저장하기</button>
+                  </div>
+                </div>
+
+                <!-- 체크리스트 — 저장 구조 보존: .checklist-block[data-chapter] 안의 .cl-row input[type="checkbox"]
+                     정확히 4개, DOM 순서 0~3 = 저장 배열 인덱스(재설계 이전과 완전히 동일, 라벨도 그대로).
+                     .count는 app.js가 갱신한다. -->
+                <div class="checklist-block s5-checklist" data-chapter="/start/orders">
+                  <div class="cl-head s5-cl-head">
+                    <div class="s5-cl-title">
+                      <h2 class="title" id="s5ChecklistTitle" tabindex="-1">오픈 준비 완료 체크리스트</h2>
+                      <p>실제로 완료한 항목만 체크하세요. 4개를 모두 확인하면 STEP 05가 완료돼요.</p>
+                    </div>
+                    <span class="count">0 / 4</span>
+                  </div>
+                  <div class="s5-cl-bar" aria-hidden="true"><div class="s5-cl-fill" id="s5ClFill"></div></div>
+                  <div class="cl-group s5-cl-group">
+                    <div class="g-label">배송 · CS 정책</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">배송정책 확정</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">CS 채널 최소 1개 준비</span></label>
+                  </div>
+                  <div class="cl-group s5-cl-group">
+                    <div class="g-label">출고 · 테스트</div>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">출고 루틴 확정</span></label>
+                    <label class="cl-row"><input type="checkbox"><span class="cl-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,6 5,9 10,3"/></svg></span><span class="label">테스트 주문 · 결제 1회 완료</span></label>
+                  </div>
+                  <div class="s5-cl-done" id="s5ClDone" hidden><span aria-hidden="true">✓</span><div><b>STEP 05 준비 완료</b><p>배송 · CS · 테스트 주문 항목을 모두 확인했어요.</p></div></div>
+                  <div class="cl-note s5-cl-note">로그인 상태에서는 체크한 내용이 계정에 저장돼요. 로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</div>
+                </div>
               </div>
             </div>
-            <p style="font-size:.86rem; color:var(--ink-faint);">참고 흐름 — 초반엔 무료배송으로 구매 장벽을 낮추고, 고객이 어느 정도 쌓이면 조건부로 전환하는 경우가 많습니다. 특정 금액이 정답은 아니며, 아래 항목을 내 상품 구조에 맞게 직접 정하면 됩니다.</p>
-            <ul class="trust-list">
-              <li>기본 배송비</li>
-              <li>무료배송 또는 조건부 무료배송 기준</li>
-              <li>도서산간 · 추가 배송비 여부</li>
-              <li>평균 출고 소요시간</li>
-              <li>묶음배송 가능 여부</li>
-              <li>반품 · 교환 배송비</li>
-            </ul>
 
-            <h2 class="section-h">CS 채널 준비</h2>
-            <p>고객이 문의할 수 있는 채널을 최소 1개 이상 준비하세요. 모든 채널을 운영할 필요는 없습니다 — 핵심은 <strong>고객이 어디로 문의해야 하는지 명확하게 알 수 있는가</strong>입니다.</p>
-            <div class="info-grid">
-              <div class="info-card"><h4>쇼핑몰 게시판</h4><p>공지사항 · Q&A로 문의를 확인하고 응답합니다.</p></div>
-              <div class="info-card"><h4>카카오채널</h4><p>실시간 응답용으로 열어두는 경우가 많습니다.</p></div>
-              <div class="info-card"><h4>이메일</h4><p>비동기 문의 · 증빙이 필요한 문의에 적합합니다.</p></div>
-              <div class="info-card"><h4>전화 · 플랫폼 문의</h4><p>급한 문의나 판매 채널 자체 문의 기능을 활용할 수 있습니다.</p></div>
-            </div>
+            <!-- ── 오른쪽 열(large) / 한 열 순서 배치(medium·small) — 탭에 따라 표시 ── -->
+            <aside class="s5-side">
+              <section class="s5-card s5-side-guide" aria-labelledby="s5PrepTitle">
+                <h3 id="s5PrepTitle">이번 단계에서 준비할 것</h3>
+                <ol class="s5-prep">
+                  <li><span>01</span>주문 처리 흐름 이해</li>
+                  <li><span>02</span>배송 정책 확정</li>
+                  <li><span>03</span>택배 발송 방식 준비</li>
+                  <li><span>04</span>포장 · 송장 준비</li>
+                  <li><span>05</span>교환 · 반품 · CS 기준 정하기</li>
+                  <li><span>06</span>테스트 주문 완료</li>
+                </ol>
+                <p class="s5-side-hint">가이드를 읽은 뒤 "오픈 전 체크리스트"에서 준비 상태를 직접 체크해보세요.</p>
+              </section>
 
-            <h2 class="section-h">출고 루틴 정하기</h2>
-            <p>업종 · 물류 형태(위탁배송 · 직접배송 · 3PL 등)에 따라 달라질 수 있습니다. 특정 시간 · 요일이 정답은 아니며, 아래를 내 상황에 맞게 정하세요.</p>
-            <ul class="trust-list">
-              <li>주문 확인 시간</li>
-              <li>발주 · 재고 확인 방식</li>
-              <li>포장 시간</li>
-              <li>택배 인계 시간 또는 출고 요일</li>
-              <li>송장 · 배송정보 등록 방식</li>
-            </ul>
-            <p style="font-size:.86rem; color:var(--ink-faint);">아래는 출고 루틴을 정할 때 참고할 수 있는 흐름의 예시입니다.</p>
-            <div class="day-timeline">
-              <div class="dt-item"><span class="dt-time">예: 오전</span><span class="dt-rail"></span><div class="dt-content"><h4>주문 · 취소건 확인</h4><p>전날 밤 주문을 확인하고, 취소 요청과 재고 상태를 먼저 점검합니다.</p></div></div>
-              <div class="dt-item"><span class="dt-time">예: 포장 전</span><span class="dt-rail"></span><div class="dt-content"><h4>불량 · 구성품 점검</h4><p>출고 직전 불량품과 구성품 누락을 점검합니다.</p></div></div>
-              <div class="dt-item"><span class="dt-time">예: 정해둔 시각</span><span class="dt-rail"></span><div class="dt-content"><h4>고정 출고</h4><p>택배 인계 시간에 맞춰, 매일 같은 시각에 출고하면 관리가 쉬워집니다.</p></div></div>
-              <div class="dt-item"><span class="dt-time">상시</span><span class="dt-rail"></span><div class="dt-content"><h4>CS 응대</h4><p>정해둔 채널로 문의가 오면 대응합니다.</p></div></div>
-            </div>
-            <div class="callout">
-              <p>예: 주문 · 배송 건이 늘어나 직접 처리가 버거워지면, 이지어드민 같은 멀티채널 주문관리 도구로 주문 수집 · 송장 발행 · 재고 동기화를 자동화하는 것도 방법입니다. 그 전까지는 직접 하는 편이 오히려 효율적인 경우가 많습니다.</p>
-            </div>
+              <section class="s5-card s5-progress" id="s5Progress" aria-labelledby="s5ProgressTitle" aria-live="polite">
+                <div class="s5-progress-head">
+                  <h3 id="s5ProgressTitle">STEP 05 진행 상태</h3>
+                  <span class="s5-progress-badge" id="s5ProgressBadge">필수 0 / 4</span>
+                </div>
+                <div class="s5-progress-bar"><div class="s5-progress-fill" id="s5ProgressFill"></div></div>
+                <ul class="s5-progress-items" id="s5ProgressItems">
+                  <li class="s5-progress-group"><span>배송 · CS 정책</span><b data-cl-range="0-1">0 / 2</b></li>
+                  <li data-cl-index="0"><span class="s5-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>배송정책 확정</li>
+                  <li data-cl-index="1"><span class="s5-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>CS 채널 최소 1개 준비</li>
+                  <li class="s5-progress-group"><span>출고 · 테스트</span><b data-cl-range="2-3">0 / 2</b></li>
+                  <li data-cl-index="2"><span class="s5-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>출고 루틴 확정</li>
+                  <li data-cl-index="3"><span class="s5-progress-check"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 5,9 10,3"/></svg></span>테스트 주문 · 결제 1회 완료</li>
+                </ul>
+                <div class="s5-progress-done" id="s5ProgressDone" hidden>✓ STEP 05 준비 완료</div>
+                <!-- 로그인 안내(게스트) / 저장 상태(회원) — 실제 인증 상태(body.is-authed)만 본다. 저장 완료 표시는 만들지 않는다. -->
+                <p class="s5-progress-foot s5-progress-guest">로그인 전에는 새로고침하거나 창을 닫으면 체크 내용이 사라질 수 있어요.</p>
+                <p class="s5-progress-foot s5-progress-member">로그인 상태 · 체크한 내용은 계정에 저장돼요.</p>
+              </section>
 
-            <h2 class="section-h">교환 · 반품 기본 정책</h2>
-            <p>배송 전에 교환 · 반품 기준을 미리 안내해두면 문의가 줄어듭니다. 다만 전자상거래 관련 법률 기준은 LaunchDesk가 대신 확정해줄 수 없으며, 판매하는 상품 · 판매 형태에 따라 예외가 있을 수 있으니 관련 기준을 직접 확인하세요.</p>
-            <div class="pull-quote"><p>교환 · 반품 문의는 감정적으로 대응하지 말고, 정해둔 기준대로 차분히 응대하세요. 다만 운영에 도움이 되는 피드백은 반영해 정책을 개선해나가면 됩니다.</p></div>
+              <section class="s5-card s5-resources" aria-labelledby="s5ResTitle">
+                <h3 id="s5ResTitle">배송 · CS 관련 자료</h3>
+                <ul class="s5-res-list">
+                  <li><a href="#/resources" data-resource-cat="cs"><span class="s5-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>택배 계약 · 발송 준비 자료</span><svg class="s5-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources" data-resource-cat="cs"><span class="s5-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>CS 응대 · 교환반품 템플릿</span><svg class="s5-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                  <li><a href="#/resources" data-resource-cat="cs"><span class="s5-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>배송 · CS 전체 자료 보기</span><svg class="s5-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
+                </ul>
+              </section>
 
-            <h2 class="section-h">테스트 주문 · 결제</h2>
-            <p>오픈 전 최소 한 번은 고객 입장에서 실제로 주문해보세요. 특정 PG나 판매 채널을 전제하지 않으며, 지금 쓰는 결제 수단 기준으로 확인하면 됩니다.</p>
-            <div class="checklist-block">
-              <div class="cl-head"><span class="title">테스트 주문 점검</span><span class="count">0 / 6</span></div>
-              <div class="cl-group">
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">상품이 장바구니에 정상적으로 담기는지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">옵션 선택이 정상인지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">결제가 정상적으로 진행되는지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">주문이 관리자 화면에 들어오는지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">주문 · 결제 안내가 정상적으로 전달되는지</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">배송비 계산이 의도한 대로 되는지</span></label>
+              <section class="desk-help s5-help" aria-labelledby="s5HelpTitle">
+                <h3 id="s5HelpTitle">배송 · CS 준비가 막혔나요?</h3>
+                <p>기본 쇼핑몰 세팅으로 필요한 설정만 도움받을 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg></a>
+              </section>
+            </aside>
+
+            <!-- 이전/다음 — 기존 경로(#/start/content, #/start/marketing-setup) 그대로인 해시 링크. 미완료 시
+                 다음 이동은 step05.js가 confirm으로 한 번 묻는다(막지 않음). -->
+            <nav class="s5-nav" aria-label="STEP 이동">
+              <p class="s5-nav-status" id="s5NavStatus"><span id="s5NavText">체크 항목 4개를 완료하면 STEP 05가 완료돼요.</span> <b id="s5NavCount">0 / 4</b></p>
+              <div class="s5-nav-btns">
+                <a class="s5-btn s5-btn-ghost s5-nav-prev" href="#/start/content">← STEP 04 · 상품 상세페이지 완성하기</a>
+                <a class="s5-btn s5-btn-primary s5-nav-next" href="#/start/marketing-setup" id="s5Next">STEP 06 · 마케팅 인프라 연결하기 →</a>
               </div>
-              <div class="cl-note">체크는 지금 화면에서만 표시돼요 · 진행률에는 반영되지 않아요 — 최종 완료는 아래 STEP05 체크리스트에서 표시하세요.</div>
-            </div>
+            </nav>
 
-            <h2 class="section-h">STEP 05 체크리스트</h2>
-            <div class="checklist-block" data-chapter="/start/orders">
-              <div class="cl-head"><span class="title">오픈 준비 완료 체크리스트</span><span class="count" id="clCount5">0 / 4</span></div>
-              <div class="cl-group">
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">배송정책 확정</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">CS 채널 최소 1개 준비</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">출고 루틴 확정</span></label>
-                <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">테스트 주문 · 결제 1회 완료</span></label>
-              </div>
-              <div class="cl-note">체크 상태는 이 브라우저에 저장돼요 — 4개를 모두 체크하면 이 STEP이 완료로 표시되고 진행률에 반영돼요.</div>
-            </div>
-
-            <p style="font-size:.84rem;"><a href="#/resources" data-resource-cat="cs" style="color:var(--accent-ink); font-weight:600;">배송 · CS 관련 자료 보기 →</a></p>
-
-            <p style="font-size:.86rem; color:var(--ink-faint); margin-top:1.2rem;">다음 STEP에서는 방문과 전환을 측정할 수 있도록 마케팅 인프라를 연결합니다.</p>
-
-            <div class="chapter-nav">
-              <a href="#/start/content"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 04 · 상품 상세페이지 완성하기</span></a>
-              <a class="next" href="#/start/marketing-setup"><span class="cn-label">다음 STEP →</span><span class="cn-title">STEP 06 · 마케팅 인프라 연결하기</span></a>
-            </div>
           </div>
         </div>
       </section>
@@ -3489,6 +3682,7 @@
 <script src="step02.js"></script>
 <script src="step03.js"></script>
 <script src="step04.js"></script>
+<script src="step05.js"></script>
 <script src="plans.js"></script>
 <script src="admin.js"></script>
 </body>

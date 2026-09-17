@@ -2229,3 +2229,273 @@
     #view-start-content .s4-guide-cta .s4-btn, #view-start-content .s4-nav-btns .s4-btn{width:100%;}
     #view-start-content .s4-section{gap:10px;}
   }
+
+  /* =========================================================================
+     STEP 05(#/start/orders) — 2026-09 UI 재설계 5차, STEP01~04 시각 구조 이식
+     (피그마 시안 없음 — STEP01~04의 레이아웃 · grid/order 패턴 · --ld-* 토큰 ·
+     반응형 규칙을 그대로 재사용). 전부 #view-start-orders 스코프라 다른 STEP은
+     그대로다. STEP01~04(.s1-*/.s2-*/.s3-*/.s4-*)와 같은 grid/order 패턴을
+     .s5-* 이름으로 따로 둔다(중복은 기술 부채로 보고, 이전 STEP 주석과 동일한
+     판단). 레이아웃: large(≥1100) [본문 | 300px 우측 열], 미만은 한 열 —
+     .s5-tabs/.s5-panel-cl/.s5-side를 display:contents로 풀어 같은 grid 안에서
+     order로 배치한다(제목 → 탭 → 탭 콘텐츠 → 진행 → 게스트 안내 → 체크리스트 →
+     자료 → 도움 → 이전/다음). 같은 패널을 DOM에 두 번 두지 않는다. sticky·고정·
+     내부 스크롤 없음(문서 스크롤만). 기존 .tabs/.tab-btn/.tab-panel·.checklist-block/
+     .cl-* 전역 규칙은 이 스코프 안에서만 덮어쓴다(저장 구조는 그대로). 가이드 탭
+     06번 섹션 안의 .s5-ref-checklist는 data-chapter가 없는 참고용 체크리스트라
+     .s5-checklist(저장되는 오픈 전 체크리스트)와 시각적으로 다르게(카드 안에
+     끼운 작은 카드) 덮어쓴다.
+     ========================================================================= */
+  #view-start-orders .s5{display:grid; grid-template-columns:minmax(0,1fr); gap:16px; color:var(--ld-text);}
+  /* 아래 줄은 위 규칙과 값이 같아 보이지만 지우면 안 된다 — 테스트 중,
+     미디어 쿼리 없는 무조건 규칙의 display 값만 실제 렌더링에 간헐적으로
+     반영되지 않는 현상을 확인했다(같은 선택자 구조의 STEP01~03에서는
+     재현되지 않았고 원인은 특정하지 못함). @media로 감싼 동일 선언은
+     항상 안정적으로 반영되어 방어적으로 중복 선언했다 — 의미 변화 없음. */
+  @media (min-width:0){ #view-start-orders .s5{display:grid;} }
+  #view-start-orders .s5 p{max-width:none;}
+  #view-start-orders .s5-head{order:0;}
+  #view-start-orders .s5-tabs{display:contents;}
+  #view-start-orders .s5-tabbar{order:1;}
+  #view-start-orders .s5-panel-guide{order:2;}
+  #view-start-orders .s5-side{display:contents;}
+  #view-start-orders .s5-side-guide{order:3;}
+  #view-start-orders .s5-progress{order:4;}
+  #view-start-orders .s5-panel-cl.active{display:contents;}
+  #view-start-orders .s5-guest{order:5;}
+  #view-start-orders .s5-checklist{order:6;}
+  #view-start-orders .s5-resources{order:7;}
+  /* .s5-help는 시작 데스크의 .desk-help 모양을 재사용한다 — 그 전역 규칙의
+     grid-area:help(데스크 grid용)가 이 grid에 암묵적 열을 만들지 않도록 되돌린다. */
+  #view-start-orders .s5-help{order:8; grid-area:auto;}
+  #view-start-orders .s5-nav{order:9;}
+  /* 탭에 따른 표시 — 가이드 탭: "준비할 것"·도움, 오픈 전 체크리스트 탭: 진행·자료·도움 */
+  #view-start-orders .s5[data-tab="guide"] .s5-progress,
+  #view-start-orders .s5[data-tab="guide"] .s5-resources{display:none;}
+  #view-start-orders .s5[data-tab="checklist"] .s5-side-guide{display:none;}
+  /* 비회원 안내 / 회원 상태 — 실제 인증 상태(app.js renderAuthUI가 body에 붙이는 .is-authed)만 본다 */
+  body.is-authed #view-start-orders .s5-guest{display:none;}
+  #view-start-orders .s5-progress-member{display:none;}
+  body.is-authed #view-start-orders .s5-progress-member{display:block;}
+  body.is-authed #view-start-orders .s5-progress-guest{display:none;}
+  @media (min-width:1100px){
+    #view-start-orders .s5{display:grid; grid-template-columns:minmax(0,1fr) var(--ld-right-w); gap:20px 24px; align-items:start; grid-template-areas:"head head" "main side" "nav nav";}
+    #view-start-orders .s5-head{grid-area:head;}
+    #view-start-orders .s5-tabs{display:flex; flex-direction:column; gap:16px; grid-area:main; min-width:0;}
+    #view-start-orders .s5-panel-cl.active{display:flex; flex-direction:column; gap:16px;}
+    #view-start-orders .s5-side{display:flex; flex-direction:column; gap:16px; grid-area:side; min-width:0;}
+    #view-start-orders .s5-nav{grid-area:nav;}
+  }
+  /* 헤더 */
+  #view-start-orders .s5-crumb{margin-bottom:10px; font-family:var(--f-body); font-size:12px; color:var(--ld-muted);}
+  #view-start-orders .s5-crumb a{color:var(--ld-muted);}
+  #view-start-orders .s5-crumb a:hover{color:var(--ld-accent);}
+  #view-start-orders .s5-eyebrow{display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--ld-accent); background:var(--ld-accent-light); padding:3px 10px; border-radius:20px; margin-bottom:10px;}
+  #view-start-orders .s5-head h1{font-size:23px; font-weight:700; letter-spacing:-.02em; line-height:1.25; margin:0 0 8px; color:var(--ld-text); word-break:keep-all;}
+  #view-start-orders .s5-lead{font-size:14px; color:var(--ld-muted); line-height:1.72; max-width:560px; word-break:keep-all;}
+  /* 탭(기존 .tabs 전역 스타일 덮어쓰기) */
+  #view-start-orders .tabs{border:none; border-radius:0; margin:0; overflow:visible; background:transparent;}
+  #view-start-orders .tab-bar{display:flex; flex-wrap:nowrap; gap:0; background:transparent; border-bottom:1.5px solid var(--ld-border); padding:0 4px;}
+  #view-start-orders .tab-btn{flex:0 0 auto; min-width:0; min-height:44px; padding:10px 18px; margin-bottom:-1.5px; border:none; border-bottom:2px solid transparent; background:transparent; font-size:14px; font-weight:500; color:var(--ld-muted); white-space:nowrap;}
+  #view-start-orders .tab-btn:hover{color:var(--ld-text); background:transparent;}
+  #view-start-orders .tab-btn.active{color:var(--ld-accent); font-weight:700; border-bottom-color:var(--ld-accent); background:transparent;}
+  #view-start-orders .tab-panel{padding:0;}
+  #view-start-orders .tab-panel p{font-size:13px; margin:0;}
+  /* 카드 공통 */
+  #view-start-orders .s5-card, #view-start-orders .s5-panel-guide, #view-start-orders .checklist-block, #view-start-orders .s5-nav{background:var(--ld-panel); border:1px solid var(--ld-border); border-radius:12px; min-width:0;}
+  #view-start-orders .s5-card{padding:20px;}
+  #view-start-orders .s5-card h3{font-size:13px; font-weight:600; margin:0 0 14px; color:var(--ld-text);}
+  /* 가이드 탭 */
+  #view-start-orders .s5-panel-guide.active{display:block; padding:24px 28px;}
+  #view-start-orders .s5-guide-intro{margin-bottom:24px;}
+  #view-start-orders .s5-guide-intro h2{font-size:16px; font-weight:700; margin:0 0 6px; line-height:1.3; word-break:keep-all;}
+  #view-start-orders .s5-guide-intro p{font-size:13px; color:var(--ld-muted); line-height:1.7; word-break:keep-all;}
+  #view-start-orders .s5-guide-intro strong{color:var(--ld-text);}
+  #view-start-orders .s5-sections{list-style:none; margin:0; padding:0; display:flex; flex-direction:column;}
+  #view-start-orders .s5-section{display:flex; gap:14px; align-items:flex-start; padding:0 0 24px; margin:0 0 24px; border-bottom:1px solid var(--ld-border);}
+  #view-start-orders .s5-section:last-child{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+  #view-start-orders .s5-num{flex:0 0 24px; padding-top:3px; font-size:11px; font-weight:700; color:var(--ld-accent); letter-spacing:.04em;}
+  #view-start-orders .s5-section-body{flex:1; min-width:0;}
+  #view-start-orders .s5-section h3{font-size:15px; font-weight:700; margin:0 0 12px; line-height:1.3; word-break:keep-all;}
+  #view-start-orders .s5-summary{font-size:13px; color:var(--ld-muted); line-height:1.68; margin:0 0 14px !important; word-break:keep-all;}
+  #view-start-orders .s5-summary strong{color:var(--ld-text);}
+  #view-start-orders .s5-note{font-size:12px !important; color:var(--ld-muted); line-height:1.65; margin-top:10px !important; word-break:keep-all;}
+  #view-start-orders .s5-note a{color:var(--ld-accent); font-weight:600;}
+  #view-start-orders .s5-center{text-align:center;}
+  #view-start-orders .s5-subhead{font-size:12px; font-weight:700; color:var(--ld-text); margin:14px 0 8px; word-break:keep-all;}
+  #view-start-orders .s5-tag{display:inline-block; margin-left:4px; font-size:11px; font-weight:600; color:var(--ld-accent); background:var(--ld-accent-light); padding:1px 8px; border-radius:20px; vertical-align:1px;}
+
+  /* 최소 기준 체크 목록 — 02/03/04/05에서 공용 */
+  #view-start-orders .s5-checks{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-start-orders .s5-checks li{position:relative; padding-left:27px; font-size:13px; color:var(--ld-text); line-height:1.6; word-break:keep-all;}
+  #view-start-orders .s5-checks li::before{content:"✓"; position:absolute; left:0; top:1px; width:18px; height:18px; border-radius:50%; background:var(--ld-accent-light); color:var(--ld-accent); font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+
+  /* 경고 안내 — 03(택배기사 연락처 · 최저가 미제공) · 04(개인정보 송장 폐기) · 05(법률 확정 불가) 공용 */
+  #view-start-orders .s5-warn{margin-top:12px; display:flex; gap:8px; align-items:flex-start; padding:10px 12px; border-radius:8px; background:#FFFBF0; border:1px solid #E8D478; color:#7A5E10;}
+  #view-start-orders .s5-warn > svg{flex:0 0 auto; width:14px; height:14px; margin-top:2px; color:#C4A030;}
+  #view-start-orders .s5-warn p{font-size:12px !important; color:#7A5E10; line-height:1.68; word-break:keep-all;}
+
+  /* 01 — 주문 처리 흐름(세로 스텝, 가로 스크롤 없이 항상 한 열) */
+  #view-start-orders .s5-flow{list-style:none; margin:0 0 14px; padding:0;}
+  #view-start-orders .s5-flow-item{position:relative; display:flex; gap:12px; padding:0 0 18px 0;}
+  #view-start-orders .s5-flow-item:last-child{padding-bottom:0;}
+  #view-start-orders .s5-flow-num{position:relative; flex:0 0 26px; width:26px; height:26px; border-radius:50%; background:var(--ld-accent-light); color:var(--ld-accent); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; z-index:1;}
+  #view-start-orders .s5-flow-item:not(:last-child) .s5-flow-num::after{content:""; position:absolute; top:26px; left:50%; width:2px; height:18px; background:var(--ld-border); transform:translateX(-50%);}
+  #view-start-orders .s5-flow-body{flex:1; min-width:0; padding-top:2px;}
+  #view-start-orders .s5-flow-body h4{font-size:13px; font-weight:700; margin:0 0 3px; color:var(--ld-text); word-break:keep-all;}
+  #view-start-orders .s5-flow-body p{font-size:12px !important; color:var(--ld-muted); line-height:1.6; margin:0 !important; word-break:keep-all;}
+
+  /* 02 — 무료배송/조건부 비교(정답 표시 없이 동등하게) */
+  #view-start-orders .s5-compare{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px;}
+  #view-start-orders .s5-compare-card{padding:16px; border-radius:10px; border:1px solid var(--ld-border); background:var(--ld-panel); min-width:0;}
+  #view-start-orders .s5-compare-card small{display:block; font-size:11px; font-weight:600; letter-spacing:.02em; color:var(--ld-muted); margin-bottom:4px;}
+  #view-start-orders .s5-compare-card h4{font-size:13px; font-weight:700; margin:0 0 10px; color:var(--ld-text);}
+  #view-start-orders .s5-compare-card ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px;}
+  #view-start-orders .s5-compare-card li{position:relative; padding-left:16px; font-size:13px; color:var(--ld-muted); line-height:1.6; word-break:keep-all;}
+  #view-start-orders .s5-compare-card li::before{position:absolute; left:0; top:0; font-size:12px; font-weight:700;}
+  #view-start-orders .s5-compare-card li.good::before{content:"✓"; color:var(--ld-accent);}
+  #view-start-orders .s5-compare-card li.limit::before{content:"–"; color:var(--ld-muted);}
+
+  /* 03 — 발송 방식 비교 카드 */
+  #view-start-orders .s5-methods{display:flex; flex-direction:column; gap:8px; margin-bottom:4px;}
+  #view-start-orders .s5-method{padding:12px 14px; border-radius:9px; border:1px solid var(--ld-border); background:var(--ld-panel);}
+  #view-start-orders .s5-method-name{font-size:13px !important; font-weight:700; color:var(--ld-text); margin:0 0 5px !important; word-break:keep-all;}
+  #view-start-orders .s5-m-good, #view-start-orders .s5-m-limit{position:relative; padding-left:16px; font-size:12px !important; line-height:1.6; margin:0 0 2px !important; word-break:keep-all;}
+  #view-start-orders .s5-m-good{color:var(--ld-text);}
+  #view-start-orders .s5-m-limit{color:var(--ld-muted);}
+  #view-start-orders .s5-m-good::before{content:"✓"; position:absolute; left:0; top:0; color:var(--ld-accent); font-weight:700; font-size:11px;}
+  #view-start-orders .s5-m-limit::before{content:"–"; position:absolute; left:2px; top:0; color:var(--ld-muted); font-weight:700;}
+
+  /* 03/05 — 자료실 안내 링크(강조 카드) */
+  #view-start-orders .s5-service{margin-top:12px; display:flex; align-items:center; gap:12px; min-height:44px; padding:12px 14px; border-radius:10px; border:1px solid var(--ld-border); background:var(--ld-muted-bg); color:var(--ld-text); transition:border-color .15s, background .15s;}
+  #view-start-orders .s5-service:hover{border-color:var(--ld-accent-mid); background:var(--ld-accent-light);}
+  #view-start-orders .s5-service-icon{width:34px; height:34px; border-radius:9px; background:var(--ld-panel); border:1px solid var(--ld-border); display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  #view-start-orders .s5-service-icon svg{width:16px; height:16px;}
+  #view-start-orders .s5-service-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+  #view-start-orders .s5-service-text b{font-size:13px; font-weight:700; word-break:keep-all;}
+  #view-start-orders .s5-service-text small{font-size:12px; color:var(--ld-muted); line-height:1.4; word-break:keep-all;}
+  #view-start-orders .s5-link-chev{width:12px; height:12px; color:var(--ld-muted); flex:0 0 auto;}
+
+  /* 05 — 응대 팁(올리브 톤 강조 박스) */
+  #view-start-orders .s5-tip{margin-top:12px; padding:12px 14px; border-radius:9px; background:var(--ld-accent-light); border:1px solid #C8D8BF;}
+  #view-start-orders .s5-tip b{display:block; font-size:12px; font-weight:600; color:var(--ld-accent); margin-bottom:4px;}
+  #view-start-orders .s5-tip p{color:var(--ld-text); line-height:1.7; word-break:keep-all;}
+
+  /* 06 — 참고용 테스트 주문 체크리스트(.s5-ref-checklist, data-chapter 없음 — 완료 판정과 무관,
+     app.js의 전역 checklist counters 핸들러가 개수만 센다). 저장되는 .s5-checklist보다
+     작고 섹션 안에 끼운 카드 형태로 시각적으로 구분한다. */
+  #view-start-orders .s5-ref-checklist{margin:14px 0 0; border:1px solid var(--ld-border); border-radius:10px; background:var(--ld-muted-bg); overflow:visible;}
+  #view-start-orders .s5-ref-checklist .cl-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--ld-border); background:transparent;}
+  #view-start-orders .s5-ref-title{font-family:var(--f-body); font-size:13px; font-weight:700; color:var(--ld-text);}
+  #view-start-orders .s5-ref-checklist .cl-head .count{font-family:var(--f-body); font-size:12px; font-weight:700; color:var(--ld-muted); white-space:nowrap;}
+  #view-start-orders .s5-ref-checklist .cl-group{padding:8px 10px;}
+  #view-start-orders .s5-ref-checklist .cl-note{margin:0; padding:10px 14px 12px; border-top:1px solid var(--ld-border); background:transparent; font-size:12px; color:var(--ld-muted); line-height:1.6; word-break:keep-all;}
+
+  #view-start-orders .s5-guide-cta{margin-top:28px; padding-top:20px; border-top:1px solid var(--ld-border); display:flex; justify-content:flex-end;}
+  /* 버튼 */
+  #view-start-orders .s5-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:10px 20px; border-radius:9px; font-family:var(--f-body); font-size:14px; font-weight:700; white-space:nowrap; cursor:pointer; border:1px solid transparent; transition:background .15s, border-color .15s, color .15s;}
+  #view-start-orders .s5-btn-primary{background:var(--ld-accent); color:#fff;}
+  #view-start-orders .s5-btn-primary:hover{background:var(--ld-accent-dark);}
+  #view-start-orders .s5-btn-ghost{background:transparent; color:var(--ld-muted); border-color:var(--ld-border); font-weight:500;}
+  #view-start-orders .s5-btn-ghost:hover{border-color:var(--ld-accent); color:var(--ld-accent);}
+  /* 비회원 안내 */
+  #view-start-orders .s5-guest{display:flex; gap:10px; align-items:flex-start; padding:12px 16px; border-radius:10px; background:#FFFBF0; border:1px solid #E8D478; color:#7A5E10;}
+  #view-start-orders .s5-guest > svg{flex:0 0 auto; width:14px; height:14px; margin-top:2px;}
+  #view-start-orders .s5-guest-body{flex:1; min-width:0;}
+  #view-start-orders .s5-guest-body p{font-size:12px; line-height:1.68; margin:0 0 8px; color:#7A5E10; word-break:keep-all;}
+  #view-start-orders .s5-guest-btn{min-height:36px; padding:5px 12px; border-radius:6px; background:transparent; color:#7A5E10; border:1px solid #C4A030; font-family:var(--f-body); font-size:12px; font-weight:600; cursor:pointer;}
+  #view-start-orders .s5-guest-btn:hover{background:#FFF4D6;}
+  /* 체크리스트(전역 .checklist-block/.cl-* 덮어쓰기 — 저장 구조는 그대로, .s5-checklist(저장)와
+     .s5-ref-checklist(참고용, 위에서 별도 처리)가 체크박스 모양(.cl-row/.cl-box)만 공유한다) */
+  #view-start-orders .checklist-block{margin:0; overflow:visible; padding-bottom:0;}
+  #view-start-orders .s5-checklist .cl-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:22px 28px 0; border-bottom:none; background:transparent;}
+  #view-start-orders .s5-cl-title{flex:1; min-width:0;}
+  #view-start-orders .s5-cl-title h2{font-family:var(--f-body); font-size:15px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--ld-text); margin:0 0 4px; line-height:1.35; outline:none; word-break:keep-all;}
+  #view-start-orders .s5-cl-title p{font-size:13px; color:var(--ld-muted); line-height:1.65; word-break:keep-all;}
+  #view-start-orders .s5-checklist .cl-head .count{font-family:var(--f-body); font-size:12px; font-weight:700; color:var(--ld-text); white-space:nowrap; padding-top:2px;}
+  #view-start-orders .s5.is-complete .s5-checklist .cl-head .count{color:var(--ld-accent);}
+  #view-start-orders .s5-cl-bar{height:4px; margin:14px 28px 8px; border-radius:2px; background:var(--ld-muted-bg); overflow:hidden;}
+  #view-start-orders .s5-cl-fill{height:100%; width:0; border-radius:2px; background:var(--ld-accent-mid); transition:width .35s ease;}
+  #view-start-orders .s5.is-complete .s5-cl-fill{background:var(--ld-accent);}
+  #view-start-orders .s5-checklist .cl-group{padding:12px 20px 6px; border-bottom:none;}
+  #view-start-orders .cl-group .g-label{font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--ld-muted); margin:0 0 6px; padding:0 4px;}
+  #view-start-orders .cl-row{position:relative; display:flex; align-items:center; gap:12px; min-height:44px; padding:11px 12px; margin:0 0 2px; border-radius:9px; cursor:pointer; user-select:none; transition:background .15s;}
+  #view-start-orders .cl-row:hover{background:var(--ld-panel);}
+  #view-start-orders .s5-checklist .cl-row:hover{background:var(--ld-muted-bg);}
+  #view-start-orders .cl-row.done, #view-start-orders .cl-row.done:hover{background:var(--ld-accent-light);}
+  #view-start-orders .cl-row input{position:absolute; opacity:0; width:1px; height:1px; margin:0;}
+  #view-start-orders .cl-box{width:22px; height:22px; border:1.5px solid #C0C8BC; border-radius:6px; background:#fff; flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:#fff; transition:background .18s, border-color .18s;}
+  #view-start-orders .cl-box::after{display:none;}
+  #view-start-orders .cl-box svg{width:11px; height:11px; display:none;}
+  #view-start-orders .cl-row input:checked + .cl-box{border-color:var(--ld-accent); background:var(--ld-accent);}
+  #view-start-orders .cl-row input:checked + .cl-box svg{display:block;}
+  #view-start-orders .cl-row .label{font-size:14px; color:var(--ld-text); line-height:1.4; word-break:keep-all;}
+  #view-start-orders .cl-row input:checked ~ .label{color:var(--ld-accent); font-weight:600; text-decoration:none;}
+  #view-start-orders .cl-row:focus-within .cl-box{outline:2px solid var(--ld-accent); outline-offset:2px;}
+  #view-start-orders .s5-cl-done{margin:6px 28px 0; padding:10px 14px; border-radius:9px; background:var(--ld-accent-light); border:1px solid #C8D8BF; display:flex; gap:8px; align-items:center;}
+  #view-start-orders .s5-cl-done > span{color:var(--ld-accent); font-size:14px; flex:0 0 auto;}
+  #view-start-orders .s5-cl-done b{display:block; font-size:13px; font-weight:700; color:var(--ld-accent);}
+  #view-start-orders .s5-cl-done p{font-size:12px; color:var(--ld-accent); opacity:.85;}
+  #view-start-orders .s5-checklist .cl-note{margin:14px 0 0; padding:12px 28px 14px; border-top:1px solid var(--ld-border); background:transparent; font-size:12px; color:var(--ld-muted); line-height:1.6; word-break:keep-all;}
+  /* 우측 열 카드 */
+  #view-start-orders .s5-prep{list-style:none; margin:0 0 18px; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-start-orders .s5-prep li{display:flex; gap:10px; align-items:flex-start; font-size:13px; font-weight:500; line-height:1.45; word-break:keep-all;}
+  #view-start-orders .s5-prep li span{width:20px; text-align:right; font-size:11px; font-weight:700; color:var(--ld-accent); opacity:.7; flex:0 0 auto; padding-top:2px;}
+  #view-start-orders .s5-side-hint{padding-top:14px; border-top:1px solid var(--ld-border); font-size:12px; color:var(--ld-muted); line-height:1.6; word-break:keep-all;}
+  #view-start-orders .s5-progress-head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;}
+  #view-start-orders .s5-progress-head h3{margin:0;}
+  #view-start-orders .s5-progress-badge{font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; color:var(--ld-muted); background:var(--ld-muted-bg); white-space:nowrap;}
+  #view-start-orders .s5-progress-badge.done{color:var(--ld-accent); background:var(--ld-accent-light);}
+  #view-start-orders .s5-progress-bar{height:4px; border-radius:2px; background:var(--ld-muted-bg); overflow:hidden; margin-bottom:14px;}
+  #view-start-orders .s5-progress-fill{height:100%; width:0; border-radius:2px; background:var(--ld-accent-mid); transition:width .35s ease;}
+  #view-start-orders .s5-progress-fill.done{background:var(--ld-accent);}
+  #view-start-orders .s5-progress-items{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-start-orders .s5-progress-items li{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ld-muted); line-height:1.4; word-break:keep-all;}
+  #view-start-orders .s5-progress-items li.done{color:var(--ld-text); font-weight:500;}
+  #view-start-orders .s5-progress-group{justify-content:space-between; font-size:11px !important; font-weight:700; letter-spacing:.04em; margin-top:6px;}
+  #view-start-orders .s5-progress-group:first-child{margin-top:0;}
+  #view-start-orders .s5-progress-group b{font-weight:600; color:var(--ld-text); white-space:nowrap;}
+  #view-start-orders .s5-progress-group.done b{color:var(--ld-accent);}
+  #view-start-orders .s5-progress-check{width:18px; height:18px; border-radius:50%; flex:0 0 auto; border:1.5px solid #C8CCC4; display:flex; align-items:center; justify-content:center; color:#fff; transition:background .22s, border-color .22s;}
+  #view-start-orders .s5-progress-check svg{width:9px; height:9px; display:none;}
+  #view-start-orders .s5-progress-items li.done .s5-progress-check{background:var(--ld-accent); border-color:var(--ld-accent);}
+  #view-start-orders .s5-progress-items li.done .s5-progress-check svg{display:block;}
+  #view-start-orders .s5-progress-done{margin-top:14px; padding:8px 12px; border-radius:8px; background:var(--ld-accent-light); border:1px solid #C8D8BF; font-size:12px; color:var(--ld-accent); font-weight:600; text-align:center;}
+  #view-start-orders .s5-progress-foot{margin:14px 0 0; padding-top:12px; border-top:1px solid var(--ld-border); font-size:12px; color:var(--ld-muted); line-height:1.6; word-break:keep-all;}
+  #view-start-orders .s5-resources h3{margin-bottom:10px;}
+  #view-start-orders .s5-res-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  #view-start-orders .s5-res-list a{display:flex; align-items:center; gap:10px; min-height:44px; padding:8px; border-radius:8px; color:var(--ld-text); font-size:13px; font-weight:500; line-height:1.4; word-break:keep-all; transition:background .13s;}
+  #view-start-orders .s5-res-list a:hover{background:var(--ld-muted-bg);}
+  #view-start-orders .s5-res-list a > span:nth-child(2){flex:1; min-width:0;}
+  #view-start-orders .s5-link-icon{width:30px; height:30px; border-radius:7px; background:var(--ld-accent-light); color:var(--ld-accent); display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  #view-start-orders .s5-link-icon svg{width:15px; height:15px;}
+  #view-start-orders .s5-help h3{margin-bottom:6px;}
+  /* 이전/다음 — 해시 링크(기존 경로). 라벨이 길어 버튼 안에서 줄바꿈 허용 */
+  #view-start-orders .s5-nav{padding:18px 24px;}
+  #view-start-orders .s5-nav-status{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 14px; padding:9px 12px; border-radius:8px; background:var(--ld-muted-bg); font-size:12px; color:var(--ld-muted); line-height:1.5;}
+  #view-start-orders .s5-nav-status b{color:var(--ld-accent); font-weight:600;}
+  #view-start-orders .s5-nav-status.done{background:var(--ld-accent-light); border:1px solid #C8D8BF; color:var(--ld-accent); font-weight:600;}
+  #view-start-orders .s5-nav-btns{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+  #view-start-orders .s5-nav-btns .s5-btn{white-space:normal; text-align:center; line-height:1.35; padding:9px 16px; font-size:13px; word-break:keep-all;}
+  #view-start-orders .s5:not(.is-complete) .s5-nav-next{background:var(--ld-accent-mid);}
+  #view-start-orders .s5:not(.is-complete) .s5-nav-next:hover{background:#7A9B6E;}
+  /* medium(640~1099) · small(<640) */
+  @media (max-width:1099px){
+    #view-start-orders .s5-panel-guide.active{padding:20px 22px;}
+    #view-start-orders .s5-checklist .cl-head{padding:18px 20px 0;}
+    #view-start-orders .s5-cl-bar{margin:12px 20px 6px;}
+    #view-start-orders .s5-cl-done{margin:6px 20px 0;}
+    #view-start-orders .s5-checklist .cl-note{padding:12px 20px 14px;}
+  }
+  @media (max-width:639px){
+    #view-start-orders .s5-head h1{font-size:20px;}
+    #view-start-orders .s5-panel-guide.active{padding:16px;}
+    #view-start-orders .s5-checklist .cl-head{padding:16px 16px 0;}
+    #view-start-orders .s5-cl-bar{margin:12px 16px 6px;}
+    #view-start-orders .s5-checklist .cl-group{padding:10px 12px 6px;}
+    #view-start-orders .s5-cl-done{margin:6px 16px 0;}
+    #view-start-orders .s5-checklist .cl-note{padding:12px 16px 14px;}
+    #view-start-orders .s5-nav{padding:14px 16px;}
+    #view-start-orders .s5-guide-cta .s5-btn, #view-start-orders .s5-nav-btns .s5-btn{width:100%;}
+    #view-start-orders .s5-section{gap:10px;}
+  }
