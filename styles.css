@@ -1329,6 +1329,9 @@
   #view-start-prepare .s1-side{display:contents;}
   #view-start-prepare .s1-side-guide{order:3;}
   #view-start-prepare .s1-progress{order:4;}
+  /* order 없으면 초기값 0이 되어 large(1100px+)에서 탭 전환 시 탭바(order:1)보다 위로
+     올라간다(STEP06에서 발견해 바로잡은 것과 동일한 문제) — panel-guide와 같은 order로 고정. */
+  #view-start-prepare .s1-panel-ws{order:2;}
   #view-start-prepare .s1-panel-ws.active{display:contents;}
   #view-start-prepare .s1-guest{order:5;}
   #view-start-prepare .s1-worksheet{order:6;}
@@ -1533,6 +1536,9 @@
   #view-start-setup .s2-side{display:contents;}
   #view-start-setup .s2-side-guide{order:3;}
   #view-start-setup .s2-progress{order:4;}
+  /* order 없으면 초기값 0이 되어 large(1100px+)에서 탭 전환 시 탭바(order:1)보다 위로
+     올라간다(STEP06에서 발견해 바로잡은 것과 동일한 문제) — panel-guide와 같은 order로 고정. */
+  #view-start-setup .s2-panel-cl{order:2;}
   #view-start-setup .s2-panel-cl.active{display:contents;}
   #view-start-setup .s2-guest{order:5;}
   #view-start-setup .s2-checklist{order:6;}
@@ -1774,6 +1780,9 @@
   #view-start-sourcing .s3-side{display:contents;}
   #view-start-sourcing .s3-side-guide{order:3;}
   #view-start-sourcing .s3-progress{order:4;}
+  /* order 없으면 초기값 0이 되어 large(1100px+)에서 탭 전환 시 탭바(order:1)보다 위로
+     올라간다(STEP06에서 발견해 바로잡은 것과 동일한 문제) — panel-guide와 같은 order로 고정. */
+  #view-start-sourcing .s3-panel-cl{order:2;}
   #view-start-sourcing .s3-panel-cl.active{display:contents;}
   #view-start-sourcing .s3-guest{order:5;}
   #view-start-sourcing .s3-checklist{order:6;}
@@ -2011,6 +2020,9 @@
   #view-start-content .s4-side{display:contents;}
   #view-start-content .s4-side-guide{order:3;}
   #view-start-content .s4-progress{order:4;}
+  /* order 없으면 초기값 0이 되어 large(1100px+)에서 탭 전환 시 탭바(order:1)보다 위로
+     올라간다(STEP06에서 발견해 바로잡은 것과 동일한 문제) — panel-guide와 같은 order로 고정. */
+  #view-start-content .s4-panel-cl{order:2;}
   #view-start-content .s4-panel-cl.active{display:contents;}
   #view-start-content .s4-guest{order:5;}
   #view-start-content .s4-checklist{order:6;}
@@ -2255,6 +2267,9 @@
   #view-start-orders .s5-side{display:contents;}
   #view-start-orders .s5-side-guide{order:3;}
   #view-start-orders .s5-progress{order:4;}
+  /* order 없으면 초기값 0이 되어 large(1100px+)에서 탭 전환 시 탭바(order:1)보다 위로
+     올라간다(STEP06에서 발견해 바로잡은 것과 동일한 문제) — panel-guide와 같은 order로 고정. */
+  #view-start-orders .s5-panel-cl{order:2;}
   #view-start-orders .s5-panel-cl.active{display:contents;}
   #view-start-orders .s5-guest{order:5;}
   #view-start-orders .s5-checklist{order:6;}
