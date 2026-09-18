@@ -1311,6 +1311,124 @@
   .cc-status.done{background:var(--badge-c-bg); color:var(--badge-c);}
 
   /* =========================================================================
+     STEP 00(#/start/intro) — 2026-09 UI 재설계, STEP01~08 시각 구조 이식(피그마
+     시안 없음). 워크시트·체크리스트가 없는 오리엔테이션 화면이라 STEP08과 같이
+     구조가 단순하다 — main 열에 카드(이 로드맵에 대하여 · 시작 전에 먼저 생각할
+     것 · 쇼핑몰 준비 흐름 · 사용 방법) + 마무리 문구, side 열에 카드 2개 + 도움
+     배너, 하단엔 STEP01 시작하기 · 전체 로드맵 보기 두 CTA만 둔다(STEP00은
+     로드맵의 첫 화면이라 이전 STEP 링크가 없음). large(1100px 이상)에서만 본문 +
+     오른쪽 300px 열이고, 그 아래는 한 열로 접힌다(STEP01~08과 같은
+     breakpoint·토큰). sticky·고정 우측 패널·내부 스크롤은 만들지 않는다(문서
+     스크롤만).
+     ========================================================================= */
+  #view-start-intro .s0{display:grid; grid-template-columns:minmax(0,1fr); gap:16px; color:var(--ld-text);}
+  #view-start-intro .s0 p{max-width:none;}
+  #view-start-intro .s0-head{order:0;}
+  #view-start-intro .s0-main{display:contents;}
+  #view-start-intro .s0-about{order:1;}
+  #view-start-intro .s0-think{order:2;}
+  #view-start-intro .s0-flow{order:3;}
+  #view-start-intro .s0-usage{order:4;}
+  #view-start-intro .s0-reality{order:5;}
+  #view-start-intro .s0-side{display:contents;}
+  #view-start-intro .s0-side-prep{order:6;}
+  #view-start-intro .s0-shortcuts{order:7;}
+  /* .s0-help는 시작 데스크의 .desk-help 모양을 재사용한다 — 그 전역 규칙의
+     grid-area:help(데스크 grid용)가 이 grid에 암묵적 열을 만들지 않도록 되돌린다. */
+  #view-start-intro .s0-help{order:8; grid-area:auto;}
+  #view-start-intro .s0-nav{order:9;}
+  @media (min-width:1100px){
+    #view-start-intro .s0{grid-template-columns:minmax(0,1fr) var(--ld-right-w); gap:20px 24px; align-items:start; grid-template-areas:"head head" "main side" "nav nav";}
+    #view-start-intro .s0-head{grid-area:head;}
+    #view-start-intro .s0-main{display:flex; flex-direction:column; gap:16px; grid-area:main; min-width:0;}
+    #view-start-intro .s0-side{display:flex; flex-direction:column; gap:16px; grid-area:side; min-width:0;}
+    #view-start-intro .s0-nav{grid-area:nav;}
+  }
+  /* 헤더 */
+  #view-start-intro .s0-crumb{margin-bottom:10px; font-family:var(--f-body); font-size:12px; color:var(--ld-muted);}
+  #view-start-intro .s0-crumb a{color:var(--ld-muted);}
+  #view-start-intro .s0-crumb a:hover{color:var(--ld-accent);}
+  #view-start-intro .s0-eyebrow{display:inline-block; font-size:11px; font-weight:700; letter-spacing:.04em; color:var(--ld-accent); background:var(--ld-accent-light); padding:3px 10px; border-radius:20px; margin-bottom:10px;}
+  #view-start-intro .s0-head h1{font-size:23px; font-weight:700; letter-spacing:-.02em; line-height:1.25; margin:0 0 8px; color:var(--ld-text); word-break:keep-all;}
+  #view-start-intro .s0-lead{font-size:14px; color:var(--ld-muted); line-height:1.72; max-width:560px; word-break:keep-all;}
+  /* 카드 공통 */
+  #view-start-intro .s0-card, #view-start-intro .s0-nav{background:var(--ld-panel); border:1px solid var(--ld-border); border-radius:12px; min-width:0;}
+  #view-start-intro .s0-card{padding:24px 28px;}
+  #view-start-intro .s0-card h3{font-size:13px; font-weight:600; margin:0 0 14px; color:var(--ld-text);}
+  #view-start-intro .s0-section-title{font-size:16px; font-weight:700; margin:0 0 6px; line-height:1.3; word-break:keep-all;}
+  #view-start-intro .s0-section-lead{font-size:13px; color:var(--ld-muted); line-height:1.7; margin:0 0 18px !important; word-break:keep-all;}
+  /* 1. 이 로드맵에 대하여 */
+  #view-start-intro .s0-about-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:14px;}
+  #view-start-intro .s0-about-list li{font-size:13px; color:var(--ld-muted); line-height:1.7; word-break:keep-all; padding-left:18px; position:relative;}
+  #view-start-intro .s0-about-list li::before{content:""; position:absolute; left:0; top:8px; width:6px; height:6px; border-radius:50%; background:var(--ld-accent-mid);}
+  #view-start-intro .s0-about-list b{color:var(--ld-text); font-weight:700;}
+  /* 2. 시작 전에 먼저 생각할 것 */
+  #view-start-intro .s0-think-grid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px;}
+  #view-start-intro .s0-think-item{display:flex; gap:12px; padding:14px 16px; border-radius:10px; background:var(--ld-muted-bg); border:1px solid var(--ld-border); min-width:0;}
+  #view-start-intro .s0-think-item h3{font-size:13.5px; font-weight:700; margin:0 0 4px; color:var(--ld-text); line-height:1.4; word-break:keep-all;}
+  #view-start-intro .s0-think-item p{font-size:12px !important; color:var(--ld-muted); margin:0 !important; line-height:1.6; word-break:keep-all;}
+  #view-start-intro .s0-num{flex:0 0 24px; font-size:11px; font-weight:700; color:var(--ld-accent); letter-spacing:.04em; padding-top:1px;}
+  #view-start-intro .s0-note{font-size:12px !important; color:var(--ld-muted); margin:14px 0 0 !important; line-height:1.6; word-break:keep-all;}
+  /* 3. 쇼핑몰 준비 흐름 — 8개 STEP을 4단계로 압축한 흐름 */
+  #view-start-intro .s0-flow-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column;}
+  #view-start-intro .s0-flow-stage{padding:16px 0; border-bottom:1px solid var(--ld-border);}
+  #view-start-intro .s0-flow-stage:first-child{padding-top:0;}
+  #view-start-intro .s0-flow-stage:last-child{border-bottom:none; padding-bottom:0;}
+  #view-start-intro .s0-flow-stage-head{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  #view-start-intro .s0-stage-num{flex:0 0 22px; height:22px; border-radius:50%; background:var(--ld-accent-light); color:var(--ld-accent); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+  #view-start-intro .s0-flow-stage-head h3{font-size:14px; font-weight:700; margin:0; color:var(--ld-text); word-break:keep-all;}
+  #view-start-intro .s0-flow-steps{display:flex; flex-wrap:wrap; gap:8px; padding-left:32px;}
+  #view-start-intro .s0-step-chip{display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:6px 14px; border-radius:20px; border:1px solid var(--ld-border); background:var(--ld-muted-bg); color:var(--ld-text); font-size:12.5px; font-weight:500; line-height:1.4; word-break:keep-all; transition:border-color .15s, background .15s;}
+  #view-start-intro .s0-step-chip:hover{border-color:var(--ld-accent-mid); background:var(--ld-accent-light);}
+  #view-start-intro .s0-step-chip b{font-weight:700; color:var(--ld-accent);}
+  /* 4. LaunchDesk 사용 방법 */
+  #view-start-intro .s0-usage-grid{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; margin-bottom:16px;}
+  #view-start-intro .s0-usage-item{display:flex; gap:12px; padding:14px 16px; border-radius:10px; background:var(--ld-muted-bg); border:1px solid var(--ld-border); min-width:0;}
+  #view-start-intro .s0-usage-item h3{font-size:13.5px; font-weight:700; margin:0 0 4px; color:var(--ld-text); line-height:1.4; word-break:keep-all;}
+  #view-start-intro .s0-usage-item p{font-size:12px !important; color:var(--ld-muted); margin:0 !important; line-height:1.6; word-break:keep-all;}
+  #view-start-intro .s0-usage-item p a{color:var(--ld-accent); font-weight:600;}
+  #view-start-intro .s0-save-note{padding:12px 14px; border-radius:8px; background:var(--ld-accent-light);}
+  #view-start-intro .s0-save-note p{font-size:12px !important; color:var(--ld-text); margin:0 !important; line-height:1.65; word-break:keep-all;}
+  /* 5. 현실적인 시작 안내 — 카드 없이 페이지 배경 위에, 인용구만 강조(STEP08의 s8-closing 톤 재사용) */
+  #view-start-intro .s0-reality{padding:4px 4px 0;}
+  #view-start-intro .s0-reality .s0-section-title{margin-bottom:10px;}
+  #view-start-intro .s0-reality-quote{margin:0; padding:16px 20px; border-left:3px solid var(--ld-accent-mid); background:var(--ld-accent-light); border-radius:0 12px 12px 0; font-size:14px; font-weight:600; color:var(--ld-text); line-height:1.7; word-break:keep-all;}
+  /* 우측 열 카드 */
+  #view-start-intro .s0-checks{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-start-intro .s0-checks li{position:relative; padding-left:27px; font-size:13px; color:var(--ld-text); line-height:1.6; word-break:keep-all;}
+  #view-start-intro .s0-checks li::before{content:"✓"; position:absolute; left:0; top:1px; width:18px; height:18px; border-radius:50%; background:var(--ld-accent-light); color:var(--ld-accent); font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center;}
+  #view-start-intro .s0-res-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  #view-start-intro .s0-res-list a{display:flex; align-items:center; gap:10px; min-height:44px; padding:8px; border-radius:8px; color:var(--ld-text); font-size:13px; font-weight:500; line-height:1.4; word-break:keep-all; transition:background .13s;}
+  #view-start-intro .s0-res-list a:hover{background:var(--ld-muted-bg);}
+  #view-start-intro .s0-res-list a > span:nth-child(2){flex:1; min-width:0;}
+  #view-start-intro .s0-link-icon{width:30px; height:30px; border-radius:7px; background:var(--ld-accent-light); color:var(--ld-accent); display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; font-size:14px; line-height:1;}
+  #view-start-intro .s0-help h3{margin-bottom:6px;}
+  /* 하단 CTA — 이전 STEP 링크 없음(STEP00은 로드맵의 첫 화면) */
+  #view-start-intro .s0-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:10px 20px; border-radius:9px; font-family:var(--f-body); font-size:14px; font-weight:700; white-space:nowrap; cursor:pointer; border:1px solid transparent; transition:background .15s, border-color .15s, color .15s;}
+  #view-start-intro .s0-btn-primary{background:var(--ld-accent); color:#fff;}
+  #view-start-intro .s0-btn-primary:hover{background:var(--ld-accent-dark);}
+  #view-start-intro .s0-btn-ghost{background:transparent; color:var(--ld-muted); border-color:var(--ld-border); font-weight:500;}
+  #view-start-intro .s0-btn-ghost:hover{border-color:var(--ld-accent); color:var(--ld-accent);}
+  #view-start-intro .s0-nav{padding:18px 24px; display:flex; flex-direction:column; gap:10px;}
+  #view-start-intro .s0-nav .s0-btn{width:100%;}
+  @media (min-width:1100px){
+    #view-start-intro .s0-nav{flex-direction:row; justify-content:flex-start;}
+    #view-start-intro .s0-nav .s0-btn{width:auto; min-width:180px;}
+  }
+  /* medium(640~1099) · small(<640) */
+  @media (max-width:1099px){
+    #view-start-intro .s0-card{padding:20px 22px;}
+  }
+  @media (max-width:639px){
+    #view-start-intro .s0-head h1{font-size:20px;}
+    #view-start-intro .s0-card{padding:16px;}
+    #view-start-intro .s0-nav{padding:14px 16px;}
+    #view-start-intro .s0-think-grid{grid-template-columns:1fr;}
+    #view-start-intro .s0-usage-grid{grid-template-columns:1fr;}
+    #view-start-intro .s0-flow-steps{padding-left:0;}
+  }
+
+  /* =========================================================================
      STEP 01(#/start/prepare) — 2026-09 UI 재설계 2차, 피그마 Step01.tsx 이식.
      전부 #view-start-prepare 스코프(--ld-* 올리브 토큰)라 다른 STEP(벽돌색)은
      그대로다. 레이아웃: large(≥1100) [본문 | 300px 우측 열], 미만은 한 열 —

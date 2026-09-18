@@ -824,53 +824,139 @@
       </section>
 
       <!-- ============ VIEW: STEP 00 · 오픈 로드맵 확인하기 (게이트 없음) ============ -->
+      <!-- ============ VIEW: STEP 00 · 오리엔테이션(게이트 없음) ============
+           STEP00(2026-09 UI 재설계, STEP01~08 시각 구조 이식 — 피그마 시안
+           없음)은 체크리스트·워크시트가 없는 오리엔테이션 화면이다. 저장·완료
+           단계가 아니라 로드맵의 성격과 사용법을 이해하고 STEP01을 시작하도록
+           돕는 화면이며, gated:false(STEP_ROADMAP)이고 완료 판정 대상이
+           아니다 — 새 data-chapter · 워크시트 · 체크리스트를 만들지 않았고
+           STEP01~07 진행 상태(user_step_progress)를 읽거나 바꾸지 않는다.
+           저장 로직이 없어 부가 JS 파일도 두지 않는다 — 라우팅에 따른 GA4
+           page_view · chapter_start, 진입 시 스크롤 최상단은 app.js 라우터가
+           기존 방식 그대로 처리한다(CHAPTER_PATHS에 '/start/intro' 포함,
+           변경 없음). STEP00은 로드맵의 첫 화면이라 이전 STEP 링크를 두지
+           않는다 — 하단은 'STEP 01 시작하기' · '전체 로드맵 보기' 두 CTA만.
+           스타일은 전부 #view-start-intro 스코프(--ld-* 올리브 토큰) — 다른
+           STEP은 그대로다. -->
       <section class="view" id="view-start-intro" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 00</span></div>
-          <span class="eyebrow">STEP 00 · 오리엔테이션</span>
-          <div class="page-head">
-            <h1>쇼핑몰 오픈, 무엇부터 해야 할까요?</h1>
-            <p class="page-lead">상품부터 정해야 할지, 사업자등록부터 해야 할지, 쇼핑몰부터 만들어야 할지 — 처음엔 헷갈리기 마련입니다.</p>
-          </div>
-          <div class="chapter-body">
-            <p>LaunchDesk는 온라인 쇼핑몰을 여는 과정을 실제 진행 순서에 맞춰 하나씩 안내합니다. 특정 업종이나 특정 상품군에 한정된 순서가 아니라, 무엇을 팔든 동일하게 따라올 수 있는 오픈 순서입니다.</p>
+        <div class="content">
+          <div class="s0" id="step00Root">
 
-            <div style="margin:1.4rem 0 2rem;">
-              <a class="btn btn-primary" href="#/start/prepare">STEP 01 시작하기 →</a>
+            <header class="s0-head">
+              <div class="breadcrumb s0-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 00</span></div>
+              <span class="s0-eyebrow">STEP 00 · 오리엔테이션</span>
+              <h1>쇼핑몰을 시작하기 전에</h1>
+              <p class="s0-lead">무엇을 팔지 정하는 일부터 첫 유입을 확인하는 일까지, 쇼핑몰을 준비하는 순서를 먼저 살펴보세요. 모든 것을 한 번에 끝내기보다 지금 필요한 단계부터 하나씩 진행하면 됩니다.</p>
+            </header>
+
+            <div class="s0-main">
+              <section class="s0-card s0-about" aria-labelledby="s0AboutTitle">
+                <h2 id="s0AboutTitle" class="s0-section-title">이 로드맵에 대하여</h2>
+                <ul class="s0-about-list">
+                  <li><b>실제 경험을 바탕으로 정리했어요.</b> 쇼핑몰을 준비하고 운영하며 겪은 시행착오와 순서를 바탕으로 만든 가이드예요. 특정 플랫폼·광고 채널·운영 방식이 모든 쇼핑몰에 똑같이 맞는 정답은 아니에요.</li>
+                  <li><b>제도와 정책은 계속 바뀔 수 있어요.</b> 사업자등록·세금·통신판매업 신고·표시광고, 플랫폼 정책 같은 내용은 시점과 상황에 따라 달라질 수 있으니, 실제로 진행할 때는 관련 기관이나 전문가를 통해 한 번 더 확인하세요.</li>
+                  <li><b>비용·성과·기간을 보장하지 않아요.</b> 이 순서를 따른다고 특정 매출이나 기간이 보장되지는 않아요. 안내에 담긴 개인적인 경험이나 사례는 참고용이며, 공식 정책과는 구분해서 봐주세요.</li>
+                </ul>
+              </section>
+
+              <section class="s0-card s0-think" aria-labelledby="s0ThinkTitle">
+                <h2 id="s0ThinkTitle" class="s0-section-title">시작 전에 먼저 생각할 것</h2>
+                <p class="s0-section-lead">아직 답이 정해지지 않아도 괜찮아요. 지금은 방향만 가볍게 떠올려보세요.</p>
+                <div class="s0-think-grid">
+                  <div class="s0-think-item"><span class="s0-num">01</span><div><h3>무엇을 팔 것인가</h3><p>상품군과 대표 상품</p></div></div>
+                  <div class="s0-think-item"><span class="s0-num">02</span><div><h3>누구에게 팔 것인가</h3><p>고객의 상황과 구매 이유</p></div></div>
+                  <div class="s0-think-item"><span class="s0-num">03</span><div><h3>얼마까지 사용할 수 있는가</h3><p>상품·촬영·포장·배송·광고 등에 사용할 초기 예산</p></div></div>
+                  <div class="s0-think-item"><span class="s0-num">04</span><div><h3>어디까지 직접 할 것인가</h3><p>직접 처리할 일과 도움받을 일을 구분</p></div></div>
+                </div>
+                <p class="s0-note">이 네 가지는 STEP 01에서 직접 정리합니다.</p>
+              </section>
+
+              <section class="s0-card s0-flow" aria-labelledby="s0FlowTitle">
+                <h2 id="s0FlowTitle" class="s0-section-title">쇼핑몰 준비 흐름</h2>
+                <p class="s0-section-lead">STEP 01부터 STEP 08까지, 아래 네 단계로 이어집니다.</p>
+                <ol class="s0-flow-list">
+                  <li class="s0-flow-stage">
+                    <div class="s0-flow-stage-head"><span class="s0-stage-num">1</span><h3>방향 정하기</h3></div>
+                    <div class="s0-flow-steps">
+                      <a class="s0-step-chip" href="#/start/prepare"><b>STEP 01</b>무엇을, 누구에게 팔지 정하기</a>
+                    </div>
+                  </li>
+                  <li class="s0-flow-stage">
+                    <div class="s0-flow-stage-head"><span class="s0-stage-num">2</span><h3>판매할 수 있는 상태 만들기</h3></div>
+                    <div class="s0-flow-steps">
+                      <a class="s0-step-chip" href="#/start/setup"><b>STEP 02</b>사업자·플랫폼</a>
+                      <a class="s0-step-chip" href="#/start/sourcing"><b>STEP 03</b>상품·공급처·가격</a>
+                      <a class="s0-step-chip" href="#/start/content"><b>STEP 04</b>촬영·상세페이지·상품 등록</a>
+                      <a class="s0-step-chip" href="#/start/orders"><b>STEP 05</b>배송·CS·오픈 준비</a>
+                    </div>
+                  </li>
+                  <li class="s0-flow-stage">
+                    <div class="s0-flow-stage-head"><span class="s0-stage-num">3</span><h3>첫 유입과 반응 확인하기</h3></div>
+                    <div class="s0-flow-steps">
+                      <a class="s0-step-chip" href="#/start/marketing-setup"><b>STEP 06</b>추적·채널 연결</a>
+                      <a class="s0-step-chip" href="#/start/marketing"><b>STEP 07</b>첫 유입·반응 테스트</a>
+                    </div>
+                  </li>
+                  <li class="s0-flow-stage">
+                    <div class="s0-flow-stage-head"><span class="s0-stage-num">4</span><h3>운영으로 전환하기</h3></div>
+                    <div class="s0-flow-steps">
+                      <a class="s0-step-chip" href="#/start/wrapup"><b>STEP 08</b>주문·고객·광고·수익 확인</a>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+
+              <section class="s0-card s0-usage" aria-labelledby="s0UsageTitle">
+                <h2 id="s0UsageTitle" class="s0-section-title">LaunchDesk 사용 방법</h2>
+                <div class="s0-usage-grid">
+                  <div class="s0-usage-item"><span class="s0-num">01</span><div><h3>가이드 읽기</h3><p>현재 단계에서 무엇을 결정해야 하는지 확인하세요.</p></div></div>
+                  <div class="s0-usage-item"><span class="s0-num">02</span><div><h3>직접 작성·체크하기</h3><p>실제로 준비한 내용만 기록하세요.</p></div></div>
+                  <div class="s0-usage-item"><span class="s0-num">03</span><div><h3>상세 자료 활용하기</h3><p>클릭 단위 설정이나 운영 예시는 <a href="#/resources">자료실</a>에서 확인하세요.</p></div></div>
+                </div>
+                <div class="s0-save-note">
+                  <p>로그인하면 작성한 워크시트와 체크 상태를 계정에 저장해 다른 기기에서도 이어갈 수 있습니다. 비로그인 상태의 진행 내용은 브라우저를 닫거나 새로고침하면 유지되지 않을 수 있습니다.</p>
+                </div>
+              </section>
+
+              <section class="s0-reality" aria-labelledby="s0RealityTitle">
+                <h2 id="s0RealityTitle" class="s0-section-title">현실적인 시작 안내</h2>
+                <p class="s0-reality-quote">쇼핑몰은 상품만 등록한다고 바로 판매되는 구조가 아닙니다. 상품 준비, 결제, 배송, 고객 안내, 유입 확인까지 함께 준비해야 합니다. 다만 처음부터 완벽하게 만들 필요는 없습니다. 대표 상품 하나를 실제로 판매할 수 있는 상태로 만드는 것부터 시작하세요.</p>
+              </section>
             </div>
 
-            <h2 class="section-h">전체 오픈 로드맵</h2>
-            <p>STEP 01부터 STEP 08까지, 아래 순서 그대로 진행하면 됩니다. 각 STEP은 이 단계에서 무엇을 끝내야 하는지 알려줍니다.</p>
+            <aside class="s0-side">
+              <section class="s0-card s0-side-prep" aria-labelledby="s0PrepTitle">
+                <h3 id="s0PrepTitle">이 로드맵에서 준비할 것</h3>
+                <ul class="s0-checks">
+                  <li>판매 방향</li>
+                  <li>사업자·쇼핑몰 기반</li>
+                  <li>상품·가격·상세페이지</li>
+                  <li>배송·고객 응대</li>
+                  <li>유입·반응 확인</li>
+                </ul>
+              </section>
 
-            <div class="timeline">
-              <div class="t-item"><h3>STEP 01 · 무엇을, 누구에게 팔지 정하기</h3><p>누구에게, 무엇을 팔지와 초기 예산·이름을 정해 이후 단계의 기준을 세웁니다.</p></div>
-              <div class="t-item"><h3>STEP 02 · 사업자 등록하고 쇼핑몰 플랫폼 만들기</h3><p>사업자 등록·통신판매업 신고를 마치고 쇼핑몰 플랫폼을 엽니다.</p></div>
-              <div class="t-item"><h3>STEP 03 · 판매할 상품과 공급처, 가격 확정하기</h3><p>무엇을 어디서 들여와 얼마에 팔지, 상품과 판매가를 확정합니다.</p></div>
-              <div class="t-item"><h3>STEP 04 · 상품 상세페이지 완성하기</h3><p>상품을 촬영하고 상세페이지를 완성해 판매 가능한 상태로 만듭니다.</p></div>
-              <div class="t-item"><h3>STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기</h3><p>배송·CS 정책을 정하고 결제 테스트까지 마쳐 오픈을 준비합니다.</p></div>
-              <div class="t-item"><h3>STEP 06 · 마케팅 인프라 연결하기</h3><p>구매 전환과 반응을 확인할 수 있는 결제·추적 인프라를 연결합니다.</p></div>
-              <div class="t-item"><h3>STEP 07 · 첫 유입 만들고 반응 테스트하기</h3><p>어떤 방법으로든 실제 방문자를 만들어보고 반응을 확인합니다.</p></div>
-              <div class="t-item"><h3>STEP 08 · 오픈 완료, 운영 시작하기</h3><p>오픈을 마무리하고, 이후엔 운영도구를 중심으로 운영을 이어갑니다.</p></div>
-            </div>
+              <section class="s0-card s0-shortcuts" aria-labelledby="s0ShortcutTitle">
+                <h3 id="s0ShortcutTitle">바로가기</h3>
+                <ul class="s0-res-list">
+                  <li><a href="#/start"><span class="s0-link-icon" aria-hidden="true">🗺️</span><span>쇼핑몰 준비 로드맵</span></a></li>
+                  <li><a href="#/resources"><span class="s0-link-icon" aria-hidden="true">📚</span><span>자료실</span></a></li>
+                  <li><a href="#/services/setup"><span class="s0-link-icon" aria-hidden="true">🛠️</span><span>세팅 도움받기</span></a></li>
+                </ul>
+              </section>
 
-            <h2 class="section-h">이용 방법</h2>
-            <p>LaunchDesk는 읽는 강의가 아니라, 실제로 쇼핑몰을 오픈하는 실행형 가이드입니다.</p>
-            <div class="info-grid">
-              <div class="info-card"><h4>① 현재 STEP 확인</h4><p>홈 화면에서 지금 해야 할 STEP을 확인합니다.</p></div>
-              <div class="info-card"><h4>② 실제 작업 진행</h4><p>안내를 따라 사업자 등록, 상품 준비 같은 실제 작업을 진행합니다.</p></div>
-              <div class="info-card"><h4>③ 체크리스트 완료</h4><p>각 STEP 안의 체크리스트·워크시트를 실제로 채웁니다.</p></div>
-              <div class="info-card"><h4>④ 다음 STEP 이동</h4><p>완료되면 다음 STEP으로 넘어가 같은 방식으로 반복합니다.</p></div>
-            </div>
+              <section class="desk-help s0-help" aria-labelledby="s0HelpTitle">
+                <h3 id="s0HelpTitle">처음부터 막막한가요?</h3>
+                <p>필요한 설정만 골라 도움받을 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg></a>
+              </section>
+            </aside>
 
-            <div class="callout">
-              <p><strong>모든 걸 하루에 끝낼 필요는 없습니다.</strong></p>
-              <p>지금 해야 할 한 단계만 완료하세요. 여기 담긴 순서와 방법이 모든 업종·모든 상황에서 같은 결과를 보장하지는 않습니다.</p>
-            </div>
+            <nav class="s0-nav" aria-label="STEP 이동">
+              <a class="s0-btn s0-btn-primary" href="#/start/prepare">STEP 01 시작하기 →</a>
+              <a class="s0-btn s0-btn-ghost" href="#/start">전체 로드맵 보기</a>
+            </nav>
 
-            <div class="chapter-nav">
-              <a href="#/"><span class="cn-label">← 홈으로</span><span class="cn-title">오픈 준비 현황판</span></a>
-              <a class="next" href="#/start/prepare"><span class="cn-label">STEP 01 시작하기 →</span><span class="cn-title">무엇을, 누구에게 팔지 정하기</span></a>
-            </div>
           </div>
         </div>
       </section>

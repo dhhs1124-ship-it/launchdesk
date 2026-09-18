@@ -45,7 +45,7 @@
     '/':                 '홈',
     '/dashboard':        '운영 현황',
     '/start':            '쇼핑몰 시작하기',
-    '/start/intro':      '챕터 00 · 시작하기 전에',
+    '/start/intro':      '00 · 오리엔테이션',
     '/tools':            '마진 계산기',
     '/resources':        '자료실',
     '/wholesale':        '도매처 찾기',
