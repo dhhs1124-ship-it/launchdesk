@@ -3236,51 +3236,54 @@
     #view-start-wrapup .s8-section{gap:10px;}
   }
 
-  /* ============ VIEW: 개인정보처리방침 (#view-privacy 전용 스코프) ============
+  /* ============ VIEW: 개인정보처리방침 · 이용약관 (#view-privacy, #view-terms 공용 스코프) ============
      전역 --accent(벽돌색) 계열에 기대지 않고 STEP00~08과 같은 --ld-*(올리브)
      토큰만 사용한다. 문서형 화면이라 sticky/fixed 내부 패널은 두지 않는다
-     (목차도 본문과 함께 자연스럽게 스크롤된다 — 이중 스크롤 금지). */
-  #view-privacy .privacy-page{max-width:100%;}
-  #view-privacy .privacy-head{padding-bottom:20px; margin-bottom:24px; border-bottom:1px solid var(--ld-border);}
-  #view-privacy .privacy-badge{display:inline-flex; align-items:center; font-family:var(--f-mono); font-size:12px; font-weight:600; letter-spacing:.04em; color:var(--ld-accent); background:var(--ld-accent-light); border-radius:99px; padding:5px 12px; margin-bottom:12px;}
-  #view-privacy .privacy-head h1{margin:0; font-size:clamp(22px,3vw,30px); font-weight:700; color:var(--ld-text); line-height:1.35; word-break:keep-all;}
-  #view-privacy .privacy-meta{margin:10px 0 0; font-size:13px; color:var(--ld-muted);}
+     (목차도 본문과 함께 자연스럽게 스크롤된다 — 이중 스크롤 금지). 클래스명은
+     그대로 "privacy-*"이지만 /terms(#view-terms)도 같은 문서형 레이아웃이라
+     이 스코프를 그대로 공유한다 — 두 화면의 스타일을 동일하게 유지하기 위해
+     별도 "terms-*" 클래스를 새로 만들지 않는다. */
+  #view-privacy .privacy-page, #view-terms .privacy-page{max-width:100%;}
+  #view-privacy .privacy-head, #view-terms .privacy-head{padding-bottom:20px; margin-bottom:24px; border-bottom:1px solid var(--ld-border);}
+  #view-privacy .privacy-badge, #view-terms .privacy-badge{display:inline-flex; align-items:center; font-family:var(--f-mono); font-size:12px; font-weight:600; letter-spacing:.04em; color:var(--ld-accent); background:var(--ld-accent-light); border-radius:99px; padding:5px 12px; margin-bottom:12px;}
+  #view-privacy .privacy-head h1, #view-terms .privacy-head h1{margin:0; font-size:clamp(22px,3vw,30px); font-weight:700; color:var(--ld-text); line-height:1.35; word-break:keep-all;}
+  #view-privacy .privacy-meta, #view-terms .privacy-meta{margin:10px 0 0; font-size:13px; color:var(--ld-muted);}
 
-  #view-privacy .privacy-layout{display:grid; grid-template-columns:200px minmax(0,1fr); gap:40px; align-items:start;}
-  @media (max-width:860px){ #view-privacy .privacy-layout{grid-template-columns:1fr; gap:24px;} }
+  #view-privacy .privacy-layout, #view-terms .privacy-layout{display:grid; grid-template-columns:200px minmax(0,1fr); gap:40px; align-items:start;}
+  @media (max-width:860px){ #view-privacy .privacy-layout, #view-terms .privacy-layout{grid-template-columns:1fr; gap:24px;} }
 
-  #view-privacy .privacy-toc{background:var(--ld-panel); border:1px solid var(--ld-border); border-radius:12px; padding:16px;}
-  #view-privacy .privacy-toc ol{list-style:none; margin:0; padding:0; counter-reset:pv-toc; display:flex; flex-direction:column; gap:2px;}
-  #view-privacy .privacy-toc a{display:block; padding:7px 8px; border-radius:7px; font-size:13px; line-height:1.5; color:var(--ld-muted); text-decoration:none; word-break:keep-all; transition:background .15s, color .15s;}
-  #view-privacy .privacy-toc a:hover,
-  #view-privacy .privacy-toc a:focus-visible{background:var(--ld-accent-light); color:var(--ld-accent);}
-  #view-privacy .privacy-toc a:focus-visible{outline:2px solid var(--ld-accent); outline-offset:2px;}
+  #view-privacy .privacy-toc, #view-terms .privacy-toc{background:var(--ld-panel); border:1px solid var(--ld-border); border-radius:12px; padding:16px;}
+  #view-privacy .privacy-toc ol, #view-terms .privacy-toc ol{list-style:none; margin:0; padding:0; counter-reset:pv-toc; display:flex; flex-direction:column; gap:2px;}
+  #view-privacy .privacy-toc a, #view-terms .privacy-toc a{display:block; padding:7px 8px; border-radius:7px; font-size:13px; line-height:1.5; color:var(--ld-muted); text-decoration:none; word-break:keep-all; transition:background .15s, color .15s;}
+  #view-privacy .privacy-toc a:hover, #view-terms .privacy-toc a:hover,
+  #view-privacy .privacy-toc a:focus-visible, #view-terms .privacy-toc a:focus-visible{background:var(--ld-accent-light); color:var(--ld-accent);}
+  #view-privacy .privacy-toc a:focus-visible, #view-terms .privacy-toc a:focus-visible{outline:2px solid var(--ld-accent); outline-offset:2px;}
   @media (max-width:860px){
-    #view-privacy .privacy-toc ol{flex-direction:row; flex-wrap:wrap; gap:6px;}
-    #view-privacy .privacy-toc a{padding:6px 10px; background:var(--ld-muted-bg);}
+    #view-privacy .privacy-toc ol, #view-terms .privacy-toc ol{flex-direction:row; flex-wrap:wrap; gap:6px;}
+    #view-privacy .privacy-toc a, #view-terms .privacy-toc a{padding:6px 10px; background:var(--ld-muted-bg);}
   }
 
-  #view-privacy .privacy-body{max-width:720px; min-width:0;}
-  #view-privacy .privacy-sec{scroll-margin-top:calc(var(--topbar-h) + 16px);}
-  #view-privacy .privacy-sec + .privacy-sec{margin-top:36px; padding-top:28px; border-top:1px solid var(--ld-border);}
-  #view-privacy .privacy-sec h2{margin:0 0 12px; font-size:17px; font-weight:700; color:var(--ld-text); line-height:1.5; word-break:keep-all;}
-  #view-privacy .privacy-sec p{margin:10px 0 0; font-size:14px; color:var(--ld-text); line-height:1.75; word-break:keep-all;}
-  #view-privacy .privacy-sec p:first-of-type{margin-top:0;}
-  #view-privacy .privacy-sec ul{margin:10px 0 0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:8px;}
-  #view-privacy .privacy-sec ul li{position:relative; padding-left:16px; font-size:14px; color:var(--ld-text); line-height:1.75; word-break:keep-all;}
-  #view-privacy .privacy-sec ul li::before{content:''; position:absolute; left:2px; top:10px; width:4px; height:4px; border-radius:50%; background:var(--ld-accent-mid);}
-  #view-privacy .privacy-sec ul.privacy-plain-list li{padding-left:16px;}
-  #view-privacy .privacy-sec a{color:var(--ld-accent); font-weight:600; text-decoration:underline; text-underline-offset:2px;}
-  #view-privacy .privacy-sec a:hover{color:var(--ld-accent-dark);}
+  #view-privacy .privacy-body, #view-terms .privacy-body{max-width:720px; min-width:0;}
+  #view-privacy .privacy-sec, #view-terms .privacy-sec{scroll-margin-top:calc(var(--topbar-h) + 16px);}
+  #view-privacy .privacy-sec + .privacy-sec, #view-terms .privacy-sec + .privacy-sec{margin-top:36px; padding-top:28px; border-top:1px solid var(--ld-border);}
+  #view-privacy .privacy-sec h2, #view-terms .privacy-sec h2{margin:0 0 12px; font-size:17px; font-weight:700; color:var(--ld-text); line-height:1.5; word-break:keep-all;}
+  #view-privacy .privacy-sec p, #view-terms .privacy-sec p{margin:10px 0 0; font-size:14px; color:var(--ld-text); line-height:1.75; word-break:keep-all;}
+  #view-privacy .privacy-sec p:first-of-type, #view-terms .privacy-sec p:first-of-type{margin-top:0;}
+  #view-privacy .privacy-sec ul, #view-terms .privacy-sec ul{margin:10px 0 0; padding-left:0; list-style:none; display:flex; flex-direction:column; gap:8px;}
+  #view-privacy .privacy-sec ul li, #view-terms .privacy-sec ul li{position:relative; padding-left:16px; font-size:14px; color:var(--ld-text); line-height:1.75; word-break:keep-all;}
+  #view-privacy .privacy-sec ul li::before, #view-terms .privacy-sec ul li::before{content:''; position:absolute; left:2px; top:10px; width:4px; height:4px; border-radius:50%; background:var(--ld-accent-mid);}
+  #view-privacy .privacy-sec ul.privacy-plain-list li, #view-terms .privacy-sec ul.privacy-plain-list li{padding-left:16px;}
+  #view-privacy .privacy-sec a, #view-terms .privacy-sec a{color:var(--ld-accent); font-weight:600; text-decoration:underline; text-underline-offset:2px;}
+  #view-privacy .privacy-sec a:hover, #view-terms .privacy-sec a:hover{color:var(--ld-accent-dark);}
 
-  #view-privacy .privacy-table-wrap{margin-top:14px; overflow-x:auto; border:1px solid var(--ld-border); border-radius:10px;}
-  #view-privacy table{width:100%; min-width:520px; border-collapse:collapse; font-size:13px;}
-  #view-privacy th, #view-privacy td{padding:10px 12px; text-align:left; vertical-align:top; line-height:1.6; word-break:keep-all;}
-  #view-privacy thead th{background:var(--ld-muted-bg); color:var(--ld-text); font-weight:700; white-space:nowrap; border-bottom:1px solid var(--ld-border);}
-  #view-privacy tbody td{color:var(--ld-text); border-bottom:1px solid var(--ld-border);}
-  #view-privacy tbody tr:last-child td{border-bottom:none;}
+  #view-privacy .privacy-table-wrap, #view-terms .privacy-table-wrap{margin-top:14px; overflow-x:auto; border:1px solid var(--ld-border); border-radius:10px;}
+  #view-privacy table, #view-terms table{width:100%; min-width:520px; border-collapse:collapse; font-size:13px;}
+  #view-privacy th, #view-privacy td, #view-terms th, #view-terms td{padding:10px 12px; text-align:left; vertical-align:top; line-height:1.6; word-break:keep-all;}
+  #view-privacy thead th, #view-terms thead th{background:var(--ld-muted-bg); color:var(--ld-text); font-weight:700; white-space:nowrap; border-bottom:1px solid var(--ld-border);}
+  #view-privacy tbody td, #view-terms tbody td{color:var(--ld-text); border-bottom:1px solid var(--ld-border);}
+  #view-privacy tbody tr:last-child td, #view-terms tbody tr:last-child td{border-bottom:none;}
 
   @media (max-width:639px){
-    #view-privacy .privacy-head{padding-bottom:16px; margin-bottom:18px;}
-    #view-privacy .privacy-sec + .privacy-sec{margin-top:28px; padding-top:20px;}
+    #view-privacy .privacy-head, #view-terms .privacy-head{padding-bottom:16px; margin-bottom:18px;}
+    #view-privacy .privacy-sec + .privacy-sec, #view-terms .privacy-sec + .privacy-sec{margin-top:28px; padding-top:20px;}
   }

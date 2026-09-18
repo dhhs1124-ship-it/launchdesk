@@ -37,7 +37,8 @@
     '/services/setup': 'view-services-setup',
     '/account':       'view-account',
     '/admin':         'view-admin',
-    '/privacy':       'view-privacy'
+    '/privacy':       'view-privacy',
+    '/terms':         'view-terms'
   };
 
   /* Display name shown in the topbar crumb, and (for paths not in
