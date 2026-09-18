@@ -743,7 +743,6 @@
     });
 
     renderHomeResumeCard(prog);
-    renderWrapupState(completed, prog);
   }
 
   /* ---- STEP_ROADMAP — single roadmap shared by every progress display --
@@ -806,54 +805,6 @@
       noteEl.hidden = !isGuest;
     }
     card.classList.toggle('is-complete', !prog.next);
-  }
-
-  /* ---- STEP08 운영 전환 화면 — computeStepProgress()의 결과를 그대로
-     읽기만 한다(별도 완료 계산 없음, ld-completed-chapters 직접 참조도
-     없음). 7/7이면 기존 "오픈 완료" 콘텐츠 그대로, 아니면 남은 STEP
-     안내로 바뀐다. STEP08 자체는 gated:false라 이 화면엔 완료 게이트가
-     없고, GA4 이벤트도 새로 추가하지 않는다(기존 page_view만 그대로). */
-  function renderWrapupState(completed, prog){
-    var titleEl = document.getElementById('wrapupTitle');
-    if(!titleEl) return; // wrapup markup not present on this build
-
-    var leadEl = document.getElementById('wrapupLead');
-    var bannerEl = document.getElementById('wrapupStatusBanner');
-    var doneBlock = document.getElementById('wrapupDoneBlock');
-    var incompleteBlock = document.getElementById('wrapupIncompleteBlock');
-
-    if(prog.done >= prog.total){
-      titleEl.textContent = '쇼핑몰 오픈 준비가 끝났습니다';
-      if(leadEl) leadEl.textContent = '오픈은 끝이 아니라 운영의 시작입니다. 이제부터는 상품, 주문, 광고, 고객 반응을 확인하며 조금씩 개선해가면 됩니다.';
-      if(bannerEl) bannerEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 모두 완료했어요 🎉';
-      if(doneBlock) doneBlock.hidden = false;
-      if(incompleteBlock) incompleteBlock.hidden = true;
-      return;
-    }
-
-    titleEl.textContent = '아직 오픈 준비가 남아있습니다';
-    if(leadEl) leadEl.textContent = 'STEP01~07을 마저 완료하면 오픈 완료 화면과 운영도구로 넘어갈 수 있어요.';
-    if(bannerEl) bannerEl.textContent = prog.total + '단계 중 ' + prog.done + '단계 완료 · ' + (prog.total - prog.done) + '단계 남음';
-    if(doneBlock) doneBlock.hidden = true;
-    if(incompleteBlock) incompleteBlock.hidden = false;
-
-    var listEl = document.getElementById('wrapupRemainingList');
-    if(listEl){
-      var remaining = GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) === -1; });
-      listEl.innerHTML = remaining.map(function(s){
-        return '<a class="quick-row" href="#' + s.route + '">' +
-          '<span class="qr-icon tone-b">' + s.num + '</span>' +
-          '<span class="qr-text"><span class="qr-title">STEP ' + s.num + ' · ' + s.label + '</span></span>' +
-          '<svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>' +
-          '</a>';
-      }).join('');
-    }
-
-    var ctaEl = document.getElementById('wrapupResumeCta');
-    if(ctaEl && prog.next){
-      ctaEl.href = '#' + prog.next.route;
-      ctaEl.textContent = 'STEP ' + prog.next.num + ' · ' + prog.next.label + ' → 이어서 하기';
-    }
   }
 
   /* single entry point every completion source (checkbox / worksheet)

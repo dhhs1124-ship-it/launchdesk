@@ -802,7 +802,7 @@
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
               <div class="gc-body"><div class="gc-body-inner">
-                <ul class="cc-points"><li>오픈 완료 체크리스트</li><li>운영 단계에서 할 일</li><li>지속적인 개선 루틴</li></ul>
+                <ul class="cc-points"><li>오픈 후 가장 먼저 할 일</li><li>운영 확인 주기</li><li>운영 도구로 이어가기</li></ul>
                 <a class="gc-link" href="#/start/wrapup">보기 →</a>
               </div></div>
             </div>
@@ -2597,92 +2597,161 @@
       </section>
 
       <!-- ============ VIEW: STEP 08 · 오픈 완료, 운영 시작하기 (전환 화면, 게이트 없음) ============ -->
+      <!-- ============ VIEW: STEP 08 · 운영 전환(게이트 없음) ============
+           STEP08(2026-09 UI 재설계 8차, STEP01~07 시각 구조 이식 — 피그마
+           시안 없음)은 체크리스트 단계가 아니라 로드맵 이후 운영으로 넘어가는
+           전환 화면이다. gated:false(STEP_ROADMAP)이며 완료 판정 대상이
+           아니다 — 새 data-chapter · 체크리스트 · 완료 플래그를 만들지
+           않았고 STEP01~07 진행 상태(user_step_progress)를 읽거나 바꾸지
+           않는다. 진입 자체로 STEP01~07을 완료 처리하지 않으며, 일부 STEP을
+           끝내지 않은 사용자도 그대로 보는 고정 콘텐츠다 — "모든 준비가
+           끝났습니다" 같은, 사실과 다를 수 있는 단정은 쓰지 않는다(구버전
+           renderWrapupState()의 7/7 분기 콘텐츠 전환을 제거하고 app.js에서
+           그 함수와 호출부를 함께 삭제함 — 상세는 app.js recomputeProgress()
+           근처 diff 참고). 저장 로직이 없어 부가 JS 파일도 두지 않는다 —
+           라우팅에 따른 GA4 page_view · chapter_start, 진입 시 스크롤
+           최상단은 app.js 라우터가 기존 방식 그대로 처리한다(CHAPTER_PATHS에
+           '/start/wrapup' 포함, 변경 없음). #/tools 링크의
+           data-tools-target="calc"는 tools.js의 기존 전역 리스너가 그대로
+           처리한다. 스타일은 전부 #view-start-wrapup 스코프(--ld-* 올리브
+           토큰) — 다른 STEP은 그대로다. -->
       <section class="view" id="view-start-wrapup" hidden>
-        <div class="content narrow">
-          <div class="breadcrumb"><a href="#/start">시작 가이드</a><span>/</span><span>STEP 08</span></div>
-          <span class="eyebrow">STEP 08 · 운영 전환</span>
-          <div class="page-head">
-            <h1 id="wrapupTitle">쇼핑몰 오픈 준비가 끝났습니다</h1>
-            <p class="page-lead" id="wrapupLead">오픈은 끝이 아니라 운영의 시작입니다. 이제부터는 상품, 주문, 광고, 고객 반응을 확인하며 조금씩 개선해가면 됩니다.</p>
-          </div>
-          <div class="chapter-body">
-            <div class="callout"><p id="wrapupStatusBanner">7단계 중 7단계 모두 완료했어요 🎉</p></div>
+        <div class="content">
+          <div class="s8" id="step08Root">
 
-            <!-- STEP01~07이 아직 7/7이 아닐 때만 보이는 안내 (진행률 시스템 v2:
-                 STEP_ROADMAP/GATED_STEPS/computeStepProgress()를 그대로 재사용해
-                 app.js의 renderWrapupState()가 채운다) -->
-            <div id="wrapupIncompleteBlock" hidden>
-              <h2 class="section-h">아직 완료하지 않은 STEP</h2>
-              <p>아래 STEP을 마저 완료하면 이 화면이 운영 전환 화면으로 바뀌어요.</p>
-              <div class="quick-row-list" id="wrapupRemainingList"></div>
-              <div style="margin:1.2rem 0 .2rem;">
-                <a class="btn btn-primary" id="wrapupResumeCta" href="#/start/prepare">STEP 01 · 무엇을, 누구에게 팔지 정하기 → 이어서 하기</a>
-              </div>
-            </div>
+            <header class="s8-head">
+              <div class="breadcrumb s8-crumb"><a href="#/start">쇼핑몰 준비</a><span>/</span><span>STEP 08</span></div>
+              <span class="s8-eyebrow">STEP 08 · 운영 전환</span>
+              <h1>오픈 이후의 운영을 시작하세요</h1>
+              <p class="s8-lead">쇼핑몰을 여는 것보다 중요한 건, 실제 반응을 확인하고 조금씩 개선하는 일입니다. 주문·고객·광고·수익을 한 번에 완벽하게 관리하려 하지 말고, 필요한 항목부터 하나씩 확인하세요.</p>
+            </header>
 
-            <!-- STEP01~07이 7/7 완료됐을 때만 보이는 기존 운영 전환 콘텐츠 -->
-            <div id="wrapupDoneBlock">
-              <h2 class="section-h">오픈 후 바로 확인할 것</h2>
-              <p>업종과 관계없이, 오픈 직후엔 아래 다섯 가지부터 확인하세요.</p>
-              <div class="checklist-block">
-                <div class="cl-head"><span class="title">오픈 직후 점검 목록</span><span class="count">0 / 5</span></div>
-                <div class="cl-group">
-                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">실제 주문이 정상적으로 들어오는지</span></label>
-                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">결제 · 배송 흐름에 문제가 없는지</span></label>
-                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">고객 문의에 대응할 채널이 준비되어 있는지</span></label>
-                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">어떤 상품 · 콘텐츠 · 유입 채널에서 반응이 발생하는지</span></label>
-                  <label class="cl-row"><input type="checkbox"><span class="cl-box"></span><span class="label">비용과 마진을 지속적으로 확인하고 있는지</span></label>
+            <div class="s8-main">
+              <section class="s8-card s8-priority" aria-labelledby="s8PriorityTitle">
+                <h2 id="s8PriorityTitle" class="s8-section-title">오픈 후 가장 먼저 할 일</h2>
+                <p class="s8-section-lead">업종과 관계없이, 오픈 직후엔 아래 세 가지부터 확인하세요.</p>
+                <ol class="s8-sections">
+                  <li class="s8-section">
+                    <span class="s8-num">01</span>
+                    <div class="s8-section-body">
+                      <h3>첫 주문 흐름 확인</h3>
+                      <ul class="s8-checks">
+                        <li>실제 주문이 들어왔을 때 결제 확인</li>
+                        <li>상품 준비</li>
+                        <li>송장 등록</li>
+                        <li>출고</li>
+                        <li>배송 완료까지 흐름 확인</li>
+                      </ul>
+                    </div>
+                  </li>
+                  <li class="s8-section">
+                    <span class="s8-num">02</span>
+                    <div class="s8-section-body">
+                      <h3>고객이 막히는 지점 확인</h3>
+                      <ul class="s8-checks">
+                        <li>문의가 반복되는 부분</li>
+                        <li>옵션 선택이 어려운 부분</li>
+                        <li>배송·교환·반품 안내가 부족한 부분</li>
+                      </ul>
+                    </div>
+                  </li>
+                  <li class="s8-section">
+                    <span class="s8-num">03</span>
+                    <div class="s8-section-body">
+                      <h3>실제로 남는 금액 확인</h3>
+                      <p class="s8-summary">매출만 보지 말고 상품 원가 · 결제수수료 · 배송·포장비 · 할인 · 광고비까지 함께 확인해야 실제로 남는 금액을 알 수 있어요.</p>
+                      <div class="s8-warn">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
+                        <p>결제수수료 · 세금 · 플랫폼 정책은 계속 바뀔 수 있어 특정 수치를 기준으로 단정하지 않습니다. 세부 내용은 이용 중인 플랫폼의 최신 공지와 세무사 등 전문가를 통해 확인하세요.</p>
+                      </div>
+                      <a class="s8-service" href="#/tools" data-tools-target="calc">
+                        <span class="s8-service-icon" aria-hidden="true">🧮</span>
+                        <span class="s8-service-text"><b>마진 계산기로 확인하기</b><small>원가 · 수수료 · 배송비를 넣고 실제 남는 금액을 계산해요</small></span>
+                        <svg class="s8-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+
+              <section class="s8-card s8-routine" aria-labelledby="s8RoutineTitle">
+                <h2 id="s8RoutineTitle" class="s8-section-title">운영은 이런 주기로 확인하세요</h2>
+                <p class="s8-section-lead">아래는 참고용 루틴입니다. 정답이 아니라 시작점으로 활용하세요.</p>
+                <div class="s8-cadence-grid">
+                  <div class="s8-cadence-item"><h4>매일</h4><p>신규 주문, 결제 오류, 고객 문의, 품절 여부</p></div>
+                  <div class="s8-cadence-item"><h4>주 1회</h4><p>유입 · 클릭 · 장바구니 · 구매 흐름, 광고비, 콘텐츠 반응</p></div>
+                  <div class="s8-cadence-item"><h4>월 1회</h4><p>상품별 수익, 반품 · 교환 이유, 재고, 반복 문의, 다음 개선 항목</p></div>
                 </div>
-                <div class="cl-note">체크는 지금 화면에서만 표시돼요 · 진행률에는 반영되지 않아요</div>
-              </div>
+                <p class="s8-note">판매량과 운영 방식에 따라 확인 주기는 달라질 수 있습니다.</p>
+              </section>
 
-              <h2 class="section-h">운영도구로 이동</h2>
-              <p>마진 · 매출 · 광고 반응은 감이 아니라 도구로 확인하세요.</p>
-              <div style="margin:.2rem 0 1.2rem;">
-                <a class="btn btn-primary" href="#/tools">운영도구로 이동 →</a>
-              </div>
-              <div class="quick-row-list">
-                <a class="quick-row" href="#/tools" data-tools-target="calc">
-                  <span class="qr-icon tone-b">🧮</span>
-                  <span class="qr-text"><span class="qr-title">마진 계산기</span><span class="qr-sub">원가 · 판매가 · 마진율 계산</span></span>
-                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                </a>
-                <a class="quick-row" href="#/tools">
-                  <span class="qr-icon tone-b">📈</span>
-                  <span class="qr-text"><span class="qr-title">수익 시뮬레이터</span><span class="qr-sub">목표 매출 · 손익분기 확인</span></span>
-                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                </a>
-                <a class="quick-row" href="#/tools">
-                  <span class="qr-icon tone-b">🎯</span>
-                  <span class="qr-text"><span class="qr-title">광고 기록</span><span class="qr-sub">소재별 성과 기록</span></span>
-                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                </a>
-              </div>
+              <section class="s8-card s8-next" aria-labelledby="s8NextTitle">
+                <h2 id="s8NextTitle" class="s8-section-title">LaunchDesk에서 이어서 할 일</h2>
+                <div class="s8-next-grid">
+                  <a class="s8-service" href="#/dashboard">
+                    <span class="s8-service-icon" aria-hidden="true">📊</span>
+                    <span class="s8-service-text"><b>운영 현황 보기</b><small>주문 · 광고 · 연결 상태와 수동 광고 기록 확인</small></span>
+                    <svg class="s8-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                  </a>
+                  <a class="s8-service" href="#/tools" data-tools-target="calc">
+                    <span class="s8-service-icon" aria-hidden="true">🧮</span>
+                    <span class="s8-service-text"><b>마진 계산하기</b><small>실제 비용을 넣고 예상 수익 확인</small></span>
+                    <svg class="s8-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                  </a>
+                  <a class="s8-service" href="#/resources">
+                    <span class="s8-service-icon" aria-hidden="true">📚</span>
+                    <span class="s8-service-text"><b>필요한 자료 찾기</b><small>배송 · CS · 마케팅 · 분석 관련 상세 가이드</small></span>
+                    <svg class="s8-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                  </a>
+                  <a class="s8-service" href="#/services/setup">
+                    <span class="s8-service-icon" aria-hidden="true">🛠️</span>
+                    <span class="s8-service-text"><b>세팅 도움받기</b><small>혼자 해결하기 어려운 설정 대행 안내</small></span>
+                    <svg class="s8-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                  </a>
+                </div>
+              </section>
 
-              <h2 class="section-h">다음 운영 루틴</h2>
-              <p>특정 광고 플랫폼이나 업종을 전제하지 않는, 오픈 이후 반복하면 좋은 기본 흐름입니다.</p>
-              <div class="timeline">
-                <div class="t-item"><h3>1 · 유입 확인</h3><p>어디서 방문자가 들어오는지 확인합니다.</p></div>
-                <div class="t-item"><h3>2 · 주문 · 전환 확인</h3><p>들어온 방문자가 실제 주문으로 이어지는지 확인합니다.</p></div>
-                <div class="t-item"><h3>3 · 비용 · 마진 확인</h3><p>광고비 · 원가 대비 남는 게 있는지 확인합니다.</p></div>
-                <div class="t-item"><h3>4 · 고객 반응 확인</h3><p>문의 · 리뷰 · 재구매로 실제 반응을 확인합니다.</p></div>
-                <div class="t-item"><h3>5 · 개선</h3><p>확인된 문제부터 하나씩 고칩니다.</p></div>
-                <div class="t-item"><h3>6 · 다시 테스트</h3><p>바꾼 것의 효과를 다시 확인하고, 1번부터 반복합니다.</p></div>
-              </div>
-
-              <div class="quick-row-list" style="margin-top:1.6rem;">
-                <a class="quick-row" href="#/services/setup">
-                  <span class="qr-icon tone-d">🛠️</span>
-                  <span class="qr-text"><span class="qr-title">오픈 전 기술 설정을 한 번에 정리하고 싶다면</span><span class="qr-sub">전체 초기 세팅을 이용할 수 있어요</span></span>
-                  <svg class="qr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
-                </a>
-              </div>
+              <section class="s8-closing">
+                <h2 class="s8-section-title">처음부터 완벽할 필요는 없습니다</h2>
+                <p class="s8-closing-quote">처음부터 모든 숫자가 좋을 필요는 없습니다. 한 번 실행하고, 반응을 확인하고, 한 가지씩 바꾸는 과정이 운영입니다.</p>
+              </section>
             </div>
 
-            <div class="chapter-nav">
-              <a href="#/start/marketing"><span class="cn-label">← 이전 STEP</span><span class="cn-title">STEP 07 · 첫 유입 만들고 반응 테스트하기</span></a>
-              <a class="next" href="#/"><span class="cn-label">처음으로 →</span><span class="cn-title">홈으로 돌아가기</span></a>
-            </div>
+            <aside class="s8-side">
+              <section class="s8-card s8-side-check" aria-labelledby="s8CheckTitle">
+                <h3 id="s8CheckTitle">이제 확인할 것</h3>
+                <ul class="s8-checks">
+                  <li>주문 흐름</li>
+                  <li>고객 반응</li>
+                  <li>실제 수익</li>
+                  <li>다음 개선 항목</li>
+                </ul>
+              </section>
+
+              <section class="s8-card s8-shortcuts" aria-labelledby="s8ShortcutTitle">
+                <h3 id="s8ShortcutTitle">바로가기</h3>
+                <ul class="s8-res-list">
+                  <li><a href="#/dashboard"><span class="s8-link-icon" aria-hidden="true">📊</span><span>운영 현황</span></a></li>
+                  <li><a href="#/tools" data-tools-target="calc"><span class="s8-link-icon" aria-hidden="true">🧮</span><span>마진 계산기</span></a></li>
+                  <li><a href="#/resources"><span class="s8-link-icon" aria-hidden="true">📚</span><span>자료실</span></a></li>
+                </ul>
+              </section>
+
+              <section class="desk-help s8-help" aria-labelledby="s8HelpTitle">
+                <h3 id="s8HelpTitle">혼자 해결하기 어렵다면</h3>
+                <p>운영에 필요한 설정이 막히면 세팅 대행으로 도움받을 수 있어요.</p>
+                <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5a3.5 3.5 0 0 0-4.9 4.9L3.5 14.5a1 1 0 0 0 0 1.4 1 1 0 0 0 1.4 0l6.1-6.1a3.5 3.5 0 0 0 3.5-6.3Z"/></svg></a>
+              </section>
+            </aside>
+
+            <nav class="s8-nav" aria-label="STEP 이동">
+              <a class="s8-btn s8-btn-ghost s8-nav-prev" href="#/start/marketing">← STEP 07 · 첫 유입 만들고 반응 테스트하기</a>
+              <div class="s8-nav-ctas">
+                <a class="s8-btn s8-btn-primary" href="#/dashboard">운영 현황으로 이동 →</a>
+                <a class="s8-btn s8-btn-ghost" href="#/start">쇼핑몰 준비 로드맵 다시 보기</a>
+              </div>
+            </nav>
+
           </div>
         </div>
       </section>
