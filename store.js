@@ -49,6 +49,50 @@
   function getCompletedPaths(){
     return Object.keys(state.steps).filter(function(p){ return state.steps[p].isCompleted; });
   }
+  // 서버가 기록한 최초 완료 시각(hydrate가 읽어온 값, 완료 전환 시 여기서 채움).
+  // 완료가 아니거나 모르면 null. 병합/마이그레이션 upsert가 이미 완료된
+  // STEP의 completed_at을 지금 시각으로 덮어쓰지 않기 위해 노출한다.
+  function getStepCompletedAt(path){
+    var e = state.steps[path];
+    return (e && e.completedAt) ? e.completedAt : null;
+  }
+
+  // ---- STEP data 비교 ------------------------------------------------------
+  // 로그인/세션 복원 직후 app.js 컨트롤러가 restore()→evaluate()로 화면 상태를
+  // 다시 store에 써넣는데, 방금 서버에서 읽은 값과 내용이 같으면 DB에 다시 쓸
+  // 이유가 없다. 체크리스트는 인덱스 "집합"(순서 무관), 워크시트는 필드별
+  // 문자열(없는 키·문자열이 아닌 값은 빈 문자열)로 비교해, 옛 저장값의 순서나
+  // 누락 키 차이만으로 불필요한 정정 쓰기가 생기지 않게 한다.
+  function normalizeStepData(d){
+    if(Array.isArray(d)){
+      var items = d.map(Number).filter(function(n){ return !isNaN(n); }).sort(function(a, b){ return a - b; });
+      return { kind: 'list', items: items };
+    }
+    if(d && typeof d === 'object'){
+      var fields = {};
+      Object.keys(d).forEach(function(k){ fields[k] = (typeof d[k] === 'string') ? d[k] : ''; });
+      return { kind: 'fields', fields: fields };
+    }
+    return { kind: 'empty' };
+  }
+  function isEmptyStepData(d){
+    var n = normalizeStepData(d);
+    if(n.kind === 'list') return n.items.length === 0;
+    if(n.kind === 'fields') return Object.keys(n.fields).every(function(k){ return n.fields[k].trim() === ''; });
+    return true;
+  }
+  function sameStepData(a, b){
+    var na = normalizeStepData(a), nb = normalizeStepData(b);
+    if(na.kind === 'empty' || nb.kind === 'empty') return isEmptyStepData(a) && isEmptyStepData(b);
+    if(na.kind !== nb.kind) return false;
+    if(na.kind === 'list'){
+      if(na.items.length !== nb.items.length) return false;
+      return na.items.every(function(v, i){ return v === nb.items[i]; });
+    }
+    var keys = {};
+    Object.keys(na.fields).concat(Object.keys(nb.fields)).forEach(function(k){ keys[k] = true; });
+    return Object.keys(keys).every(function(k){ return (na.fields[k] || '') === (nb.fields[k] || ''); });
+  }
   function getCalcHistory(){ return state.calcHistory.slice(); }
   function getAdlogRecords(){ return state.adlogRecords.slice(); }
   // 로그인 직전 "게스트 메모리" 상태를 통째로 떠간다(얕은 복사) — hydrate()가
@@ -74,8 +118,8 @@
   // 아무 것도 쓰지 않고 onChange도 울리지 않는다 — 실제 저장은 호출한
   // 쪽이 평가 결과를 가지고 별도로 setStepState()/직접 upsert해야 한다.
   function pokeStepData(path, data){
-    var prevCompleted = state.steps[path] ? state.steps[path].isCompleted : false;
-    state.steps[path] = { data: data, isCompleted: prevCompleted };
+    var prev = state.steps[path];
+    state.steps[path] = { data: data, isCompleted: prev ? prev.isCompleted : false, completedAt: (prev && prev.completedAt) ? prev.completedAt : null };
   }
 
   // ----------------------------------------------------------------- writes
@@ -128,7 +172,9 @@
       step_path: path,
       data: entry.data,
       is_completed: !!entry.isCompleted,
-      completed_at: entry.isCompleted ? new Date().toISOString() : null
+      // 완료 시각은 setStepState가 "미완료→완료로 처음 바뀐 순간"에만 새로 찍고
+      // 그 뒤로는 그대로 들고 있는 값 — 여기서 다시 now()로 만들지 않는다.
+      completed_at: entry.isCompleted ? (entry.completedAt || null) : null
     }, { onConflict: 'user_id,step_path' }).then(function(res){
       if(res.error) console.warn('[launchdesk] STEP 저장 실패(' + path + '):', res.error.message);
       afterAttempt();
@@ -159,8 +205,24 @@
     if(!state.authed || state.userId !== forUserId) return;
     requestStepSave(path);
   }
+  /* STEP 상태 반영. 메모리는 항상 최신으로 맞추되, DB 쓰기는 "실제로 무언가
+     바뀐 경우"에만 예약한다:
+     - 내용(data)과 완료 여부가 이미 들고 있는 값과 같으면 아무 것도 하지
+       않는다 → 로그인/새로고침/세션 복원 뒤 컨트롤러가 화면 값을 그대로
+       되써넣어도 upsert가 나가지 않는다.
+     - 서버에 row가 없는 STEP(메모리에도 없음)에 빈 데이터·미완료를 써넣는
+       경우도 쓰지 않는다 → 손대지 않은 STEP에 빈 row가 생기지 않는다.
+     - completed_at은 미완료→완료로 처음 바뀔 때만 새로 찍고, 완료 상태가
+       이어지는 동안(내용만 바뀌어도)은 기존 값을 유지한다. 완료→미완료면 null. */
   function setStepState(path, data, isCompleted){
-    state.steps[path] = { data: data, isCompleted: !!isCompleted };
+    var done = !!isCompleted;
+    var prev = state.steps[path];
+    if(prev && prev.isCompleted === done && sameStepData(prev.data, data)) return;
+    var completedAt = null;
+    if(done) completedAt = (prev && prev.isCompleted) ? (prev.completedAt || null) : new Date().toISOString();
+    var freshEmpty = !prev && !done && isEmptyStepData(data);
+    state.steps[path] = { data: data, isCompleted: done, completedAt: completedAt };
+    if(freshEmpty) return;
     if(!state.authed || !state.userId) return;
     var userId = state.userId;
     if(pendingStepTimers[path]) clearTimeout(pendingStepTimers[path]);
@@ -168,14 +230,14 @@
   }
   // 워크시트 입력칸에서 포커스가 빠지는 등, "지금 바로 저장해도 되는"
   // 시점에 예약된 저장을 앞당겨 실행한다. 예약이 없으면 아무 일도
-  // 하지 않는다(비회원이거나, 이미 저장이 끝난 경우 포함). 이미 그 STEP의
+  // 하지 않는다(비회원이거나, 바뀐 게 없거나, 이미 저장이 끝난 경우 포함 —
+  // 변경 없이 칸만 옮겨 다녀도 같은 값을 다시 쓰지 않는다). 이미 그 STEP의
   // 요청이 나가 있는 중이면(requestStepSave 내부에서) 병렬로 보내지 않고
   // dirty로만 표시된다.
   function flushStepNow(path){
-    if(pendingStepTimers[path]){
-      clearTimeout(pendingStepTimers[path]);
-      delete pendingStepTimers[path];
-    }
+    if(!pendingStepTimers[path]) return;
+    clearTimeout(pendingStepTimers[path]);
+    delete pendingStepTimers[path];
     requestStepSave(path);
   }
   // 로그아웃 버튼 등, "지금 로그아웃하기 전에 밀린 저장을 다 반영해줘"
@@ -264,7 +326,7 @@
     clearPendingStepTimers();
     state.userId = userId;
 
-    var stepsQ = sb.from('user_step_progress').select('step_path, data, is_completed').eq('user_id', userId);
+    var stepsQ = sb.from('user_step_progress').select('step_path, data, is_completed, completed_at').eq('user_id', userId);
     var calcQ = sb.from('tool_records').select('data, created_at').eq('user_id', userId).eq('tool_type', 'margin_calc').order('created_at', { ascending: false }).limit(5);
     var adlogQ = sb.from('tool_records').select('data, created_at').eq('user_id', userId).eq('tool_type', 'ad_log').order('created_at', { ascending: false });
 
@@ -274,7 +336,7 @@
 
       if(stepsRes && !stepsRes.error && stepsRes.data){
         stepsRes.data.forEach(function(row){
-          state.steps[row.step_path] = { data: row.data, isCompleted: !!row.is_completed };
+          state.steps[row.step_path] = { data: row.data, isCompleted: !!row.is_completed, completedAt: row.completed_at || null };
         });
       } else if(stepsRes && stepsRes.error){
         console.warn('[launchdesk] user_step_progress 조회 실패:', stepsRes.error.message);
@@ -314,6 +376,7 @@
     getStepData: getStepData,
     isStepCompleted: isStepCompleted,
     getCompletedPaths: getCompletedPaths,
+    getStepCompletedAt: getStepCompletedAt,
     setStepState: setStepState,
     flushStepNow: flushStepNow,
     flushAllPendingSteps: flushAllPendingSteps,

@@ -977,6 +977,12 @@
       return Array.prototype.every.call(inputs, function(inp, i){ return typeof saved[i] === 'string' && saved[i].trim() !== ''; });
     }catch(e){ return false; }
   }
+  // 이미 완료돼 있던 STEP을 다시 완료 상태로 upsert할 때 최초 완료 시각을
+  // 유지한다 — store가 hydrate 때 읽어둔 completed_at을 그대로 돌려주고,
+  // 아직 완료가 아니었으면 null(호출한 쪽이 지금 시각을 새로 찍는다).
+  function preservedCompletedAt(path){
+    return launchdeskStore.isStepCompleted(path) ? launchdeskStore.getStepCompletedAt(path) : null;
+  }
   function migrateLegacyToAccount(userId){
     var sb = window.launchdeskSupabase;
     if(!sb) return Promise.resolve(false);
@@ -997,7 +1003,7 @@
         step_path: path,
         data: data,
         is_completed: isDone,
-        completed_at: isDone ? new Date().toISOString() : null
+        completed_at: isDone ? (preservedCompletedAt(path) || new Date().toISOString()) : null
       }, { onConflict: 'user_id,step_path' }));
     });
 
@@ -1159,7 +1165,7 @@
           step_path: path,
           data: mergedData,
           is_completed: isDone,
-          completed_at: isDone ? new Date().toISOString() : null
+          completed_at: isDone ? (preservedCompletedAt(path) || new Date().toISOString()) : null
         }, { onConflict: 'user_id,step_path' }));
       });
 
