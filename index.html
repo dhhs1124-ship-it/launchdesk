@@ -3,15 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-H3D0EDRZL5"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-H3D0EDRZL5', { send_page_view: false }); // app.js의 render()가 hash 라우팅에 맞춰 수동으로 page_view를 보냄
-</script>
+<!-- Google tag (gtag.js) — 더 이상 여기서 즉시 로드하지 않는다. 동의 전 GA4
+     요청 자체가 나가면 안 되므로(Basic Consent), 로드·gtag 정의·config는
+     analytics-consent.js가 저장된 동의 상태(ld-analytics-consent-v1)를 확인한
+     뒤에만 수행한다 — 측정 ID(G-H3D0EDRZL5)와 { send_page_view:false } 설정,
+     app.js render()의 수동 page_view 방식은 그대로 유지된다. -->
 
 <title>런치데스크</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -71,7 +67,14 @@
           <svg viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.583-5.036-3.71H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.348 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
           Google로 계속하기
         </button>
-        <button type="button" class="oauth-btn oauth-kakao" id="kakaoLoginBtn">
+        <!-- 실제 베타 운영 로그인 방식은 이메일 + Google뿐이라 카카오 버튼은
+             숨긴다(요구사항 8) — OAuth 설정/Supabase Provider/버튼 자체는
+             그대로 두고 hidden 속성만 추가한다. hidden은 시각적으로 감출 뿐
+             아니라 접근성 트리에서도 제외해 스크린리더에 노출되지 않고,
+             display:none 결과로 탭 순서에서도 빠진다(별도 tabindex 불필요).
+             app.js의 kakaoLoginBtn 클릭 리스너는 이미 null 가드가 있어
+             그대로 둬도 안전하다. 재활성화하려면 hidden만 지우면 된다. -->
+        <button type="button" class="oauth-btn oauth-kakao" id="kakaoLoginBtn" hidden>
           <svg viewBox="0 0 20 20" aria-hidden="true"><path fill="#191919" d="M10 2C5.03 2 1 5.14 1 9c0 2.52 1.7 4.74 4.26 5.98-.19.7-.68 2.51-.78 2.9 0 0-.02.13.07.18a.24.24 0 0 0 .2 0c.27-.04 3.1-2.04 3.62-2.4.85.13 1.72.2 2.63.2 4.97 0 9-3.14 9-7s-4.03-7-9-7z"/></svg>
           카카오로 계속하기
         </button>
@@ -208,6 +211,23 @@
 </div>
 
 <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+<!-- 분석 동의 배너(analytics-consent.js가 표시/숨김·버튼 동작을 맡는다) —
+     모달이 아닌 하단 고정 region이라 페이지의 다른 기능을 막지 않는다.
+     최초 진입 시 저장된 동의값이 없으면 자동으로 뜨고, 이후에는 푸터의
+     "분석 설정" 링크로 다시 열 수 있다. -->
+<div class="consent-banner" id="analyticsConsentBanner" role="region" aria-label="서비스 이용 분석 설정" hidden>
+  <div class="consent-banner-text">
+    <h2 id="analyticsConsentTitle">서비스 이용 분석 설정</h2>
+    <p>LaunchDesk는 서비스 개선을 위해 Google Analytics를 사용합니다. 허용하기 전에는 분석 정보가 전송되지 않습니다.</p>
+    <p class="consent-banner-status" id="analyticsConsentStatus" hidden></p>
+    <a href="#/privacy">개인정보처리방침 보기</a>
+  </div>
+  <div class="consent-banner-actions">
+    <button type="button" class="btn btn-ghost" id="analyticsConsentDeny">허용하지 않음</button>
+    <button type="button" class="btn btn-primary" id="analyticsConsentAllow">분석 허용</button>
+  </div>
+</div>
 
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
@@ -4239,8 +4259,9 @@
             <section id="pv-11" class="privacy-sec">
               <h2>11. 개인정보 자동 수집 장치 및 분석 도구</h2>
               <p>회사는 서비스 이용 현황을 파악하기 위해 Google Analytics 4(측정 ID: G-H3D0EDRZL5)를 사용합니다.</p>
-              <p><strong>현재 상태 안내</strong> — Google Analytics 4는 별도의 동의 절차 없이 웹사이트 접속과 동시에 자동으로 실행됩니다.</p>
-              <p>Google Analytics는 쿠키 등을 이용해 방문 통계를 수집하며, 이용자는 브라우저 설정에서 쿠키 저장을 거부하거나 Google이 제공하는 분석 차단 도구를 설치해 수집을 거부할 수 있습니다. 다만 쿠키 저장을 거부할 경우 일부 서비스 이용에 어려움이 있을 수 있습니다.</p>
+              <p><strong>현재 상태 안내</strong> — Google Analytics 4는 이용자가 분석 수집에 동의한 경우에만 로드되어 실행됩니다. 동의하기 전에는 관련 스크립트가 불러와지지 않고 어떤 분석 정보도 전송되지 않으며, 동의하지 않더라도 LaunchDesk의 핵심 기능은 동일하게 이용하실 수 있습니다.</p>
+              <p>동의 여부는 이용자의 브라우저 localStorage에 저장되며, 로그인 여부와 무관하게 브라우저 단위로 적용됩니다. 화면 하단 푸터의 <strong>분석 설정</strong> 링크를 통해 언제든지 동의를 허용하거나 철회할 수 있습니다. 동의를 철회하면 그 즉시 이후의 GA4 이벤트 전송이 중단되며, 회사는 가능한 범위에서 브라우저에 남아 있는 GA4 분석 쿠키(_ga, _ga_* 등)를 함께 삭제합니다.</p>
+              <p>Google Analytics는 쿠키 등을 이용해 방문 통계를 수집하며, 수집되는 이벤트·사용자 데이터는 각 14개월간 보관되고 새로운 활동이 발생해도 보유기간이 다시 연장되지 않습니다(자세한 내용은 7번 항목 참고). 동의와 별개로 브라우저 설정에서 쿠키 저장을 거부하거나 Google이 제공하는 분석 차단 도구를 설치해 수집을 거부할 수도 있습니다.</p>
               <p>이 외에 서비스는 아래와 같이 브라우저 저장소(localStorage·sessionStorage)에 정보를 임시로 저장합니다. 이 정보는 회사 서버로 자동 전송되지 않으며, 이용자의 브라우저에만 남습니다.</p>
               <div class="privacy-table-wrap">
                 <table>
@@ -4249,6 +4270,7 @@
                     <tr><th scope="col">저장 위치</th><th scope="col">항목명</th><th scope="col">목적</th><th scope="col">보유기간</th></tr>
                   </thead>
                   <tbody>
+                    <tr><td>localStorage</td><td>ld-analytics-consent-v1</td><td>Google Analytics 4 분석 수집 동의 여부 저장</td><td>이용자가 분석 설정에서 다시 변경하거나 삭제할 때까지</td></tr>
                     <tr><td>localStorage</td><td>ld-plan-draft</td><td>로그인 전 작성 중인 실행 계획 임시 저장</td><td>로그인 후 서버에 저장되거나 이용자가 삭제할 때까지</td></tr>
                     <tr><td>localStorage</td><td>ld-pending-acquisition</td><td>최초 방문 유입 경로(광고·검색 등) 임시 저장</td><td>최대 30일, 또는 로그인 시 서버로 이전 후 삭제</td></tr>
                     <tr><td>sessionStorage</td><td>ld-product-event-session-id</td><td>서비스 이용 이벤트 집계용 세션 식별자</td><td>브라우저 탭 종료 시 자동 삭제</td></tr>
@@ -4333,7 +4355,8 @@
             <a href="#/contact">문의하기</a><span class="footer-sep">·</span>
             <a href="#/terms">이용약관</a><span class="footer-sep">·</span>
             <a href="#/privacy">개인정보처리방침</a><span class="footer-sep">·</span>
-            <a href="#/business-info">사업자 정보</a>
+            <a href="#/business-info">사업자 정보</a><span class="footer-sep">·</span>
+            <button type="button" class="footer-link-btn" id="analyticsSettingsLink">분석 설정</button>
           </div>
           <div class="footer-meta">
             사업자 정보는 확정되는 대로 이 자리에 표시할 예정입니다.<br>
@@ -4351,6 +4374,8 @@
 <script src="product-events.js"></script>
 <script src="utm-acquisition.js"></script>
 <script src="store.js"></script>
+<script src="analytics-consent-core.js"></script>
+<script src="analytics-consent.js"></script>
 <script src="app.js"></script>
 <script src="margin-calc.js"></script>
 <script src="plans-core.js"></script>

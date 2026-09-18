@@ -362,6 +362,9 @@
      Kakao 고유 브랜드 색만 유지한다. */
   .oauth-btn.oauth-kakao{background:#FEE500; border-color:#FEE500; color:#191919;}
   .oauth-btn.oauth-kakao:hover:not(:disabled){background:#f5da00;}
+  /* 카카오 로그인 임시 비활성화(요구사항 8) — .oauth-btn의 display:flex보다
+     더 구체적인 선택자로 [hidden]을 이겨야 실제로 감춰진다. */
+  #kakaoLoginBtn[hidden]{display:none;}
   .oauth-divider{display:flex; align-items:center; gap:.8rem; margin:0 0 1.2rem; font-size:.76rem; color:var(--ink-faint);}
   .oauth-divider::before, .oauth-divider::after{content:""; flex:1; height:1px; background:var(--border);}
 
@@ -819,8 +822,30 @@
   footer{border-top:1px solid var(--border); padding:1.8rem 0 .4rem; margin-top:2.4rem;}
   .footer-row{display:flex; flex-wrap:wrap; align-items:center; gap:.55rem 1.1rem; font-size:.82rem; color:var(--ink-soft);}
   .footer-row a:hover{color:var(--ink);}
+  .footer-link-btn{font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer;}
+  .footer-link-btn:hover{color:var(--ink);}
+  .footer-link-btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   .footer-sep{color:var(--border-strong);}
   .footer-meta{font-size:.75rem; color:var(--ink-faint); margin-top:.8rem; line-height:1.8;}
+
+  /* ---------------- 분석 동의 배너 (analytics-consent.js) ----------------
+     하단 고정 바 — 모달이 아니라 페이지 조작을 막지 않는 region이다.
+     z-index는 모달(110)보다 위(130)에 둬서 다른 화면 어디서든 계속 보이고
+     조작 가능하게 한다. */
+  .consent-banner{position:fixed; left:0; right:0; bottom:0; z-index:130; background:var(--surface); border-top:1px solid var(--border-strong); box-shadow:0 -12px 32px -16px rgba(0,0,0,.25); padding:1rem 1.4rem; display:flex; align-items:center; justify-content:space-between; gap:1.2rem 1.6rem; flex-wrap:wrap;}
+  .consent-banner[hidden]{display:none;}
+  .consent-banner-text{flex:1 1 320px; min-width:220px;}
+  .consent-banner-text h2{font-size:.95rem; font-weight:700; margin:0 0 .3rem; color:var(--ink);}
+  .consent-banner-text p{font-size:.82rem; color:var(--ink-soft); margin:0 0 .35rem; line-height:1.6;}
+  .consent-banner-status{font-weight:600; color:var(--ink);}
+  .consent-banner-text a{color:var(--accent); text-decoration:underline;}
+  .consent-banner-actions{display:flex; gap:.6rem; flex:0 0 auto; flex-wrap:wrap;}
+  .consent-banner-actions .btn{min-height:44px;}
+  @media (max-width:480px){
+    .consent-banner{flex-direction:column; align-items:stretch; padding:1rem;}
+    .consent-banner-actions{width:100%;}
+    .consent-banner-actions .btn{flex:1 1 auto; width:100%; justify-content:center;}
+  }
 
   /* ---------------- resume banner (home) ---------------- */
 

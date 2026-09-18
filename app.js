@@ -162,6 +162,26 @@
     });
   }
 
+  /* GA4 page_view — hash routes never trigger a real page load, so the
+     automatic page_view (disabled via send_page_view:false in the GA4
+     tag) is replaced by this one manual event per render(), covering
+     both the initial paint and every hashchange. No user input here —
+     path/title are always one of the fixed strings in BUILT/TITLES.
+     Guarded so a blocked/failed GA4 load never breaks navigation.
+     Exposed as window.launchdeskSendPageView so the analytics-consent
+     banner can fire exactly one page_view for the current route right
+     after the user grants consent mid-session (render() itself won't
+     run again then — no hashchange happens on a consent click). */
+  function sendPageViewEvent(path){
+    if(typeof gtag !== 'function') return;
+    gtag('event', 'page_view', {
+      page_title: TITLES[path] || '준비 중',
+      page_location: safePageLocation(), // location.href 그대로 쓰지 않음 — 위 safePageLocation() 주석 참고(인증 콜백 토큰 해시 유출 방지)
+      page_path: path
+    });
+  }
+  window.launchdeskSendPageView = function(){ sendPageViewEvent(currentPath()); };
+
   function render(){
     var path = currentPath();
     document.querySelectorAll('.view').forEach(function(v){ v.hidden = true; v.classList.remove('fade-in'); });
@@ -194,19 +214,7 @@
       pendingResourceFilter = null;
     }
 
-    /* GA4 page_view — hash routes never trigger a real page load, so the
-       automatic page_view (disabled via send_page_view:false in the GA4
-       tag) is replaced by this one manual event per render(), covering
-       both the initial paint and every hashchange. No user input here —
-       path/title are always one of the fixed strings in BUILT/TITLES.
-       Guarded so a blocked/failed GA4 load never breaks navigation. */
-    if(typeof gtag === 'function'){
-      gtag('event', 'page_view', {
-        page_title: TITLES[path] || '준비 중',
-        page_location: safePageLocation(), // location.href 그대로 쓰지 않음 — 위 safePageLocation() 주석 참고(인증 콜백 토큰 해시 유출 방지)
-        page_path: path
-      });
-    }
+    sendPageViewEvent(path);
 
     /* GA4 setup_page_view — a dedicated arrival signal for the setup-
        service page specifically, on top of (not instead of) the page_view
