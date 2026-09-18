@@ -337,7 +337,11 @@
   .modal{position:fixed; inset:0; z-index:110; display:flex; align-items:center; justify-content:center; padding:1.4rem; opacity:0; pointer-events:none; transition:opacity .18s ease;}
   .modal.open{opacity:1; pointer-events:auto;}
   .modal-backdrop{position:absolute; inset:0; background:rgba(28,26,22,.55);}
-  .modal-panel{position:relative; width:100%; max-width:380px; background:var(--surface); border-radius:var(--radius); padding:2rem 1.8rem 1.8rem; box-shadow:0 30px 60px -20px rgba(0,0,0,.35);}
+  /* max-height + overflow — 회원가입 필수 동의 블록(.consent-block)이
+     추가되며 모달 콘텐츠가 짧은 화면 높이를 넘어설 수 있어, 넘치면 잘리는
+     대신 패널 안에서만 스크롤되게 한다(가로 폭 400px 대응과 별개로, 세로
+     공간이 부족한 경우의 안전장치). */
+  .modal-panel{position:relative; width:100%; max-width:380px; max-height:calc(100vh - 2.8rem); overflow-y:auto; background:var(--surface); border-radius:var(--radius); padding:2rem 1.8rem 1.8rem; box-shadow:0 30px 60px -20px rgba(0,0,0,.35);}
   .modal-close{position:absolute; top:1rem; right:1rem; width:30px; height:30px; border-radius:50%; border:1px solid var(--border-strong); background:var(--surface); color:var(--ink); cursor:pointer;}
   .modal-head{text-align:center; margin-bottom:1.5rem;}
   .modal-head .logo-mini{font-family:var(--f-display); font-weight:700; font-size:1rem; display:inline-flex; align-items:center; gap:.4rem; margin-bottom:1rem;}
@@ -367,6 +371,19 @@
   #kakaoLoginBtn[hidden]{display:none;}
   .oauth-divider{display:flex; align-items:center; gap:.8rem; margin:0 0 1.2rem; font-size:.76rem; color:var(--ink-faint);}
   .oauth-divider::before, .oauth-divider::after{content:""; flex:1; height:1px; background:var(--border);}
+
+  /* 회원가입 필수 동의(이용약관 · 개인정보 수집·이용) — loginModal 회원가입
+     모드와 consentGateModal(기존 회원/미동의 사용자 게이트)이 공유하는
+     구조. 400px 폭에서도 잘리지 않도록 줄바꿈에 맡기고 고정 폭을 주지
+     않는다. */
+  .consent-block{margin-bottom:1.2rem; padding:.85rem .9rem; border:1px solid var(--border); border-radius:10px; background:var(--bg);}
+  .consent-info{font-size:.76rem; line-height:1.6; color:var(--ink-soft); margin:0 0 .8rem;}
+  .consent-info strong{color:var(--ink); font-weight:700;}
+  .consent-row{display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; padding:.3rem 0;}
+  .consent-row label{display:flex; align-items:center; gap:.5rem; font-size:.85rem; color:var(--ink); cursor:pointer; min-width:0;}
+  .consent-row input[type="checkbox"]{accent-color:var(--accent); width:17px; height:17px; flex:0 0 auto;}
+  .consent-row a{font-size:.78rem; color:var(--accent-ink); font-weight:600; white-space:nowrap;}
+  .consent-error{margin:.5rem 0 0; font-size:.8rem; font-weight:600; color:var(--badge-a);}
 
   .info-card h4{font-size:.92rem; font-weight:700; margin-bottom:.5rem; display:flex; align-items:center; gap:.45rem; flex-wrap:wrap;}
   .info-card .tag{font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .45rem; border-radius:4px; letter-spacing:.02em;}

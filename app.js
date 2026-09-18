@@ -378,6 +378,11 @@
   var pendingFreshLogin = false;
 
   function applyLoginModalMode(){
+    // 필수 동의 체크박스는 이메일 회원가입 모드에서 항상 보이고, 로그인
+    // 모드에서는 기본 숨김 — 다만 Google 버튼은 모드 구분 없이 항상 동의를
+    // 요구하므로(startOAuthLogin 참고) 로그인 모드에서 그 버튼을 누르면
+    // revealSignupConsent()로 강제로 드러난다.
+    var PC = window.launchdeskPolicyConsent;
     if(loginMode === 'signup'){
       loginModalTitle.textContent = '회원가입';
       loginModalLead.textContent = '이메일과 비밀번호로 몇 초 만에 시작하세요.';
@@ -385,6 +390,7 @@
       loginFootLead.textContent = '이미 계정이 있으신가요?';
       loginToSignup.textContent = '로그인';
       if(loginPwConfirmField) loginPwConfirmField.hidden = false;
+      if(PC) PC.setSignupConsentVisible(true);
     } else {
       loginModalTitle.textContent = '로그인';
       loginModalLead.textContent = '로그인하면 진행 상황이 계정에 저장돼요.';
@@ -393,7 +399,9 @@
       loginToSignup.textContent = '회원가입';
       if(loginPwConfirmField) loginPwConfirmField.hidden = true;
       if(loginPwConfirm) loginPwConfirm.value = '';
+      if(PC) PC.setSignupConsentVisible(false);
     }
+    if(PC) PC.clearSignupConsentError();
   }
   function openLoginModal(opts){
     loginMode = 'login';
@@ -421,6 +429,10 @@
   function closeLoginModal(){
     loginModal.classList.remove('open');
     loginForm.reset();
+    // 동의 체크박스는 loginForm 밖에 있어(Google 버튼이 모드 구분 없이
+    // 참조해야 하므로) 위 reset()이 닿지 않는다 — 항상 미체크로 다시
+    // 열리도록 별도로 초기화한다(요구사항 1).
+    if(window.launchdeskPolicyConsent) window.launchdeskPolicyConsent.resetSignupConsent();
   }
   function showLoginNotice(message){
     loginNoticeText.textContent = message || '로그인 기능은 아직 준비 중이에요. 조금만 기다려주세요!';
@@ -487,6 +499,25 @@
     if(oauthInFlight) return;
     var sb = window.launchdeskSupabase;
     if(!sb){ showLoginNotice(); return; }
+
+    // Google OAuth는 로그인/회원가입 모드 구분이 없고(버튼 하나가 최초
+    // 로그인 시 자동으로 신규 가입까지 겸함) 리다이렉트 전에는 신규/기존
+    // 계정 여부를 구조적으로 알 수 없다 — 그래서 모드와 무관하게 매번
+    // 시작 전 필수 동의 두 항목을 확인한다. 이미 동의 이력이 있는 기존
+    // 회원은 이 체크를 통과해도 아무 불이익이 없고(어차피 체크 상태만
+    // 확인), 복귀 후 handleSession()의 게이트가 중복 행을 만들지 않는다.
+    if(provider === 'google'){
+      var consentPC = window.launchdeskPolicyConsent;
+      if(consentPC && !consentPC.bothSignupConsentChecked()){
+        consentPC.revealSignupConsent();
+        consentPC.showSignupConsentError('필수 동의 항목을 확인해주세요');
+        consentPC.focusFirstUncheckedSignupConsent();
+        showToast('필수 동의 항목을 확인해주세요');
+        return;
+      }
+      if(consentPC) consentPC.clearSignupConsentError();
+    }
+
     // OAuth는 전체 페이지 이동이라 메모리에만 있는 작성 내용은 사라진다.
     // plans.js가 "저장을 눌렀지만 이 브라우저에 보관하지 못한 계획 폼"을
     // 갖고 있으면 떠나기 전에 확인받는다(false면 중단). 인증 제공자 설정·
@@ -500,6 +531,16 @@
     oauthInFlight = true;
     setOAuthButtonsBusy(true);
     markOAuthFreshLoginPending();
+    // 리다이렉트 전 sessionStorage에 남기는 최소 임시 신호(버전 · source ·
+    // 생성시각만 — 이메일/이름 등 개인정보 없음). 이것만으로 동의 완료를
+    // 확정하지 않는다 — 복귀 후 handleSession()이 insert 뒤 반드시 DB를
+    // 재조회해 실제로 행이 있는지 확인한 경우에만 통과시킨다
+    // (policy-consent.js ensureConsent 참고). TTL이 지나거나 시작에
+    // 실패/취소되면 아래에서 즉시 지운다.
+    if(provider === 'google'){
+      var consentCore = window.launchdeskPolicyConsentCore;
+      if(consentCore) window.launchdeskPolicyConsent.stashPending(consentCore.SOURCES.GOOGLE_OAUTH);
+    }
     // redirectTo는 현재 접속한 origin 그대로 사용한다(하드코딩된 프로덕션
     // 도메인이 아님) — 실제로 어디로 돌아올 수 있는지는 Supabase Auth URL
     // Configuration의 allow list가 최종적으로 결정하므로, 여기서 다른
@@ -515,6 +556,7 @@
         // 성공하면 브라우저가 곧바로 provider 페이지로 이동해 이 콜백 자체가
         // 사실상 의미 없어진다.
         clearOAuthFreshLoginPending();
+        if(window.launchdeskPolicyConsent) window.launchdeskPolicyConsent.clearPending();
         oauthInFlight = false;
         setOAuthButtonsBusy(false);
         console.warn('[launchdesk] OAuth(' + provider + ') 시작 실패:', res.error.message);
@@ -522,6 +564,7 @@
       }
     }).catch(function(err){
       clearOAuthFreshLoginPending();
+      if(window.launchdeskPolicyConsent) window.launchdeskPolicyConsent.clearPending();
       oauthInFlight = false;
       setOAuthButtonsBusy(false);
       console.warn('[launchdesk] OAuth(' + provider + ') 호출 중 오류:', err && err.message);
@@ -547,6 +590,11 @@
       var newSearch = params.toString();
       history.replaceState(null, '', location.pathname + (newSearch ? '?' + newSearch : '') + location.hash);
       showToast('로그인에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+      // 취소/오류로 세션 없이 돌아온 경로라 SIGNED_IN이 절대 발생하지 않는다
+      // — ensureConsent()가 pending을 소비할 기회 자체가 없으므로 여기서
+      // 직접 비운다. 비우지 않으면 같은 탭에서 곧이어 시도하는 다른 로그인
+      // (예: 이메일/비밀번호)이 이 pending을 잘못 이어받을 수 있다(요구사항 4).
+      if(window.launchdeskPolicyConsent) window.launchdeskPolicyConsent.clearPending();
     }catch(e){}
   })();
 
@@ -568,6 +616,17 @@
       var confirmVal = loginPwConfirm ? loginPwConfirm.value : '';
       if(password.length < 8){ showToast('비밀번호는 8자 이상으로 입력해주세요.'); return; }
       if(password !== confirmVal){ showToast('비밀번호가 일치하지 않아요.'); return; }
+      // 필수 동의(이용약관·개인정보 수집·이용) 둘 다 체크해야만 signUp()을
+      // 호출한다 — 하나만 체크해도 가입을 막는다(요구사항 1·3).
+      var signupConsentPC = window.launchdeskPolicyConsent;
+      if(signupConsentPC && !signupConsentPC.bothSignupConsentChecked()){
+        signupConsentPC.revealSignupConsent();
+        signupConsentPC.showSignupConsentError('필수 동의 항목을 확인해주세요');
+        signupConsentPC.focusFirstUncheckedSignupConsent();
+        showToast('필수 동의 항목을 확인해주세요');
+        return;
+      }
+      if(signupConsentPC) signupConsentPC.clearSignupConsentError();
     }
 
     var restoreLabel = loginSubmitBtn.textContent;
@@ -576,13 +635,36 @@
     function reenable(){ loginSubmitBtn.disabled = false; loginSubmitBtn.textContent = restoreLabel; }
 
     if(loginMode === 'signup'){
+      // signUp() 호출 직전에 pending을 남긴다 — Confirm email이 꺼져 있어
+      // 세션이 즉시 생기는 설정이면(현재는 켜져 있어 실제로는 아래
+      // session이 항상 null이지만, 설정이 바뀌어도 안전하도록) 곧이어
+      // 발생하는 SIGNED_IN에서 handleSession()이 이 pending을 소비해
+      // source='email_signup'으로 기록한다.
+      var signupPCCore = window.launchdeskPolicyConsentCore;
+      var signupPC = window.launchdeskPolicyConsent;
+      if(signupPC && signupPCCore) signupPC.stashPending(signupPCCore.SOURCES.EMAIL_SIGNUP);
       sb.auth.signUp({ email: email, password: password }).then(function(res){
         reenable();
-        if(res.error){ showToast(getAuthErrorMessage(res.error)); return; }
-        // Confirm email이 켜져 있으므로 여기서는 세션이 아직 없다 — 바로
-        // 로그인된 것처럼 처리하지 않고, 이메일 인증부터 안내한다.
+        if(res.error){
+          if(signupPC) signupPC.clearPending();
+          showToast(getAuthErrorMessage(res.error));
+          return;
+        }
+        var immediateSession = res.data && res.data.session;
+        if(!immediateSession && signupPC){
+          // Confirm email이 켜져 있어 세션이 아직 없다 — 이 pending을 다른
+          // 계정의 다음 로그인이 잘못 이어받을 위험이 있으므로 여기서 즉시
+          // 비운다. 실제 동의 기록은 이메일 인증 후 최초 로그인 시
+          // existing_user_gate 화면에서 다시 받는다(요구사항 3).
+          signupPC.clearPending();
+        }
+        // 바로 로그인된 것처럼 처리하지 않고, 이메일 인증부터 안내한다.
         showLoginNotice('인증 이메일을 보냈습니다. 이메일 인증 후 로그인해주세요.');
-      }).catch(function(err){ reenable(); showToast(getAuthErrorMessage(err)); });
+      }).catch(function(err){
+        reenable();
+        if(signupPC) signupPC.clearPending();
+        showToast(getAuthErrorMessage(err));
+      });
     } else {
       pendingFreshLogin = true;
       sb.auth.signInWithPassword({ email: email, password: password }).then(function(res){
@@ -596,6 +678,9 @@
     e.preventDefault();
     loginMode = (loginMode === 'signup') ? 'login' : 'signup';
     applyLoginModalMode();
+    // 모드 전환 시 오래된 pending을 정리한다(요구사항 3) — 정상 흐름에서는
+    // 이미 각 실패/완료 경로에서 비워지지만, 방어적으로 한 번 더 비운다.
+    if(window.launchdeskPolicyConsent) window.launchdeskPolicyConsent.clearPending();
   });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && loginModal.classList.contains('open')) closeLoginModal(); });
   document.addEventListener('click', function(e){
@@ -1322,19 +1407,47 @@
         // isAuthed()가 이미 true라면 스냅샷을 뜨지 않는다(계정 간 데이터
         // 유출 방지).
         var guestSnapshot = (isFreshSignIn && !launchdeskStore.isAuthed()) ? launchdeskStore.getSnapshot() : null;
-        lastHydratedUserId = user.id;
-        var hydration = launchdeskStore.hydrate(user.id);
-        if(isFreshSignIn){
-          // A(과거 legacy localStorage) → B(이번 세션의 게스트 메모리)
-          // 순서로 처리한다. 동시에 처리하지 않고 순서대로 이어야, A에서
-          // 옮겨진 값이 B의 "서버 값" 판단 기준에도 정확히 반영된다.
-          hydration = hydration
-            .then(function(){ return maybeMigrateLegacy(user.id); })
-            .then(function(){ return maybeMergeGuestSnapshot(user.id, guestSnapshot); });
+
+        // 필수 동의(이용약관 · 개인정보 수집·이용) 게이트 — STEP · 계획 ·
+        // 마진/광고 기록(hydrate)은 이 확인을 통과해야만 진행된다. 이
+        // 콜백(onAuthStateChange) 자체는 여기서 블로킹하지 않는다 — 아래
+        // .then()으로 이어지는 별도 비동기 체인이 처리하고, 이 함수는 곧바로
+        // 리턴한다. ensureConsent()는 user_id 기준 single-flight로 묶여
+        // 있어 getSession()/onAuthStateChange가 겹쳐 호출돼도 동의 조회·
+        // 게이트 모달이 중복 생성되지 않는다(policy-consent.js 참고).
+        var PC = window.launchdeskPolicyConsent;
+        if(!PC){
+          lastHydratedUserId = user.id;
+          proceedHydrate(user, isFreshSignIn, guestSnapshot);
+          return;
         }
+        PC.ensureConsent(user).then(function(ok){
+          if(!ok) return; // 게이트 대기 중 취소(로그아웃/계정 전환) 또는 로그아웃 선택 — 하이드레이트 금지
+          // 대기하는 동안 다른 사용자로 바뀌었을 수 있으므로 하이드레이트
+          // 직전에 현재 세션의 user_id를 다시 확인한다.
+          var sb2 = window.launchdeskSupabase;
+          return sb2.auth.getSession().then(function(res2){
+            var latestUser = res2.data && res2.data.session && res2.data.session.user;
+            if(!latestUser || latestUser.id !== user.id) return;
+            lastHydratedUserId = user.id;
+            proceedHydrate(user, isFreshSignIn, guestSnapshot);
+          });
+        });
       } else {
         lastHydratedUserId = null;
         launchdeskStore.resetToGuest();
+        if(window.launchdeskPolicyConsent) window.launchdeskPolicyConsent.handleSignedOut();
+      }
+    }
+    function proceedHydrate(user, isFreshSignIn, guestSnapshot){
+      var hydration = launchdeskStore.hydrate(user.id);
+      if(isFreshSignIn){
+        // A(과거 legacy localStorage) → B(이번 세션의 게스트 메모리)
+        // 순서로 처리한다. 동시에 처리하지 않고 순서대로 이어야, A에서
+        // 옮겨진 값이 B의 "서버 값" 판단 기준에도 정확히 반영된다.
+        hydration = hydration
+          .then(function(){ return maybeMigrateLegacy(user.id); })
+          .then(function(){ return maybeMergeGuestSnapshot(user.id, guestSnapshot); });
       }
     }
 
