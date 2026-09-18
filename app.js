@@ -36,7 +36,8 @@
     '/wholesale':     'view-wholesale',
     '/services/setup': 'view-services-setup',
     '/account':       'view-account',
-    '/admin':         'view-admin'
+    '/admin':         'view-admin',
+    '/privacy':       'view-privacy'
   };
 
   /* Display name shown in the topbar crumb, and (for paths not in
