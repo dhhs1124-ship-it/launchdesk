@@ -2929,238 +2929,74 @@
       </section>
 
       <!-- ============ VIEW: 자료실 ============ -->
+      <!-- ============ VIEW: 자료실 (#/resources, 2026-09 전면 재설계) ============
+           역할 재정의: "외부 링크 모음" → "막힌 일을 고르면 설명→체크리스트→도구
+           순서로 보여주는 실무 가이드"(비로그인 이용 가능은 유지). 카드
+           데이터 · 가이드 본문은 전부 resources-data.js에, 렌더링 · 검색 ·
+           필터 · 상세 패널은 전부 resources.js에 있다 — 이 섹션은 빈 컨테이너
+           마크업만 갖는다(wholesalers.js의 #wholesaleGrid와 같은 방식). 카테고리
+           탭 라벨은 resources-data.js의 CATEGORIES와 반드시 같게 유지한다.
+
+           내부 가이드 상세는 #/resources/<slug> 하위 경로로 연다(예:
+           #/resources/platform-choice) — 이 앱의 라우터가 해시만 보는 구조라
+           별도 history 처리 없이 그 자체로 새로고침 · 공유 · 브라우저
+           뒤로가기가 정상 동작한다(app.js의 BUILT 조회에 "/resources/로
+           시작하면 이 화면" 1줄만 추가했다). 한 화면에는 #resIndex(목록)
+           또는 #resGuidePanel(가이드 1개) 중 하나만 보인다. -->
       <section class="view" id="view-resources" hidden>
         <div class="content">
-          <span class="eyebrow">자료실</span>
-          <div class="page-head">
-            <h1>자료실</h1>
-            <p class="page-lead">실무에서 바로 쓰는 외부 도구 링크와 설정 가이드를 모았어요. 패키지형 템플릿은 순서대로 채워나갈게요.</p>
+          <span class="res-eyebrow">실무 자료실</span>
+          <div class="page-head res-head">
+            <h1>초보 사장님의 실무 자료실</h1>
+            <p class="res-lead">막힌 일을 골라보세요. 필요한 순서와 도구만 모았습니다.</p>
           </div>
 
-          <div class="kpi-grid cols-3">
-            <div class="kpi-card"><div class="kpi-head"><span>전체 자료</span><span>📚</span></div><div class="kpi-value">19개</div></div>
-            <div class="kpi-card"><div class="kpi-head"><span>지금 바로 쓸 수 있는 것</span><span>✅</span></div><div class="kpi-value">16개</div></div>
-            <div class="kpi-card"><div class="kpi-head"><span>출시 예정</span><span>🛠️</span></div><div class="kpi-value">3개</div></div>
+          <div class="res-search-wrap">
+            <svg class="res-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14.5" y2="14.5"/></svg>
+            <label for="resSearch" class="sr-only">자료 검색</label>
+            <input type="search" id="resSearch" class="res-search" placeholder="예: 광고비, PG, 반품, 마진" autocomplete="off">
           </div>
+          <p id="resResultStatus" class="sr-only" role="status"></p>
 
-          <div class="filter-tabs" data-scope="resources" style="margin-top:1.8rem;">
-            <button class="filter-tab active" type="button" data-filter="all">전체</button>
-            <button class="filter-tab" type="button" data-filter="business">사업자 · 플랫폼</button>
-            <button class="filter-tab" type="button" data-filter="product">상품 · 소싱 · 마진</button>
-            <button class="filter-tab" type="button" data-filter="detail">상세페이지</button>
-            <button class="filter-tab" type="button" data-filter="cs">배송 · CS</button>
-            <button class="filter-tab" type="button" data-filter="analytics">분석 · 연동</button>
-            <button class="filter-tab" type="button" data-filter="marketing">마케팅 · 유입</button>
-          </div>
+          <div id="resIndex">
+            <div class="res-stuck-section">
+              <p class="res-section-label">지금 무엇이 막혔나요?</p>
+              <div class="res-stuck-grid" id="resStuckGrid"></div>
+            </div>
 
-          <div class="resource-grid" id="resourceGrid">
-            <div class="resource-card" data-cat="business">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP02</span></div>
-              <h3>사업자 · 플랫폼 실무 가이드</h3>
-              <p>도메인 연결, SEO, PG 신청까지 클릭 단위로 정리했어요.</p>
-              <button type="button" class="rc-action rc-guide-link" data-filter="business" data-target="setupAccordion">3개 가이드 보기 →</button>
+            <div class="res-featured-wrap" id="resFeaturedWrap">
+              <p class="res-section-label">처음이라면 여기부터</p>
+              <div class="res-featured-grid" id="resFeaturedGrid"></div>
             </div>
-            <div class="resource-card" data-cat="product">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP03</span></div>
-              <h3>상품리스트 시트</h3>
-              <p>상품 업로드 전 정리용 구글시트</p>
-              <a class="rc-action" href="https://docs.google.com/spreadsheets/d/1UPIM38BJntGWCMSjGTeLFwc8wdyJuFzH/edit?usp=sharing" target="_blank" rel="noopener">바로가기 ↗</a>
+
+            <div class="res-cat-tabs" id="resCatTabs" role="group" aria-label="카테고리 필터">
+              <button class="res-cat-tab active" type="button" data-cat="all" aria-pressed="true">전체</button>
+              <button class="res-cat-tab" type="button" data-cat="start" aria-pressed="false">쇼핑몰 시작</button>
+              <button class="res-cat-tab" type="button" data-cat="product" aria-pressed="false">상품과 수익</button>
+              <button class="res-cat-tab" type="button" data-cat="operation" aria-pressed="false">판매 운영</button>
+              <button class="res-cat-tab" type="button" data-cat="growth" aria-pressed="false">광고와 성장</button>
             </div>
-            <div class="resource-card" data-cat="product">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP03</span></div>
-              <h3>샘플리스트 시트</h3>
-              <p>샘플 구할 때 작성용 구글시트</p>
-              <a class="rc-action" href="https://docs.google.com/spreadsheets/d/1cDeCnfxtyonZyI_sXxNIeSemL-sDYpkE/edit?usp=sharing" target="_blank" rel="noopener">바로가기 ↗</a>
+
+            <div class="res-grid" id="resGrid"></div>
+
+            <div class="res-empty-state" id="resEmptyState" hidden>
+              <p>조건에 맞는 자료가 없어요.</p>
+              <button type="button" class="btn btn-ghost" id="resEmptyReset">전체 보기</button>
             </div>
-            <div class="resource-card" data-cat="product">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP03</span></div>
-              <h3>마진계산기 (엑셀)</h3>
-              <p>구글시트로 만든 마진 계산기 원본</p>
-              <a class="rc-action" href="https://docs.google.com/spreadsheets/d/1ekDDeorLITFHPWI8Wf6gB56H9hEvPYbk/edit?usp=sharing" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="product">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP03</span></div>
-              <h3>신상마켓</h3>
-              <span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--ink-soft); background:var(--sidebar-bg); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em; align-self:flex-start;">패션 · 의류 특화</span>
-              <p>동대문 도매 브랜드를 모바일로 확인 · 사입하는 대표 앱</p>
-              <a class="rc-action" href="https://sinsangmarket.kr/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="product">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP03</span></div>
-              <h3>셀러오션</h3>
-              <span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--ink-soft); background:var(--sidebar-bg); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em; align-self:flex-start;">패션 · 의류 특화</span>
-              <p>사입삼촌 구인 · 셀러 커뮤니티</p>
-              <a class="rc-action" href="https://cafe.naver.com/soho" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="product">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP03</span></div>
-              <h3>중국 신상마켓</h3>
-              <span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--ink-soft); background:var(--sidebar-bg); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em; align-self:flex-start;">패션 · 의류 특화</span>
-              <p>중국 다이렉트 사입용 플랫폼</p>
-              <a class="rc-action" href="https://www.vvic.com/gz" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="detail">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP04</span></div>
-              <h3>신상스튜디오</h3>
-              <span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--ink-soft); background:var(--sidebar-bg); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em; align-self:flex-start;">패션 · 의류 특화</span>
-              <p>촬영 대행을 구할 수 있는 구인 앱</p>
-              <a class="rc-action" href="https://sinsangstudio.com/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card soon" data-cat="detail">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP04</span></div>
-              <h3>상세페이지 기획안 프레임</h3>
-              <p>전환율 높은 상세페이지 구성 공식 노션 템플릿</p>
-              <span class="rc-action soon-tag">출시 예정</span>
-            </div>
-            <div class="resource-card" data-cat="cs">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP05</span></div>
-              <h3>알파리뷰</h3>
-              <p>리뷰 자동 수집 · 적립</p>
-              <a class="rc-action" href="https://alph.kr/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="cs">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP05</span></div>
-              <h3>킵그로우</h3>
-              <p>회원가입 · 리뷰 자동화 통합</p>
-              <a class="rc-action" href="https://keepgrow.com/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="cs">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP05</span></div>
-              <h3>채널톡</h3>
-              <p>실시간 문의 · 자동응답</p>
-              <a class="rc-action" href="https://channel.io/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="cs">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP05</span></div>
-              <h3>이지어드민</h3>
-              <p>멀티채널 주문 · 송장 자동화</p>
-              <a class="rc-action" href="https://www.easyadmin.co.kr/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card soon" data-cat="cs">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP05</span></div>
-              <h3>CS 응대 스크립트</h3>
-              <p>교환 · 반품 · 배송 문의 답변 템플릿 모음</p>
-              <span class="rc-action soon-tag">출시 예정</span>
-            </div>
-            <div class="resource-card" data-cat="analytics">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP06</span></div>
-              <h3>GA4</h3>
-              <p>구글 애널리틱스 실시간 통계</p>
-              <a class="rc-action" href="https://analytics.google.com/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="analytics">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP06</span></div>
-              <h3>분석 · 연동 실무 가이드</h3>
-              <p>네이버페이, 카카오, 메타 픽셀 연동을 클릭 단위로 정리했어요.</p>
-              <button type="button" class="rc-action rc-guide-link" data-filter="analytics" data-target="analyticsAccordion">3개 가이드 보기 →</button>
-            </div>
-            <div class="resource-card" data-cat="marketing">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP07</span></div>
-              <h3>메타 광고 관리자</h3>
-              <p>Facebook · Instagram 광고 운영 도구</p>
-              <a class="rc-action" href="https://business.meta.com/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card" data-cat="marketing">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP07</span></div>
-              <h3>메타 광고 라이브러리</h3>
-              <p>타 업체 광고 소재 리서치용</p>
-              <a class="rc-action" href="https://business.facebook.com/ads/library/" target="_blank" rel="noopener">바로가기 ↗</a>
-            </div>
-            <div class="resource-card soon" data-cat="marketing">
-              <div class="rc-top"><span style="font-family:var(--f-mono); font-size:.64rem; font-weight:600; color:var(--accent-ink); background:var(--accent-soft); padding:.1rem .5rem; border-radius:4px; letter-spacing:.02em;">STEP07</span></div>
-              <h3>SNS 콘텐츠 캘린더</h3>
-              <p>월별 포스팅 계획표 · 해시태그 전략 노션 템플릿</p>
-              <span class="rc-action soon-tag">출시 예정</span>
+
+            <div class="res-external-wrap" id="resExternalWrap" hidden>
+              <p class="res-section-label">외부 도구</p>
+              <p class="res-external-note"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg><span>외부 서비스의 요금과 기능은 변경될 수 있습니다. 이용 전 공식 사이트에서 확인해주세요.</span></p>
+              <div class="res-external-grid" id="resExternalGrid"></div>
             </div>
           </div>
 
-          <div class="empty-state" id="resourceEmptyState" hidden>
-            <div class="es-icon">📭</div>
-            <p>이 카테고리엔 아직 자료가 없어요.</p>
-            <button type="button" class="btn btn-ghost" id="resourceEmptyReset">필터 초기화</button>
-          </div>
-
-          <div class="resource-section" data-cat="business" id="setupAccordion" style="display:none;">
-          <h2 class="section-h">사업자 · 플랫폼 실무 가이드</h2>
-          <p>가이드 챕터에서 "왜 해야 하는지"를 봤다면, 여기서는 화면에서 실제로 뭘 눌러야 하는지만 다룹니다.</p>
-          <div class="accordion">
-            <div class="acc-item open">
-              <button class="acc-head" type="button"><div><div class="at">도메인 연결하기</div><div class="as">카페24 사용 시 예시 · SSL 인증서 발급</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-              <div class="acc-body"><div class="acc-body-inner">
-                <div class="steps">
-                  <div class="step"><div class="step-text">카페24 로그인 → <strong>설정 → 기본 설정 → 도메인 설정</strong></div></div>
-                  <div class="step"><div class="step-text">'신규 도메인' → <strong>구매하기</strong> 클릭</div></div>
-                  <div class="step"><div class="step-text">브랜드명으로 검색 후 원하는 도메인(.com / .kr 등) 구매</div></div>
-                  <div class="step"><div class="step-text">도메인 설정 → <strong>도메인 관리</strong> → 구매한 도메인의 관리 설정 클릭</div></div>
-                  <div class="step"><div class="step-text">SSL 인증서 발급 진행 (HTTPS 보안 주소 적용)</div></div>
-                </div>
-              </div></div>
+          <div class="res-panel" id="resGuidePanel" hidden>
+            <div class="res-panel-head">
+              <button type="button" class="res-panel-back" id="resGuidePanelBack"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="10,3 5,8 10,13"/></svg>목록으로</button>
+              <button type="button" class="res-panel-close" id="resGuidePanelClose" aria-label="닫기"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg></button>
             </div>
-            <div class="acc-item">
-              <button class="acc-head" type="button"><div><div class="at">SEO 기본 세팅</div><div class="as">검색 노출을 위한 필수 태그 설정</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-              <div class="acc-body"><div class="acc-body-inner">
-                <div class="steps">
-                  <div class="step"><div class="step-text">설정 → 기본 설정 → <strong>검색엔진 최적화(SEO)</strong> 진입</div></div>
-                  <div class="step"><div class="step-text">공통 페이지 SEO 태그 — 쇼핑몰 이름 · 설명 · 키워드 입력</div></div>
-                  <div class="step"><div class="step-text">파비콘 설정 (16×16 또는 32×32) + SNS 공유 이미지 (권장 1200×628px)</div></div>
-                  <div class="step"><div class="step-text">네이버 연관 채널에 블로그 · 인스타 · 유튜브 URL 등록</div></div>
-                  <div class="step"><div class="step-text">고급설정 — <strong>사이트맵 · RSS 피드는 반드시 "사용함"</strong>으로 (검색 노출에 직결)</div></div>
-                </div>
-              </div></div>
-            </div>
-            <div class="acc-item">
-              <button class="acc-head" type="button"><div><div class="at">PG(결제) 서비스 신청</div><div class="as">KG이니시스 기준 예시</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-              <div class="acc-body"><div class="acc-body-inner">
-                <div class="steps">
-                  <div class="step"><div class="step-text">카페24 로그인 → <strong>부가서비스 → 기본 운영서비스 → 통합결제(PG)</strong></div></div>
-                  <div class="step"><div class="step-text">PG 신청하기 → 신청서 작성 후 계약 진행</div></div>
-                  <div class="step"><div class="step-text">사업자등록증 · 통신판매신고번호 · 사이트 정보가 미리 준비돼 있어야 함</div></div>
-                </div>
-              </div></div>
-            </div>
-          </div>
-          </div>
-
-          <div class="resource-section" data-cat="analytics" id="analyticsAccordion" style="display:none;">
-          <h2 class="section-h">분석 · 연동 실무 가이드</h2>
-          <p>가이드 챕터에서 "왜 해야 하는지"를 봤다면, 여기서는 화면에서 실제로 뭘 눌러야 하는지만 다룹니다.</p>
-          <div class="accordion">
-            <div class="acc-item open">
-              <button class="acc-head" type="button"><div><div class="at">네이버페이 연동</div><div class="as">신청 → 승인 → 4개 키 연동</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-              <div class="acc-body"><div class="acc-body-inner">
-                <div class="steps">
-                  <div class="step"><div class="step-text">카페24 → 판매채널 → 네이버 → <strong>네이버페이 안내</strong> → 서비스 신청 (심사 1~3일)</div></div>
-                  <div class="step"><div class="step-text">승인 후 카페24 → 판매채널 → 네이버 → <strong>네이버페이 설정</strong> 화면을 열어둠</div></div>
-                  <div class="step"><div class="step-text">새 탭에서 네이버페이 판매자센터 로그인 → 내 정보 → 가입정보 변경</div></div>
-                  <div class="step"><div class="step-text">공통 인증키 · 페이센터 ID · 가맹점 ID · 버튼 인증키 4가지 복사</div></div>
-                  <div class="step"><div class="step-text">카페24 설정 화면에 붙여넣고 저장</div></div>
-                </div>
-              </div></div>
-            </div>
-            <div class="acc-item">
-              <button class="acc-head" type="button"><div><div class="at">카카오 싱크 · 톡체크아웃 연동</div><div class="as">카카오톡 채널 개설부터</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-              <div class="acc-body"><div class="acc-body-inner">
-                <div class="steps">
-                  <div class="step"><div class="step-text">카카오 비즈니스 채널 관리자 접속 → 사업자 정보 입력 → 채널 개설</div></div>
-                  <div class="step"><div class="step-text">카페24 → 판매채널 → 카카오 → 카카오 비즈니스 → '카카오 로그인 사용함' 체크</div></div>
-                  <div class="step"><div class="step-text"><strong>카카오 싱크 간편 설정하기</strong> 클릭 → 로그인 + 연동 완료</div></div>
-                  <div class="step"><div class="step-text">톡체크아웃 → '사용함' 설정 (카카오페이 바로결제 활성화)</div></div>
-                </div>
-              </div></div>
-            </div>
-            <div class="acc-item">
-              <button class="acc-head" type="button"><div><div class="at">메타 픽셀 연동</div><div class="as">광고계정 → 픽셀 → 카페24 채널 연동</div></div><svg class="acc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-              <div class="acc-body"><div class="acc-body-inner">
-                <div class="steps">
-                  <div class="step"><div class="step-text">인스타그램 앱 → 프로필 편집 → 페이지 → 페이스북 페이지 연결</div></div>
-                  <div class="step"><div class="step-text">Meta Business Suite → 비즈니스 설정 → 계정 → <strong>광고 계정</strong> 새로 생성 (이름 · 시간대 · 통화 원화)</div></div>
-                  <div class="step"><div class="step-text">비즈니스 설정 → 데이터 소스 → 데이터 세트 → <strong>픽셀 생성</strong></div></div>
-                  <div class="step"><div class="step-text">카페24 → 설정 → 기본 설정 → 고급설정 → 코드 직접 입력 (PC · 모바일 쇼핑몰 모두)</div></div>
-                  <div class="step"><div class="step-text">카페24 → 판매채널 → 페이스북 → 채널 탭 → <strong>설정하기</strong> → 불러와진 항목 승인</div></div>
-                </div>
-              </div></div>
-            </div>
-          </div>
+            <div id="resGuidePanelBody"></div>
           </div>
         </div>
       </section>
@@ -4723,6 +4559,8 @@
 <script src="stores.js"></script>
 <script src="ops-overview.js"></script>
 <script src="wholesalers.js"></script>
+<script src="resources-data.js"></script>
+<script src="resources.js"></script>
 <script src="home-dashboard.js"></script>
 <script src="desk.js"></script>
 <script src="step01.js"></script>

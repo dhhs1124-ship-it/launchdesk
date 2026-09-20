@@ -10,10 +10,6 @@
   // actually changing, while still firing again on every real navigation
   // back into /tools (which is what the 7-day revisit metric needs).
   var lastDashboardViewedPath = null;
-  // set by a click on any [data-resource-cat] link (STEP02~07 → 자료실
-  // links); consumed once by render() the moment /resources is reached,
-  // so that STEP's relevant category filter is pre-selected automatically
-  var pendingResourceFilter = null;
 
   /* Views that actually exist. Add a line here the moment a new
      <section class="view" id="view-XXX"> is built — every #/path
@@ -80,6 +76,13 @@
   function currentPath(){
     var h = location.hash.replace(/^#/, '');
     return h || '/';
+  }
+
+  // TITLES엔 /resources/<slug> 형태의 가이드 하나하나를 등록하지 않으므로(위
+  // BUILT viewId 처리와 같은 이유), crumb·GA4 page_title이 "준비 중"으로
+  // 잘못 떨어지지 않도록 /resources 자체의 제목으로 대신 채운다.
+  function titleForPath(path){
+    return TITLES[path] || (path.indexOf('/resources/') === 0 ? TITLES['/resources'] : undefined);
   }
 
   /* GA4로 보낼 page_location을 안전하게 만든다(2026-09-15 감사 반영,
@@ -176,7 +179,7 @@
   function sendPageViewEvent(path){
     if(typeof gtag !== 'function') return;
     gtag('event', 'page_view', {
-      page_title: TITLES[path] || '준비 중',
+      page_title: titleForPath(path) || '준비 중',
       page_location: safePageLocation(), // location.href 그대로 쓰지 않음 — 위 safePageLocation() 주석 참고(인증 콜백 토큰 해시 유출 방지)
       page_path: path
     });
@@ -186,14 +189,19 @@
   function render(){
     var path = currentPath();
     document.querySelectorAll('.view').forEach(function(v){ v.hidden = true; v.classList.remove('fade-in'); });
-    var viewId = BUILT[path];
+    // 자료실 내부 가이드 상세는 #/resources/<slug> 하위 경로로 연다(2026-09
+    // 자료실 전면 재설계) — BUILT에 가이드 하나하나를 등록하지 않고, "/resources/로
+    // 시작하면 자료실 화면"이라는 규칙만 여기 둔다. 실제 어떤 가이드를 보여줄지는
+    // resources.js가 자기 hashchange 리스너로 독립적으로 판단한다(이 파일은
+    // 화면 전환 자체만 책임진다) — resources.js 상단 주석 참고.
+    var viewId = BUILT[path] || (path.indexOf('/resources/') === 0 ? 'view-resources' : undefined);
     var target = document.getElementById(viewId || 'view-coming-soon');
     if(!viewId){
       document.getElementById('csLabel').textContent = TITLES[path] || '요청하신 페이지';
     }
     target.hidden = false;
     if(!reduceMotion){ target.classList.add('fade-in'); applyStagger(target); }
-    document.getElementById('crumbLabel').textContent = CRUMB_LABELS[path] || TITLES[path] || '준비 중';
+    document.getElementById('crumbLabel').textContent = CRUMB_LABELS[path] || titleForPath(path) || '준비 중';
     setActiveNav(path);
     window.scrollTo(0, 0);
     closeSidebar();
@@ -204,16 +212,6 @@
        반영되게 한다. recomputeProgress()는 DOM만 다시 칠하고 저장·완료 판정은
        하지 않는다(setChapterDone/STEP_EVALUATORS와 무관). */
     if(path === '/' || path === '/start') recomputeProgress();
-
-    /* STEP02~07의 "OO 관련 자료 보기" 링크가 남겨둔 카테고리를 자료실
-       도착 시 한 번만 적용 — 새 라우팅을 추가하지 않고, 자료실 자체의
-       필터 탭 클릭 메커니즘을 그대로 재사용한다(아래 filter-tab 클릭
-       위임 로직과 동일). */
-    if(path === '/resources' && pendingResourceFilter){
-      var pendingTab = document.querySelector('.filter-tabs[data-scope="resources"] .filter-tab[data-filter="' + pendingResourceFilter + '"]');
-      if(pendingTab) pendingTab.click();
-      pendingResourceFilter = null;
-    }
 
     sendPageViewEvent(path);
 
@@ -1482,14 +1480,9 @@
 
   /* tab switcher — generic, scoped to the .tabs the clicked button lives in */
   document.addEventListener('click', function(e){
-    // STEP02~07 → 자료실 deep-link: just remember which category to
-    // pre-select once /resources actually renders (see render() above);
-    // the <a>'s own href="#/resources" navigation is left to run normally.
-    var resourceCatLink = e.target.closest('[data-resource-cat]');
-    if(resourceCatLink){
-      pendingResourceFilter = resourceCatLink.getAttribute('data-resource-cat');
-      return;
-    }
+    // STEP02~07 → 자료실 [data-resource-cat] 딥링크는 resources.js가 자기
+    // 리스너로 직접 처리한다(2026-09 자료실 전면 재설계) — 이 파일은 더 이상
+    // 관여하지 않는다.
     var tabBtn = e.target.closest('.tab-btn');
     if(tabBtn){
       var tabs = tabBtn.closest('.tabs');
@@ -1547,26 +1540,6 @@
       var scope = filterTab.closest('.filter-tabs').getAttribute('data-scope');
       var fkey = filterTab.getAttribute('data-filter');
       filterTab.parentElement.querySelectorAll('.filter-tab').forEach(function(b){ b.classList.toggle('active', b === filterTab); });
-      if(scope === 'resources'){
-        var anyVisibleR = false;
-        document.querySelectorAll('#resourceGrid .resource-card').forEach(function(card){
-          var cat = card.getAttribute('data-cat');
-          var show = (fkey === 'all' || fkey === cat);
-          card.style.display = show ? '' : 'none';
-          if(show) anyVisibleR = true;
-        });
-        var resourceGrid = document.getElementById('resourceGrid');
-        var resourceEmpty = document.getElementById('resourceEmptyState');
-        if(resourceGrid) resourceGrid.hidden = !anyVisibleR;
-        if(resourceEmpty) resourceEmpty.hidden = anyVisibleR;
-        // sections living outside the card grid (the setup accordion) —
-        // unlike the cards, these only show once their exact category is
-        // picked, never under "전체" (keeps the default view to just the grid)
-        document.querySelectorAll('.resource-section[data-cat]').forEach(function(sec){
-          sec.style.display = (fkey === sec.getAttribute('data-cat')) ? '' : 'none';
-        });
-        return;
-      }
       // 도매처 찾기(#/wholesale) 필터 — active 클래스 토글은 위에서 이미
       // 공통으로 처리됐으니, 실제 목록 다시 그리기는 wholesalers.js가
       // 자기 컨테이너에 직접 건 리스너에서 한다. 여기서 더 진행하면 바로
@@ -1591,23 +1564,6 @@
       var allTab = document.querySelector('.filter-tabs[data-scope="chapters"] .filter-tab[data-filter="all"]');
       if(allTab) allTab.click();
       return;
-    }
-    var resourceReset = e.target.closest('#resourceEmptyReset');
-    if(resourceReset){
-      var allResTab = document.querySelector('.filter-tabs[data-scope="resources"] .filter-tab[data-filter="all"]');
-      if(allResTab) allResTab.click();
-      return;
-    }
-    // generic "N개 가이드 보기" button on a resource-card — reveals the
-    // matching category's accordion (data-filter) and scrolls to it
-    // (data-target). Replaces the old single hardcoded #scrollToSetupGuide
-    // button now that there are two such cards (사업자·플랫폼 / 분석·연동).
-    var guideLink = e.target.closest('.rc-guide-link');
-    if(guideLink){
-      var glFilterTab = document.querySelector('.filter-tabs[data-scope="resources"] .filter-tab[data-filter="' + guideLink.getAttribute('data-filter') + '"]');
-      if(glFilterTab) glFilterTab.click(); // reveals the accordion (hidden under other filters)
-      var glTarget = document.getElementById(guideLink.getAttribute('data-target'));
-      if(glTarget) glTarget.scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth', block: 'start'});
     }
   });
 
