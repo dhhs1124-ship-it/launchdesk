@@ -3403,7 +3403,7 @@
   #view-resources .res-formula-list{display:flex; flex-direction:column; gap:8px; margin:0 0 14px;}
   #view-resources .res-formula-row{padding:12px 14px; border:1px solid var(--ld-border); border-radius:9px; background:var(--ld-muted-bg);}
   #view-resources .res-formula-term{font-size:13.5px; font-weight:700; color:var(--ld-text); margin-bottom:3px;}
-  #view-resources .res-formula-expr{font-family:var(--f-mono); font-size:12.5px; color:var(--ld-accent); line-height:1.5; margin-bottom:3px; word-break:keep-all;}
+  #view-resources .res-formula-expr{font-family:var(--f-mono); font-size:12.5px; color:var(--ld-accent); line-height:1.5; margin-bottom:3px; word-break:keep-all; overflow-wrap:anywhere;}
   #view-resources .res-formula-desc{font-size:12.5px; color:var(--ld-muted); line-height:1.5; word-break:keep-all;}
 
   #view-resources .res-note{display:flex; align-items:flex-start; gap:9px; padding:12px 14px; border-radius:9px; background:var(--ld-accent-light); margin:0 0 16px;}
@@ -3412,6 +3412,66 @@
 
   #view-resources .res-cta{display:inline-flex; align-items:center; gap:6px; min-height:44px; margin:4px 0 18px; padding:0 16px; border-radius:10px; background:var(--ld-accent); color:#fff; font-size:13.5px; font-weight:700;}
   #view-resources .res-cta:hover{background:var(--ld-accent-dark);}
+  #view-resources .res-cta + .res-cta{margin-left:8px;}
+
+  /* ---- 가이드 상세: 지표 공식 카드의 "예시 · 먼저 확인" 줄 ---- */
+  #view-resources .res-formula-line{margin-top:6px; font-size:12.5px; color:var(--ld-text); line-height:1.6; word-break:keep-all; overflow-wrap:anywhere;}
+  #view-resources .res-formula-tag{display:inline-block; margin-right:6px; padding:1px 7px; border-radius:999px; background:var(--ld-accent-light); color:var(--ld-accent-dark); font-size:11px; font-weight:700; vertical-align:1px;}
+
+  /* ---- 가이드 상세: 단계 카드(step) — 점검 항목 · 진단 단계 ---- */
+  #view-resources .res-step{margin:0 0 16px; padding:16px; border:1px solid var(--ld-border); border-radius:12px; background:var(--ld-panel); scroll-margin-top:calc(var(--topbar-h) + 16px);}
+  #view-resources .res-step:focus{outline:none; border-color:var(--ld-accent-mid);}
+  #view-resources .res-step-head{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+  #view-resources .res-step-num{flex:0 0 auto; width:26px; height:26px; border-radius:50%; background:var(--ld-accent); color:#fff; font-size:13px; font-weight:700; display:inline-flex; align-items:center; justify-content:center;}
+  #view-resources .res-step-title{margin:0; font-size:15px; font-weight:700; line-height:1.4; color:var(--ld-text); word-break:keep-all;}
+  #view-resources .res-step-fields{margin:0; display:flex; flex-direction:column; gap:20px;}
+  #view-resources .res-step-field{min-width:0;}
+  #view-resources .res-step-field dt{margin:0 0 8px; font-size:12px; font-weight:700; letter-spacing:.02em; color:var(--ld-accent-dark);}
+  #view-resources .res-step-field dd{margin:0; min-width:0;}
+  #view-resources .res-step-field .res-panel-p{margin:0;}
+  #view-resources .res-step-field .res-panel-list{margin:0 0 10px;}
+  #view-resources .res-step-field .res-panel-numbered{margin:0 0 10px;}
+  #view-resources .res-step-field .res-panel-h3{margin:14px 0 8px;}
+  #view-resources .res-step-field .res-note{margin:0 0 12px;}
+  #view-resources .res-step-field .res-formula-list, #view-resources .res-step-field .res-table-wrap{margin:0 0 12px;}
+  #view-resources .res-step-field dd > :last-child{margin-bottom:0;}
+
+  /* ---- 읽기 스타일(rich 가이드 = 광고 핵심 3종 전용, resources.js가 .res-rich를 붙인다) ----
+     전역 ul{list-style:none} 때문에 목록이 글머리표 없이 들여쓴 문단처럼 보이던 것을
+     글머리표 · 항목 간격 · 줄 간격으로 정리한다. 다른 가이드에는 영향이 없다. */
+  #view-resources .res-rich .res-panel-p{line-height:1.75; margin:0 0 14px;}
+  #view-resources .res-rich .res-panel-h3{margin:24px 0 10px;}
+  #view-resources .res-rich .res-panel-list, #view-resources .res-rich .res-panel-numbered{gap:9px; margin:0 0 16px;}
+  #view-resources .res-rich .res-panel-list{padding-left:0;}
+  #view-resources .res-rich .res-panel-numbered{padding-left:22px;}
+  #view-resources .res-rich .res-panel-list > li, #view-resources .res-rich .res-panel-numbered > li{line-height:1.7;}
+  #view-resources .res-rich .res-panel-list > li{position:relative; padding-left:16px;}
+  #view-resources .res-rich .res-panel-list > li::before{content:''; position:absolute; left:3px; top:.66em; width:5px; height:5px; border-radius:50%; background:var(--ld-accent-mid);}
+  #view-resources .res-rich .res-panel-numbered > li::marker{font-weight:700; color:var(--ld-accent);}
+  #view-resources .res-rich .res-item-lead{font-weight:700; color:var(--ld-text);}
+  #view-resources .res-rich .res-formula-desc{line-height:1.65;}
+  #view-resources .res-rich .res-formula-line{margin-top:8px; line-height:1.65;}
+  #view-resources .res-rich .res-note p{line-height:1.7;}
+
+  /* ---- 가이드 상세: 표(table) — 넓은 화면은 표, 좁은 화면은 카드형 ---- */
+  #view-resources .res-table-wrap{margin:0 0 16px; min-width:0;}
+  #view-resources .res-table{width:100%; min-width:0; border-collapse:collapse; font-size:12.5px; line-height:1.55;} /* 전역 table{min-width:460px} 무효화 — 좁은 화면 가로 넘침 방지 */
+  #view-resources .res-table caption{caption-side:top; text-align:left; margin-bottom:6px; font-size:12px; font-weight:700; color:var(--ld-muted);}
+  #view-resources .res-table th, #view-resources .res-table td{padding:9px 10px; border-bottom:1px solid var(--ld-border); text-align:left; vertical-align:top; color:var(--ld-text); word-break:keep-all; overflow-wrap:anywhere;}
+  #view-resources .res-table thead th{background:var(--ld-muted-bg); font-size:12px; font-weight:700; color:var(--ld-muted); border-top:1px solid var(--ld-border);}
+  #view-resources .res-table tbody th{font-weight:700;}
+  #view-resources .res-jump{min-height:36px; padding:0 12px; border:1px solid var(--ld-accent-mid); border-radius:8px; background:var(--ld-accent-light); color:var(--ld-accent-dark); font-family:var(--f-body); font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap;}
+  #view-resources .res-jump:hover{background:var(--ld-accent); color:#fff;}
+
+  /* ---- 가이드 상세: 참고한 공식 자료 ---- */
+  #view-resources .res-sources{margin-top:22px; padding-top:6px; border-top:1px solid var(--ld-border);}
+  #view-resources .res-sources-meta{margin:0 0 10px; font-size:12px; color:var(--ld-muted);}
+  #view-resources .res-sources-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-resources .res-sources-list li{display:flex; flex-direction:column; gap:2px; min-width:0; padding:10px 12px; border:1px solid var(--ld-border); border-radius:9px; background:var(--ld-muted-bg);}
+  #view-resources .res-source-link{font-size:13px; font-weight:700; color:var(--ld-accent); word-break:keep-all; overflow-wrap:anywhere;}
+  #view-resources .res-source-link:hover{text-decoration:underline;}
+  #view-resources .res-source-org{font-size:12px; color:var(--ld-muted);}
+  #view-resources .res-source-url{font-family:var(--f-mono); font-size:11.5px; color:var(--ld-muted); overflow-wrap:anywhere;}
 
   #view-resources .btn{min-height:44px; justify-content:center;}
   #view-resources .btn-ghost{border-color:var(--ld-border); color:var(--ld-text);}
@@ -3420,4 +3480,15 @@
   @media (max-width:639px){
     #view-resources .res-panel{max-width:100%;}
     #view-resources .res-card{padding:14px 15px;}
+    #view-resources .res-step{padding:14px;}
+    #view-resources .res-step-fields{gap:18px;}
+    #view-resources .res-cta + .res-cta{margin-left:0;}
+    /* 표 → 카드형 행: 머리글 행은 시각적으로 숨기고(스크린리더용으로만 남김), 각 셀 앞에 열 이름을 붙인다. */
+    #view-resources .res-table thead{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
+    #view-resources .res-table, #view-resources .res-table tbody, #view-resources .res-table tr, #view-resources .res-table th, #view-resources .res-table td{display:block; width:100%;}
+    #view-resources .res-table caption{display:block; width:100%;} /* block 표 안의 table-caption은 폭이 줄어 글자가 세로로 깨진다 */
+    #view-resources .res-table tr{margin-bottom:8px; padding:4px 0; border:1px solid var(--ld-border); border-radius:9px; background:var(--ld-panel);}
+    #view-resources .res-table th, #view-resources .res-table td{padding:5px 12px; border-bottom:none;}
+    #view-resources .res-table tbody th{font-size:13px;}
+    #view-resources .res-table td::before{content:attr(data-label); display:block; margin-bottom:1px; font-size:11px; font-weight:700; color:var(--ld-muted);}
   }

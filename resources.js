@@ -247,6 +247,12 @@
   });
 
   // ------------------------------------------------------------- 가이드 상세 패널
+  // "항목명 — 설명" 형태의 목록 항목은 항목명만 굵게 해 항목별로 눈에 띄게 한다(문장은 그대로).
+  function itemLeadHtml(text){
+    var k = text.indexOf(' — ');
+    if(k <= 0 || k > 30) return escapeHtml(text);
+    return '<strong class="res-item-lead">' + escapeHtml(text.slice(0, k)) + '</strong> — ' + escapeHtml(text.slice(k + 3));
+  }
   function blockHtml(b){
     switch(b.t){
       case 'p': return '<p class="res-panel-p">' + escapeHtml(b.text) + '</p>';
@@ -259,8 +265,46 @@
       case 'formula': return '<div class="res-formula-list">' + b.items.map(function(i){
         return '<div class="res-formula-row"><div class="res-formula-term">' + escapeHtml(i.term) + '</div>' +
           (i.formula ? '<div class="res-formula-expr">' + escapeHtml(i.formula) + '</div>' : '') +
-          '<div class="res-formula-desc">' + escapeHtml(i.desc) + '</div></div>';
+          '<div class="res-formula-desc">' + escapeHtml(i.desc) + '</div>' +
+          (i.example ? '<div class="res-formula-line"><span class="res-formula-tag">예시</span>' + escapeHtml(i.example) + '</div>' : '') +
+          (i.check ? '<div class="res-formula-line"><span class="res-formula-tag">먼저 확인</span>' + escapeHtml(i.check) + '</div>' : '') +
+          '</div>';
       }).join('') + '</div>';
+      // 단계 카드 — fields[].blocks에 표 · 공식 · CTA 같은 블록을 중첩할 수 있다.
+      // id가 있으면 표의 jump 버튼이 이 카드로 스크롤한다(해시를 바꾸지 않는다).
+      case 'step': return '<section class="res-step"' + (b.id ? ' id="res-anchor-' + escapeHtml(b.id) + '" tabindex="-1"' : '') + '>' +
+        '<div class="res-step-head">' + (b.num ? '<span class="res-step-num">' + escapeHtml(b.num) + '</span>' : '') +
+        '<h3 class="res-step-title">' + escapeHtml(b.title) + '</h3></div>' +
+        '<dl class="res-step-fields">' + b.fields.map(function(f){
+          return '<div class="res-step-field"><dt>' + escapeHtml(f.label) + '</dt><dd>' +
+            (f.text ? '<p class="res-panel-p">' + escapeHtml(f.text) + '</p>' : '') +
+            (f.items ? '<ul class="res-panel-list">' + f.items.map(function(i){ return '<li>' + itemLeadHtml(i) + '</li>'; }).join('') + '</ul>' : '') +
+            (f.blocks ? f.blocks.map(blockHtml).join('') : '') +
+            '</dd></div>';
+        }).join('') + '</dl></section>';
+      // 표 — 첫 열은 행 머리글(th scope=row), 나머지 셀에 data-label을 달아 좁은 화면에서
+      // "열 이름: 값" 카드로 바꿔 보여준다(가로 스크롤 없이). 셀이 { text, jump }면
+      // 같은 가이드의 step으로 이동하는 버튼이다.
+      case 'table': return '<div class="res-table-wrap"><table class="res-table">' +
+        (b.caption ? '<caption>' + escapeHtml(b.caption) + '</caption>' : '') +
+        '<thead><tr>' + b.head.map(function(h){ return '<th scope="col">' + escapeHtml(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        b.rows.map(function(r){
+          return '<tr>' + r.map(function(c, ci){
+            var inner = (c && typeof c === 'object' && c.jump)
+              ? '<button type="button" class="res-jump" data-res-jump="' + escapeHtml(c.jump) + '">' + escapeHtml(c.text) + '</button>'
+              : escapeHtml(c && typeof c === 'object' ? c.text : c);
+            return ci === 0 ? '<th scope="row">' + inner + '</th>' : '<td data-label="' + escapeHtml(b.head[ci]) + '">' + inner + '</td>';
+          }).join('') + '</tr>';
+        }).join('') + '</tbody></table></div>';
+      // 참고한 공식 자료 — 일반 외부 링크다. 카드의 data-res-external과 달리 GA4 이벤트를
+      // 만들지 않는다(resource_external_click은 자료실 카드 전용 그대로).
+      case 'sources': return '<div class="res-sources"><h3 class="res-panel-h3">참고한 공식 자료</h3>' +
+        '<p class="res-sources-meta">확인 시점: ' + escapeHtml(b.checkedAt) + '</p>' +
+        '<ul class="res-sources-list">' + b.items.map(function(i){
+          return '<li><a class="res-source-link" href="' + escapeHtml(i.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(i.title) + '</a>' +
+            '<span class="res-source-org">' + escapeHtml(i.org) + '</span>' +
+            '<span class="res-source-url">' + escapeHtml(i.url) + '</span></li>';
+        }).join('') + '</ul></div>';
       case 'note': return '<div class="res-note"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg><p>' + escapeHtml(b.text) + '</p></div>';
       case 'cta':
         if(b.slug){
@@ -277,6 +321,8 @@
     var guide = DATA.getGuide(slug);
     if(!resource || !guide){ return null; }
 
+    // rich 가이드(광고 핵심 3종)만 읽기 쉬운 목록 · 여백 스타일(CSS의 .res-rich)을 쓴다.
+    panelBody.classList.toggle('res-rich', !!guide.rich);
     var html = '<div class="res-panel-meta">' + typeBadge(resource.type) +
       '<span class="res-panel-cat">' + escapeHtml(DATA.CATEGORY_LABEL[resource.category] || '') + '</span></div>' +
       '<h2 class="res-panel-title" tabindex="-1">' + escapeHtml(resource.title) + '</h2>' +
@@ -312,6 +358,16 @@
   panelBody && panelBody.addEventListener('click', function(e){
     var item = e.target.closest('.res-check-item');
     if(item){ item.classList.toggle('checked'); return; }
+    // 표 안의 "N단계로 이동" 버튼 — 해시(#/resources/<slug>)를 건드리지 않고 같은
+    // 가이드의 step 카드로 스크롤 + 포커스한다(해시를 바꾸면 라우터가 화면을 벗어난다).
+    var jump = e.target.closest('[data-res-jump]');
+    if(jump){
+      var target = panelBody.querySelector('#res-anchor-' + jump.getAttribute('data-res-jump'));
+      if(target){
+        target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        target.focus({ preventScroll: true });
+      }
+    }
   });
 
   // 패널 안의 내부 가이드 링크(다른 가이드로 이동)/도구 링크(#/tools 등)는
