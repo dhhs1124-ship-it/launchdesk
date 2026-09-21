@@ -329,20 +329,33 @@ test('광고비 쓰기 전 가이드: 이미지 · 이미지 placeholder가 없�
   assert.equal(/image\/|<img|placeholder/i.test(JSON.stringify(data.getGuide('ad-before-start'))), false);
 });
 
-test('광고비 쓰기 전 가이드: 공헌이익 계산 예시가 수학적으로 맞는다(변동비 합계 30,000 · 공헌이익 20,000 · 40% · 손익분기 250%)', () => {
-  const t = tableByCaption('ad-before-start', '광고 전 공헌이익 계산 예시(가상)');
-  const v = (name) => num(rowByName(t, name)[1]);
-  const price = v('판매가(고객 결제 금액)');
-  const parts = ['상품원가', '판매수수료', '실제 배송비', '포장비', '판매자 부담 적립금 · 쿠폰 등'].map(v);
-  const sum = parts.reduce((a, b) => a + b, 0);
+test('광고비 쓰기 전 가이드: 공헌이익 숫자 요약이 수학적으로 맞는다(변동비 30,000 · 공헌이익 20,000 · 40% · 손익분기 250%)', () => {
+  const blocks = allBlocks('ad-before-start');
+  const summary = blocks.find((b) => b.t === 'metric-summary');
+  assert.ok(summary, '공헌이익 숫자 요약(metric-summary) 블록이 없음');
+  const v = (term) => {
+    const item = summary.items.find((i) => i.term === term);
+    assert.ok(item, '"' + term + '" 항목이 숫자 요약에 없음');
+    return num(item.desc);
+  };
+  const price = v('판매가');
+  const varCost = v('광고비 제외 변동비');
+  const contrib = v('광고비를 빼기 전 남는 돈');
   assert.equal(price, 50000);
-  assert.equal(sum, 30000);
-  assert.equal(v('광고비를 뺀 변동비 합계'), sum);
-  assert.equal(v('광고 전 공헌이익(주문 1건)'), price - sum);
-  near(v('광고 전 공헌이익률'), (price - sum) / price * 100, '공헌이익률');
-  near(v('손익분기 ROAS'), 100 / ((price - sum) / price), '손익분기 ROAS');
+  assert.equal(varCost, 30000);
+  assert.equal(contrib, price - varCost);
+  assert.equal(contrib, 20000);
+  near(v('공헌이익률'), contrib / price * 100, '공헌이익률');
+  assert.equal(v('공헌이익률'), 40);
+  near(v('손익분기 ROAS'), 100 / (contrib / price), '손익분기 ROAS');
   assert.equal(v('손익분기 ROAS'), 250);
-  assert.equal(v('주문당 광고비 한도(손익분기 CPA)'), price - sum);
+  assert.equal(v('주문당 광고비 한도'), contrib);
+  // 변동비에 포함할 항목은 금액 없이 짧은 목록으로만 남는다(반복 표 제거).
+  const step4 = steps('ad-before-start')[3];
+  const items = step4.fields.find((f) => f.label === '무엇을 확인하나요').items;
+  ['상품원가', '판매수수료', '실제 배송비', '포장비', '판매자 부담 쿠폰·적립금·사은품 비용'].forEach((name) => {
+    assert.ok(items.includes(name), '변동비 항목 목록에 "' + name + '"가 없음');
+  });
 });
 
 test('광고비 쓰기 전 가이드: 손익분기 ROAS 공식과 광고 기록 CTA(#/dashboard)가 있다', () => {
@@ -353,14 +366,18 @@ test('광고비 쓰기 전 가이드: 손익분기 ROAS 공식과 광고 기록 
   assert.ok(text.includes('공헌이익률'));
 });
 
-test('광고비 쓰기 전 가이드: 기록표에 요구 항목이 모두 있고 LaunchDesk 광고 기록의 입력 범위를 정직하게 밝힌다', () => {
+test('광고비 쓰기 전 가이드: 기록표는 LaunchDesk가 실제로 받는 핵심 항목만 남기고, 나머지는 정직하게 안내한다', () => {
   const t = tableByCaption('ad-before-start', '광고 기록표에 적을 항목');
   const names = t.rows.map((r) => cellText(r[0]));
-  ['날짜', '광고비', '노출', '클릭', '랜딩페이지 조회', '장바구니', '구매', '매출', 'CPA', 'ROAS', '메모'].forEach((n) => {
-    assert.ok(names.includes(n), '기록표에 "' + n + '" 항목이 없음');
+  // 긴 11행 표 대신 핵심 6항목만 남는다(초보자 부담 감소 + LaunchDesk에 없는 입력칸 나열 금지).
+  assert.deepEqual(names, ['날짜', '채널', '소재명', '광고비', '전환 매출', 'ROAS']);
+  ['노출', '클릭', '랜딩페이지 조회', '장바구니', '구매', 'CPA', '메모'].forEach((n) => {
+    assert.equal(names.includes(n), false, '기록표에 LaunchDesk에 없는 입력 항목 "' + n + '"이 남아 있음');
   });
   const text = data.guideSearchText('ad-before-start');
   assert.ok(text.includes('소재명'), 'LaunchDesk 광고 기록이 받는 항목(소재명 · 지출 · 전환 매출)을 설명하지 않음');
+  assert.ok(text.includes('ROAS를 계산'), 'LaunchDesk가 ROAS를 계산해 준다는 안내가 없음');
+  assert.ok(text.includes('구매 수') && (text.includes('관리자') || text.includes('메모')), '구매 수 · 변경사항은 관리자/메모에서 확인하라는 안내가 없음');
 });
 
 /* ---------------------------------------------------------- 가이드 2 */
@@ -565,7 +582,7 @@ test('검색: 요구한 6개 검색어가 관련 가이드를 찾는다', () => 
 });
 
 test('렌더러(resources.js)는 광고 3종이 쓰는 모든 블록 유형을 지원한다', () => {
-  const supported = new Set((resourcesJs.match(/case '([a-z0-9]+)':/g) || []).map((m) => m.slice(6, -2)));
+  const supported = new Set((resourcesJs.match(/case '([a-z0-9-]+)':/g) || []).map((m) => m.slice(6, -2)));
   AD_SLUGS.forEach((slug) => {
     allBlocks(slug).forEach((b) => assert.ok(supported.has(b.t), slug + '의 블록 유형 "' + b.t + '"를 resources.js가 렌더링하지 못함'));
   });
@@ -631,19 +648,17 @@ test('가독성: 광고 3종 어디에도 ①②③ 같은 문단 속 번호 나
   });
 });
 
-test('가독성: 광고비 쓰기 전 가이드의 결론부터는 "안내 문장 → numbered 3항목 → 마무리 문장" 순서다', () => {
-  const blocks = data.getGuide('ad-before-start').blocks;
+test('가독성: 광고비 쓰기 전 가이드의 결론부터는 "짧은 도입 → 준비 3단계 시각 흐름 → 준비 상태 안내" 순서다', () => {
+  const guide = data.getGuide('ad-before-start');
+  assert.equal(guide.intro, '광고는 켜는 순간 비용이 나갑니다. 목표·손익·측정 방법을 먼저 정해 두면 결과가 좋지 않을 때 원인을 더 빠르게 찾을 수 있습니다.');
+  const blocks = guide.blocks;
   const i = blocks.findIndex((b) => b.t === 'h3' && b.text === '결론부터');
   assert.equal(i, 0);
-  assert.equal(blocks[i + 1].t, 'p');
-  assert.equal(blocks[i + 2].t, 'numbered');
-  assert.deepEqual(blocks[i + 2].items, [
-    '이번 광고로 무엇을 얻을지 정하기',
-    '상품 1개가 팔릴 때 광고비를 빼기 전 얼마가 남는지 계산하기',
-    '광고 결과를 어떤 숫자로 측정할지 정하기'
-  ]);
-  assert.equal(blocks[i + 3].t, 'p');
-  assert.equal(blocks[i + 3].text, '이 세 가지가 비어 있으면 광고 결과가 좋지 않아도 무엇이 원인인지 구분하기 어렵습니다.');
+  assert.equal(blocks[i + 1].t, 'flow');
+  assert.deepEqual(blocks[i + 1].items.map((it) => it.title), ['목표와 상품 정하기', '손익과 예산 정하기', '측정하고 기록하기']);
+  assert.deepEqual(blocks[i + 1].items.map((it) => it.desc), ['1~3단계', '4·6단계', '5·7단계']);
+  assert.equal(blocks[i + 2].t, 'note');
+  assert.equal(blocks[i + 2].text, '이 가이드는 광고 설정법이 아니라, 광고를 시작하기 전 준비 상태를 확인하는 체크리스트입니다.');
 });
 
 test('가독성: 광고 숫자 가이드의 결론부터도 numbered 3항목으로 세로 분리돼 있다', () => {

@@ -262,6 +262,28 @@
       case 'checklist': return '<ul class="res-checklist">' + b.items.map(function(i, idx){
         return '<li><button type="button" class="res-check-item" data-check-idx="' + idx + '"><span class="res-check-box" aria-hidden="true"></span><span>' + escapeHtml(i) + '</span></button></li>';
       }).join('') + '</ul>';
+      // 시각 흐름(flow) — 순서가 있는 준비/측정 단계를 화면에 3~5개 이어지는 카드로 보여준다.
+      // <ol>을 써서 스크린리더가 항목 개수·순서를 그대로 읽는다(시각 번호는 CSS counter로만 그림).
+      case 'flow': return '<ol class="res-flow"' + (b.label ? ' aria-label="' + escapeHtml(b.label) + '"' : '') + '>' + b.items.map(function(i){
+        return '<li class="res-flow-step"><span class="res-flow-title">' + escapeHtml(i.title) + '</span>' +
+          (i.desc ? '<span class="res-flow-desc">' + escapeHtml(i.desc) + '</span>' : '') + '</li>';
+      }).join('') + '</ol>';
+      // 숫자 요약(metric-summary) — 공헌이익 계산을 "판매가 − 변동비 = 남는 돈" 흐름 카드 +
+      // 핵심 결과(공헌이익률 · 손익분기 ROAS · 주문당 광고비 한도) 통계 카드로 보여준다.
+      case 'metric-summary':
+        var msChain = b.items.filter(function(i){ return i.role === 'chain' || i.role === 'result'; });
+        var msStats = b.items.filter(function(i){ return i.role === 'stat'; });
+        return '<div class="res-metric-summary">' +
+          '<div class="res-metric-chain">' + msChain.map(function(i, idx){
+            return (idx > 0 ? '<span class="res-metric-op" aria-hidden="true">' + escapeHtml(i.op || '') + '</span>' : '') +
+              '<div class="res-metric-chip' + (i.role === 'result' ? ' res-metric-chip-result' : '') + '">' +
+              '<span class="res-metric-term">' + escapeHtml(i.term) + '</span>' +
+              '<span class="res-metric-value">' + escapeHtml(i.desc) + '</span></div>';
+          }).join('') + '</div>' +
+          '<div class="res-metric-stats">' + msStats.map(function(i){
+            return '<div class="res-metric-stat"><span class="res-metric-term">' + escapeHtml(i.term) + '</span>' +
+              '<span class="res-metric-value">' + escapeHtml(i.desc) + '</span></div>';
+          }).join('') + '</div></div>';
       case 'formula': return '<div class="res-formula-list">' + b.items.map(function(i){
         return '<div class="res-formula-row"><div class="res-formula-term">' + escapeHtml(i.term) + '</div>' +
           (i.formula ? '<div class="res-formula-expr">' + escapeHtml(i.formula) + '</div>' : '') +
@@ -297,14 +319,16 @@
           }).join('') + '</tr>';
         }).join('') + '</tbody></table></div>';
       // 참고한 공식 자료 — 일반 외부 링크다. 카드의 data-res-external과 달리 GA4 이벤트를
-      // 만들지 않는다(resource_external_click은 자료실 카드 전용 그대로).
-      case 'sources': return '<div class="res-sources"><h3 class="res-panel-h3">참고한 공식 자료</h3>' +
-        '<p class="res-sources-meta">확인 시점: ' + escapeHtml(b.checkedAt) + '</p>' +
+      // 만들지 않는다(resource_external_click은 자료실 카드 전용 그대로). 링크가 여러 개라
+      // 본문 아래가 길어 보이지 않도록 네이티브 details/summary로 접어 둔다(기본 닫힘,
+      // 키보드 Enter/Space로 여닫기는 브라우저가 기본 제공 — 별도 JS 불필요).
+      case 'sources': return '<details class="res-sources"><summary class="res-sources-summary">참고한 공식 자료 ' +
+        b.items.length + '개 · ' + escapeHtml(b.checkedAt) + ' 확인</summary>' +
         '<ul class="res-sources-list">' + b.items.map(function(i){
           return '<li><a class="res-source-link" href="' + escapeHtml(i.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(i.title) + '</a>' +
             '<span class="res-source-org">' + escapeHtml(i.org) + '</span>' +
             '<span class="res-source-url">' + escapeHtml(i.url) + '</span></li>';
-        }).join('') + '</ul></div>';
+        }).join('') + '</ul></details>';
       case 'note': return '<div class="res-note"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg><p>' + escapeHtml(b.text) + '</p></div>';
       case 'cta':
         if(b.slug){
