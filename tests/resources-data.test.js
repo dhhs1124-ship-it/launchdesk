@@ -236,10 +236,16 @@ const AD_SLUGS = ['ad-before-start', 'ad-metrics', 'ad-troubleshoot'];
 const resourcesJs = fs.readFileSync(path.join(__dirname, '..', 'resources.js'), 'utf8');
 const stylesCss = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
 
-// 가이드의 모든 블록(step 필드 안에 중첩된 blocks 포함)
+// 가이드의 모든 블록(step 필드 안 · collapse 안에 중첩된 blocks 포함)
 function allBlocks(slug){
   const out = [];
-  (function walk(blocks){ (blocks || []).forEach((b) => { out.push(b); if(b.t === 'step') (b.fields || []).forEach((f) => walk(f.blocks)); }); })(data.getGuide(slug).blocks);
+  (function walk(blocks){
+    (blocks || []).forEach((b) => {
+      out.push(b);
+      if(b.t === 'step') (b.fields || []).forEach((f) => walk(f.blocks));
+      if(b.t === 'collapse') walk(b.blocks);
+    });
+  })(data.getGuide(slug).blocks);
   return out;
 }
 function tableByCaption(slug, caption){
@@ -277,6 +283,7 @@ function humanStrings(slug){
       (b.fields || []).forEach((f) => { out.push(f.label); if(f.text) out.push(f.text); (f.items || []).forEach((i) => out.push(i)); if(f.blocks) walk(f.blocks); });
       (b.head || []).forEach((h) => out.push(h));
       (b.rows || []).forEach((r) => r.forEach((c) => out.push(cellText(c))));
+      if(b.blocks) walk(b.blocks); // collapse — 접혀 있어도 검색 대상이어야 함
     });
   })(g.blocks);
   return out.filter(Boolean);
@@ -382,8 +389,9 @@ test('광고비 쓰기 전 가이드: 기록표는 LaunchDesk가 실제로 받�
 
 /* ---------------------------------------------------------- 가이드 2 */
 test('광고 숫자 가이드: 흐름 설명 순서와 예시 데이터가 요구와 같다', () => {
-  const text = data.guideSearchText('ad-metrics');
-  assert.ok(text.includes('노출 → 클릭 → 랜딩페이지 도착 → 장바구니 → 결제 시작 → 구매 → 매출과 이익'));
+  const funnel = allBlocks('ad-metrics').find((b) => b.t === 'flow' && b.items.length === 7);
+  assert.ok(funnel, '7단계 광고 퍼널 flow 블록이 없음');
+  assert.deepEqual(funnel.items.map((it) => it.title), ['노출', '링크 클릭', '랜딩페이지 도착', '장바구니', '결제 시작', '구매', '매출과 이익']);
   const ex = tableByCaption('ad-metrics', '이 가이드의 예시 쇼핑몰(가상 데이터)');
   const v = (name) => num(rowByName(ex, name)[1]);
   assert.equal(v('광고비'), 100000);
@@ -459,8 +467,13 @@ test('광고 숫자 가이드: "ROAS 400% = 매출 400,000원 전부 이익"이 
   const text = data.guideSearchText('ad-metrics');
   assert.ok(text.includes('ROAS 400%는 매출 400,000원이 전부 이익이라는 뜻이 아닙니다'));
   ['세금', '반품', '쿠폰', '고정비'].forEach((w) => assert.ok(text.includes(w), '"' + w + '" 안내가 없음'));
-  const t = tableByCaption('ad-metrics', '매출 400,000원이 남는 돈이 되기까지');
-  const v = (name) => num(rowByName(t, name)[1]);
+  const summary = allBlocks('ad-metrics').find((b) => b.t === 'metric-summary' && b.items.some((i) => i.term === '주문 8건의 광고비 제외 변동비'));
+  assert.ok(summary, '매출 → 이익 금액 흐름 숫자 요약(metric-summary) 블록이 없음');
+  const v = (term) => {
+    const item = summary.items.find((i) => i.term === term);
+    assert.ok(item, '"' + term + '" 항목이 숫자 요약에 없음');
+    return num(item.desc);
+  };
   assert.equal(v('매출'), 400000);
   assert.equal(v('주문 8건의 광고비 제외 변동비'), 8 * 30000);
   assert.equal(v('광고 전 총 공헌이익'), 400000 - 8 * 30000);
@@ -661,15 +674,15 @@ test('가독성: 광고비 쓰기 전 가이드의 결론부터는 "짧은 도�
   assert.equal(blocks[i + 2].text, '이 가이드는 광고 설정법이 아니라, 광고를 시작하기 전 준비 상태를 확인하는 체크리스트입니다.');
 });
 
-test('가독성: 광고 숫자 가이드의 결론부터도 numbered 3항목으로 세로 분리돼 있다', () => {
+test('가독성: 광고 숫자 가이드의 결론부터는 3단계 시각 흐름(flow)으로 세로 분리돼 있다', () => {
   const blocks = data.getGuide('ad-metrics').blocks;
+  assert.equal(blocks[0].t, 'h3');
   assert.equal(blocks[0].text, '결론부터');
-  assert.equal(blocks[1].t, 'p');
-  assert.equal(blocks[2].t, 'numbered');
-  assert.equal(blocks[2].items.length, 3);
-  assert.ok(blocks[2].items[1].includes('CPA'));
-  assert.ok(blocks[2].items[2].includes('손익분기 ROAS') && blocks[2].items[2].includes('광고비 차감 후 남는 공헌이익'));
-  assert.equal(blocks[3].t, 'p');
+  assert.equal(blocks[1].t, 'flow');
+  assert.equal(blocks[1].items.length, 3);
+  assert.deepEqual(blocks[1].items.map((it) => it.title), ['유입 확인', '구매 확인', '이익 확인']);
+  assert.ok(blocks[1].items[2].desc.includes('CPA') && blocks[1].items[2].desc.includes('ROAS'));
+  assert.equal(blocks[2].t, 'note');
 });
 
 test('가독성: 광고가 안 될 때 가이드의 결론부터는 원칙 문단과 예외(추적 문제) 문단으로 나뉜다', () => {

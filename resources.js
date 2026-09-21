@@ -284,6 +284,13 @@
             return '<div class="res-metric-stat"><span class="res-metric-term">' + escapeHtml(i.term) + '</span>' +
               '<span class="res-metric-value">' + escapeHtml(i.desc) + '</span></div>';
           }).join('') + '</div></div>';
+      // 접기(collapse) — 초보자에게 한 번에 다 보여주면 부담스러운 심화/전체
+      // 목록을 details/summary로 접어 둔다(참고 자료 접기와 같은 이유·같은
+      // 네이티브 방식). 안의 blocks는 이 함수로 그대로 재귀 렌더링한다(step의
+      // fields[].blocks와 같은 패턴) — 접혀 있어도 DOM에는 있으므로 검색·접근성에
+      // 영향 없다.
+      case 'collapse': return '<details class="res-collapse"><summary class="res-collapse-summary">' +
+        escapeHtml(b.summary) + '</summary>' + (b.blocks || []).map(blockHtml).join('') + '</details>';
       case 'formula': return '<div class="res-formula-list">' + b.items.map(function(i){
         return '<div class="res-formula-row"><div class="res-formula-term">' + escapeHtml(i.term) + '</div>' +
           (i.formula ? '<div class="res-formula-expr">' + escapeHtml(i.formula) + '</div>' : '') +

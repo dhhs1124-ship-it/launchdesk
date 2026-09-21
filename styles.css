@@ -3477,11 +3477,20 @@
   #view-resources .res-source-org{font-size:12px; color:var(--ld-muted);}
   #view-resources .res-source-url{font-family:var(--f-mono); font-size:11.5px; color:var(--ld-muted); overflow-wrap:anywhere;}
 
+  /* ---- 가이드 상세: 심화/전체 목록 접기(collapse) — sources와 같은 details/summary 패턴 ---- */
+  #view-resources .res-collapse{margin:0 0 16px; padding-top:4px; border-top:1px solid var(--ld-border);}
+  #view-resources .res-collapse-summary{cursor:pointer; min-height:44px; display:flex; align-items:center; list-style:none; font-size:14px; font-weight:700; color:var(--ld-text);}
+  #view-resources .res-collapse-summary::-webkit-details-marker{display:none;}
+  #view-resources .res-collapse-summary::before{content:'▸'; display:inline-block; width:14px; margin-right:6px; color:var(--ld-accent); transition:transform .15s;}
+  #view-resources details.res-collapse[open] > .res-collapse-summary::before{transform:rotate(90deg);}
+  #view-resources .res-collapse-summary:focus-visible{outline:2px solid var(--ld-accent-mid); outline-offset:2px;}
+  #view-resources .res-collapse > .res-panel-p:first-of-type{margin-top:12px;}
+
   /* ---- 가이드 상세: 시각 흐름(flow) — 결론부터의 준비 3단계, 전환 측정 준비의 측정 흐름 ---- */
   #view-resources .res-flow{counter-reset:res-flow; list-style:none; margin:0 0 16px; padding:0; display:flex; flex-wrap:wrap; gap:18px 0;}
-  #view-resources .res-flow-step{counter-increment:res-flow; position:relative; flex:1 1 0; min-width:90px; display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; padding:12px 6px 10px; margin:0 7px; background:var(--ld-accent-light); border-radius:10px;}
+  #view-resources .res-flow-step{counter-increment:res-flow; position:relative; flex:1 1 0; min-width:76px; display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; padding:12px 5px 10px; margin:0 5px; background:var(--ld-accent-light); border-radius:10px;}
   #view-resources .res-flow-step::before{content:counter(res-flow); width:22px; height:22px; border-radius:50%; background:var(--ld-accent); color:#fff; font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center;}
-  #view-resources .res-flow-step:not(:last-child)::after{content:'→'; position:absolute; right:-13px; top:23px; color:var(--ld-accent-mid); font-size:16px; font-weight:700; line-height:1;}
+  #view-resources .res-flow-step:not(:last-child)::after{content:'→'; position:absolute; right:-11px; top:23px; color:var(--ld-accent-mid); font-size:16px; font-weight:700; line-height:1;}
   #view-resources .res-flow-title{font-size:13px; font-weight:700; color:var(--ld-text); word-break:keep-all;}
   #view-resources .res-flow-desc{font-size:11.5px; color:var(--ld-muted);}
 
