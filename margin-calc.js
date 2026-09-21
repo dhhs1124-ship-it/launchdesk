@@ -170,6 +170,16 @@
     var ratio = totalIncome > 0 ? (postAd / totalIncome) * 100 : null; // 분모 0 → 계산 불가
     var adRoom = input.targetProfit === null ? null : preAd - roundWon(input.targetProfit);
 
+    // 광고비 차감 전 공헌이익률 · 손익분기 ROAS — 둘 다 preAd/totalIncome만으로
+    // 계산해서 adCost와 완전히 무관하다(광고비 입력을 바꿔도 이 값들은 그대로여야
+    // 한다는 요구사항을 계산식 자체로 보장한다. adCost는 이미 preAd 계산 이후에만
+    // 등장하므로 여기서 참조하지 않는다).
+    // preAd <= 0이면 "이익 기준 손익분기점"이 존재하지 않으므로 null(화면에서
+    // Infinity·NaN·음수 ROAS를 표시하지 않기 위함) — totalIncome <= 0인 경우도
+    // 마찬가지로 null.
+    var preAdRatio = totalIncome > 0 ? (preAd / totalIncome) * 100 : null;
+    var breakevenRoas = (totalIncome > 0 && preAd > 0) ? (totalIncome / preAd) * 100 : null;
+
     return {
       calcVersion: CALC_VERSION,
       grossBeforeDiscount: roundWon(grossBeforeDiscount),
@@ -192,6 +202,8 @@
       adRate: input.adMode === AD_MODE.RATE ? input.adRate : null,
       postAd: postAd,
       ratio: ratio,
+      preAdRatio: preAdRatio,
+      breakevenRoas: breakevenRoas,
       isDeficit: postAd < 0,
       targetProfit: input.targetProfit,
       adRoom: adRoom

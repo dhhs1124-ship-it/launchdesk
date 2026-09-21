@@ -223,3 +223,111 @@ test('플랫폼 안내에는 확인되지 않은 요율 · 확인일이 들어�
 test('저장 레코드 버전 상수', () => {
   assert.equal(calc.CALC_VERSION, 2);
 });
+
+// ===== 손익분기 ROAS(요구사항: 광고 가이드 CTA와 일치) =====================
+
+test('손익분기 ROAS 정상 사례 — 매출 50,000 · 변동비 30,000 → 공헌이익 20,000 · 40% · 손익분기 250%', () => {
+  const r = calc.calculate({
+    price: 50000, qty: 1, sellerDiscount: 0, unitCost: 30000,
+    customerShipping: 0, actualShipping: 0, packaging: 0,
+    feeRate: 0, feeBase: 'after_discount', feeVat: 'included',
+    shippingFeeMode: 'none', pgRate: 0, otherCost: 0, adMode: 'none'
+  }).result;
+  assert.equal(r.totalIncome, 50000);
+  assert.equal(r.preAd, 20000);
+  assert.equal(r.preAdRatio, 40);
+  assert.equal(r.breakevenRoas, 250);
+});
+
+test('광고비 입력을 바꿔도 공헌이익률 · 손익분기 ROAS는 그대로(광고비 차감 후 잔액만 달라짐)', () => {
+  const none = run({ adMode: 'none' });
+  const rate6 = run({ adMode: 'rate', adRate: 6 });
+  const rate20 = run({ adMode: 'rate', adRate: 20 });
+  const amount = run({ adMode: 'amount', adAmount: 4000 });
+  assert.notEqual(none.postAd, rate20.postAd); // 대조군: 광고비 차감 후 잔액은 실제로 달라진다
+  for (const r of [none, rate6, rate20, amount]) {
+    assert.equal(r.preAd, 9000);
+    assert.equal(r.preAdRatio, none.preAdRatio);
+    assert.equal(r.breakevenRoas, none.breakevenRoas);
+  }
+});
+
+test('공헌이익 0원 — 손익분기 ROAS는 null(Infinity 아님)', () => {
+  const r = run({ otherCost: 9000 }); // 기존 "손익 0원" 픽스처(위 테스트) 재사용
+  assert.equal(r.preAd, 0);
+  assert.equal(r.preAdRatio, 0);
+  assert.equal(r.breakevenRoas, null);
+});
+
+test('공헌이익 적자 — 매출 50,000 · 변동비 55,000 → -5,000원 · -10% · 손익분기 ROAS 없음', () => {
+  const r = calc.calculate({
+    price: 50000, qty: 1, sellerDiscount: 0, unitCost: 55000,
+    customerShipping: 0, actualShipping: 0, packaging: 0,
+    feeRate: 0, feeBase: 'after_discount', feeVat: 'included',
+    shippingFeeMode: 'none', pgRate: 0, otherCost: 0, adMode: 'none'
+  }).result;
+  assert.equal(r.preAd, -5000);
+  assert.equal(r.preAdRatio, -10);
+  assert.equal(r.breakevenRoas, null);
+  assert.equal(calc.fmtWon(r.preAd), '-5,000원');
+  assert.equal(calc.fmtPct(r.preAdRatio), '-10.0%');
+});
+
+test('광고비까지 더한 적자 — 광고 전/후 손실액이 서로 다른 값으로 구분된다', () => {
+  const r = run({ unitCost: 26000, adMode: 'rate', adRate: 10 }); // 기존 "음수 잔액" 픽스처 재사용
+  assert.equal(r.preAd, -2000);
+  assert.equal(r.postAd, -5000);
+  assert.notEqual(r.preAd, r.postAd);
+  assert.equal(r.breakevenRoas, null); // preAd < 0이므로 광고비와 무관하게 여전히 없음
+});
+
+test('매출 0원 — 공헌이익률 · 손익분기 ROAS는 null이지만 손실 금액(공헌이익) 자체는 실수로 확정된다', () => {
+  const r = run({ sellerDiscount: 30000, customerShipping: 0 }); // 기존 "총 수입 0원" 픽스처 재사용
+  assert.equal(r.totalIncome, 0);
+  assert.equal(r.preAdRatio, null);
+  assert.equal(r.breakevenRoas, null);
+  assert.equal(Number.isFinite(r.preAd), true); // 계산할 수 없는 값으로 지어내지 않고, 확정 가능한 손실은 그대로 노출
+  assert.ok(r.preAd < 0);
+});
+
+test('소수점 사례 — 공헌이익률 · 손익분기 ROAS 반올림 표시', () => {
+  const r = run(); // 기준 사례: preAd 9,000 / totalIncome 30,000
+  assert.equal(Number(r.preAdRatio.toFixed(1)), 30.0);
+  assert.equal(calc.fmtPct(r.preAdRatio), '30.0%');
+  assert.equal(Number(r.breakevenRoas.toFixed(2)), 333.33);
+  assert.equal(calc.fmtPct(r.breakevenRoas), '333.3%');
+});
+
+test('경계값 전체에서 preAdRatio · breakevenRoas에 NaN · Infinity가 나오지 않는다', () => {
+  const fixtures = [
+    run(),
+    run({ otherCost: 9000 }),                              // 공헌이익 0원
+    run({ unitCost: 26000 }),                               // 공헌이익 적자
+    run({ sellerDiscount: 30000, customerShipping: 0 })     // 매출 0원
+  ];
+  for (const r of fixtures) {
+    if (r.preAdRatio !== null) assert.equal(Number.isFinite(r.preAdRatio), true);
+    if (r.breakevenRoas !== null) assert.equal(Number.isFinite(r.breakevenRoas), true);
+    assert.notEqual(r.breakevenRoas, Infinity);
+    assert.equal(Number.isNaN(r.breakevenRoas), false);
+  }
+});
+
+test('결과 화면: 손익분기 ROAS · 계획된 적자 안내 마크업이 있고 금지 표현이 없다', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const toolsJs = fs.readFileSync(path.join(__dirname, '..', 'tools.js'), 'utf8');
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+
+  assert.ok(/id="mcResultBreakeven"/.test(indexHtml), '손익분기 ROAS 결과 컨테이너가 index.html에 없음');
+  assert.ok(/mcResultBreakeven/.test(toolsJs), 'tools.js가 mcResultBreakeven 컨테이너를 채우지 않음');
+  assert.ok(/mcBreakevenHtml/.test(toolsJs), 'mcBreakevenHtml 렌더 함수가 없음');
+  assert.ok(/손익분기 ROAS/.test(toolsJs), 'tools.js에 손익분기 ROAS 문구가 없음');
+  assert.ok(/계획된 적자라면/.test(toolsJs), '계획된 적자 안내 문구가 없음');
+  assert.ok(/런칭 · 행사 · 신규고객 확보/.test(toolsJs), '계획된 적자 안내의 구체적 문구가 없음');
+
+  const banned = ['적자이므로 광고하지 마세요', '광고할 수 없습니다', '사업성이 없습니다', '즉시 중단'];
+  for (const phrase of banned) {
+    assert.equal(toolsJs.includes(phrase), false, '금지 단정 문구가 tools.js에 있음: ' + phrase);
+  }
+});

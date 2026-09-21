@@ -223,6 +223,50 @@
     return (Math.round(n * 100) / 100) + '%';
   }
 
+  /* 손익분기 ROAS 표시 문구 — margin-calc.js는 계산 불가/없음을 둘 다 null로
+     반환하므로(구분하는 boolean을 따로 안 두고, 존재하는 값만으로 원인을
+     되짚는다 — 요구사항: 계산할 수 없는 값을 위해 새 입력값/필드를 만들지
+     않음), 화면에서만 두 원인을 구분한 문구를 고른다:
+     - 총 수입(매출) 자체가 0원이라 계산 자체가 성립하지 않는 경우 → "계산할 수 없음"
+     - 매출은 있지만 공헌이익이 0원 이하라 "이익 기준 손익분기점"이 없는 경우 → "없음" */
+  function mcPreAdRatioText(r){
+    return r.preAdRatio === null ? '계산할 수 없음' : MC.fmtPct(r.preAdRatio);
+  }
+  function mcBreakevenRoasText(r){
+    if(r.breakevenRoas !== null) return MC.fmtPct(r.breakevenRoas);
+    return r.totalIncome > 0 ? '없음' : '계산할 수 없음';
+  }
+
+  /* 손익분기 ROAS 결과 블록 — 광고 가이드의 "마진 계산기로 손익분기 ROAS
+     확인하기" CTA가 그대로 이어지는 곳이라 details로 접지 않고 항상 보이는
+     mc-result-facts 영역에 둔다(요구사항: 값을 숨기지 않음). 공헌이익이
+     마이너스일 때만 손실 금액 · 계획된 적자 안내를 덧붙인다 — 광고를 금지하는
+     문구는 쓰지 않는다. 기존 클래스(mc-result-facts/mc-fact-row/mc-res-room)만
+     재사용하고 새 CSS는 추가하지 않는다. */
+  function mcBreakevenHtml(input, r){
+    var html = '';
+    html += '<div class="mc-fact-row"><b>광고비 차감 전 공헌이익:</b> ' + MC.fmtWon(r.preAd) + '</div>';
+    html += '<div class="mc-fact-row"><b>광고비 차감 전 공헌이익률:</b> ' + mcPreAdRatioText(r) + '</div>';
+    html += '<div class="mc-fact-row"><b>손익분기 ROAS:</b> ' + mcBreakevenRoasText(r) + '</div>';
+    if(r.breakevenRoas !== null){
+      html += '<div class="mc-fact-row mc-fact-disclaimer">실제 ROAS가 이 기준보다 높아야 광고비를 낸 뒤 이익이 남아요. 세금 · 반품 · 고정비까지 고려하면 실제로 필요한 ROAS는 더 높아질 수 있어요 — 모든 상품에 적용되는 광고 합격선은 아니에요.</div>';
+    }
+    if(r.preAd < 0){
+      html += '<div class="mc-res-room short mc-result-facts">';
+      html += '<div class="mc-fact-row">현재 조건에서는 광고비를 쓰기 전부터 주문 1건당 ' + MC.fmtWon(Math.abs(r.preAd)) + ' 손실이 발생해요. 따라서 이 조건에는 이익 기준의 손익분기 ROAS가 없어요.</div>';
+      html += '<div class="mc-res-row"><span>주문 1건당 광고 전 손실액</span><b>' + MC.fmtWon(r.preAd) + '</b></div>';
+      if(r.postAd < 0){
+        html += '<div class="mc-res-row"><span>광고비까지 포함한 최종 예상 손실액</span><b>' + MC.fmtWon(r.postAd) + '</b></div>';
+      }
+      if(input.qty > 1){
+        html += '<div class="mc-fact-row">위 금액은 이 주문에 포함된 판매 수량 ' + input.qty + '개를 모두 반영한 주문 전체 기준이에요.</div>';
+      }
+      html += '<div class="mc-fact-row"><b>계획된 적자라면:</b> 런칭 · 행사 · 신규고객 확보를 위한 계획된 적자라면 진행할 수 있어요. 다만 총예산, 주문당 허용 손실, 종료 날짜를 먼저 정하세요.</div>';
+      html += '</div>';
+    }
+    return html;
+  }
+
   /* 계산 과정 — 결과 패널(잔액률·계산 과정 details)과 예시 카드가 같은
      HTML을 쓴다. 숫자는 전부 우리 계산 결과(사용자 입력을 문자열로 다시
      넣지 않음)라 escape 할 게 없다. */
@@ -257,7 +301,7 @@
     html += row('= 비용 합계 (광고비 제외)', MC.fmtWon(r.productCostTotal + r.actualShipping + r.packaging + r.feeTotal + r.otherCost), 'total');
     html += '</div>';
     html += '<div class="mc-bd-sec"><b>남는 금액</b>';
-    html += row('광고비 차감 전 예상 잔액 = 총 수입 − 비용 합계', MC.fmtWon(r.preAd));
+    html += row('광고비 차감 전 예상 잔액(공헌이익) = 총 수입 − 비용 합계', MC.fmtWon(r.preAd));
     if(r.adMode === 'rate'){
       html += row('주문당 광고비 배분액 = 상품 결제금액 ' + MC.fmtWon(r.productAmount) + ' × ' + fmtRate(r.adRate), MC.fmtWon(r.adCost));
     } else if(r.adMode === 'amount'){
@@ -267,6 +311,8 @@
     }
     html += row('광고비 차감 후 예상 잔액', MC.fmtWon(r.postAd), 'total');
     html += row('총 수입 대비 예상 잔액률', r.ratio === null ? '계산 불가 (총 수입 0원)' : MC.fmtPct(r.ratio));
+    html += row('광고비 차감 전 공헌이익률 = 공헌이익 ÷ 총 수입', mcPreAdRatioText(r));
+    html += row('손익분기 ROAS = 100 ÷ 공헌이익률', mcBreakevenRoasText(r));
     html += '</div>';
     return html;
   }
@@ -336,6 +382,7 @@
       byId('mcResultHeroSub').textContent = r.adMode === 'none' ? '광고비는 반영하지 않았어요' : '광고비까지 뺀 금액이에요';
 
       byId('mcResultFacts').innerHTML = mcResultFactsHtml(calc.input, r);
+      byId('mcResultBreakeven').innerHTML = mcBreakevenHtml(calc.input, r);
 
       byId('mcResIncome').textContent = MC.fmtWon(r.totalIncome);
       byId('mcResPreAd').textContent = MC.fmtWon(r.preAd);
