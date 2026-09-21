@@ -392,6 +392,12 @@ verify_jwt = true
 [functions.meta-insights]
 verify_jwt = true
 
+# meta-adset-insights — 캠페인/광고 세트/광고 레벨 성과 조회(진단 1단계).
+# meta-insights와 동일하게 LaunchDesk 로그인 사용자만 호출해야 하므로
+# verify_jwt = true.
+[functions.meta-adset-insights]
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.
