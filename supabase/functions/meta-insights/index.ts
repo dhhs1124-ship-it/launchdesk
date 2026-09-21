@@ -39,6 +39,8 @@ interface ConnectedAccountRow {
   id: number;
   status: string | null;
   external_account_id: string | null;
+  // 아래 pending 전환 compare-and-set에만 쓴다 — 화면에는 노출하지 않는다.
+  updated_at: string | null;
 }
 
 function toNumber(value: unknown): number | null {
@@ -144,6 +146,74 @@ function classifyMetaApiError(errorBody: unknown): {
     return { code: "RATE_LIMITED", status: 429 };
   }
   return { code: "TEMPORARY_ERROR", status: 502 };
+}
+
+// [베타 전 필수 수정 — 감사 지적] connected_accounts.status가 'connected'로
+// 남아있는데 실제 Meta 인증이 끊어진 경우(로컬 만료, credential 없음, Meta
+// OAuthException/code 190)를 구분해 'pending'(재연결 필요)으로 되돌린다.
+// 판정을 순수 함수로 분리해 DB/네트워크 없이 테스트한다.
+//
+// 정책(요구사항 2에 따라 명시적으로 결정):
+// - RECONNECT_REQUIRED: getValidMetaAccessToken/classifyMetaApiError가
+//   "credential 없음 · 로컬 만료 · OAuthException(190)"을 이미 이 하나의
+//   코드로 묶어 판정한다 — 실제 인증 자체가 끊어졌다는 뜻이므로 되돌린다.
+// - PERMISSION_REQUIRED(code 200/10)는 토큰 자체는 유효한데 이 광고계정에
+//   대한 권한만 없는 경우일 수 있다(Meta가 190과 200/10을 서로 다른
+//   코드로 명확히 구분해 내려줌) — 로그인이 끊어졌다는 증거가 아니므로
+//   전체 연결을 되돌리지 않는다.
+// - ACCOUNT_UNAVAILABLE은 사용자의 인증이 아니라 광고계정 자체의 상태
+//   (비활성·심사중·해지 등)다 — 마찬가지로 되돌리지 않는다.
+// - RATE_LIMITED/TEMPORARY_ERROR는 재시도하면 해결될 수 있는 일시적
+//   상태라 그대로 둔다.
+function shouldDowngradeToPending(code: ErrorCode): boolean {
+  return code === "RECONNECT_REQUIRED";
+}
+
+// service_role(ctx.supabaseAdmin)에서만 실행하는 best-effort 상태 되돌림.
+// - provider='meta' · 현재 status='connected' · updated_at이 이 요청 맨
+//   앞에서 읽은 값과 같을 때만 되돌린다(compare-and-set). Meta API 호출이
+//   진행되는 동안 사용자가 다른 탭 등에서 재연결에 성공했다면
+//   meta-account-select가 이미 updated_at을 새로 찍어뒀을 것이므로, 이
+//   UPDATE는 조건에 안 걸려 조용히 0행만 갱신하고 끝난다 — 오래된 실패
+//   응답이 새 연결을 덮어쓰지 않는다. connected_accounts/credential에
+//   이보다 더 안전한 동시성 컬럼(예: 토큰 버전)은 없어 updated_at을 쓴다
+//   (요구사항 4 — 잔여 레이스는 최종 보고에 명시).
+// - 이 UPDATE가 실패하거나 0행이어도 호출부는 원래 오류 응답을 그대로
+//   반환한다 — 상태 되돌림은 부가 효과일 뿐, 사용자에게 보여줄 오류를
+//   이것 때문에 바꾸지 않는다(요구사항 5, best-effort).
+// - access_token/refresh_token/state는 이 함수에 전달되지도, 로그에
+//   남지도 않는다 — 실패 로그에는 Postgres 오류 메시지만 남긴다.
+// deno-lint-ignore no-explicit-any
+async function downgradeToPendingIfStale(
+  supabaseAdmin: any,
+  account: { id: number; updated_at: string | null }
+): Promise<void> {
+  try {
+    let query = supabaseAdmin
+      .from("connected_accounts")
+      .update({ status: "pending", updated_at: new Date().toISOString() })
+      .eq("id", account.id)
+      .eq("provider", "meta")
+      .eq("status", "connected");
+
+    query = account.updated_at
+      ? query.eq("updated_at", account.updated_at)
+      : query.is("updated_at", null);
+
+    const { error } = await query;
+
+    if (error) {
+      console.error(
+        "Meta connected_accounts pending 전환 실패:",
+        error.message
+      );
+    }
+  } catch (err) {
+    console.error(
+      "Meta connected_accounts pending 전환 중 예외:",
+      err instanceof Error ? err.message : "unknown error"
+    );
+  }
 }
 
 type MetaFetchResult =
@@ -255,7 +325,7 @@ export default {
       //    이미 걸러진다.
       const { data: account, error: accountError } = await ctx.supabase
         .from("connected_accounts")
-        .select("id, status, external_account_id")
+        .select("id, status, external_account_id, updated_at")
         .eq("id", connected_account_id)
         .eq("provider", "meta")
         .returns<ConnectedAccountRow[]>()
@@ -281,6 +351,9 @@ export default {
       );
 
       if (!tokenResult.ok) {
+        // CREDENTIAL_NOT_FOUND · RECONNECT_REQUIRED 둘 다 "실제 인증이
+        // 끊어짐"에 해당한다(위 shouldDowngradeToPending 정책과 동일한 근거).
+        await downgradeToPendingIfStale(ctx.supabaseAdmin, account);
         return errorResponse("RECONNECT_REQUIRED", 401);
       }
 
@@ -307,6 +380,9 @@ export default {
           metaResult.data?.error?.message
         );
         const cls = classifyMetaApiError(metaResult.data);
+        if (shouldDowngradeToPending(cls.code)) {
+          await downgradeToPendingIfStale(ctx.supabaseAdmin, account);
+        }
         return errorResponse(cls.code, cls.status);
       }
 
@@ -350,6 +426,9 @@ export default {
             result.data?.error?.message
           );
           const cls = classifyMetaApiError(result.data);
+          if (shouldDowngradeToPending(cls.code)) {
+            await downgradeToPendingIfStale(ctx.supabaseAdmin, account);
+          }
           return errorResponse(cls.code, cls.status);
         }
       }

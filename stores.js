@@ -267,9 +267,9 @@
           (isSyncing ? ' disabled' : '') + '>' + (isSyncing ? '동기화 중...' : '주문 동기화') + '</button>';
       }
       // Meta 광고 연결 — Cafe24 쇼핑몰 카드에만 붙인다(요구사항 그대로).
-      // 아직 연결 안 됨 → 버튼 하나. 연결 시작했지만 광고계정 미선택
-      // (status='pending') → "광고계정 선택 대기 중" + 선택하기/해제. 선택
-      // 완료(status='connected') → 광고계정 이름 + "연결됨" + 해제.
+      // 아직 연결 안 됨 → 버튼 하나. 선택 완료(status='connected') →
+      // 광고계정 이름 + "연결됨" + 해제. status='pending'에는 서로 다른
+      // 두 상황이 섞여 있어 external_account_id로 구분한다(아래 참고).
       var metaHtml = '';
       if(isCafe24){
         var metaRow = metaAccountsByStoreId[String(s.id)];
@@ -290,9 +290,28 @@
               '<div class="store-status connected">연결됨</div>' +
               '<div class="store-card-actions" style="margin-top:.5rem;">' + metaDisconnectBtnHtml + '</div>' +
             '</div>';
+          } else if(metaRow.external_account_id){
+            // pending인데 external_account_id가 남아있음 — meta-oauth-callback은
+            // 최초 연결·재연결(OAuth 재로그인) 둘 다 pending으로 바꿀 때
+            // external_account_id/display_name을 항상 함께 비운다(코드 확인,
+            // meta-oauth-callback.ts). 반면 meta-insights의 자동 되돌림(인증
+            // 무효화 감지)은 status만 pending으로 바꾸고 이 값은 그대로 둔다
+            // (meta-insights/index.ts의 downgradeToPendingIfStale 참고) — 즉
+            // 이 값이 남아있다는 건 "광고계정을 이미 선택한 적이 있는 기존
+            // 연결의 인증이 끊어졌다"는 뜻이지, "아직 선택 전"이 아니다. 그래서
+            // 광고계정 선택 화면이 아니라 Meta 재연결(OAuth 재시작)로 보낸다.
+            metaHtml = '<div class="store-meta-block">' +
+              '<div class="store-meta-label">Meta 광고</div>' +
+              '<div class="store-name" style="font-size:.88rem;">Meta 연결이 만료되었어요. 다시 연결해주세요.</div>' +
+              '<div class="store-card-actions" style="margin-top:.5rem;">' +
+                '<button type="button" class="btn btn-primary btn-sm store-meta-connect-btn" data-id="' + escapeHtml(s.id) + '">다시 연결하기</button>' +
+                metaDisconnectBtnHtml +
+              '</div>' +
+            '</div>';
           } else {
-            // pending — OAuth는 끝났지만 광고계정을 아직 선택하지 않음. 잘못
-            // 연결했을 수도 있으므로 선택 전에도 해제할 수 있게 한다(요구사항 1).
+            // pending + external_account_id 없음 — OAuth는 끝났지만 광고계정을
+            // 아직 한 번도 선택한 적이 없음. 잘못 연결했을 수도 있으므로 선택
+            // 전에도 해제할 수 있게 한다(요구사항 1).
             metaHtml = '<div class="store-meta-block">' +
               '<div class="store-meta-label">Meta 광고</div>' +
               '<div class="store-name" style="font-size:.88rem;">광고계정 선택 대기 중</div>' +
