@@ -42,6 +42,22 @@
   var panelClose = document.getElementById('resGuidePanelClose');
   var panelBack = document.getElementById('resGuidePanelBack');
   var resultStatusEl = document.getElementById('resResultStatus');
+  // "초보 사장님 질문"(FAQ) — 홈 미리보기 6개 + 검색 서브섹션 + 별도 화면(#/resources/faq).
+  // RESOURCES 카드와 완전히 분리된 UI라 실패해도(요소가 없어도) 기존 자료실
+  // 동작에는 영향이 없도록 각 참조를 매번 null 체크한다.
+  var faqPreviewEl = document.getElementById('resFaqPreview');
+  var faqPreviewList = document.getElementById('resFaqPreviewList');
+  var faqSearchWrap = document.getElementById('resFaqSearchWrap');
+  var faqSearchList = document.getElementById('resFaqSearchList');
+  var faqScreenEl = document.getElementById('resFaqScreen');
+  var faqScreenTitle = document.getElementById('resFaqScreenTitle');
+  var faqSearchInput = document.getElementById('resFaqSearch');
+  var faqCatTabsEl = document.getElementById('resFaqCatTabs');
+  var faqResultStatusEl = document.getElementById('resFaqResultStatus');
+  var faqListEl = document.getElementById('resFaqList');
+  var faqEmptyStateEl = document.getElementById('resFaqEmptyState');
+  var faqEmptyResetBtn = document.getElementById('resFaqEmptyReset');
+  var faqBackBtn = document.getElementById('resFaqBack');
   if(!root || !indexEl || !panelEl || !gridEl || !catTabsEl){ return; }
 
   function escapeHtml(str){
@@ -143,6 +159,20 @@
     }).join('');
   }
 
+  // ------------------------------------------------------------- "초보 사장님 질문"(FAQ) 홈 미리보기
+  // 답변 전문은 펼치지 않고 질문 + 카테고리만 보여준다(요구사항) — 각 항목은
+  // 바로 #/resources/faq/<id>로 이동해 그 질문이 펼쳐진 채로 열린다.
+  if(faqPreviewList){
+    faqPreviewList.innerHTML = DATA.FEATURED_FAQ_IDS.map(function(id){
+      var f = DATA.getFaq(id);
+      if(!f) return '';
+      return '<li><a class="res-faq-preview-item" href="#/resources/faq/' + encodeURIComponent(f.id) + '">' +
+        '<span class="res-badge">' + escapeHtml(DATA.CATEGORY_LABEL[f.category] || '') + '</span>' +
+        '<span class="res-faq-preview-q">' + escapeHtml(f.question) + '</span>' +
+        '</a></li>';
+    }).join('');
+  }
+
   // ------------------------------------------------------------- 카드 렌더링
   function typeBadge(type){
     return '<span class="res-badge res-badge-' + escapeHtml(type) + '">' + escapeHtml(DATA.TYPE_LABEL[type] || type) + '</span>';
@@ -187,6 +217,8 @@
     var isSearching = state.query.trim() !== '';
     if(stuckGrid) stuckGrid.closest('.res-stuck-section').hidden = isSearching;
     if(featuredWrap) featuredWrap.hidden = isSearching;
+    if(faqPreviewEl) faqPreviewEl.hidden = isSearching;
+    renderFaqSearchSubsection();
 
     var items = filteredResources();
     var internalItems = items.filter(function(r){ return r.type !== 'external'; });
@@ -252,6 +284,11 @@
     var k = text.indexOf(' — ');
     if(k <= 0 || k > 30) return escapeHtml(text);
     return '<strong class="res-item-lead">' + escapeHtml(text.slice(0, k)) + '</strong> — ' + escapeHtml(text.slice(k + 3));
+  }
+  // note 박스 — 가이드 본문(blockHtml의 'note')과 FAQ 답변(faqAnswerHtml)이
+  // 같은 마크업을 쓰므로 한 곳으로 뺐다.
+  function noteHtml(text){
+    return '<div class="res-note"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg><p>' + escapeHtml(text) + '</p></div>';
   }
   function blockHtml(b){
     switch(b.t){
@@ -336,7 +373,7 @@
             '<span class="res-source-org">' + escapeHtml(i.org) + '</span>' +
             '<span class="res-source-url">' + escapeHtml(i.url) + '</span></li>';
         }).join('') + '</ul></details>';
-      case 'note': return '<div class="res-note"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg><p>' + escapeHtml(b.text) + '</p></div>';
+      case 'note': return noteHtml(b.text);
       case 'cta':
         if(b.slug){
           return '<a class="res-cta" href="#/resources/' + encodeURIComponent(b.slug) + '">' + escapeHtml(b.label) + ' →</a>';
@@ -344,6 +381,130 @@
         var attrs = b.toolsTarget ? ' data-tools-target="' + escapeHtml(b.toolsTarget) + '"' : '';
         return '<a class="res-cta" href="' + escapeHtml(b.href) + '"' + attrs + '>' + escapeHtml(b.label) + ' →</a>';
       default: return '';
+    }
+  }
+
+  // ------------------------------------------------------------- "초보 사장님 질문" 전체 화면(#/resources/faq)
+  // 카드 그리드(state/renderGrid)와 완전히 분리된 자기 상태를 쓴다 — 자료
+  // 검색·카테고리와 섞이면 "기존 자료 개수에 FAQ를 합산하지 않는다"는
+  // 요구사항을 지키기 어려워진다.
+  var faqState = { category: 'all', query: '' };
+
+  function faqCtaHtml(f){
+    if(!f.relatedLabel || !f.relatedHref) return '';
+    var attrs = '';
+    if(f.relatedExternal) attrs += ' target="_blank" rel="noopener noreferrer"';
+    if(f.relatedToolsTarget) attrs += ' data-tools-target="' + escapeHtml(f.relatedToolsTarget) + '"';
+    return '<a class="res-cta' + (f.relatedExternal ? ' res-faq-external-cta' : '') + '" href="' + escapeHtml(f.relatedHref) + '"' + attrs + '>' +
+      escapeHtml(f.relatedLabel) + (f.relatedExternal ? ' ↗' : ' →') + '</a>';
+  }
+  // 답변을 열면 보이는 순서(요구사항): 1) 한 줄 답변 2) 변경 가능 정보 안내
+  // 3) 관련 가이드 · 도구 CTA 4) 법률 · 정책은 공식 확인 안내. 법률 · 정책
+  // 문항의 실제 URL을 이번 세션에서 검증하지 못했으므로 sourceTitle은
+  // 클릭 가능한 링크가 아니라 "어디에서 확인하라"는 기관명 텍스트로만 둔다.
+  function faqAnswerHtml(f){
+    var html = '<p class="res-panel-p">' + escapeHtml(f.answer) + '</p>';
+    if(f.notice) html += noteHtml(f.notice);
+    html += faqCtaHtml(f);
+    if(f.sourceTitle){
+      html += noteHtml('공식 확인 필요 — ' + f.sourceTitle + '에서 최신 안내를 확인하세요.');
+    }
+    return html;
+  }
+  function faqItemHtml(f){
+    return '<details class="res-collapse res-faq-item" data-faq-id="' + escapeHtml(f.id) + '">' +
+      '<summary class="res-collapse-summary res-faq-summary">' +
+        '<span class="res-badge">' + escapeHtml(DATA.CATEGORY_LABEL[f.category] || '') + '</span>' +
+        '<span class="res-faq-summary-q">' + escapeHtml(f.question) + '</span>' +
+      '</summary>' +
+      '<div class="res-faq-answer">' + faqAnswerHtml(f) + '</div>' +
+    '</details>';
+  }
+  function filteredFaqs(){
+    return DATA.FAQS.filter(function(f){
+      var catOk = faqState.category === 'all' || f.category === faqState.category;
+      return catOk && DATA.matchesFaqQuery(f, faqState.query);
+    });
+  }
+  function renderFaqList(){
+    var items = filteredFaqs();
+    if(faqListEl){
+      faqListEl.innerHTML = items.map(faqItemHtml).join('');
+      faqListEl.hidden = items.length === 0;
+    }
+    if(faqEmptyStateEl) faqEmptyStateEl.hidden = items.length > 0;
+    if(faqResultStatusEl){
+      faqResultStatusEl.textContent = items.length > 0 ? (items.length + '개 질문이 있어요.') : '조건에 맞는 질문이 없어요.';
+    }
+  }
+  function setFaqCategory(cat){
+    faqState.category = cat;
+    if(faqCatTabsEl){
+      faqCatTabsEl.querySelectorAll('.res-cat-tab').forEach(function(b){
+        var isActive = b.getAttribute('data-cat') === cat;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    }
+    renderFaqList();
+  }
+  if(faqCatTabsEl){
+    faqCatTabsEl.addEventListener('click', function(e){
+      var btn = e.target.closest('.res-cat-tab');
+      if(!btn) return;
+      setFaqCategory(btn.getAttribute('data-cat'));
+    });
+  }
+  // 검색어 원문은 어디에도 보내지 않는다(요구사항) — 이번 범위에서는 FAQ
+  // 검색에 새 GA4 이벤트 자체를 추가하지 않으므로 디바운스도 필요 없다.
+  if(faqSearchInput){
+    faqSearchInput.addEventListener('input', function(){
+      faqState.query = faqSearchInput.value;
+      renderFaqList();
+    });
+  }
+  if(faqEmptyResetBtn){
+    faqEmptyResetBtn.addEventListener('click', function(){
+      faqState.query = '';
+      if(faqSearchInput) faqSearchInput.value = '';
+      setFaqCategory('all');
+    });
+  }
+  if(faqBackBtn) faqBackBtn.addEventListener('click', function(){ location.hash = '/resources'; });
+
+  function showFaqScreen(openId){
+    indexEl.hidden = true;
+    panelEl.hidden = true;
+    if(faqScreenEl) faqScreenEl.hidden = false;
+    renderFaqList();
+    var target = openId && faqListEl ? faqListEl.querySelector('[data-faq-id="' + openId + '"]') : null;
+    if(target){
+      target.open = true;
+      target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      var summary = target.querySelector('summary');
+      if(summary) summary.focus({ preventScroll: true });
+    } else if(faqScreenTitle){
+      faqScreenTitle.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+      faqScreenTitle.focus({ preventScroll: true });
+    }
+  }
+
+  // "질문에서도 찾았어요" — 자료실 검색 결과와 같은 그리드에 섞지 않고
+  // 별도 서브섹션에 최대 5개까지만 보여준다. 이 개수는 resResultStatus ·
+  // renderGrid()의 totalCount(자료 카드 수)에 절대 합산하지 않는다.
+  function renderFaqSearchSubsection(){
+    if(!faqSearchWrap) return;
+    var query = state.query.trim();
+    if(!query){ faqSearchWrap.hidden = true; return; }
+    var matches = DATA.FAQS.filter(function(f){ return DATA.matchesFaqQuery(f, state.query); }).slice(0, 5);
+    faqSearchWrap.hidden = matches.length === 0;
+    if(faqSearchList){
+      faqSearchList.innerHTML = matches.map(function(f){
+        return '<li><a class="res-faq-search-item" href="#/resources/faq/' + encodeURIComponent(f.id) + '">' +
+          '<span class="res-faq-search-q">' + escapeHtml(f.question) + '</span>' +
+          '<span class="res-faq-search-a">' + escapeHtml(f.answer) + '</span>' +
+        '</a></li>';
+      }).join('');
     }
   }
 
@@ -371,12 +532,14 @@
 
   function showIndex(){
     panelEl.hidden = true;
+    if(faqScreenEl) faqScreenEl.hidden = true;
     indexEl.hidden = false;
   }
   function showGuide(slug){
     var resource = renderGuidePanel(slug);
     if(!resource){ showIndex(); return; }
     indexEl.hidden = true;
+    if(faqScreenEl) faqScreenEl.hidden = true;
     panelEl.hidden = false;
     gaEvent('resource_open', DATA.buildOpenPayload(slug, resource.type, resource.category));
   }
@@ -440,7 +603,12 @@
     }
 
     var slug = slugFromPath(path);
-    if(slug) showGuide(slug);
+    // #/resources/faq(전체) · #/resources/faq/<id>(개별 질문, 열린 채로 포커스)는
+    // GUIDES 슬러그가 아니라 "초보 사장님 질문" 전체 화면으로 간다 — 기존
+    // #/resources/<guide-slug> 라우팅(showGuide)은 그대로 둔다.
+    if(slug === 'faq') showFaqScreen(null);
+    else if(slug && slug.indexOf('faq/') === 0) showFaqScreen(slug.slice('faq/'.length));
+    else if(slug) showGuide(slug);
     else showIndex();
   }
 

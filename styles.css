@@ -3513,6 +3513,38 @@
   #view-resources .btn-ghost{border-color:var(--ld-border); color:var(--ld-text);}
   #view-resources .btn-ghost:hover{border-color:var(--ld-accent-mid); color:var(--ld-accent); background:var(--ld-accent-light);}
 
+  /* ---- "초보 사장님 질문"(FAQ) — 홈 미리보기 6개 ---- */
+  #view-resources .res-faq-preview{margin-bottom:30px;}
+  #view-resources .res-faq-preview-title{font-size:16px; font-weight:700; color:var(--ld-text); margin:0 0 6px; word-break:keep-all;}
+  #view-resources .res-faq-preview-list{list-style:none; margin:0 0 14px; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-resources .res-faq-preview-item{display:flex; align-items:center; gap:10px; min-height:44px; padding:12px 14px; border:1px solid var(--ld-border); border-radius:10px; background:var(--ld-panel); text-decoration:none; color:inherit; transition:border-color .15s;}
+  #view-resources .res-faq-preview-item:hover{border-color:var(--ld-accent-mid);}
+  #view-resources .res-faq-preview-q{flex:1; min-width:0; font-size:13.5px; font-weight:600; color:var(--ld-text); word-break:keep-all;}
+
+  /* ---- FAQ 검색 서브섹션("질문에서도 찾았어요") — 자료 카드 결과와 분리 ---- */
+  #view-resources .res-faq-search-wrap{margin:0 0 24px;}
+  #view-resources .res-faq-search-list{list-style:none; margin:0 0 10px; padding:0; display:flex; flex-direction:column; gap:8px;}
+  #view-resources .res-faq-search-item{display:block; padding:12px 14px; border:1px solid var(--ld-border); border-radius:10px; background:var(--ld-panel); text-decoration:none; color:inherit; transition:border-color .15s;}
+  #view-resources .res-faq-search-item:hover{border-color:var(--ld-accent-mid);}
+  #view-resources .res-faq-search-q{display:block; font-size:13.5px; font-weight:700; color:var(--ld-text); margin-bottom:3px; word-break:keep-all;}
+  #view-resources .res-faq-search-a{display:block; font-size:12.5px; color:var(--ld-muted); line-height:1.5; word-break:keep-all;}
+  #view-resources .res-faq-search-more{display:inline-flex; align-items:center; min-height:36px; font-size:13px; font-weight:700; color:var(--ld-accent); text-decoration:none;}
+  #view-resources .res-faq-search-more:hover{color:var(--ld-accent-dark);}
+
+  /* ---- FAQ 전체 화면(#/resources/faq) ---- */
+  #view-resources .res-faq-result-count{font-size:12px; color:var(--ld-muted); margin:0 0 14px;}
+  #view-resources .res-faq-list{display:flex; flex-direction:column; gap:10px; margin:0 0 20px;}
+  #view-resources .res-faq-item{margin:0; padding:0; border:1px solid var(--ld-border); border-radius:12px;}
+  #view-resources .res-faq-item .res-collapse-summary{padding:13px 16px; gap:10px;}
+  #view-resources .res-faq-item[open] .res-collapse-summary{border-bottom:1px solid var(--ld-border);}
+  #view-resources .res-faq-summary-q{flex:1; min-width:0; word-break:keep-all;}
+  #view-resources .res-faq-answer{padding:14px 16px 16px;}
+  #view-resources .res-faq-answer .res-panel-p{margin:0 0 10px;}
+  #view-resources .res-faq-answer .res-note{margin:0 0 10px;}
+  #view-resources .res-faq-answer .res-cta{margin:0 0 10px;}
+  #view-resources .res-faq-answer > :last-child{margin-bottom:0;}
+  #view-resources .res-faq-external-cta{position:relative;}
+
   @media (max-width:639px){
     #view-resources .res-panel{max-width:100%;}
     #view-resources .res-card{padding:14px 15px;}

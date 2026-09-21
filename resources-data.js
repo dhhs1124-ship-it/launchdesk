@@ -136,6 +136,210 @@
   var RESOURCE_BY_SLUG = {};
   RESOURCES.forEach(function(r){ RESOURCE_BY_SLUG[r.slug] = r; });
 
+  /* ------------------------------------------------------------ FAQS
+     "초보 사장님 질문" — RESOURCES(카드)와 완전히 분리된 별도 배열이다.
+     자료 그리드 · 카드 개수 · 카테고리 필터 결과에는 절대 섞이지 않는다
+     (섞으면 카드 30장이 늘어나 자료실이 다시 복잡해진다는 것이 이 기능을
+     만든 이유이기도 하다). 화면(resources.js)은 #/resources/faq에서만 이
+     배열을 읽는다.
+     - category는 기존 CATEGORY_LABEL의 4개 값(start/product/operation/growth)만
+       재사용한다 — 새 카테고리를 만들지 않는다.
+     - id는 라우팅(#/resources/faq/<id>)에도 쓰이므로 영문 kebab-case, 중복 금지.
+     - relatedHref가 '#'로 시작하면 내부 라우트, 아니면 외부 URL(반드시
+       https, relatedExternal:true와 함께 새 탭 + noopener noreferrer로 연다).
+     - notice: "달라질 수 있다"류 변경 가능 정보 안내(있는 경우만).
+     - sourceTitle: 법률 · 정책처럼 전문가 · 공식 확인이 필요한 질문에
+       기관명만 안내한다(특정 URL을 검증하지 못했으므로 링크는 넣지 않는다 —
+       href 없이 기관명만 화면에 표시한다). */
+  var FAQS = [
+    // ---- start · 쇼핑몰 시작 ----
+    { id: 'biz-reg-before-selling', category: 'start',
+      question: '사업자등록 전에 상품부터 팔아봐도 되나요?',
+      answer: '반복적으로 영리 목적의 상품을 판매하거나 쇼핑몰에서 주문을 받기 전에는 사업자등록과 통신판매업 신고 대상 여부를 공식 안내에서 먼저 확인해야 합니다.',
+      tags: ['사업자등록', '통신판매업', '창업'],
+      relatedLabel: '사업자등록 · PG 준비 체크리스트 보기', relatedHref: '#/resources/business-pg-checklist',
+      notice: '업종과 판매 방식에 따라 등록 · 신고 대상 여부가 달라질 수 있습니다.',
+      sourceTitle: '국세청 · 정부24 공식 안내' },
+    { id: 'biz-reg-order', category: 'start',
+      question: '사업자등록이랑 통신판매업 신고는 어떤 순서로 하나요?',
+      answer: '일반적으로 사업자등록을 먼저 마친 뒤 통신판매업 신고를 접수하는 순서로 진행합니다.',
+      tags: ['사업자등록', '통신판매업', '신고'],
+      relatedLabel: '사업자등록 · PG 준비 체크리스트 보기', relatedHref: '#/resources/business-pg-checklist',
+      notice: '업종과 판매 방식에 따라 필요한 절차와 순서가 달라질 수 있습니다.',
+      sourceTitle: '국세청 · 정부24 공식 안내' },
+    { id: 'marketplace-or-own-start', category: 'start',
+      question: '스마트스토어·오픈마켓·자사몰 중 어디부터 시작해야 하나요?',
+      answer: '어느 쪽이 유리한지는 상품 · 경쟁 강도 · 채널 수수료에 따라 달라 두 방식을 먼저 비교해보는 것이 좋습니다.',
+      tags: ['스마트스토어', '오픈마켓', '자사몰'],
+      relatedLabel: '오픈마켓과 자사몰 비교 가이드 보기', relatedHref: '#/resources/marketplace-vs-own' },
+    { id: 'platform-choice-faq', category: 'start',
+      question: '카페24랑 아임웹 중 뭐가 더 맞을까요?',
+      answer: '정답은 없고 요금제와 내게 필요한 기능을 직접 비교해보는 것이 정확합니다.',
+      tags: ['카페24', '아임웹', '플랫폼'],
+      relatedLabel: '카페24 vs 아임웹 비교 가이드 보기', relatedHref: '#/resources/platform-choice' },
+    { id: 'domain-ssl-timing', category: 'start',
+      question: '도메인이랑 SSL은 꼭 처음부터 준비해야 하나요?',
+      answer: '독립 도메인은 브랜드 주소로 쓸 수 있고 SSL은 개인정보 · 결제 정보 보호에 필요하지만, 플랫폼 제공 여부와 PG 심사 요건은 서비스마다 달라 이용 중인 플랫폼에서 확인해야 합니다.',
+      tags: ['도메인', 'SSL', 'PG'],
+      relatedLabel: '도메인 · SSL · SEO 기본 설정 보기', relatedHref: '#/resources/domain-ssl-seo' },
+    { id: 'multi-channel-selling', category: 'start',
+      question: '여러 플랫폼(오픈마켓+자사몰)에 동시에 팔아도 되나요?',
+      answer: '가능하지만 채널별로 재고 · 주문을 따로 관리하면 실수가 생기기 쉬워 통합 관리 방법을 함께 고려하는 것이 좋습니다.',
+      tags: ['멀티채널', '재고관리', '주문관리'],
+      relatedLabel: '이지어드민 공식 사이트', relatedHref: 'https://ezadmin.co.kr/', relatedExternal: true },
+
+    // ---- product · 상품과 수익 ----
+    { id: 'what-to-sell', category: 'product',
+      question: '무엇을 팔아야 할지 전혀 모르겠어요, 어떻게 정하나요?',
+      answer: '모든 옵션을 갖추기보다 대표 상품 1~2개로 먼저 반응을 확인하는 방법을 권합니다.',
+      tags: ['상품기획', '소싱'],
+      relatedLabel: '상품을 찾기 전에 먼저 정할 것 보기', relatedHref: '#/resources/product-before-sourcing' },
+    { id: 'sourcing-method-diff', category: 'product',
+      question: '사입·위탁·제작은 뭐가 다르고 어떻게 골라야 하나요?',
+      answer: '재고 부담과 마진 구조가 방식마다 다르며, 실제로는 상품 특성과 발주 · 계약 조건에 따라 유불리가 달라집니다.',
+      tags: ['사입', '위탁판매', '제작', '소싱'],
+      relatedLabel: '상품을 찾기 전에 먼저 정할 것 보기', relatedHref: '#/resources/product-before-sourcing' },
+    { id: 'supplier-trust-check', category: 'product',
+      question: '도매처가 믿을 만한 곳인지 어떻게 확인하나요?',
+      answer: '단가만 보지 말고 여러 업체의 배송 조건 · 반품 정책 · 재입고 대응을 함께 비교해야 합니다.',
+      tags: ['도매처', '공급처', '사입'],
+      relatedLabel: '공급처 확인 질문 체크리스트 보기', relatedHref: '#/resources/supplier-check-checklist' },
+    { id: 'pricing-margin', category: 'product',
+      question: '판매가는 원가에 얼마를 붙여야 하나요?',
+      answer: '정해진 배율은 없고, 수수료 · 배송비 · 광고비까지 뺀 뒤 실제로 남는 금액을 계산해보고 정해야 합니다.',
+      tags: ['판매가', '마진', '가격'],
+      relatedLabel: '마진 계산기 열기', relatedHref: '#/tools', relatedToolsTarget: 'calc' },
+    { id: 'discount-without-loss', category: 'product',
+      question: '할인을 해도 손해 보지 않는 가격은 어떻게 정하나요?',
+      answer: '할인 후 결제금액을 기준으로 변동비를 다시 계산해 마이너스가 나지 않는 하한선을 먼저 정해야 합니다.',
+      tags: ['할인', '가격', '마진'],
+      relatedLabel: '마진 계산기 열기', relatedHref: '#/tools', relatedToolsTarget: 'calc' },
+    { id: 'product-name-keywords', category: 'product',
+      question: '상품명에 검색어를 많이 넣을수록 좋은가요?',
+      answer: '개수가 많다고 유리한 것은 아니고, 실제 구매자가 검색할 법한 표현인지가 더 중요합니다.',
+      tags: ['상품명', 'SEO', '검색어'] },
+    { id: 'detail-page-first-view', category: 'product',
+      question: '상세페이지 첫 화면에는 뭐가 꼭 있어야 하나요?',
+      answer: '정확한 시간 기준은 없지만, 상품이 무엇이고 누구를 위한 것인지가 스크롤 없이 바로 보이는 것이 중요합니다.',
+      tags: ['상세페이지', '기획'],
+      relatedLabel: '상세페이지 기획 기본 구조 보기', relatedHref: '#/resources/detail-page-structure' },
+    { id: 'not-enough-photos', category: 'product',
+      question: '상품 사진이 부족할 때는 어떻게 해야 하나요?',
+      answer: '먼저 구매 판단에 필요한 사진을 정리한 뒤 직접 촬영 · 제조사 제공 자료 · 촬영 대행 중 상품과 예산에 맞는 방법을 선택하세요. 제조사 사진은 사용 권한을 먼저 확인해야 합니다.',
+      tags: ['상품사진', '촬영', '상세페이지'],
+      relatedLabel: '상세페이지 기획 기본 구조 보기', relatedHref: '#/resources/detail-page-structure' },
+    { id: 'ai-writing-caution', category: 'product',
+      question: 'AI로 상품명이나 상세 설명을 쓸 때 주의할 점이 있나요?',
+      answer: 'AI가 사실과 다른 효능 · 성분을 만들어낼 수 있어 게시 전 사람이 확인하는 과정이 필요합니다.',
+      tags: ['AI', '상세페이지', '상품설명'],
+      notice: '표시 · 광고 관련 법령은 상품 유형에 따라 다르게 적용될 수 있습니다.',
+      sourceTitle: '국가법령정보센터 · 공정거래위원회 공식 안내' },
+
+    // ---- operation · 판매 운영 ----
+    { id: 'free-shipping-myth', category: 'operation',
+      question: '무료배송으로 하면 무조건 더 잘 팔리나요?',
+      answer: '무조건은 아니며, 배송비를 판매가에 어떻게 반영했는지에 따라 오히려 마진이 줄어들 수 있습니다.',
+      tags: ['무료배송', '배송비', '가격'],
+      relatedLabel: '마진 계산기 열기', relatedHref: '#/tools', relatedToolsTarget: 'calc' },
+    { id: 'shipping-delay-notice', category: 'operation',
+      question: '배송이 늦어질 때 고객에게 어떻게 안내해야 하나요?',
+      answer: '지연 사실과 예상 도착일을 먼저 안내하는 것이 클레임을 줄이는 데 도움이 됩니다.',
+      tags: ['배송지연', 'CS'],
+      relatedLabel: '자주 쓰는 CS 응대 예시 보기', relatedHref: '#/resources/cs-script-examples' },
+    { id: 'stockout-mis-shipment-defect', category: 'operation',
+      question: '품절·오배송·불량이 생기면 어떻게 대응해야 하나요?',
+      answer: '먼저 불편에 대해 사과하고 주문 · 상품 상태를 확인한 뒤, 재발송 · 교환 · 환불 등 실제로 가능한 해결 방법을 안내하세요.',
+      tags: ['품절', '오배송', '불량', 'CS'],
+      relatedLabel: '자주 쓰는 CS 응대 예시 보기', relatedHref: '#/resources/cs-script-examples' },
+    { id: 'return-exchange-standard', category: 'operation',
+      question: '교환·반품 기준은 어떻게 정해야 하나요?',
+      answer: '법정 최소 기준을 벗어나지 않는 범위에서 단순 변심과 상품 하자를 구분해 정해야 합니다.',
+      tags: ['교환', '반품', '환불'],
+      relatedLabel: '교환 · 반품 기준 준비 보기', relatedHref: '#/resources/return-exchange-checklist',
+      notice: '청약철회 등 법정 기준은 상품 유형과 거래 방식에 따라 다를 수 있습니다.',
+      sourceTitle: '국가법령정보센터 · 공정거래위원회 공식 안내' },
+    { id: 'negative-review-response', category: 'operation',
+      question: '부정적인 후기에는 어떻게 답해야 하나요?',
+      answer: '감정적으로 반응하지 말고 확인된 사실과 해결 방법을 짧고 정중하게 남기세요.',
+      tags: ['후기', '리뷰', 'CS'],
+      relatedLabel: '리뷰 수집과 적립금 운영 기본 보기', relatedHref: '#/resources/review-points-basics' },
+    { id: 'settlement-mismatch', category: 'operation',
+      question: '정산금액이 주문금액이랑 다른데 왜 그런가요?',
+      answer: '플랫폼 수수료 · 결제수단 · 프로모션 분담금 등이 반영될 수 있지만, 정확히 어떤 항목이 얼마나 빠지는지는 플랫폼과 정산 조건마다 달라 실제 정산내역의 항목별 상세를 확인해야 합니다.',
+      tags: ['정산', '정산금액', '수수료'],
+      notice: '정산 차감 항목과 기준은 이용 중인 플랫폼과 결제수단에 따라 달라질 수 있습니다.' },
+    { id: 'restock-timing', category: 'operation',
+      question: '재고는 언제 추가로 채워야 하나요?',
+      answer: '정해진 공식은 없고, 평균 판매 속도와 재입고까지 걸리는 기간을 비교해 여유를 두고 판단해야 합니다.',
+      tags: ['재고', '재입고', '발주'] },
+    { id: 'frequent-returns', category: 'operation',
+      question: '반품이 자꾸 많이 들어오면 어떻게 해야 하나요?',
+      answer: '반품 사유를 기록해 상세페이지 정보 부족인지 상품 자체 문제인지부터 구분해야 합니다.',
+      tags: ['반품', '교환'],
+      relatedLabel: '교환 · 반품 기준 준비 보기', relatedHref: '#/resources/return-exchange-checklist' },
+
+    // ---- growth · 광고와 성장 ----
+    { id: 'no-visitors-need-ads', category: 'growth',
+      question: '상품을 올렸는데 방문자가 아예 없어요. 광고를 꼭 해야 하나요?',
+      answer: '광고는 유입을 만드는 방법 중 하나이며 필수는 아닙니다. 먼저 상품이 정상 노출되는지, 고객이 검색할 표현을 사용했는지, 오픈마켓 · SNS 등 다른 유입 경로가 있는지 확인하세요.',
+      tags: ['방문자', '유입', '노출'],
+      relatedLabel: '광고비를 쓰기 전 확인할 7가지 보기', relatedHref: '#/resources/ad-before-start' },
+    { id: 'visitors-no-purchase', category: 'growth',
+      question: '방문자는 있는데 왜 구매로 안 이어질까요?',
+      answer: '광고와 상품 페이지가 같은 약속을 하는지, 가격 · 배송비가 결제 전에 보이는지부터 확인해야 합니다.',
+      tags: ['방문자', '구매', '전환율'],
+      relatedLabel: '광고가 안 될 때 확인 순서 보기', relatedHref: '#/resources/ad-troubleshoot' },
+    { id: 'clicks-no-purchase', category: 'growth',
+      question: '클릭은 있는데 왜 구매가 없을까요?',
+      answer: '상품 페이지 도착 이후 장바구니 · 결제 단계 중 어디서 사람이 줄어드는지 순서대로 확인해야 합니다.',
+      tags: ['클릭', '구매', '전환율'],
+      relatedLabel: '광고가 안 될 때 확인 순서 보기', relatedHref: '#/resources/ad-troubleshoot' },
+    { id: 'ad-budget-start', category: 'growth',
+      question: '광고비는 얼마부터 시작해야 하나요?',
+      answer: '정해진 금액은 없고, 구매가 0건이어도 감당할 수 있는 손실 한도를 먼저 정하는 방식을 권합니다.',
+      tags: ['광고비', '예산'],
+      relatedLabel: '광고비를 쓰기 전 확인할 7가지 보기', relatedHref: '#/resources/ad-before-start' },
+    { id: 'ad-performance-timing', category: 'growth',
+      question: '광고 성과는 며칠 정도 지나야 판단할 수 있나요?',
+      answer: '정해진 일수는 없고, 하루 결과만으로 성공 · 실패를 판단하지 않는 것이 원칙입니다.',
+      tags: ['광고성과', '판단시점'],
+      relatedLabel: '광고비를 쓰기 전 확인할 7가지 보기', relatedHref: '#/resources/ad-before-start' },
+    { id: 'ad-metric-terms', category: 'growth',
+      question: 'CTR·CPC·CPA·ROAS, 이 용어들이 정확히 무슨 뜻인가요?',
+      answer: '순서대로 클릭률 · 클릭당 비용 · 구매당 비용 · 광고비 대비 매출을 뜻하며 광고 흐름을 단계별로 읽는 지표입니다.',
+      tags: ['CTR', 'CPC', 'CPA', 'ROAS', '지표'],
+      relatedLabel: '광고 숫자 읽는 법 보기', relatedHref: '#/resources/ad-metrics' },
+    { id: 'revenue-vs-profit', category: 'growth',
+      question: '매출은 많이 나오는데 왜 남는 돈이 없을까요?',
+      answer: 'ROAS가 높아도 매출 안에는 원가 · 수수료 · 광고비가 이미 포함돼 있어 이를 뺀 뒤 남는 돈을 따로 봐야 합니다.',
+      tags: ['매출', '순이익', 'ROAS'],
+      relatedLabel: '광고 숫자 읽는 법 보기', relatedHref: '#/resources/ad-metrics' }
+  ];
+
+  var FAQ_BY_ID = {};
+  FAQS.forEach(function(f){ FAQ_BY_ID[f.id] = f; });
+
+  // 홈 미리보기 6개 — 카테고리별 대표 질문(요구사항 원문 그대로 6개 고정).
+  var FEATURED_FAQ_IDS = [
+    'marketplace-or-own-start', 'what-to-sell', 'pricing-margin',
+    'free-shipping-myth', 'clicks-no-purchase', 'revenue-vs-profit'
+  ];
+
+  function getFaq(id){ return FAQ_BY_ID[id] || null; }
+
+  // FAQ 검색 대상: 질문 · 답변 · 태그 · 카테고리명(요구사항) — RESOURCES의
+  // matchesQuery와 같은 AND 토큰 원칙을 재사용한다(아래 tokensMatchAll 공용).
+  function faqSearchText(faq){
+    return [faq.question, faq.answer].concat(faq.tags || []).join(' ');
+  }
+  function matchesFaqQuery(faq, query){
+    var tokens = queryTokens(query);
+    if(tokens.length === 0) return true;
+    var haystack = [faq.question, faq.answer, CATEGORY_LABEL[faq.category] || '']
+      .concat(faq.tags || []).join(' ').toLowerCase();
+    return tokensMatchAll(haystack, tokens);
+  }
+
   /* ------------------------------------------------------------ GUIDES
      내부 가이드/체크리스트 본문(#/resources/<slug>에서 보여줄 내용).
      블록 타입: p / h3 / list / numbered / checklist / formula / note / cta,
@@ -740,6 +944,12 @@
     return (query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   }
 
+  // 토큰이 전부(각각 어디에 있든) haystack에 포함되는지 — RESOURCES(matchesQuery)와
+  // FAQS(matchesFaqQuery)가 같은 AND 매칭 규칙을 공유하도록 분리했다.
+  function tokensMatchAll(haystack, tokens){
+    return tokens.every(function(t){ return haystack.indexOf(t) !== -1; });
+  }
+
   function matchesQuery(resource, query){
     var tokens = queryTokens(query);
     if(tokens.length === 0) return true;
@@ -749,7 +959,7 @@
       CATEGORY_LABEL[resource.category] || '',
       TYPE_LABEL[resource.type] || ''
     ].concat(resource.tags || [], [guideSearchText(resource.slug)]).join(' ').toLowerCase();
-    return tokens.every(function(t){ return haystack.indexOf(t) !== -1; });
+    return tokensMatchAll(haystack, tokens);
   }
 
   /* ------------------------------------------------------------ GA4 payload
@@ -791,12 +1001,17 @@
     LEGACY_CATEGORY_MAP: LEGACY_CATEGORY_MAP,
     RESOURCES: RESOURCES,
     GUIDES: GUIDES,
+    FAQS: FAQS,
+    FEATURED_FAQ_IDS: FEATURED_FAQ_IDS,
     mapLegacyCategory: mapLegacyCategory,
     getResource: getResource,
     getGuide: getGuide,
+    getFaq: getFaq,
     guideSearchText: guideSearchText,
+    faqSearchText: faqSearchText,
     titleForSlug: titleForSlug,
     matchesQuery: matchesQuery,
+    matchesFaqQuery: matchesFaqQuery,
     buildSearchPayload: buildSearchPayload,
     buildFilterPayload: buildFilterPayload,
     buildOpenPayload: buildOpenPayload,

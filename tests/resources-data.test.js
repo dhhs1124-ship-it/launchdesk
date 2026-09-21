@@ -235,6 +235,7 @@ test('손익분기 ROAS 설명에 "공헌이옵니다/공헌이(단독)/이옵�
 const AD_SLUGS = ['ad-before-start', 'ad-metrics', 'ad-troubleshoot'];
 const resourcesJs = fs.readFileSync(path.join(__dirname, '..', 'resources.js'), 'utf8');
 const stylesCss = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
+const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 // 가이드의 모든 블록(step 필드 안 · collapse 안에 중첩된 blocks 포함)
 function allBlocks(slug){
@@ -743,4 +744,146 @@ test('가독성 CSS: 글머리표 · 항목 간격 6~10px · 필드 간격 18~24
   });
   // 제목(dt)과 본문 사이 간격이 명확하다(이전 4px → 8px 이상)
   assert.ok(/margin:\s*0 0 (8|9|10)px/.test(rule('#view-resources .res-step-field dt')), '필드 제목 아래 간격이 부족');
+});
+
+/* ===================================================================
+   "초보 사장님 질문"(FAQS) — RESOURCES와 분리된 별도 배열
+   =================================================================== */
+const LAW_POLICY_FAQ_IDS = ['biz-reg-before-selling', 'biz-reg-order', 'ai-writing-caution', 'return-exchange-standard'];
+
+test('FAQS: 정확히 30개이고 id가 중복 없이 kebab-case다', () => {
+  assert.equal(data.FAQS.length, 30);
+  const ids = data.FAQS.map((f) => f.id);
+  assert.equal(new Set(ids).size, ids.length, '중복된 id가 있음');
+  ids.forEach((id) => assert.ok(/^[a-z0-9]+(-[a-z0-9]+)*$/.test(id), 'kebab-case가 아님: ' + id));
+});
+
+test('FAQS: category는 기존 4개(start/product/operation/growth)만 쓰고, 한 카테고리에 과도하게 몰리지 않는다', () => {
+  const counts = {};
+  data.FAQS.forEach((f) => {
+    assert.ok(data.CATEGORY_LABEL.hasOwnProperty(f.category), f.id + '의 category "' + f.category + '"가 정의되지 않음');
+    counts[f.category] = (counts[f.category] || 0) + 1;
+  });
+  assert.deepEqual(Object.keys(counts).sort(), ['growth', 'operation', 'product', 'start']);
+  Object.values(counts).forEach((n) => assert.ok(n >= 5 && n <= 10, '한 카테고리에 과도하게 몰림: ' + n));
+});
+
+test('FAQS: 모든 질문 · 답변이 비어 있지 않다', () => {
+  data.FAQS.forEach((f) => {
+    assert.ok(f.question && f.question.trim().length > 5, f.id + '의 question이 비어 있음');
+    assert.ok(f.answer && f.answer.trim().length > 5, f.id + '의 answer가 비어 있음');
+  });
+});
+
+test('FAQS: 내부 CTA 경로는 전부 실제 존재하는 자료 · 라우트를 가리킨다', () => {
+  const knownRoutes = ['#/tools', '#/dashboard'];
+  data.FAQS.forEach((f) => {
+    if(!f.relatedHref || f.relatedExternal) return;
+    if(f.relatedHref.indexOf('#/resources/') === 0){
+      const slug = f.relatedHref.slice('#/resources/'.length);
+      assert.ok(data.getResource(slug), f.id + '의 관련 경로가 존재하지 않는 자료를 가리킴: ' + f.relatedHref);
+    } else {
+      assert.ok(knownRoutes.includes(f.relatedHref), f.id + '의 관련 경로가 알 수 없는 라우트: ' + f.relatedHref);
+    }
+  });
+});
+
+test('FAQS: 외부 링크는 HTTPS이고 relatedExternal 플래그가 함께 있다', () => {
+  data.FAQS.forEach((f) => {
+    if(!f.relatedHref || f.relatedHref.indexOf('#') === 0) return;
+    assert.equal(new URL(f.relatedHref).protocol, 'https:', f.id + '의 외부 링크가 HTTPS가 아님: ' + f.relatedHref);
+    assert.equal(f.relatedExternal, true, f.id + '의 외부 링크에 relatedExternal 플래그가 없음');
+  });
+});
+
+test('FAQS: 법률 · 정책 확인이 필요한 질문에는 안내 문구(sourceTitle)가 있다', () => {
+  LAW_POLICY_FAQ_IDS.forEach((id) => {
+    const f = data.getFaq(id);
+    assert.ok(f, id + ' FAQ가 없음');
+    assert.ok(f.sourceTitle && f.sourceTitle.length > 0, id + '에 공식 확인 안내(sourceTitle)가 없음');
+  });
+  // 법률 · 정책 안내에는 특정 URL을 검증하지 못했으므로 sourceHref(클릭 가능한 링크)를 넣지 않는다.
+  data.FAQS.forEach((f) => {
+    if(f.sourceTitle) assert.equal(f.sourceHref, undefined, f.id + '의 sourceTitle에 검증하지 않은 링크(sourceHref)가 붙어 있음');
+  });
+});
+
+test('FAQS: 단정 금지 표현이 없다("무조건은 아니며"처럼 신화를 부정하는 문장은 예외)', () => {
+  const bannedAbsolute = /무조건(?!\s*(은|이)\s*아니)|반드시|보장|확실히/;
+  const bannedComparative = /업(계|종)\s*평균|(좋은|나쁜|정상|합격|적정)\s*(CTR|CPC|ROAS|CVR|CPA|클릭률|전환율)/;
+  data.FAQS.forEach((f) => {
+    [f.answer, f.notice].filter(Boolean).forEach((text) => {
+      assert.equal(bannedAbsolute.test(text), false, f.id + '에 단정 표현: ' + text);
+      assert.equal(bannedComparative.test(text), false, f.id + '에 근거 없는 비교 표현: ' + text);
+    });
+  });
+});
+
+test('FAQS: 대표 질문 6개(FEATURED_FAQ_IDS)가 요구된 질문과 정확히 같다', () => {
+  const questions = data.FEATURED_FAQ_IDS.map((id) => data.getFaq(id) && data.getFaq(id).question);
+  assert.deepEqual(questions, [
+    '스마트스토어·오픈마켓·자사몰 중 어디부터 시작해야 하나요?',
+    '무엇을 팔아야 할지 전혀 모르겠어요, 어떻게 정하나요?',
+    '판매가는 원가에 얼마를 붙여야 하나요?',
+    '무료배송으로 하면 무조건 더 잘 팔리나요?',
+    '클릭은 있는데 왜 구매가 없을까요?',
+    '매출은 많이 나오는데 왜 남는 돈이 없을까요?'
+  ]);
+});
+
+test('FAQS: matchesFaqQuery는 토큰 AND 검색이고 질문 · 답변 · 태그 · 카테고리명에서 찾는다', () => {
+  assert.equal(data.matchesFaqQuery(data.getFaq('clicks-no-purchase'), ''), true);
+  // "클릭"은 질문에, "전환율"은 태그에 — 서로 다른 위치에 나뉘어 있어도 AND로 찾아야 한다.
+  assert.equal(data.matchesFaqQuery(data.getFaq('clicks-no-purchase'), '클릭 전환율'), true);
+  assert.equal(data.matchesFaqQuery(data.getFaq('clicks-no-purchase'), '클릭 존재하지않는토큰'), false);
+  // 카테고리명으로도 찾는다.
+  assert.equal(data.matchesFaqQuery(data.getFaq('pricing-margin'), '상품과 수익'), true);
+  // 답변 본문으로도 찾는다.
+  assert.equal(data.matchesFaqQuery(data.getFaq('free-shipping-myth'), '마진이 줄어들'), true);
+});
+
+test('FAQS: RESOURCES 카드 개수 · 검색에는 FAQ가 전혀 섞이지 않는다', () => {
+  assert.equal(data.RESOURCES.length, 34, 'RESOURCES 카드 수가 바뀜(FAQ가 섞였을 가능성)');
+  data.RESOURCES.forEach((r) => assert.ok(!data.FAQS.some((f) => f.id === r.slug), 'FAQ id가 RESOURCES.slug와 겹침: ' + r.slug));
+  // matchesQuery(RESOURCES용)는 FAQS 텍스트를 전혀 보지 않는다 — FAQ 전용 문구로 검색해도
+  // 그 문구가 우연히 다른 자료에도 있지 않은 한 RESOURCES에서는 찾아지지 않아야 한다.
+  const faqOnlyPhrase = '정산금액이 주문금액이랑 다른데';
+  const leaked = data.RESOURCES.filter((r) => data.matchesQuery(r, faqOnlyPhrase));
+  assert.equal(leaked.length, 0, 'FAQ 전용 문구가 RESOURCES 검색에 노출됨: ' + leaked.map((r) => r.slug).join(', '));
+});
+
+test('resources.js: FAQ 화면 라우팅(#/resources/faq, #/resources/faq/<id>)과 개별 질문 열기 로직이 있다', () => {
+  assert.ok(/slug === 'faq'/.test(resourcesJs), "slug==='faq' 분기가 없음");
+  assert.ok(/indexOf\('faq\/'\)\s*===\s*0/.test(resourcesJs), "'faq/' 접두사 분기가 없음");
+  assert.ok(/showFaqScreen/.test(resourcesJs), 'showFaqScreen 함수 호출이 없음');
+  assert.ok(/data-faq-id/.test(resourcesJs), '개별 질문 열기(data-faq-id) 로직이 없음');
+  assert.ok(/\.open\s*=\s*true/.test(resourcesJs), '개별 경로 진입 시 details를 열어주는 코드가 없음');
+});
+
+test('resources.js: 홈 검색 "질문에서도 찾았어요"는 최대 5개만 보여주고, 새 GA4 이벤트를 추가하지 않았다', () => {
+  assert.ok(/renderFaqSearchSubsection/.test(resourcesJs), 'renderFaqSearchSubsection 함수가 없음');
+  assert.ok(/\.slice\(0,\s*5\)/.test(resourcesJs), 'FAQ 검색 결과를 5개로 자르는 코드가 없음');
+  const names = new Set((resourcesJs.match(/gaEvent\('([a-z_]+)'/g) || []).map((m) => m.slice(9, -1)));
+  assert.deepEqual([...names].sort(), ['resource_external_click', 'resource_filter', 'resource_open', 'resource_search'], 'GA4 이벤트가 4개에서 바뀜(요구사항: 불필요하면 새 이벤트 추가 금지)');
+});
+
+test('resources.js: FAQ 검색어 원문을 gtag로 보내지 않는다', () => {
+  const faqSearchBlock = resourcesJs.slice(resourcesJs.indexOf('renderFaqSearchSubsection'));
+  const inputHandlerMatch = resourcesJs.match(/faqSearchInput\.addEventListener\('input',[\s\S]*?\}\);/);
+  assert.ok(inputHandlerMatch, 'faqSearchInput input 핸들러를 찾지 못함');
+  assert.equal(/gtag|gaEvent/.test(inputHandlerMatch[0]), false, 'FAQ 검색 입력 핸들러가 GA 이벤트를 보냄');
+});
+
+test('index.html: 홈 FAQ 미리보기 · 검색 서브섹션 · 전체 화면 마크업이 있다', () => {
+  assert.ok(/id="resFaqPreviewList"/.test(indexHtml), '홈 FAQ 미리보기 목록이 없음');
+  assert.ok(/모든 질문 보기/.test(indexHtml), '"모든 질문 보기" 버튼 문구가 없음');
+  assert.ok(/id="resFaqSearchWrap"/.test(indexHtml), 'FAQ 검색 서브섹션이 없음');
+  assert.ok(/질문에서도 찾았어요/.test(indexHtml), '"질문에서도 찾았어요" 제목이 없음');
+  assert.ok(/id="resFaqScreen"/.test(indexHtml), 'FAQ 전체 화면 컨테이너가 없음');
+  assert.ok(/id="resFaqCatTabs"/.test(indexHtml), 'FAQ 카테고리 필터가 없음');
+  assert.ok(/id="resFaqSearch"/.test(indexHtml), 'FAQ 전용 검색창이 없음');
+  assert.ok(/id="resFaqEmptyState"/.test(indexHtml), 'FAQ 빈 상태가 없음');
+  ['TOP 30', '가장 많이 묻는 질문', 'GPT 질문 순위'].forEach((banned) => {
+    assert.equal(indexHtml.includes(banned), false, '금지 표현이 화면 문구에 있음: ' + banned);
+  });
 });
