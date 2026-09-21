@@ -34,37 +34,51 @@ export default {
         });
       }
 
-      // 1. LaunchDesk가 발급한 OAuth state인지 확인
-      const { data: oauthState, error: stateError } =
+      // 1. LaunchDesk가 발급한 OAuth state를 원자적으로 "claim"한다(감사 지적 —
+      //    Cafe24 OAuth callback TOCTOU). 예전처럼 SELECT로 조건(존재 · 미사용 ·
+      //    미만료)을 확인한 뒤 별도 UPDATE로 used_at을 찍는 방식은, 같은 state로
+      //    콜백이 동시에 두 번 들어오면(중복 탭, 재전송 등) 둘 다 SELECT 시점에는
+      //    "아직 사용 안 됨"을 보고 통과해버릴 수 있었다(TOCTOU race). meta-oauth-
+      //    callback과 동일한 방식으로 UPDATE ... WHERE state=? AND provider='cafe24'
+      //    AND used_at IS NULL AND expires_at > now() ... RETURNING을 한 번에
+      //    실행해 "찾기"와 "사용 처리"를 하나의 원자적 연산으로 합친다. 같은
+      //    state에 두 요청이 동시에 이 UPDATE를 실행해도 Postgres가 행 잠금으로
+      //    직렬화하므로 먼저 커밋된 요청만 행을 갱신해 결과를 돌려받고(=claim
+      //    성공), 나중 요청은 그 시점엔 이미 used_at이 채워져 있어 조건에 안
+      //    걸려 0행(= null)을 받는다.
+      const nowIso = new Date().toISOString();
+
+      const { data: oauthState, error: claimError } =
         await ctx.supabaseAdmin
           .from("oauth_states")
-          .select(
-            "state,user_id,store_id,mall_id,expires_at,used_at"
-          )
+          .update({ used_at: nowIso })
           .eq("state", state)
           .eq("provider", "cafe24")
+          .is("used_at", null)
+          .gt("expires_at", nowIso)
+          .select("store_id,mall_id")
           .maybeSingle();
 
-      if (stateError || !oauthState) {
-        return new Response("Invalid OAuth state.", {
-          status: 400,
-        });
+      if (claimError) {
+        console.error("Cafe24 OAuth state claim error:", claimError.message);
+        return goBack("server_error");
       }
 
-      if (oauthState.used_at) {
-        return new Response("OAuth state already used.", {
-          status: 400,
-        });
+      if (!oauthState) {
+        // state가 없거나, 이미 사용됐거나, 만료됐거나, provider가 다름 — 원자적
+        // claim이라 어느 사유인지 별도로 다시 조회해 구분하지 않는다(meta-oauth-
+        // callback과 동일한 이유 — 재조회하면 그 사이 다른 요청이 먼저
+        // claim해갈 수 있어 원자성이 깨진다). 이 응답은 정상 사용자 흐름에서는
+        // 나오지 않고, 위조/재전송/만료된 리다이렉트에서만 보인다.
+        return new Response(
+          "Invalid, expired, or already-used OAuth state.",
+          { status: 400 }
+        );
       }
 
-      if (
-        new Date(oauthState.expires_at).getTime() <= Date.now()
-      ) {
-        return new Response("OAuth state expired.", {
-          status: 400,
-        });
-      }
-
+      // claim에 성공한 이 요청만 아래로 진행한다. 이후 token exchange가
+      // 실패해도 state를 다시 쓸 수 있게 되돌리지 않는다 — 사용자는 Cafe24
+      // 연결부터 처음부터 다시 시작하면 된다(meta-oauth-callback과 동일한 방침).
       const mallId = oauthState.mall_id;
 
       // mall_id가 외부 임의 호스트를 만들지 못하도록 제한
@@ -208,19 +222,9 @@ export default {
         throw storeError;
       }
 
-      // 6. state 재사용 방지
-      const { error: usedError } = await ctx.supabaseAdmin
-        .from("oauth_states")
-        .update({
-          used_at: new Date().toISOString(),
-        })
-        .eq("state", state);
-
-      if (usedError) {
-        throw usedError;
-      }
-
-      // 토큰은 절대 브라우저로 반환하지 않음
+      // state는 위 1번 claim 시점에 이미 used 처리됐으므로 여기서 다시
+      // 건드리지 않는다(meta-oauth-callback과 동일). 토큰은 절대 브라우저로
+      // 반환하지 않음.
       return goBack("connected");
     } catch (error) {
       console.error(
