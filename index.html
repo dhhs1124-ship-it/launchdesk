@@ -636,6 +636,27 @@
               </div>
             </div>
 
+            <!-- Meta 광고 세트 · 광고별 성과 — meta-adsets.js가 채운다. 계정 전체 요약
+                 (위 KPI · 쇼핑몰 운영 현황)은 그대로 두고 그 아래에서 캠페인 → 광고 세트
+                 → 광고 순으로 탐색한다. 계정 요약이 성공(meta.state='data')하기 전에는
+                 hidden. 광고 데이터는 저장하지 않고 메모리에서만 쓴다. -->
+            <section class="dash-panel madsets-panel" id="metaAdsetsPanel" aria-labelledby="metaAdsetsTitle" hidden>
+              <div class="dash-panel-head madsets-head">
+                <h2 class="madsets-title" id="metaAdsetsTitle">광고별 성과 보기</h2>
+                <div class="madsets-controls">
+                  <div class="madsets-period" role="group" aria-label="조회 기간">
+                    <button type="button" class="madsets-period-btn" data-madsets-period="today" aria-pressed="false">오늘</button>
+                    <button type="button" class="madsets-period-btn" data-madsets-period="month" aria-pressed="true">이번 달</button>
+                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm madsets-refresh" id="metaAdsetsRefresh">새로고침</button>
+                </div>
+              </div>
+              <div class="madsets-body-wrap">
+                <p class="sr-only" id="metaAdsetsStatus" aria-live="polite"></p>
+                <div id="metaAdsetsBody" aria-busy="true"></div>
+              </div>
+            </section>
+
             <!-- (내 계획 #ldPlanPanel은 홈(#/)의 시작 데스크 아래에 있다 — 이 화면으로
                  옮기지 않았다. id 중복 없음.) -->
 
@@ -4602,6 +4623,8 @@
 <script src="setup.js"></script>
 <script src="stores.js"></script>
 <script src="ops-overview.js"></script>
+<script src="meta-adsets-core.js"></script>
+<script src="meta-adsets.js"></script>
 <script src="wholesalers.js"></script>
 <script src="resources-data.js"></script>
 <script src="resources.js"></script>

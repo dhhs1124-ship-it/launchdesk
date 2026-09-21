@@ -1087,6 +1087,72 @@
   .opsdash-next-action-title{font-size:.87rem; font-weight:700;}
   .opsdash-next-action svg{flex:0 0 auto; color:var(--ink-faint);}
 
+  /* ---- Meta 광고 세트 · 광고별 성과(meta-adsets.js) — 기존 토큰만 쓰는 중립 색상.
+     상태를 색으로 구분하지 않는다(강조색 · 배지 없음). 광고 행은 세트 카드보다
+     글자 크기 · 배경 대비를 낮춰 위계를 한 단계 낮춘다. ---- */
+  .madsets-panel{margin-bottom:.9rem;}
+  .madsets-head{display:flex; align-items:center; justify-content:space-between; gap:.6rem 1rem; flex-wrap:wrap;}
+  .madsets-title{margin:0; font:inherit; font-weight:700; color:inherit;}
+  .madsets-controls{display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;}
+  .madsets-period{display:inline-flex; border:1px solid var(--border-strong); border-radius:99px; padding:3px; background:var(--surface); gap:2px;}
+  .madsets-period-btn{border:none; background:none; min-height:36px; padding:.35rem 1rem; border-radius:99px; font-family:var(--f-body); font-size:.84rem; font-weight:700; color:var(--ink-soft); cursor:pointer;}
+  .madsets-period-btn[aria-pressed="true"]{background:var(--ink); color:var(--surface);}
+  .madsets-period-btn[aria-pressed="false"]:hover{background:var(--surface-hover);}
+  .madsets-body-wrap{padding:.85rem 1.1rem 1.1rem;}
+
+  .madsets-range{margin:0 0 .8rem; font-size:.78rem; color:var(--ink-faint);}
+  .madsets-note{margin:.6rem 0 0; font-size:.78rem; color:var(--ink-faint); line-height:1.45;}
+  .madsets-partial{margin:0 0 .8rem;}
+  .madsets-loading, .madsets-empty{margin:0; padding:.6rem 0; font-size:.82rem; color:var(--ink-faint); line-height:1.5;}
+  .madsets-error{font-size:.85rem; color:var(--ink); line-height:1.5;}
+  .madsets-error p{margin:0 0 .6rem;}
+  .madsets-error-link{color:var(--op-accent-ink); font-weight:600; font-size:.83rem;}
+
+  .madsets-campaign + .madsets-campaign{margin-top:1.3rem;}
+  .madsets-campaign-name{margin:0; font-family:var(--f-body); font-size:1rem; font-weight:700; color:var(--ink); overflow-wrap:anywhere;}
+  .madsets-campaign-meta{display:flex; flex-wrap:wrap; gap:.15rem .9rem; margin:.25rem 0 .65rem; font-size:.78rem; color:var(--ink-soft);}
+  .madsets-adsets, .madsets-ads-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.6rem;}
+  .madsets-adset-card{border:1px solid var(--border); border-radius:var(--radius-sm); padding:.8rem .95rem; background:var(--surface);}
+  .madsets-adset-name{margin:0; font-family:var(--f-body); font-size:.92rem; font-weight:700; color:var(--ink); overflow-wrap:anywhere;}
+
+  .madsets-kpis{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.6rem .9rem; margin:.65rem 0 0;}
+  .madsets-kpi{min-width:0;}
+  .madsets-kpi dt{font-size:.75rem; color:var(--ink-faint);}
+  .madsets-kpi dd{margin:.15rem 0 0; font-size:.92rem; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; overflow-wrap:anywhere;}
+
+  .madsets-toggle{margin-top:.75rem; min-height:44px; padding:.5rem 1rem; border:1px solid var(--border-strong); border-radius:99px; background:var(--surface); font-family:var(--f-body); font-size:.82rem; font-weight:700; color:var(--ink); cursor:pointer;}
+  .madsets-toggle:hover{background:var(--surface-hover);}
+  .madsets-detail{margin-top:.75rem; padding-top:.75rem; border-top:1px solid var(--border);}
+  .madsets-detail[hidden]{display:none;}
+  .madsets-detail-list{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem .9rem; margin:0;}
+  .madsets-datanote{margin:.7rem 0 0; font-size:.78rem; color:var(--ink-soft); line-height:1.45;}
+
+  .madsets-ads{margin-top:.9rem; padding-top:.7rem; border-top:1px solid var(--border);}
+  .madsets-ads-title{margin:0 0 .5rem; font-size:.78rem; font-weight:700; color:var(--ink-soft);}
+  .madsets-ads-list{gap:.45rem;}
+  .madsets-ad{padding:.55rem .7rem; border-radius:var(--radius-sm); background:var(--sidebar-bg);}
+  .madsets-ad-name{margin:0; font-size:.8rem; font-weight:600; color:var(--ink); overflow-wrap:anywhere;}
+  .madsets-ad-kpis{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.4rem .7rem; margin:.4rem 0 0;}
+  .madsets-ad-kpis .madsets-kpi dt{font-size:.7rem;}
+  .madsets-ad-kpis .madsets-kpi dd{font-size:.8rem; font-weight:600;}
+
+  @media (max-width:860px){
+    .madsets-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+    .madsets-ad-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
+  }
+  @media (max-width:560px){
+    .madsets-body-wrap{padding:.8rem .9rem 1rem;}
+    .madsets-controls{width:100%;}
+    .madsets-period{display:grid; grid-template-columns:1fr 1fr; width:100%;}
+    .madsets-period-btn{min-height:44px;}
+    .madsets-refresh{width:100%; justify-content:center; min-height:44px;}
+    .madsets-kpis, .madsets-ad-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .madsets-toggle{width:100%;}
+    .madsets-detail-list{grid-template-columns:1fr; gap:0;}
+    .madsets-detail-list .madsets-kpi{display:flex; justify-content:space-between; gap:.8rem; padding:.45rem 0; border-bottom:1px solid var(--border);}
+    .madsets-detail-list .madsets-kpi dd{margin:0; text-align:right;}
+  }
+
   /* ---- 내 계획 패널(plans.js) — 홈 #ldPlanPanel ---- */
   .ldplan-head-note{font-size:.75rem; font-weight:600; color:var(--ink-faint); margin-left:.5rem;}
   .ldplan-draft{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.5rem .8rem; margin:0 1.1rem .6rem; padding:.6rem .8rem; border-radius:8px; background:var(--op-accent-soft); font-size:.82rem; color:var(--op-accent-ink); line-height:1.5;}

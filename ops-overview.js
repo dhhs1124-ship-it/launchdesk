@@ -175,6 +175,7 @@
   function publishOpsSnapshot(){
     var store = eligibleStores.filter(function(s){ return String(s.id) === String(selectedStoreId); })[0] || null;
     latestOpsSnapshot = {
+      storeId: selectedStoreId, // 광고 세트 패널(meta-adsets.js)이 쇼핑몰 변경을 감지 · 조회할 때 쓴다
       cafe24: {
         state: currentTopState, // 'guest'|'no-store'|'loading'|'data'
         storeName: store ? store.name : null,
