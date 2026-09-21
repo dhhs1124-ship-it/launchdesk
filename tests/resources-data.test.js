@@ -486,38 +486,38 @@ test('광고 숫자 가이드: 합격선 대신 이전 기간 · 소재 간 비�
 });
 
 /* ---------------------------------------------------------- 가이드 3 */
-test('광고가 안 될 때 가이드: 진단 단계 7개가 요구 순서와 같고 각 단계가 5개 항목을 갖는다', () => {
+test('광고가 안 될 때 가이드: 진단 단계 6개가 퍼널 순서와 같고 각 단계가 4개 항목을 갖는다', () => {
   const s = steps('ad-troubleshoot');
-  assert.equal(s.length, 7);
+  assert.equal(s.length, 6);
   assert.deepEqual(s.map((b) => b.title), [
-    '광고가 집행되지 않거나 노출이 거의 없음', '노출은 있는데 클릭이 적음', '클릭은 있는데 랜딩페이지 조회가 적음',
-    '방문은 있는데 장바구니가 적음', '장바구니는 있는데 구매가 적음', '구매는 발생하지만 이익이 남지 않음', '광고 관리자 숫자와 실제 주문이 다름'
+    '노출 자체가 거의 없음', '노출은 있는데 클릭이 없음', '클릭은 있는데 상품 페이지 도착이 적음',
+    '방문은 있는데 장바구니가 없음', '결제 도중 이탈하거나 오류가 발생함', '구매는 있지만 이익이 남지 않음'
   ]);
-  assert.deepEqual(s.map((b) => b.id), ['s1', 's2', 's3', 's4', 's5', 's6', 's7']);
+  assert.deepEqual(s.map((b) => b.id), ['s1', 's2', 's3', 's4', 's5', 's6']);
   s.forEach((b) => {
-    assert.deepEqual(b.fields.map((f) => f.label), ['보이는 증상', '가능한 원인', '먼저 확인할 것', '바로 할 수 있는 조치', '다음 단계로 넘어가는 기준'], b.title);
+    assert.deepEqual(b.fields.map((f) => f.label), ['이 증상이 뜻하는 것', '먼저 확인할 것', '이번에 바꿀 것', '확인 완료 기준'], b.title);
   });
 });
 
 test('광고가 안 될 때 가이드: 원칙 5가지와 추적 오류 vs 실제 부진 구분 안내가 있다', () => {
   const text = data.guideSearchText('ad-troubleshoot');
-  ['한 번에 한 가지', '변경 전', '변경 시각', '성급히', '추적 오류'].forEach((p) => assert.ok(text.includes(p), '"' + p + '" 원칙 안내가 없음'));
+  ['한 번에 하나만', '바꾸기 전', '바꾼 시각', '성급히', '추적 오류'].forEach((p) => assert.ok(text.includes(p), '"' + p + '" 원칙 안내가 없음'));
 });
 
-test('광고가 안 될 때 가이드: 마지막 진단 요약표의 이동 링크는 전부 실제 단계 id를 가리킨다', () => {
+test('광고가 안 될 때 가이드: 앞쪽 빠른 진단표의 이동 링크는 전부 실제 단계 id를 가리키고, 첫 단계보다 앞에 있다', () => {
   const s = steps('ad-troubleshoot');
   const ids = s.map((b) => b.id);
   const blocks = allBlocks('ad-troubleshoot');
-  const summaryIdx = blocks.findIndex((b) => b.t === 'table' && b.caption === '증상별 진단 요약');
-  assert.ok(summaryIdx > -1, '진단 요약표가 없음');
-  assert.ok(summaryIdx > blocks.lastIndexOf(s[s.length - 1]), '진단 요약표가 7단계 뒤(마지막 쪽)에 있지 않음');
+  const summaryIdx = blocks.findIndex((b) => b.t === 'table' && b.caption === '증상별 빠른 진단');
+  assert.ok(summaryIdx > -1, '빠른 진단표가 없음');
+  assert.ok(summaryIdx < blocks.indexOf(s[0]), '빠른 진단표가 1단계보다 앞(가이드 앞부분)에 있지 않음');
   const t = blocks[summaryIdx];
-  assert.ok(t.rows.length >= 7);
+  assert.ok(t.rows.length >= 6);
   const jumps = [];
   t.rows.forEach((r) => r.forEach((c) => { if(typeof c === 'object' && c.jump){ jumps.push(c.jump); } }));
   assert.equal(jumps.length, t.rows.length, '모든 행에 이동 링크가 있어야 함');
   jumps.forEach((j) => assert.ok(ids.includes(j), '존재하지 않는 단계로 이동: ' + j));
-  assert.deepEqual([...new Set(jumps)].sort(), ids.slice().sort(), '7개 단계가 모두 요약표에서 연결돼야 함');
+  assert.deepEqual([...new Set(jumps)].sort(), ids.slice().sort(), '6개 단계가 모두 빠른 진단표에서 연결돼야 함');
 });
 
 test('광고가 안 될 때 가이드: 이익 단계의 변동비 +5,000원 예시가 수학적으로 맞는다', () => {
@@ -591,6 +591,13 @@ test('검색: 요구한 6개 검색어가 관련 가이드를 찾는다', () => 
   Object.keys(expectations).forEach((q) => {
     const slugs = matchingSlugs(q);
     expectations[q].forEach((s) => assert.ok(slugs.includes(s), '"' + q + '" 검색에서 ' + s + '가 안 나옴 — 결과: ' + slugs.join(', ')));
+  });
+});
+
+test('검색: 광고가 안 될 때 가이드 재구성 후에도 보존해야 할 6개 검색어가 여전히 이 가이드를 찾는다', () => {
+  ['클릭은 있는데 구매', '결제 오류', '장바구니', '광고가 안 돼요', 'ROAS', 'CPA'].forEach((q) => {
+    const slugs = matchingSlugs(q);
+    assert.ok(slugs.includes('ad-troubleshoot'), '"' + q + '" 검색에서 ad-troubleshoot가 안 나옴 — 결과: ' + slugs.join(', '));
   });
 });
 
@@ -685,12 +692,15 @@ test('가독성: 광고 숫자 가이드의 결론부터는 3단계 시각 흐�
   assert.equal(blocks[2].t, 'note');
 });
 
-test('가독성: 광고가 안 될 때 가이드의 결론부터는 원칙 문단과 예외(추적 문제) 문단으로 나뉜다', () => {
+test('가독성: 광고가 안 될 때 가이드의 결론부터는 흐름(flow) 다음 원칙 문단과 예외(추적 문제) 안내로 이어진다', () => {
   const blocks = data.getGuide('ad-troubleshoot').blocks;
+  assert.equal(blocks[0].t, 'h3');
   assert.equal(blocks[0].text, '결론부터');
-  assert.equal(blocks[1].t, 'p');
+  assert.equal(blocks[1].t, 'flow');
+  assert.deepEqual(blocks[1].items.map((it) => it.title), ['노출', '클릭', '상품 페이지 도착', '장바구니·결제', '구매', '이익']);
   assert.equal(blocks[2].t, 'p');
-  assert.ok(blocks[2].text.indexOf('다만') === 0 && blocks[2].text.includes('7단계'));
+  assert.equal(blocks[3].t, 'note');
+  assert.ok(blocks[3].text.indexOf('다만') === 0 && blocks[3].text.includes('측정 오류'));
 });
 
 test('가독성: 단계 카드의 여러 항목은 문단이 아니라 items(목록)로 들어 있다', () => {
