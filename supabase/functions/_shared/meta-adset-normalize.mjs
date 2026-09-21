@@ -146,22 +146,38 @@ export function resolvePeriodRange(period, now, timeZone) {
 // observed는 파일 상단 "[observed 필드의 정확한 의미]" 정의를 그대로 따른다
 // — 후보 action_type이 이번 actions 배열에 있었는지만 나타내며, 추적 설정
 // 여부를 증명하지 않는다.
+//
+// [실계정 검증 후 추가] basis — 이번 응답에서 실제로 선택된 action_type
+// 문자열을 그대로 노출한다(추측·신규 후보 생성 없음). 후보가 하나도 없으면
+// null. 실계정 검증에서 landing_rate가 100%를 넘는 값을 반환한 원인을
+// 조사하려면 "정확히 어떤 action_type이 선택됐는지"가 응답에 보여야
+// 했는데, 이전 버전은 이를 노출하지 않아 원인을 특정할 수 없었다.
 export function pickConversionEvent(actions, priorityList) {
   const list = Array.isArray(actions) ? actions : [];
   for (const type of priorityList) {
     const entry = list.find((a) => a && a.action_type === type);
     if (entry) {
       const n = toNumber(entry.value);
-      return { value: n === null ? 0 : n, observed: true };
+      return { value: n === null ? 0 : n, observed: true, basis: type };
     }
   }
-  return { value: 0, observed: false };
+  return { value: 0, observed: false, basis: null };
 }
 
-// purchase/purchase_value는 같은 basis(action_type)를 actions와
-// action_values 양쪽에서 같이 써야 한다(교차 사용 금지 — 기존 pickPurchase와
-// 동일한 제약). count가 발견된 basis로만 value를 찾는다. observed의 의미는
-// pickConversionEvent와 동일(파일 상단 정의 참고).
+// purchase/purchase_value는 같은 basis(action_type) 후보 목록을 공유하되,
+// count는 actions 배열에서, value는 action_values 배열에서 "각자 실제로
+// 찾았는지"를 독립적으로 반영한다(교차 합산 금지 — 기존 pickPurchase와
+// 동일한 제약: count가 어떤 basis로 잡혔든, value는 반드시 그 "같은
+// action_type 문자열"을 action_values에서 다시 찾아야만 인정되고, 다른
+// 순위의 후보가 action_values에 있어도 대신 쓰지 않는다). observed의
+// 의미는 pickConversionEvent와 동일(파일 상단 정의 참고).
+//
+// [교정] value.basis는 "그 action_type으로 찾아봤다"가 아니라 "실제로
+// action_values 배열에서 찾았다"는 뜻이어야 한다 — count.basis가 있어도
+// action_values에 같은 action_type 항목이 없으면(value.observed:false)
+// value.basis는 반드시 null이다("찾으려 시도한 이름"과 "실제로 찾은
+// 이름"을 혼동하면 안 된다는 지적 반영). count의 basis가 필요하면
+// purchase.basis로 이미 확인 가능하므로 별도 필드를 추가하지 않는다.
 export function pickCountAndValue(actions, actionValues, priorityList) {
   const actionList = Array.isArray(actions) ? actions : [];
   const valueList = Array.isArray(actionValues) ? actionValues : [];
@@ -172,14 +188,39 @@ export function pickCountAndValue(actions, actionValues, priorityList) {
     const countNum = toNumber(countEntry.value);
     const valueNum = valueEntry ? toNumber(valueEntry.value) : null;
     return {
-      count: { value: countNum === null ? 0 : countNum, observed: true },
-      value: { value: valueNum === null ? 0 : valueNum, observed: !!valueEntry },
+      count: { value: countNum === null ? 0 : countNum, observed: true, basis: type },
+      value: {
+        value: valueNum === null ? 0 : valueNum,
+        observed: !!valueEntry,
+        basis: valueEntry ? type : null,
+      },
     };
   }
   return {
-    count: { value: 0, observed: false },
-    value: { value: 0, observed: false },
+    count: { value: 0, observed: false, basis: null },
+    value: { value: 0, observed: false, basis: null },
   };
+}
+
+// ---- 퍼널 비교 가능 여부(실계정 검증 결과 추가) -----------------------------
+// 실계정 검증에서 landing_page_view가 link_clicks보다 큰 값으로 반환되는
+// 사례가 확인됐다(예: link_clicks=36인데 landing_page_view=1035). 원인은
+// 이 서버 코드만으로는 확정할 수 없다(픽셀 중복·기여 설정·재방문 등 여러
+// 가능성이 있고, 어느 것도 여기서 단정하지 않는다) — 다만 원인과 무관하게
+// "링크 클릭 대비 랜딩페이지 도달률"이라는 해석 자체가 성립하지 않는
+// 상태이므로, 그 사실만 구조적으로 표시한다. usable:false는 "이 광고
+// 성과가 나쁘다"가 아니라 "이 비교를 지금 데이터로 할 수 없다"는 뜻이다.
+export function computeFunnelStatus(landingPageView, linkClicks) {
+  if (!landingPageView.observed) {
+    return { usable: false, code: "LPV_NOT_OBSERVED" };
+  }
+  if (linkClicks <= 0) {
+    return { usable: false, code: "NO_LINK_CLICKS" };
+  }
+  if (landingPageView.value > linkClicks) {
+    return { usable: false, code: "LPV_EXCEEDS_LINK_CLICKS" };
+  }
+  return { usable: true, code: null };
 }
 
 // ---- 파생 지표 -------------------------------------------------------------
@@ -209,12 +250,18 @@ export function normalizeAdsetMetrics(row) {
   const linkCpc = linkClicks > 0 ? spend / linkClicks : null;
   const cpm = impressions > 0 ? (spend / impressions) * 1000 : null;
 
-  const landingRate =
-    linkClicks > 0 && landingPageView.observed
-      ? (landingPageView.value / linkClicks) * 100
-      : null;
+  // [실계정 검증 후 추가] landing_page_view가 link_clicks를 넘는 등 퍼널
+  // 비교 자체가 성립하지 않는 상태를 먼저 판정한다. 100% 상한을 씌우거나
+  // 분모를 바꾸는 보정은 하지 않는다 — usable:false면 아래에서 관련 비율만
+  // null로 반환하고, landing_page_view.value/link_clicks 원본은 그대로 둔다.
+  const funnelStatus = computeFunnelStatus(landingPageView, linkClicks);
+
+  // landing_page_view를 분모로 쓰는 비율(landing_rate, add_to_cart_rate,
+  // purchase_rate)만 funnelStatus.usable로 추가 차단한다. checkout_rate는
+  // 분모가 add_to_cart이므로(landing_page_view가 아님) 영향받지 않는다.
+  const landingRate = funnelStatus.usable ? (landingPageView.value / linkClicks) * 100 : null;
   const addToCartRate =
-    landingPageView.observed && landingPageView.value > 0 && addToCart.observed
+    funnelStatus.usable && landingPageView.value > 0 && addToCart.observed
       ? (addToCart.value / landingPageView.value) * 100
       : null;
   const checkoutRate =
@@ -222,7 +269,7 @@ export function normalizeAdsetMetrics(row) {
       ? (initiateCheckout.value / addToCart.value) * 100
       : null;
   const purchaseRate =
-    landingPageView.observed && landingPageView.value > 0 && purchasePair.count.observed
+    funnelStatus.usable && landingPageView.value > 0 && purchasePair.count.observed
       ? (purchasePair.count.value / landingPageView.value) * 100
       : null;
   const cpa =
@@ -249,6 +296,7 @@ export function normalizeAdsetMetrics(row) {
     initiate_checkout: initiateCheckout,
     purchase: purchasePair.count,
     purchase_value: purchasePair.value,
+    funnel_status: funnelStatus,
     landing_rate: landingRate,
     add_to_cart_rate: addToCartRate,
     checkout_rate: checkoutRate,

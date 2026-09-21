@@ -183,6 +183,10 @@ test('purchase 액션 우선순위 — 여러 action_type이 동시에 와도 �
   assert.equal(metrics.purchase.value, 5);
   assert.equal(metrics.purchase_value.value, 50000);
   assert.equal(metrics.purchase.observed, true);
+  // 여러 우선순위 후보가 동시에 존재해도 basis는 선택된 단 하나(최상단
+  // 후보)만 반환한다 — 다른 두 후보 이름이 basis에 섞여 나오면 안 된다.
+  assert.equal(metrics.purchase.basis, 'offsite_conversion.fb_pixel_purchase');
+  assert.equal(metrics.purchase_value.basis, 'offsite_conversion.fb_pixel_purchase');
 });
 
 // observed의 정확한 의미(교정): "이번 Meta 응답의 actions/action_values
@@ -191,32 +195,45 @@ test('purchase 액션 우선순위 — 여러 action_type이 동시에 와도 �
 // 0건이 확정" 중 무엇인지는 구분할 수 없다 — 아래 두 테스트는 그 경계를
 // 정확히 이 정의로만 나눈다(추적 설정 여부에 대한 판단은 하지 않는다).
 
-test('후보 action_type 자체가 이번 응답에 없으면 value:0 · observed:false다', async () => {
+test('후보 action_type 자체가 이번 응답에 없으면 value:0 · observed:false · basis:null이다', async () => {
   const m = await modPromise;
   const metrics = m.normalizeAdsetMetrics(row({ actions: [], action_values: [] }));
-  assert.deepEqual(metrics.landing_page_view, { value: 0, observed: false });
-  assert.deepEqual(metrics.add_to_cart, { value: 0, observed: false });
-  assert.deepEqual(metrics.initiate_checkout, { value: 0, observed: false });
-  assert.deepEqual(metrics.purchase, { value: 0, observed: false });
-  assert.deepEqual(metrics.purchase_value, { value: 0, observed: false });
+  assert.deepEqual(metrics.landing_page_view, { value: 0, observed: false, basis: null });
+  assert.deepEqual(metrics.add_to_cart, { value: 0, observed: false, basis: null });
+  assert.deepEqual(metrics.initiate_checkout, { value: 0, observed: false, basis: null });
+  assert.deepEqual(metrics.purchase, { value: 0, observed: false, basis: null });
+  assert.deepEqual(metrics.purchase_value, { value: 0, observed: false, basis: null });
 });
 
-test('후보 action_type이 존재하고 값이 "0"이면 value:0 · observed:true다(응답 자체에 없는 경우와 구분)', async () => {
+test('후보 action_type이 존재하고 값이 "0"이면 value:0 · observed:true · basis=실제 선택된 이름이다(응답 자체에 없는 경우와 구분)', async () => {
   const m = await modPromise;
   const presentButZero = m.normalizeAdsetMetrics(row({
     inline_link_clicks: '100',
     actions: [{ action_type: 'landing_page_view', value: '0' }],
   }));
-  assert.deepEqual(presentButZero.landing_page_view, { value: 0, observed: true });
+  assert.deepEqual(presentButZero.landing_page_view, { value: 0, observed: true, basis: 'landing_page_view' });
 
   const absentFromResponse = m.normalizeAdsetMetrics(row({ inline_link_clicks: '100', actions: [] }));
-  assert.deepEqual(absentFromResponse.landing_page_view, { value: 0, observed: false });
+  assert.deepEqual(absentFromResponse.landing_page_view, { value: 0, observed: false, basis: null });
 
   // value는 둘 다 0이지만 observed가 다르므로 파생 지표(landing_rate) 결과가
   // 달라진다 — observed:true·value:0은 실제 계산 가능한 0%, observed:false는
   // "이번 응답만으로는 계산 근거가 없음"을 뜻하는 null이다(0으로 위장하지 않음).
   assert.equal(presentButZero.landing_rate, 0);
   assert.equal(absentFromResponse.landing_rate, null);
+});
+
+test('basis는 add_to_cart/initiate_checkout에서도 실제 선택된 action_type을 반환한다', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    inline_link_clicks: '200',
+    actions: [
+      { action_type: 'omni_add_to_cart', value: '3' },
+      { action_type: 'offsite_conversion.fb_pixel_initiate_checkout', value: '2' },
+    ],
+  }));
+  assert.equal(metrics.add_to_cart.basis, 'omni_add_to_cart');
+  assert.equal(metrics.initiate_checkout.basis, 'offsite_conversion.fb_pixel_initiate_checkout');
 });
 
 test('funnel 단계별 비율(landing_rate/add_to_cart_rate/checkout_rate/purchase_rate) 계산', async () => {
@@ -235,6 +252,105 @@ test('funnel 단계별 비율(landing_rate/add_to_cart_rate/checkout_rate/purcha
   assert.equal(metrics.add_to_cart_rate, (40 / 100) * 100);
   assert.equal(metrics.checkout_rate, (20 / 40) * 100);
   assert.equal(metrics.purchase_rate, (10 / 100) * 100); // 명세: purchase ÷ landing_page_view
+});
+
+// ===== funnel_status(실계정 검증 후 추가) ====================================
+// 실계정 검증에서 landing_page_view가 link_clicks보다 큰 값(link_clicks=36,
+// landing_page_view=1035 / link_clicks=771, landing_page_view=4493)으로
+// 반환되는 사례가 실제로 확인됐다 — 아래 두 테스트는 그 실측값을 그대로
+// 재현한다. 원인은 단정하지 않고, "비교 불가" 상태만 구조적으로 검증한다.
+
+test('실계정에서 확인된 사례(link_clicks=36, landing_page_view=1035) → landing_rate:null, usable:false, LPV_EXCEEDS_LINK_CLICKS', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    inline_link_clicks: '36',
+    actions: [{ action_type: 'landing_page_view', value: '1035' }],
+  }));
+  assert.equal(metrics.landing_rate, null);
+  assert.deepEqual(metrics.funnel_status, { usable: false, code: 'LPV_EXCEEDS_LINK_CLICKS' });
+  // 원본 값은 그대로 유지되어야 한다(삭제·보정 금지) — 이상값이어도 숨기지 않는다.
+  assert.equal(metrics.link_clicks, 36);
+  assert.equal(metrics.landing_page_view.value, 1035);
+});
+
+test('실계정에서 확인된 사례(link_clicks=771, landing_page_view=4493) → landing_rate:null, usable:false, LPV_EXCEEDS_LINK_CLICKS', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    inline_link_clicks: '771',
+    actions: [{ action_type: 'landing_page_view', value: '4493' }],
+  }));
+  assert.equal(metrics.landing_rate, null);
+  assert.deepEqual(metrics.funnel_status, { usable: false, code: 'LPV_EXCEEDS_LINK_CLICKS' });
+  assert.equal(metrics.link_clicks, 771);
+  assert.equal(metrics.landing_page_view.value, 4493);
+});
+
+test('link_clicks=100, landing_page_view=80(정상 범위) → landing_rate:80, usable:true, code:null', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    inline_link_clicks: '100',
+    actions: [{ action_type: 'landing_page_view', value: '80' }],
+  }));
+  assert.equal(metrics.landing_rate, 80);
+  assert.deepEqual(metrics.funnel_status, { usable: true, code: null });
+});
+
+test('landing_page_view이 이번 응답에 없으면(observed:false) usable:false · code:LPV_NOT_OBSERVED', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({ inline_link_clicks: '100', actions: [] }));
+  assert.deepEqual(metrics.funnel_status, { usable: false, code: 'LPV_NOT_OBSERVED' });
+  assert.equal(metrics.landing_rate, null);
+});
+
+test('link_clicks<=0이면 usable:false · code:NO_LINK_CLICKS', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    inline_link_clicks: '0',
+    actions: [{ action_type: 'landing_page_view', value: '5' }],
+  }));
+  assert.deepEqual(metrics.funnel_status, { usable: false, code: 'NO_LINK_CLICKS' });
+  assert.equal(metrics.landing_rate, null);
+});
+
+test('funnel_status.usable=false면 add_to_cart_rate · purchase_rate도 null이지만 checkout_rate는 영향받지 않는다', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    inline_link_clicks: '36', // landing_page_view(1035) > link_clicks(36) → usable:false
+    actions: [
+      { action_type: 'landing_page_view', value: '1035' },
+      { action_type: 'add_to_cart', value: '5' },
+      { action_type: 'initiate_checkout', value: '2' },
+      { action_type: 'purchase', value: '1' },
+    ],
+    action_values: [{ action_type: 'purchase', value: '10000' }],
+  }));
+  assert.equal(metrics.funnel_status.usable, false);
+  assert.equal(metrics.landing_rate, null);
+  assert.equal(metrics.add_to_cart_rate, null); // landing_page_view를 분모로 씀 → 차단
+  assert.equal(metrics.purchase_rate, null);    // landing_page_view를 분모로 씀 → 차단
+  // checkout_rate의 분모는 add_to_cart이지 landing_page_view가 아니므로
+  // funnel_status와 무관하게 정상 계산되어야 한다.
+  assert.equal(metrics.checkout_rate, (2 / 5) * 100);
+});
+
+test('funnel_status.usable=false여도 CPA · ROAS · link_ctr · link_cpc · CPM은 영향받지 않는다(회귀 없음)', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    spend: '10000',
+    impressions: '20000',
+    inline_link_clicks: '36',
+    actions: [
+      { action_type: 'landing_page_view', value: '1035' }, // usable:false를 유발
+      { action_type: 'purchase', value: '2' },
+    ],
+    action_values: [{ action_type: 'purchase', value: '40000' }],
+  }));
+  assert.equal(metrics.funnel_status.usable, false);
+  assert.equal(metrics.link_ctr, (36 / 20000) * 100);
+  assert.equal(metrics.link_cpc, 10000 / 36);
+  assert.equal(metrics.cpm, (10000 / 20000) * 1000);
+  assert.equal(metrics.cpa, 10000 / 2);
+  assert.equal(metrics.roas, 40000 / 10000);
 });
 
 test('선행 단계의 action_type이 이번 응답에 없으면 그 다음 단계 비율도 null이다(0으로 위장하지 않음)', async () => {
@@ -283,7 +399,73 @@ test('roas = purchase_value ÷ spend, purchase_value가 응답에 없거나 spen
   }));
   assert.equal(valueNotObserved.purchase.observed, true);
   assert.equal(valueNotObserved.purchase_value.observed, false);
+  assert.equal(valueNotObserved.purchase_value.basis, null); // 찾으려 시도한 이름이 아니라 실제로 못 찾았다는 뜻
   assert.equal(valueNotObserved.roas, null);
+});
+
+// ===== purchase_value.basis 의미 교정 =========================================
+// basis는 "그 action_type으로 찾아봤다"가 아니라 "실제로 그 배열에서
+// 찾았다"는 뜻이어야 한다 — count(actions)와 value(action_values)는 각자
+// 독립적으로 찾았는지를 반영하며, 서로 다른 후보를 섞어 쓰지 않는다.
+
+test('actions와 action_values에 같은 basis가 있으면 purchase.basis와 purchase_value.basis가 동일하다', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    actions: [{ action_type: 'omni_purchase', value: '3' }],
+    action_values: [{ action_type: 'omni_purchase', value: '90000' }],
+  }));
+  assert.equal(metrics.purchase.basis, 'omni_purchase');
+  assert.equal(metrics.purchase_value.basis, 'omni_purchase');
+  assert.equal(metrics.purchase.observed, true);
+  assert.equal(metrics.purchase_value.observed, true);
+});
+
+test('actions에만 basis가 있고 action_values에는 없으면 purchase_value는 value:0 · observed:false · basis:null이다', async () => {
+  const m = await modPromise;
+  const metrics = m.normalizeAdsetMetrics(row({
+    actions: [{ action_type: 'omni_purchase', value: '3' }],
+    action_values: [],
+  }));
+  assert.equal(metrics.purchase.observed, true);
+  assert.equal(metrics.purchase.basis, 'omni_purchase');
+  assert.deepEqual(metrics.purchase_value, { value: 0, observed: false, basis: null });
+});
+
+test('actions는 최우선 후보, action_values는 다른 하위 후보만 있으면 교차 혼합하지 않는다', async () => {
+  const m = await modPromise;
+  // actions: 최우선 후보(offsite_conversion.fb_pixel_purchase)만 존재.
+  // action_values: 그보다 하위 후보(purchase, 맨 아래 순위)만 존재 —
+  // 서로 다른 action_type이므로 절대 대신 쓰면 안 된다.
+  const metrics = m.normalizeAdsetMetrics(row({
+    actions: [{ action_type: 'offsite_conversion.fb_pixel_purchase', value: '3' }],
+    action_values: [{ action_type: 'purchase', value: '99999' }],
+  }));
+  assert.equal(metrics.purchase.basis, 'offsite_conversion.fb_pixel_purchase');
+  assert.deepEqual(metrics.purchase_value, { value: 0, observed: false, basis: null });
+});
+
+test('purchase_value.basis 교정 후에도 CPA/ROAS와 0/null 규칙은 회귀 없이 그대로다', async () => {
+  const m = await modPromise;
+  // 정상: 같은 basis로 count/value 모두 존재 → cpa/roas 정상 계산.
+  const ok = m.normalizeAdsetMetrics(row({
+    spend: '100000',
+    actions: [{ action_type: 'purchase', value: '4' }],
+    action_values: [{ action_type: 'purchase', value: '400000' }],
+  }));
+  assert.equal(ok.cpa, 25000);
+  assert.equal(ok.roas, 4);
+  // value만 못 찾은 경우 → roas는 null(0 아님), cpa는 count만으로 계산되므로 그대로.
+  const noValue = m.normalizeAdsetMetrics(row({
+    spend: '100000',
+    actions: [{ action_type: 'purchase', value: '4' }],
+    action_values: [],
+  }));
+  assert.equal(noValue.cpa, 25000);
+  assert.equal(noValue.roas, null);
+  // 후보 자체가 전혀 없는 경우 → 둘 다 null.
+  const none = m.normalizeAdsetMetrics(row({ spend: '100000', actions: [], action_values: [] }));
+  assert.equal(none.cpa, null);
+  assert.equal(none.roas, null);
 });
 
 // ===== 4) 캠페인/광고 세트 그룹화 ============================================
