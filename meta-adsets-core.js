@@ -139,6 +139,11 @@
       purchases: fmtCount(purchase),
       cpa: fmtMoney(m.cpa, currency),
       roas: fmtRoas(m.roas),
+      // 손익분기 기준 비교(meta-adsets.js + meta-margin-core.js)에 쓰는 원본
+      // ratio 값 — 화면에는 이 숫자를 직접 찍지 않고 항상 roas(포맷된
+      // 문자열)만 보여준다. 식별자가 아니라 순수 숫자라 노출 금지 대상이
+      // 아니다.
+      roasRatio: num(m.roas),
       note: note,
       detail: [
         { label: '노출', value: fmtInt(m.impressions) },
@@ -364,6 +369,10 @@
         return id && open[id] ? ensureAds(id) : Promise.resolve(null);
       },
       getStoreId: function(){ return storeId; },
+      // 손익분기 기준 연결(meta-adsets.js)이 로컬 카드키(mk)로 원본 Meta
+      // adset_id를 찾을 때만 쓴다 — 뷰모델/HTML에는 이 값이 들어가지
+      // 않는다. 목록이 아직 없거나 키가 없으면 null.
+      adsetIdOf: adsetIdOf,
       getView: function(){
         var e = storeId ? cache[listKey()] : null;
         var view = {
@@ -431,6 +440,47 @@
     return h + '<div class="madsets-ads"><p class="madsets-ads-title">광고별 성과</p>' + renderAds(ads, mk) + '</div>';
   }
 
+  // 광고 세트 손익분기 기준 연결 상태 — 원본 Meta adset_id는 여기서도
+  // 절대 쓰지 않는다(로컬 카드키 mk만 data-mk에 싣는다). link는
+  // meta-adsets.js가 미리 계산해 view.links[mk]에 넣어준 표시용 값만
+  // 받는다(meta-margin-core.js의 computeBreakeven/compareRoas 결과) —
+  // 이 함수는 그 값을 그대로 HTML로 옮기기만 한다("합성"만 한다).
+  function renderLinkBlock(a, view){
+    var mk = a.key;
+    var link = (view.links && view.links[mk]) || null;
+    if(!link || !link.connected){
+      return '<div class="madsets-link">' +
+        '<p class="madsets-link-status">손익분기 기준이 연결되지 않았어요.</p>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-mlink-action="connect" data-mk="' + mk + '"' +
+        ' data-mf="mlink-connect-' + mk + '">마진 계산 연결</button></div>';
+    }
+    var h = '<div class="madsets-link madsets-link-connected">' +
+      '<p class="madsets-link-product">' + esc(link.productLabel) + '</p>';
+    if(link.breakeven && link.breakeven.ok){
+      var hasCurrent = a.roasRatio !== null && a.roasRatio !== undefined;
+      if(hasCurrent) h += '<p class="madsets-link-roas">현재 ROAS ' + esc(a.roas) + '</p>';
+      h += '<p class="madsets-link-roas">연결한 손익분기 기준 ' + esc(link.breakeven.pctLabel) + '</p>';
+      if(link.compare){
+        h += '<p class="madsets-link-compare">' + esc(link.compare.text) + '</p>';
+        if(view.period === 'today'){
+          h += '<p class="madsets-note">오늘 데이터는 집계가 늦어 값이 바뀔 수 있어요.</p>';
+        }
+      }
+    } else if(link.breakeven){
+      h += '<p class="madsets-link-roas">' + esc(link.breakeven.reason) + '</p>';
+    }
+    var disconnecting = !!link.disconnecting;
+    h += '<p class="madsets-link-caption">연결한 계산 기준</p>' +
+      '<div class="madsets-link-actions">' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-mlink-action="change" data-mk="' + mk + '"' +
+        ' data-mf="mlink-change-' + mk + '"' + (disconnecting ? ' disabled' : '') + '>기준 변경</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-mlink-action="disconnect" data-mk="' + mk + '"' +
+        ' data-mf="mlink-disconnect-' + mk + '"' + (disconnecting ? ' disabled' : '') + '>' +
+        (disconnecting ? '해제하는 중…' : '연결 해제') + '</button>' +
+      '</div></div>';
+    return h;
+  }
+
   function renderAdset(a, view){
     var mk = a.key;
     var isOpen = !!view.open[mk];
@@ -442,6 +492,7 @@
       '<dl class="madsets-kpis">' + kpi('광고비', a.spend) + kpi('링크 클릭률', a.linkCtr) +
       kpi('구매', a.purchases) + kpi('CPA', a.cpa) + kpi('ROAS', a.roas) + '</dl>' +
       (a.note ? '<p class="madsets-note">' + esc(a.note) + '</p>' : '');
+    if(a.canExpand) h += renderLinkBlock(a, view);
     if(a.canExpand){
       h += '<button type="button" class="madsets-toggle" id="' + toggleId + '" data-mk="' + mk + '" data-mf="toggle-' + mk + '"' +
         ' aria-expanded="' + (isOpen ? 'true' : 'false') + '" aria-controls="' + detailId + '"' +
@@ -460,6 +511,62 @@
       '<span>광고 세트 ' + c.adsetCount + '개</span>' +
       '<span>' + esc(c.spendLabel) + ' ' + esc(c.spendTotal) + '</span></p></header>' +
       '<ul class="madsets-adsets">' + c.adsets.map(function(a){ return renderAdset(a, view); }).join('') + '</ul></article>';
+  }
+
+  // ------------------------------------------------- 손익분기 기준 연결 모달
+  // candidates: meta-margin-core.js buildCandidateList()가 만든 배열에
+  // platformLabel(표시용 문자열, 이 파일은 platform 코드→이름 매핑을 모른다)
+  // 을 meta-adsets.js가 덧붙인 것. 여기서는 Meta adset_id를 전혀 다루지
+  // 않는다 — 후보는 "저장한 계산 기록"일 뿐 광고 세트와 무관한 데이터다.
+  function renderLinkPicker(candidates){
+    if(!candidates || !candidates.length){
+      return '<p class="madsets-link-modal-empty">저장한 마진 계산 기록이 없어요.</p>' +
+        '<a class="btn btn-ghost btn-sm" href="#/tools" data-mf="mlink-goto-tools">마진 계산기로 이동</a>';
+    }
+    return '<ul class="madsets-link-modal-list">' + candidates.map(function(c, i){
+      var breakevenText = (c.breakeven && c.breakeven.ok)
+        ? ('손익분기 ROAS ' + esc(c.breakeven.pctLabel))
+        : esc(c.breakeven ? c.breakeven.reason : '');
+      return '<li><button type="button" class="madsets-link-modal-item" data-mlink-pick="' + i + '" data-mf="mlink-pick-' + i + '">' +
+        (c.source === 'current' ? '<span class="madsets-link-modal-tag">지금 입력한 값</span>' : '') +
+        '<span class="madsets-link-modal-date">' + esc(c.dateLabel) + '</span>' +
+        '<span class="madsets-link-modal-summary">' + esc(c.priceLabel) + ' × ' + esc(String(c.qty)) + '</span>' +
+        '<span class="madsets-link-modal-pread">광고비 전 남는 금액 ' + esc(c.preAdLabel) + '</span>' +
+        '<span class="madsets-link-modal-breakeven">' + breakevenText + '</span>' +
+        '<span class="madsets-link-modal-platform">' + esc(c.platformLabel || '플랫폼 미입력') + '</span>' +
+        '</button></li>';
+    }).join('') + '</ul>';
+  }
+
+  function renderLinkLabelForm(candidate, labelValue, labelError, saving){
+    var breakevenText = (candidate.breakeven && candidate.breakeven.ok)
+      ? ('손익분기 ROAS ' + esc(candidate.breakeven.pctLabel))
+      : esc(candidate.breakeven ? candidate.breakeven.reason : '');
+    return '<div class="madsets-link-modal-selected">' +
+        '<p>' + esc(candidate.dateLabel) + ' · ' + esc(candidate.priceLabel) + ' × ' + esc(String(candidate.qty)) + '</p>' +
+        '<p>' + breakevenText + '</p>' +
+      '</div>' +
+      '<form class="madsets-link-modal-form" data-mlink-form="label">' +
+        '<div class="ws-field"><label for="mlinkProductLabel">상품 구분용 이름</label>' +
+        '<input type="text" id="mlinkProductLabel" name="productLabel" maxlength="40" value="' + esc(labelValue || '') + '" required></div>' +
+        '<p class="madsets-link-modal-hint">상품명처럼 알아볼 수 있는 이름만 적어주세요.</p>' +
+        '<p class="madsets-link-modal-warn">실명·연락처 등 개인정보는 적지 마세요.</p>' +
+        (labelError ? '<p class="madsets-link-modal-error" role="alert">' + esc(labelError) + '</p>' : '') +
+        '<div class="madsets-link-modal-actions">' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-mlink-back="1" data-mf="mlink-back"' + (saving ? ' disabled' : '') + '>뒤로</button>' +
+          '<button type="submit" class="btn btn-primary btn-sm" data-mf="mlink-save"' + (saving ? ' disabled' : '') + '>' +
+          (saving ? '연결하는 중…' : '연결하기') + '</button>' +
+        '</div>' +
+      '</form>';
+  }
+
+  // state: { step:'pick'|'label', candidates, selectedIndex, labelValue, labelError, saving }
+  function renderLinkModal(state){
+    if(state.step === 'label'){
+      var c = state.candidates[state.selectedIndex];
+      return c ? renderLinkLabelForm(c, state.labelValue, state.labelError, !!state.saving) : '';
+    }
+    return renderLinkPicker(state.candidates);
   }
 
   // 패널 본문(기간 탭 · 새로고침 아래 영역) 전체.
@@ -485,6 +592,7 @@
     buildListVm: buildListVm, buildAdsVm: buildAdsVm,
     errorInfo: errorInfo, normalizeInvokeResult: normalizeInvokeResult,
     cacheKey: cacheKey, createController: createController,
-    statusText: statusText, renderBody: renderBody
+    statusText: statusText, renderBody: renderBody,
+    renderLinkModal: renderLinkModal
   };
 });

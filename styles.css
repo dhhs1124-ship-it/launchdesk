@@ -1136,6 +1136,33 @@
   .madsets-ad-kpis .madsets-kpi dt{font-size:.7rem;}
   .madsets-ad-kpis .madsets-kpi dd{font-size:.8rem; font-weight:600;}
 
+  /* 광고 세트 손익분기 기준 연결 — 기존 .madsets-adset-card 안쪽에 붙는
+     블록. 색상으로 성공/위험을 나타내지 않는다(중립 텍스트만). */
+  .madsets-link{margin-top:.75rem; padding-top:.75rem; border-top:1px solid var(--border);}
+  .madsets-link-status{margin:0 0 .6rem; font-size:.82rem; color:var(--ink-soft);}
+  .madsets-link-product{margin:0; font-size:.88rem; font-weight:700; color:var(--ink); overflow-wrap:anywhere;}
+  .madsets-link-roas{margin:.3rem 0 0; font-size:.82rem; color:var(--ink); font-variant-numeric:tabular-nums;}
+  .madsets-link-compare{margin:.3rem 0 0; font-size:.82rem; color:var(--ink-soft);}
+  .madsets-link-caption{margin:.7rem 0 .4rem; font-size:.75rem; color:var(--ink-faint);}
+  .madsets-link-actions{display:flex; flex-wrap:wrap; gap:.5rem;}
+
+  /* 연결 모달 본문(#marginLinkBody) — 기존 .modal-panel 안에서 그린다. */
+  .madsets-link-modal-empty{margin:0 0 1rem; font-size:.88rem; color:var(--ink-soft);}
+  .madsets-link-modal-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.6rem; max-height:min(60vh,420px); overflow-y:auto;}
+  .madsets-link-modal-item{display:flex; flex-direction:column; gap:.2rem; width:100%; text-align:left; min-height:44px; padding:.7rem .85rem; border:1px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--surface); font-family:var(--f-body); cursor:pointer;}
+  .madsets-link-modal-item:hover, .madsets-link-modal-item:focus-visible{background:var(--surface-hover);}
+  .madsets-link-modal-tag{align-self:flex-start; font-size:.72rem; font-weight:700; color:var(--op-accent-ink);}
+  .madsets-link-modal-date{font-size:.76rem; color:var(--ink-faint);}
+  .madsets-link-modal-summary{font-size:.9rem; font-weight:700; color:var(--ink);}
+  .madsets-link-modal-pread, .madsets-link-modal-breakeven, .madsets-link-modal-platform{font-size:.8rem; color:var(--ink-soft);}
+  .madsets-link-modal-selected{margin:0 0 1rem; padding:.7rem .85rem; border-radius:var(--radius-sm); background:var(--sidebar-bg); font-size:.85rem; color:var(--ink);}
+  .madsets-link-modal-selected p{margin:0 0 .2rem;}
+  .madsets-link-modal-form .ws-field{margin-bottom:.5rem;}
+  .madsets-link-modal-hint{margin:.2rem 0 0; font-size:.78rem; color:var(--ink-faint);}
+  .madsets-link-modal-warn{margin:.2rem 0 0; font-size:.78rem; color:var(--ink-soft);}
+  .madsets-link-modal-error{margin:.6rem 0 0; font-size:.82rem; color:var(--ink);}
+  .madsets-link-modal-actions{display:flex; justify-content:flex-end; gap:.6rem; margin-top:1.1rem;}
+
   @media (max-width:860px){
     .madsets-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
     .madsets-ad-kpis{grid-template-columns:repeat(3,minmax(0,1fr));}
@@ -1151,6 +1178,10 @@
     .madsets-detail-list{grid-template-columns:1fr; gap:0;}
     .madsets-detail-list .madsets-kpi{display:flex; justify-content:space-between; gap:.8rem; padding:.45rem 0; border-bottom:1px solid var(--border);}
     .madsets-detail-list .madsets-kpi dd{margin:0; text-align:right;}
+    .madsets-link-actions{flex-direction:column;}
+    .madsets-link-actions .btn{width:100%; justify-content:center; min-height:44px;}
+    .madsets-link-modal-actions{flex-direction:column-reverse;}
+    .madsets-link-modal-actions .btn{width:100%; justify-content:center; min-height:44px;}
   }
 
   /* ---- 내 계획 패널(plans.js) — 홈 #ldPlanPanel ---- */

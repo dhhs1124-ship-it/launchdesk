@@ -628,12 +628,35 @@ test('금지 표현 · 통화 하드코딩이 소스에 없다', () => {
   }
 });
 
-test('저장 금지: localStorage · sessionStorage · insert · upsert · DB 조회가 없다', () => {
+test('저장 금지(광고 성과): localStorage · sessionStorage가 없고, core는 여전히 완전한 순수 함수다', () => {
   for (const [name, src] of [['core', CORE_SRC], ['dom', DOM_SRC]]) {
     assert.doesNotMatch(src, /localStorage|sessionStorage|indexedDB|document\.cookie/, name);
-    assert.doesNotMatch(src, /\.insert\(|\.upsert\(|\.update\(|\.delete\(|\.from\(|\.rpc\(/, name);
   }
+  // meta-adsets-core.js는 광고 세트 손익분기 기준 연결이 생긴 뒤에도 여전히
+  // DOM · 네트워크 · DB를 전혀 모르는 순수 모듈이어야 한다.
+  assert.doesNotMatch(CORE_SRC, /\.insert\(|\.upsert\(|\.update\(|\.delete\(|\.from\(|\.rpc\(/);
   assert.doesNotMatch(CORE_SRC, /document|XMLHttpRequest|fetch\(/);
+});
+
+test('DB 쓰기는 ad_margin_links 하나로만 한정되고, Meta 광고 성과 자체는 저장하지 않는다', () => {
+  // meta-adsets.js의 유일한 DB 접근 대상은 ad_margin_links(손익분기 기준
+  // 연결)뿐이다 — .from(...)에 다른 테이블 이름이 등장하면 안 된다.
+  const fromCalls = DOM_SRC.match(/\.from\(\s*(['"])([^'"]+)\1/g) || [];
+  assert.ok(fromCalls.length > 0, 'ad_margin_links 접근 코드를 찾지 못함');
+  for (const call of fromCalls) assert.match(call, /ad_margin_links/, call);
+  // 광고 성과 지표(광고비 · ROAS · 구매 등)를 쓰기 페이로드 필드로 쓰는
+  // 코드가 없다 — 저장하는 것은 사용자가 선택한 마진 계산 스냅샷뿐이다.
+  assert.doesNotMatch(DOM_SRC, /\bspend\s*:|\broas\s*:|\bpurchases\s*:|\bimpressions\s*:|\breach\s*:|\bfrequency\s*:|\blink_ctr\s*:|\bcpa\s*:/);
+  // upsert/delete 대상도 ad_margin_links로만 한정된다.
+  assert.match(DOM_SRC, /\.upsert\(payload, \{ onConflict: 'store_id,meta_adset_id' \}\)/);
+  assert.match(DOM_SRC, /\.delete\(\)\s*\n\s*\.eq\('store_id', storeId\)\.eq\('meta_adset_id', adsetId\)/);
+});
+
+test('원본 Meta adset_id(rawId)는 store_id/meta_adset_id 키 이름으로만 페이로드에 실리고, 그 값 자체는 로그에 남지 않는다', () => {
+  const consoleCalls = DOM_SRC.match(/console\.(error|log|warn)\([^)]*\)/g) || [];
+  for (const call of consoleCalls) {
+    assert.doesNotMatch(call, /rawId|adsetId|snap\.value|snapshotValue|candidate\.record|rawLabel/, call);
+  }
 });
 
 test('호출 조건: 운영 현황 경로 · storeId · meta.state==="data"만 쓰고 Cafe24 상태는 조건이 아니다', () => {
@@ -690,4 +713,232 @@ test('스타일: 신규 규칙은 기존 토큰만 쓰고 색 리터럴 · good/
   assert.match(CSS, /\.madsets-toggle\{[^}]*min-height:44px/);
   assert.match(CSS, /\.madsets-period\{display:grid; grid-template-columns:1fr 1fr; width:100%;\}/);
   assert.match(CSS, /\.madsets-detail\[hidden\]\{display:none;\}/);
+});
+
+// ================================================ 광고 세트 손익분기 기준 연결
+const MarginCore = require('../meta-margin-core.js');
+
+function linkedView(list, mk, linkOverride){
+  return readyView(list, { links: Object.assign({ [mk]: { connected: false } }, linkOverride ? { [mk]: linkOverride } : {}) });
+}
+
+test('renderAdset: 연결 없음 → 안내 문구 + "마진 계산 연결" 버튼, 원본 Meta ID는 어디에도 없다', () => {
+  const list = Core.buildListVm(payload([campaign('1', 'C', 'OUTCOME_SALES', [adset('11', 'S', metrics())])]));
+  const view = linkedView(list, 'c0-a0');
+  const html = Core.renderBody(view);
+  assert.match(html, /손익분기 기준이 연결되지 않았어요\./);
+  assert.match(html, /data-mlink-action="connect" data-mk="c0-a0"/);
+  assert.doesNotMatch(html, /기준 변경|연결 해제/);
+  assert.doesNotMatch(html, /1202\d{9,}/); // Meta adset_id 원문 없음
+});
+
+test('renderAdset: 연결됨 + 유효 → 상품명 · 현재/손익분기 ROAS · 비교 문구 · 변경/해제 버튼', () => {
+  const list = Core.buildListVm(payload([campaign('1', 'C', 'OUTCOME_SALES', [adset('11', 'S', metrics({ roas: 2.44 }))])]));
+  const breakeven = MarginCore.computeBreakeven(25000, 10000); // 250.0%
+  const compare = MarginCore.compareRoas(2.44, breakeven.ratio);
+  const view = linkedView(list, 'c0-a0', { connected: true, productLabel: '여름 원피스', breakeven, compare });
+  const html = Core.renderBody(view);
+  assert.match(html, /여름 원피스/);
+  assert.match(html, /현재 ROAS 244%/);
+  assert.match(html, /연결한 손익분기 기준 250\.0%/);
+  assert.match(html, /연결한 기준보다 6\.0%p 낮아요\./);
+  assert.match(html, /연결한 계산 기준/);
+  assert.match(html, /data-mlink-action="change" data-mk="c0-a0"/);
+  assert.match(html, /data-mlink-action="disconnect" data-mk="c0-a0"/);
+});
+
+test('renderAdset: 연결됨 + 손익분기 계산 불가 → 사유 문구만, ROAS 비교 없음', () => {
+  const list = Core.buildListVm(payload([campaign('1', 'C', 'OUTCOME_SALES', [adset('11', 'S', metrics())])]));
+  const breakeven = MarginCore.computeBreakeven(10000, 0);
+  const view = linkedView(list, 'c0-a0', { connected: true, productLabel: 'X', breakeven, compare: null });
+  const html = Core.renderBody(view);
+  assert.match(html, /광고비 전 남는 금액이 0원이라 손익분기 ROAS가 없어요\./);
+  assert.doesNotMatch(html, /연결한 손익분기 기준 \d/);
+  assert.doesNotMatch(html, /낮아요|높아요/);
+});
+
+test('오늘 기간 + 유효한 비교가 있을 때만 "오늘 데이터는 집계가 늦어" 안내가 붙는다', () => {
+  const list = Core.buildListVm(payload([campaign('1', 'C', 'OUTCOME_SALES', [adset('11', 'S', metrics({ roas: 2.44 }))])]));
+  const breakeven = MarginCore.computeBreakeven(25000, 10000);
+  const compare = MarginCore.compareRoas(2.44, breakeven.ratio);
+  const todayView = Object.assign({}, linkedView(list, 'c0-a0', { connected: true, productLabel: 'X', breakeven, compare }), { period: 'today' });
+  assert.match(Core.renderBody(todayView), /오늘 데이터는 집계가 늦어 값이 바뀔 수 있어요\./);
+  const monthView = linkedView(list, 'c0-a0', { connected: true, productLabel: 'X', breakeven, compare });
+  assert.doesNotMatch(Core.renderBody(monthView), /오늘 데이터는 집계가 늦어/);
+});
+
+test('연결 카드에 좋음/나쁨/성공/위험/중단 같은 확정 표현이나 색상 클래스가 없다', () => {
+  const list = Core.buildListVm(payload([campaign('1', 'C', 'OUTCOME_SALES', [adset('11', 'S', metrics({ roas: 2.62 }))])]));
+  const breakeven = MarginCore.computeBreakeven(25000, 10000);
+  const compare = MarginCore.compareRoas(2.62, breakeven.ratio);
+  const html = Core.renderBody(linkedView(list, 'c0-a0', { connected: true, productLabel: 'X', breakeven, compare }));
+  assert.doesNotMatch(html, /좋음|나쁨|성공|위험|중단|양호|주의|class="[^"]*good|class="[^"]*warn/);
+});
+
+test('view.links가 아예 없어도(과거 호출부와 호환) 렌더는 "연결 없음"으로 안전하게 처리된다', () => {
+  const list = Core.buildListVm(payload([campaign('1', 'C', 'OUTCOME_SALES', [adset('11', 'S', metrics())])]));
+  const html = Core.renderBody(readyView(list)); // links 필드 자체가 없음
+  assert.match(html, /손익분기 기준이 연결되지 않았어요\./);
+});
+
+test('renderLinkModal — pick 단계: 후보 나열, 지금 입력한 값 태그, 빈 목록이면 #/tools 링크', () => {
+  const candidates = [
+    { source: 'current', dateLabel: '지금', qty: 1, priceLabel: '10,000원', preAdLabel: '3,000원', platformLabel: '카페24', breakeven: { ok: true, pctLabel: '150.0%' } },
+    { source: 'saved', dateLabel: '9.20.', qty: 2, priceLabel: '20,000원', preAdLabel: '5,000원', platformLabel: '스마트스토어', breakeven: { ok: false, reason: '총 수입이 0원 이하라 손익분기 ROAS를 계산할 수 없어요.' } }
+  ];
+  const html = Core.renderLinkModal({ step: 'pick', candidates: candidates });
+  assert.match(html, /지금 입력한 값/);
+  assert.match(html, /data-mlink-pick="0"/);
+  assert.match(html, /data-mlink-pick="1"/);
+  assert.match(html, /손익분기 ROAS 150\.0%/);
+  assert.match(html, /총 수입이 0원 이하라 손익분기 ROAS를 계산할 수 없어요\./);
+
+  const empty = Core.renderLinkModal({ step: 'pick', candidates: [] });
+  assert.match(empty, /저장한 마진 계산 기록이 없어요\./);
+  assert.match(empty, /href="#\/tools"/);
+});
+
+test('renderLinkModal — label 단계: 안내·경고 문구, 필수 입력, 오류 표시, 저장 중 버튼 잠금', () => {
+  const candidate = { dateLabel: '9.20.', qty: 1, priceLabel: '10,000원', breakeven: { ok: true, pctLabel: '150.0%' } };
+  const base = { step: 'label', candidates: [candidate], selectedIndex: 0, labelValue: '', labelError: null, saving: false };
+  const html = Core.renderLinkModal(base);
+  assert.match(html, /상품 구분용 이름/);
+  assert.match(html, /상품명처럼 알아볼 수 있는 이름만 적어주세요\./);
+  assert.match(html, /실명·연락처 등 개인정보는 적지 마세요\./);
+  assert.match(html, /<input type="text" id="mlinkProductLabel" name="productLabel" maxlength="40"[^>]*required>/);
+  assert.doesNotMatch(html, /role="alert"/);
+
+  const withError = Core.renderLinkModal(Object.assign({}, base, { labelValue: '가'.repeat(41), labelError: '상품 구분용 이름은 40자 이내로 적어주세요.' }));
+  assert.match(withError, /role="alert"/);
+  assert.match(withError, /상품 구분용 이름은 40자 이내로 적어주세요\./);
+
+  const saving = Core.renderLinkModal(Object.assign({}, base, { saving: true }));
+  assert.match(saving, /연결하는 중…/);
+  assert.match(saving, /data-mf="mlink-save" disabled/);
+  assert.match(saving, /data-mf="mlink-back" disabled/);
+});
+
+test('meta-adsets.js: 확인(window.confirm) 이후에만 저장/삭제가 실행된다(취소 시 쓰기 없음)', () => {
+  const saveIdx = DOM_SRC.indexOf('function saveLink(');
+  const confirmIdx = DOM_SRC.indexOf('window.confirm(');
+  assert.ok(confirmIdx > -1);
+  const submitHandlerIdx = DOM_SRC.indexOf("marginLinkBody.addEventListener('submit'");
+  const saveCallIdx = DOM_SRC.indexOf('saveLink(storeId, rawId, snap.value)');
+  assert.ok(submitHandlerIdx > -1 && saveCallIdx > -1 && confirmIdx > submitHandlerIdx && confirmIdx < saveCallIdx,
+    'confirm이 제출 핸들러 안에서 saveLink 호출보다 먼저 나와야 함');
+  assert.match(DOM_SRC, /if\(!confirmed\) return; \/\/ 취소 — 쓰기 없음/);
+
+  const disconnectFnIdx = DOM_SRC.indexOf('function disconnectLink(');
+  const disconnectConfirmIdx = DOM_SRC.indexOf('window.confirm(', disconnectFnIdx);
+  const deleteCallIdx = DOM_SRC.indexOf('deleteLink(storeId, rawId)');
+  assert.ok(disconnectFnIdx > -1 && disconnectConfirmIdx > disconnectFnIdx && deleteCallIdx > disconnectConfirmIdx);
+  assert.ok(saveIdx > -1);
+});
+
+test('meta-adsets.js: 중복 클릭 방지 — 저장 중(saving)·해제 중(linkDisconnectInFlight) 가드가 있다', () => {
+  assert.match(DOM_SRC, /if\(linkModalState\.saving\) return; \/\/ 중복 클릭 방지/);
+  assert.match(DOM_SRC, /if\(linkDisconnectInFlight\[mk\]\) return; \/\/ 중복 클릭 방지/);
+});
+
+test('meta-adsets.js: 이름·상품명 기반 자동 매칭이나 최신 계산 자동 선택 코드가 없다', () => {
+  assert.doesNotMatch(DOM_SRC, /adset_name|adsetName\.includes|productLabel ===.*name|\.sort\(/);
+  // 선택은 오직 사용자의 data-mlink-pick 클릭으로만 selectedIndex가 정해진다.
+  assert.match(DOM_SRC, /linkModalState\.selectedIndex = idx;/);
+  assert.equal((DOM_SRC.match(/selectedIndex = /g) || []).length, 2); // 초기화(null)와 pick 클릭, 두 곳뿐
+});
+
+test('meta-adsets.js: 예시 모드 값은 후보에 들어가지 않는다(buildCurrentRecord 공개 API를 그대로 신뢰)', () => {
+  assert.match(DOM_SRC, /window\.launchdeskMarginCalcUI\.buildCurrentRecord\(\)/);
+  // buildCurrentRecord()는 예시 모드일 때 null을 돌려준다(tools.js 계약) —
+  // 이 파일은 그 반환값을 그대로 buildCandidateList에 넘기기만 하고,
+  // 스스로 예시 모드를 판별하는 로직(예: exampleKey)을 새로 만들지 않는다.
+  assert.doesNotMatch(DOM_SRC, /exampleKey/);
+});
+
+test('meta-adsets.js: 로그아웃 · 쇼핑몰 변경 시 링크 상태 · 원본 ID 매핑이 완전히 초기화된다', () => {
+  assert.match(DOM_SRC, /function resetLinksState\(\)\{/);
+  const fnBody = DOM_SRC.slice(DOM_SRC.indexOf('function resetLinksState(){'), DOM_SRC.indexOf('function syncLinksStore'));
+  assert.match(fnBody, /linksState\.byId = \{\};/);
+  assert.match(fnBody, /linksState\.storeId = null;/);
+  assert.match(fnBody, /linksState\.epoch \+= 1;/);
+  assert.match(DOM_SRC, /var linksChanged = syncLinksStore\(storeId, authed\);/);
+});
+
+test('meta-adsets.js: 다른 쇼핑몰로 늦게 도착한 링크 응답은 무시된다(epoch · storeId 재확인)', () => {
+  const idx = DOM_SRC.indexOf('function ensureLinksLoaded(){');
+  const body = DOM_SRC.slice(idx, DOM_SRC.indexOf('\n  }\n', idx));
+  assert.match(body, /if\(myEpoch !== linksState\.epoch \|\| linksState\.storeId !== storeId\) return;/);
+});
+
+test('meta-adsets.js: upsert · delete 응답도 요청 시작 시점의 storeId · epoch를 캡처해 stale이면 상태 · 토스트를 건드리지 않는다', () => {
+  // upsert(연결 저장) — submit 핸들러 안에서 saveLink 호출 전에 epoch를 캡처하고,
+  // 응답 콜백 첫머리에서 store/세대가 바뀌었는지부터 확인한 뒤에만 모달 상태를 만진다.
+  const submitIdx = DOM_SRC.indexOf("marginLinkBody.addEventListener('submit'");
+  const saveCallIdx = DOM_SRC.indexOf('saveLink(storeId, rawId, snap.value)', submitIdx);
+  const captureIdx = DOM_SRC.indexOf('var myEpoch = linksState.epoch;', submitIdx);
+  assert.ok(captureIdx > -1 && captureIdx < saveCallIdx, 'saveLink 호출 전에 epoch를 캡처해야 함');
+  const thenIdx = DOM_SRC.indexOf('.then(function(res){', saveCallIdx);
+  const thenBody = DOM_SRC.slice(thenIdx, DOM_SRC.indexOf('\n      });', thenIdx));
+  assert.match(thenBody, /var stale = \(myEpoch !== linksState\.epoch\) \|\| \(linksState\.storeId !== storeId\);/);
+  assert.match(thenBody, /if\(stale\) return;/);
+  // stale 판정이 모달 상태(닫힘/다른 세트) 판정보다 먼저 나와야 한다 —
+  // store 전환 뒤 같은 카드키(mk)로 새 모달이 열려도 이전 store 응답이
+  // "우연히 같은 mk"라는 이유로 통과되지 않도록.
+  const modalCheckIdx = thenBody.indexOf('linkModalState.mk !== mk');
+  assert.ok(modalCheckIdx > thenBody.indexOf('if(stale) return;'));
+
+  // delete(연결 해제) — disconnectLink 안에서도 동일하게 캡처 · 확인한다.
+  const disconnectFnIdx = DOM_SRC.indexOf('function disconnectLink(');
+  const deleteCallIdx = DOM_SRC.indexOf('deleteLink(storeId, rawId)', disconnectFnIdx);
+  const delCaptureIdx = DOM_SRC.indexOf('var myEpoch = linksState.epoch;', disconnectFnIdx);
+  assert.ok(delCaptureIdx > -1 && delCaptureIdx < deleteCallIdx, 'deleteLink 호출 전에 epoch를 캡처해야 함');
+  const delThenIdx = DOM_SRC.indexOf('.then(function(res){', deleteCallIdx);
+  const delThenBody = DOM_SRC.slice(delThenIdx, DOM_SRC.indexOf('\n    });', delThenIdx));
+  assert.match(delThenBody, /var stale = \(myEpoch !== linksState\.epoch\) \|\| \(linksState\.storeId !== storeId\);/);
+  assert.match(delThenBody, /if\(stale\) return;/);
+  // 실패 토스트든 성공 토스트든 stale이면 둘 다 건너뛰어야 한다 — stale 확인이
+  // res.ok 분기보다 먼저 나와야 함.
+  const staleIdx = delThenBody.indexOf('if(stale) return;');
+  const okBranchIdx = delThenBody.indexOf('if(!res.ok){');
+  assert.ok(staleIdx > -1 && okBranchIdx > staleIdx);
+});
+
+test('meta-adsets.js: localStorage/sessionStorage를 쓰지 않고, console 호출에 토큰·스냅샷·사용자 입력이 없다', () => {
+  assert.doesNotMatch(DOM_SRC, /localStorage|sessionStorage|indexedDB/);
+});
+
+test('meta-adsets.js: 홈/#tools에서는 조회하지 않는다 — dashboard 경로 + becameReady 게이트를 ensureLinksLoaded도 그대로 쓴다', () => {
+  const idx = DOM_SRC.indexOf('if(becameReady && isDashboardRoute()){');
+  assert.ok(idx > -1);
+  const block = DOM_SRC.slice(idx, DOM_SRC.indexOf('}', idx));
+  assert.match(block, /ctl\.ensureList\(\);/);
+  assert.match(block, /ensureLinksLoaded\(\);/);
+});
+
+test('meta-adsets.js: 모달 열기/닫기에서 포커스를 저장·복원한다', () => {
+  assert.match(DOM_SRC, /linkModalOpenerEl = triggerEl \|\| document\.activeElement;/);
+  assert.match(DOM_SRC, /opener\.focus\(\)/);
+});
+
+test('meta-adsets.js: ESC · 배경 클릭 · 닫기 버튼으로 모달을 닫을 수 있다', () => {
+  assert.match(DOM_SRC, /marginLinkClose\.addEventListener\('click', closeLinkModal\)/);
+  assert.match(DOM_SRC, /marginLinkBackdrop\.addEventListener\('click', closeLinkModal\)/);
+  assert.match(DOM_SRC, /e\.key === 'Escape' && marginLinkModal/);
+});
+
+test('index.html: 손익분기 기준 연결 모달이 존재하고 필수 접근성 속성을 갖는다', () => {
+  const start = INDEX.indexOf('id="marginLinkModal"');
+  assert.ok(start > -1);
+  const modalTag = INDEX.slice(INDEX.lastIndexOf('<div class="modal"', start), start + 400);
+  assert.match(modalTag, /role="dialog" aria-modal="true" aria-labelledby="marginLinkTitle"/);
+  assert.match(INDEX, /id="marginLinkBackdrop"/);
+  assert.match(INDEX, /id="marginLinkClose"/);
+  assert.match(INDEX, /id="marginLinkBody"/);
+});
+
+test('index.html: meta-margin-core.js가 meta-adsets-core.js 뒤, meta-adsets.js 앞에 로드된다', () => {
+  const core = INDEX.indexOf('<script src="meta-adsets-core.js">');
+  const marginCore = INDEX.indexOf('<script src="meta-margin-core.js">');
+  const dom = INDEX.indexOf('<script src="meta-adsets.js">');
+  assert.ok(core > 0 && core < marginCore && marginCore < dom, [core, marginCore, dom].join(','));
 });

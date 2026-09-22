@@ -235,6 +235,24 @@
   </div>
 </div>
 
+<!-- 광고 세트 손익분기 기준 연결 모달 — meta-adsets.js가 연다. 사용자가
+     저장한 마진 계산 기록(또는 지금 계산기에 입력한 값) 중 하나를 직접
+     선택해야만 연결이 만들어진다(이름·상품명 기반 자동 매칭, 최신 계산
+     자동 선택 없음). Meta 광고 세트 ID는 이 모달의 어떤 속성에도 나타나지
+     않는다 — data-mk에는 항상 화면 전용 로컬 카드키만 실린다. 본문
+     (#marginLinkBody)은 meta-adsets-core.js의 renderLinkModal()이 만든
+     HTML로 매번 교체된다. -->
+<div class="modal" id="marginLinkModal" role="dialog" aria-modal="true" aria-labelledby="marginLinkTitle">
+  <div class="modal-backdrop" id="marginLinkBackdrop"></div>
+  <div class="modal-panel">
+    <button class="modal-close" type="button" id="marginLinkClose" aria-label="닫기">✕</button>
+    <div class="modal-head">
+      <h2 id="marginLinkTitle">마진 계산 연결</h2>
+    </div>
+    <div id="marginLinkBody"></div>
+  </div>
+</div>
+
 <!-- 도매처 등록 문의 모달 — loginModal/storeFormModal과 같은 구조(배경+패널,
      제출 후 폼을 감추고 완료 안내로 교체)를 그대로 재사용한다. 로그인
      여부 확인은 wholesalers.js가 이 모달을 열기 전에 먼저 하므로, 여기
@@ -4637,6 +4655,7 @@
 <script src="stores.js"></script>
 <script src="ops-overview.js"></script>
 <script src="meta-adsets-core.js"></script>
+<script src="meta-margin-core.js"></script>
 <script src="meta-adsets.js"></script>
 <script src="wholesalers.js"></script>
 <script src="resources-data.js"></script>
