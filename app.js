@@ -777,8 +777,9 @@
   }
 
   /* STEP01~07 공용 진행률 계산 — 완료 STEP 수 / 전체 STEP 수(7) / % /
-     다음 미완료 STEP을 한 번에 계산해 사이드바 · 홈 · /start가 모두
-     같은 결과를 나눠 쓰게 한다 (STEP_ROADMAP/GATED_STEPS는 아래 정의). */
+     다음 미완료 STEP을 한 번에 계산해 /start 상단 상태와 STEP 카드 배지가
+     같은 결과를 나눠 쓰게 한다(오픈 베타 전 단순화 3차로 홈 "이어서
+     준비하기" 카드는 제거) (STEP_ROADMAP/GATED_STEPS는 아래 정의). */
   function computeStepProgress(completed){
     var total = GATED_STEPS.length;
     var done = GATED_STEPS.filter(function(s){ return completed.indexOf(s.route) !== -1; }).length;
@@ -834,8 +835,6 @@
         }
       }
     });
-
-    renderHomeResumeCard(prog);
   }
 
   /* ---- STEP_ROADMAP — single roadmap shared by every progress display --
@@ -858,48 +857,6 @@
     {num:'08', route:'/start/wrapup',          label:'오픈 완료, 운영 시작하기',          gated:false}
   ];
   var GATED_STEPS = STEP_ROADMAP.filter(function(s){ return s.gated; });
-  /* 홈 "이어서 준비하기" 카드(2026-09 UI 재설계 2차) — 예전 로드맵 패널의
-     퍼센트/원형 그래프/진행 바/STEP 00~08 목록(#resumeTitle·#rbPct·#rbRingArc·
-     #rbBarFill·#resumeSub·#resumeLink·.gp-row·.gp-check)은 제거했고, 이 함수만
-     computeStepProgress() 결과로 카드 하나를 채운다. 완료 판정·저장 구조는
-     건드리지 않는다. 홈 마크업이 없는 화면(또는 요소 일부가 없는 경우)에서도
-     예외 없이 끝난다. */
-  function renderHomeResumeCard(prog){
-    var card = document.getElementById('deskResume');
-    if(!card || !prog) return;
-    var eyebrowEl = document.getElementById('deskResumeEyebrow');
-    var stepEl = document.getElementById('deskResumeStep');
-    var labelEl = document.getElementById('deskResumeLabel');
-    var descEl = document.getElementById('deskResumeDesc');
-    var noteEl = document.getElementById('deskResumeNote');
-    var linkEl = document.getElementById('deskResumeLink');
-    var isGuest = !(window.launchdeskStore && launchdeskStore.isAuthed());
-    if(prog.next){
-      if(eyebrowEl) eyebrowEl.textContent = '이어서 준비하기';
-      if(stepEl){ stepEl.textContent = 'STEP ' + prog.next.num; stepEl.hidden = false; }
-      if(labelEl) labelEl.textContent = prog.next.label;
-      // 완료한 단계가 아직 없으면 "마지막으로 준비하던 단계"가 없으므로 첫 단계 안내로 쓴다.
-      if(descEl) descEl.textContent = prog.done === 0 ? '첫 단계부터 차근차근 시작해보세요.' : '마지막으로 준비하던 단계부터 계속해보세요.';
-      if(linkEl){ linkEl.href = '#' + prog.next.route; linkEl.textContent = '계속하기 →'; }
-    } else {
-      if(eyebrowEl) eyebrowEl.textContent = '준비 완료';
-      if(stepEl){ stepEl.textContent = ''; stepEl.hidden = true; }
-      if(labelEl) labelEl.textContent = '쇼핑몰 준비 기본 단계를 완료했어요';
-      if(descEl) descEl.textContent = '운영 현황에서 주문과 광고 상태를 확인해보세요.';
-      if(linkEl){ linkEl.href = '#/dashboard'; linkEl.textContent = '운영 현황 보기 →'; }
-    }
-    // 비회원에게는 진행 상태와 무관하게 항상 저장 안내를 보여준다(실제 인증 상태
-    // launchdeskStore.isAuthed() 기준 — hydrate/resetToGuest와 함께 바뀌고, 이
-    // 함수는 그 onChange 경로에서 다시 불린다). 회원에게는 표시하지 않는다.
-    if(noteEl){
-      noteEl.textContent = prog.next
-        ? '로그인하면 진행 상황을 다른 기기에서도 이어갈 수 있어요.'
-        : '로그인하면 완료한 준비 상태를 계정에 저장할 수 있어요.';
-      noteEl.hidden = !isGuest;
-    }
-    card.classList.toggle('is-complete', !prog.next);
-  }
-
   /* single entry point every completion source (checkbox / worksheet)
      reports through. 항상 launchdeskStore에 최신 data/완료여부를 반영하고
      (memory + 로그인 시 background DB), "지금 막 완료/미완료로 전환된

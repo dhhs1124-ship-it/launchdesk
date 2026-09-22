@@ -417,21 +417,22 @@
     <main>
 
       <!-- ============ VIEW: 홈 — 시작 데스크 ============
-           2026-09 UI 재설계: 홈은 시작 데스크(desk.js) + 운영 현황 안내 카드 +
-           내 계획(plans.js #ldPlanPanel) + "이어서 준비하기" 카드(app.js
-           renderHomeResumeCard)로 구성된다. 운영 대시보드(#opsdashRoot,
-           home-dashboard.js)는 #/dashboard(#view-dashboard)로 옮겼고, 예전
-           로드맵 패널(퍼센트·원형 그래프·진행 바·STEP 00~08 목록)은 2차에서
-           제거했다. -->
+           2026-09 UI 재설계: 홈은 시작 데스크(desk.js) + 운영 현황 안내 카드로
+           구성된다. 운영 대시보드(#opsdashRoot, home-dashboard.js)는
+           #/dashboard(#view-dashboard)로 옮겼고, 예전 로드맵 패널(퍼센트·원형
+           그래프·진행 바·STEP 00~08 목록)은 2차에서 제거했다. 오픈 베타 전
+           단순화(3차)로 "내 계획"(#ldPlanPanel)은 #/dashboard로 옮기고, "이어서
+           준비하기" 카드(#deskResume · app.js renderHomeResumeCard)는 완전히
+           제거했다 — 쇼핑몰 준비 진행률은 /start 상단 상태(#startStatusDone 등)와
+           STEP 카드 배지(.cc-status)에서 계속 확인할 수 있다(computeStepProgress·
+           STEP_ROADMAP·GATED_STEPS는 그대로 재사용, 변경 없음). -->
       <section class="view" id="view-home" hidden>
         <div class="content">
           <!-- ============ 시작 데스크 (2026-09 UI 재설계 1차, desk.js) ============
                피그마 Make 시안의 홈을 정적 마크업으로 옮긴 것. 상황 선택(A~D)은
                진짜 radio + label이고, 선택 결과는 desk.js가 #deskRec/#deskDecideList에
                createElement로 그린다(저장 없음). 링크는 전부 app.js BUILT에 이미 있는
-               해시 라우트만 쓴다. 이 블록 아래에는 운영 현황 안내 카드 · 내 계획
-               (#ldPlanPanel) · "이어서 준비하기" 카드(#deskResume)가 이어진다(id 중복
-               없음, 기존 모듈 연결 유지). -->
+               해시 라우트만 쓴다. 이 블록 아래에는 운영 현황 안내 카드가 이어진다. -->
           <div class="desk" id="deskRoot">
             <section class="desk-hero" aria-labelledby="deskHeroTitle">
               <div class="desk-hero-text">
@@ -555,35 +556,6 @@
             <a class="desk-ops-card-btn" href="#/dashboard">운영 현황 보기 →</a>
           </section>
 
-          <!-- 내 계획 — 마진 계산기에서 만든 계획을 재확인일 순으로(지난 날짜·
-               오늘 → 예정, 완료는 분리) 보여준다. 내용 렌더링·저장은 전부
-               plans.js(public.plans, RLS 본인 행만). 로그인 전에는 안내만.
-               (2026-09 UI 재설계 1차: 운영 대시보드 안에서 이 위치로 옮김. .ldplan-*
-               규칙이 .opsdash 스코프 토큰을 쓰므로 .opsdash 래퍼를 유지한다.) -->
-          <div class="opsdash desk-plans">
-            <div class="dash-panel ldplan-panel" id="ldPlanPanel">
-              <div class="dash-panel-head">내 계획 <span class="ldplan-head-note" id="ldPlanHeadNote"></span></div>
-              <div class="ldplan-draft" id="ldPlanDraftNotice" hidden></div>
-              <div id="ldPlanBody"></div>
-            </div>
-          </div>
-
-          <!-- 이어서 준비하기(2026-09 UI 재설계 2차) — 예전 "쇼핑몰 오픈 로드맵" 패널
-               (퍼센트·원형 그래프·진행 바·STEP 00~08 목록·운영 도구 링크·오늘의 팁)을 이
-               작은 카드 하나로 대체했다. 내용은 app.js renderHomeResumeCard()가
-               computeStepProgress()(STEP_ROADMAP/GATED_STEPS · user_step_progress 기준,
-               변경 없음)로 채운다. 위 4단계 요약(.desk-roadmap)은 안내용이라 이 카드의
-               데이터와 연결하지 않는다. 아래 기본 텍스트는 완료 0 상태와 같다. -->
-          <section class="desk-resume" id="deskResume" aria-labelledby="deskResumeTitle">
-            <div class="desk-resume-text">
-              <p class="desk-resume-eyebrow" id="deskResumeEyebrow">이어서 준비하기</p>
-              <h2 id="deskResumeTitle"><span class="desk-resume-step" id="deskResumeStep">STEP 01</span><span id="deskResumeLabel">무엇을, 누구에게 팔지 정하기</span></h2>
-              <p class="desk-resume-desc" id="deskResumeDesc">첫 단계부터 차근차근 시작해보세요.</p>
-              <p class="desk-resume-note" id="deskResumeNote" hidden>로그인하면 진행 상황을 다른 기기에서도 이어갈 수 있어요.</p>
-            </div>
-            <a class="desk-resume-btn" id="deskResumeLink" href="#/start/prepare">계속하기 →</a>
-          </section>
-
         </div>
       </section>
 
@@ -594,10 +566,33 @@
            옮겼으므로 home-dashboard.js / ops-overview.js / wholesalers.js가 id로 잡는
            요소와 launchdeskOpsSnapshot 구독은 그대로다(스크립트는 화면 표시 여부와
            무관하게 로드 시 id로 요소를 잡고 계속 갱신한다). 홈(#/)에는 이 id들이
-           더 이상 없다. -->
+           더 이상 없다.
+
+           오픈 베타 전 단순화(3차) — 비회원 게이트(#opsdashGuestGate). 실제
+           데이터·수치는 전혀 담지 않은 정적 안내 카드이고, 버튼 2개(무료
+           회원가입 · 로그인)만 기존 로그인 모달(window.launchdeskOpenLoginModal
+           · #loginToSignup 토글)을 그대로 연다 — 새 인증 로직 없음. 기본값은
+           "보이는 채로" 시작해(hidden 없음) 로그인 여부가 아직 확정되기 전에도
+           안전한 쪽(회원 전용 안내)이 기본이고, home-dashboard.js가 스냅샷을
+           받으면 회원이면 즉시 숨긴다. 아래 #opsdashRoot는 실제 KPI·브리핑·
+           연결 상태 전체를 담은 "구조만 있는 미리보기"다 — 별도로 복제한
+           가짜 카드가 아니라 이 마크업 자체가 기본값(전부 '-'·빈 상태)일 때의
+           모습을 그대로 쓴다. 기본값이 inert + aria-hidden="true"라 게스트에게는
+           클릭·Tab·스크린리더 어디로도 닿지 않고, 로그인 확인 즉시 두 속성을
+           모두 뗀다(요구사항: blur만으로 잠그지 않기 · inert/aria-hidden 사용). -->
       <section class="view" id="view-dashboard" hidden>
         <div class="content">
-          <div class="opsdash" id="opsdashRoot">
+          <div class="opsdash-guest-gate" id="opsdashGuestGate">
+            <div class="opsdash-guest-gate-text">
+              <h2>운영 현황은 회원 전용 기능이에요</h2>
+              <p>무료로 가입하고 Cafe24 주문과 Meta 광고 성과를 한곳에서 확인해보세요.</p>
+            </div>
+            <div class="opsdash-guest-gate-actions">
+              <button type="button" class="btn btn-primary" id="opsdashGateSignup">무료 회원가입</button>
+              <button type="button" class="btn btn-ghost" id="opsdashGateLogin">로그인</button>
+            </div>
+          </div>
+          <div class="opsdash" id="opsdashRoot" inert aria-hidden="true">
             <div class="opsdash-header">
               <div>
                 <h1 id="opsdashTitle">운영 현황</h1>
@@ -675,11 +670,25 @@
               </div>
             </section>
 
-            <!-- (내 계획 #ldPlanPanel은 홈(#/)의 시작 데스크 아래에 있다 — 이 화면으로
-                 옮기지 않았다. id 중복 없음.) -->
+            <!-- 내 계획 — 마진 계산기에서 만든 계획을 재확인일 순으로(지난 날짜·
+                 오늘 → 예정, 완료는 분리) 보여준다. 내용 렌더링·저장은 전부
+                 plans.js(public.plans, RLS 본인 행만). 오픈 베타 전 단순화(3차)로
+                 홈(#/)에서 이 화면(#/dashboard, 주문·광고 성과 아래)으로 옮겼다 —
+                 마크업 자체를 옮긴 것이라 DOM에 #ldPlanPanel은 항상 정확히 1개만
+                 존재한다. .ldplan-* CSS 규칙이 쓰는 --op-accent-ink 등은 이 화면의
+                 .opsdash(#opsdashRoot) 조상에서 이미 정의되므로 별도 .opsdash 래퍼가
+                 더 필요 없다. 비회원 처리는 plans.js renderHome()이 전담 —
+                 listState==='guest'일 때 패널 자체를 숨겨(위 게스트 게이트가 이미
+                 안내하므로 중복 안내 없음) 로그인 사용자에게만 보인다. -->
+            <div class="dash-panel ldplan-panel" id="ldPlanPanel">
+              <div class="dash-panel-head">내 계획 <span class="ldplan-head-note" id="ldPlanHeadNote"></span></div>
+              <div class="ldplan-draft" id="ldPlanDraftNotice" hidden></div>
+              <div id="ldPlanBody"></div>
+            </div>
 
-            <!-- 하단 3열 — 도매처 / 세팅 대행 / 연결 상태(+다음 할 일)
-                 (요구사항 8). 세팅 대행은 실제 플랜 이름(#view-services-setup
+            <!-- 하단 3열 — 도매처 / 세팅 대행 / 연결 상태(요구사항 8, 오픈 베타 전
+                 단순화 3차로 "다음 할 일" 중복 CTA는 제거). 세팅 대행은 실제 플랜
+                 이름(#view-services-setup
                  data-plan과 동일)에 등급 라벨만 보조로 붙였다 — 문의 조회
                  기능은 만들지 않는다. -->
             <div class="opsdash-row triple">
@@ -699,7 +708,6 @@
               <div class="dash-panel">
                 <div class="dash-panel-head"><span class="opsdash-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"/><path d="M8 9.5 6.5 8a3 3 0 1 1 4.2-4.2L12 5"/><path d="M15 14.5l1.5 1.5a3 3 0 1 1-4.2 4.2L11 19"/></svg></span>연결 상태</div>
                 <div class="opsdash-connection-list" id="opsdashConnectionStatus"></div>
-                <div id="opsdashNextAction"></div>
               </div>
             </div>
 
@@ -3403,98 +3411,18 @@
       </div>
 
       <div class="callout">
-        <p><strong>마진 계산기는 지금 바로 실제로 계산 · 저장됩니다.</strong> 계산 결과 저장 · 불러오기, 이 조건으로 계획 만들기까지 그대로 이용할 수 있어요.</p>
+        <p><strong>마진 계산기는 로그인 없이도 지금 바로 실제로 계산해볼 수 있어요.</strong> 로그인하면 계산 결과 저장 · 불러오기, 이 조건으로 계획 만들기까지 그대로 이용할 수 있어요.</p>
       </div>
 
-      <!-- 쇼핑몰 운영 현황 — 연결된 Cafe24 쇼핑몰의 실제 orders 데이터.
-           아래 KPI 카드 · 차트는 여전히 예시지만, 이 패널만은 실제 값이다. -->
-      <div class="dash-panel" id="opsOverviewPanel" style="margin-bottom:1.3rem;">
-        <div class="dash-panel-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.6rem;">
-          <span>쇼핑몰 운영 현황</span>
-          <select id="opsStoreSelect" hidden style="border:1px solid var(--border-strong); border-radius:8px; background:var(--bg); padding:.4rem .7rem; font-family:var(--f-body); font-size:.84rem; color:var(--ink);"></select>
-        </div>
-        <div style="padding:1.2rem 1.3rem;">
-          <div class="empty-state" id="opsGuestNotice" style="padding:1.6rem 1rem;" hidden>
-            <div class="es-icon">🔒</div>
-            <p>로그인하면 연결된 쇼핑몰의 운영 현황을 확인할 수 있어요.</p>
-          </div>
-          <div class="empty-state" id="opsNoStoreNotice" style="padding:1.6rem 1rem;" hidden>
-            <div class="es-icon">🏬</div>
-            <p>Cafe24 쇼핑몰을 연결하면<br>주문 현황을 여기에서 확인할 수 있어요.</p>
-            <a class="btn btn-ghost btn-sm" href="#/account">내 쇼핑몰 관리로 이동</a>
-          </div>
-          <div id="opsDataWrap" hidden>
-            <div style="font-size:.82rem; font-weight:700; color:var(--ink-soft); margin-bottom:.5rem;">오늘</div>
-            <div class="adlog-summary" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
-              <div class="adlog-sum-card"><div class="al-label">결제금액</div><div class="al-value" id="opsTodayPayment">0원</div></div>
-              <div class="adlog-sum-card"><div class="al-label">주문수</div><div class="al-value" id="opsTodayCount">0건</div></div>
-            </div>
-            <div style="font-size:.82rem; font-weight:700; color:var(--ink-soft); margin:1.1rem 0 .5rem;">이번 달</div>
-            <div class="adlog-summary" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
-              <div class="adlog-sum-card"><div class="al-label">누적 결제금액</div><div class="al-value" id="opsMonthPayment">0원</div></div>
-              <div class="adlog-sum-card"><div class="al-label">누적 주문수</div><div class="al-value" id="opsMonthCount">0건</div></div>
-            </div>
-            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4rem; margin-top:1.1rem; font-size:.78rem; color:var(--ink-faint);">
-              <span>최근 동기화: <b id="opsLastSynced" style="color:var(--ink-soft);">아직 없음</b></span>
-              <span>주문 동기화는 <a href="#/account" style="color:var(--accent-ink); font-weight:600;">내 쇼핑몰 관리</a>에서 할 수 있어요.</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Meta 광고 성과 — 위 "쇼핑몰 운영 현황"에서 선택된 쇼핑몰에 연결된
-           Meta 광고계정의 실제 Insights. Cafe24 결제금액과 물리적으로
-           분리된 별도 패널이다 — Meta "광고매출"은 Meta 자체 집계치이며
-           Cafe24 실제 결제금액과 다를 수 있다(혼동 방지). 로그인/쇼핑몰
-           미연결 상태는 위 패널이 이미 안내하므로, 이 패널은 위에서 실제
-           쇼핑몰이 선택됐을 때만(state='data') 나타난다. -->
-      <div class="dash-panel" id="metaOpsPanel" style="margin-bottom:1.3rem;" hidden>
-        <div class="dash-panel-head">Meta 광고 성과</div>
-        <div style="padding:1.2rem 1.3rem;">
-          <div class="empty-state" id="metaOpsNotConnected" style="padding:1.6rem 1rem;" hidden>
-            <div class="es-icon">📣</div>
-            <p>Meta 광고 계정을 연결해주세요.</p>
-            <a class="btn btn-ghost btn-sm" href="#/account">내 쇼핑몰 관리로 이동</a>
-          </div>
-          <div class="empty-state" id="metaOpsNotSelected" style="padding:1.6rem 1rem;" hidden>
-            <div class="es-icon">🗂️</div>
-            <p>분석할 광고계정을 선택해주세요.</p>
-            <a class="btn btn-ghost btn-sm" href="#/account">내 쇼핑몰 관리로 이동</a>
-          </div>
-          <div class="empty-state" id="metaOpsLoading" style="padding:1.6rem 1rem;" hidden>
-            <p>Meta 광고 데이터를 불러오는 중...</p>
-          </div>
-          <div class="empty-state" id="metaOpsError" style="padding:1.6rem 1rem;" hidden>
-            <div class="es-icon">⚠️</div>
-            <p id="metaOpsErrorMsg">Meta 데이터를 불러오지 못했습니다.</p>
-            <button type="button" class="btn btn-ghost btn-sm" id="metaOpsRetryBtn">다시 시도</button>
-          </div>
-          <div id="metaOpsDataWrap" hidden>
-            <div style="font-size:.82rem; font-weight:700; color:var(--ink-soft); margin-bottom:.5rem;">오늘</div>
-            <div class="adlog-summary" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
-              <div class="adlog-sum-card"><div class="al-label">Meta 광고비</div><div class="al-value" id="metaTodaySpend">-</div></div>
-              <div class="adlog-sum-card"><div class="al-label">Meta 광고매출</div><div class="al-value" id="metaTodayRevenue">-</div></div>
-              <div class="adlog-sum-card"><div class="al-label">구매</div><div class="al-value" id="metaTodayPurchases">-</div></div>
-              <div class="adlog-sum-card"><div class="al-label">ROAS</div><div class="al-value" id="metaTodayRoas">-</div></div>
-            </div>
-            <div style="font-size:.76rem; color:var(--ink-faint); margin-top:.4rem;">CTR <b id="metaTodayCtr">-</b> · CPC <b id="metaTodayCpc">-</b> · CPM <b id="metaTodayCpm">-</b></div>
-            <div style="font-size:.76rem; color:var(--ink-faint); margin-top:.2rem;" id="metaTodayRoasNote"></div>
-
-            <div style="font-size:.82rem; font-weight:700; color:var(--ink-soft); margin:1.1rem 0 .5rem;">이번 달</div>
-            <div class="adlog-summary" style="grid-template-columns:repeat(2,1fr); margin-top:0;">
-              <div class="adlog-sum-card"><div class="al-label">Meta 광고비</div><div class="al-value" id="metaMonthSpend">-</div></div>
-              <div class="adlog-sum-card"><div class="al-label">Meta 광고매출</div><div class="al-value" id="metaMonthRevenue">-</div></div>
-              <div class="adlog-sum-card"><div class="al-label">구매</div><div class="al-value" id="metaMonthPurchases">-</div></div>
-              <div class="adlog-sum-card"><div class="al-label">ROAS</div><div class="al-value" id="metaMonthRoas">-</div></div>
-            </div>
-            <div style="font-size:.76rem; color:var(--ink-faint); margin-top:.4rem;">CTR <b id="metaMonthCtr">-</b> · CPC <b id="metaMonthCpc">-</b> · CPM <b id="metaMonthCpm">-</b></div>
-            <div style="font-size:.76rem; color:var(--ink-faint); margin-top:.2rem;" id="metaMonthRoasNote"></div>
-
-            <p style="font-size:.76rem; color:var(--ink-faint); margin-top:1rem;">Meta 광고매출은 Meta 자체 집계 기준(광고주 신고 전환)이며, Cafe24 실제 결제금액과 다를 수 있습니다.</p>
-            <p style="font-size:.72rem; color:var(--ink-faint); margin-top:.3rem;" id="metaOpsDebugInfo"></p>
-          </div>
-        </div>
-      </div>
+      <!-- 오픈 베타 전 단순화(3차)로 "쇼핑몰 운영 현황"(#opsOverviewPanel)과
+           "Meta 광고 성과"(#metaOpsPanel) 패널은 이 화면에서 제거했다 —
+           #/dashboard(운영 현황)와 내용이 중복이었고, 계산기와 직접 관련이
+           없었다. 데이터 조회·집계 로직 자체는 ops-overview.js에 그대로
+           남아 있다 — #/dashboard(home-dashboard.js)와 광고별 성과 보기
+           패널(meta-adsets.js)이 window.launchdeskOpsSnapshot 구독으로
+           계속 재사용하므로, ops-overview.js는 지우지 않았다(그 파일의 DOM
+           참조는 전부 null-safe라 이 마크업이 없어도 조회·발행은 그대로
+           계속된다). -->
 
       <!-- ============ 마진 계산기 — 주문 1건 기준 ============
            계산은 margin-calc.js(순수 함수), 화면 제어는 tools.js.

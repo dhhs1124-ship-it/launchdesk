@@ -1056,6 +1056,14 @@
      쓰여서(장식 배지가 아님) 흑색 계열로 바꾼다 — 성공/좋음 의미가 실제로
      필요한 .opsdash-pill.good만 아래에서 badge-c(초록)를 직접 따로 쓴다. */
   .opsdash{ --op-accent:var(--ink); --op-accent-soft:var(--surface-hover); --op-accent-ink:#000000; margin-bottom:1.5rem; }
+  /* 비회원 운영 현황 게이트 — .desk-ops-card와 같은 얕은 카드 레이아웃을
+     그대로 재사용한다(새 색상 없음, 기존 .btn.btn-primary/.btn-ghost만). */
+  .opsdash-guest-gate{display:flex; align-items:center; justify-content:space-between; gap:.7rem 1.2rem; flex-wrap:wrap; margin-bottom:1.5rem; padding:1.2rem 1.4rem; border-radius:var(--radius); background:var(--surface); border:1px solid var(--border-strong);}
+  .opsdash-guest-gate-text{flex:1 1 260px; min-width:0;}
+  .opsdash-guest-gate-text h2{margin:0 0 .35rem; font-size:1.05rem; font-weight:700; color:var(--ink);}
+  .opsdash-guest-gate-text p{margin:0; font-size:.86rem; color:var(--ink-soft); line-height:1.6;}
+  .opsdash-guest-gate-actions{display:flex; gap:.6rem; flex-wrap:wrap; flex:0 0 auto;}
+  @media (max-width:639px){ .opsdash-guest-gate{padding:1rem 1.1rem;} .opsdash-guest-gate-actions{width:100%;} .opsdash-guest-gate-actions .btn{flex:1 1 auto;} }
   /* 타이포 hierarchy(요구사항 16) — page title 28~32px, section title
      15~18px, KPI 숫자 24~30px, body 13~15px, muted 12~14px 범위를
      지키면서 padding/margin/레이아웃 재구성으로 밀도를 올린다(폰트를
@@ -1129,15 +1137,6 @@
   .opsdash-connection-row:last-child{border-bottom:none;}
   .opsdash-connection-label{display:flex; align-items:center; gap:.5rem;}
   .opsdash-connection-label svg{flex:0 0 auto; color:var(--ink-faint); width:16px; height:16px;}
-  /* "다음 할 일" — 별도 큰 카드 대신 연결 상태 패널 맨 아래 강조 행 하나로
-     합친다. 라벨(작은 muted)과 실제 액션(굵게)을 같은 줄에 붙이지 않고
-     위/아래로 분리한다(요구사항 2·5 — 제목/설명이 옆에 붙어 보이는 문제
-     수정). */
-  .opsdash-next-action{display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.7rem 0 .5rem; margin-top:.1rem; color:var(--op-accent-ink);}
-  .opsdash-next-action-text{display:flex; flex-direction:column; gap:.2rem; min-width:0;}
-  .opsdash-next-action-label{font-size:.75rem; color:var(--ink-faint); font-weight:600;}
-  .opsdash-next-action-title{font-size:.87rem; font-weight:700;}
-  .opsdash-next-action svg{flex:0 0 auto; color:var(--ink-faint);}
 
   /* ---- Meta 광고 세트 · 광고별 성과(meta-adsets.js) — 기존 토큰만 쓰는 중립 색상.
      상태를 색으로 구분하지 않는다(강조색 · 배지 없음). 광고 행은 세트 카드보다
@@ -3473,9 +3472,7 @@
   @media (max-width:560px){ #view-resources .res-stuck-grid{grid-template-columns:1fr;} }
   #view-resources .res-stuck-card{display:flex; align-items:center; gap:11px; width:100%; min-height:44px; text-align:left; padding:13px 14px; border:1px solid var(--ld-border-strong); border-radius:3px; background:var(--ld-panel); cursor:pointer; transition:border-color .15s, background .15s; word-break:keep-all;}
   #view-resources .res-stuck-card:hover{border-color:var(--ld-accent-mid);}
-  #view-resources .res-stuck-card[data-cat="growth"]{background:var(--ld-accent-light); border-color:#D8D8D5;}
   #view-resources .res-stuck-icon{flex:0 0 auto; width:34px; height:34px; border-radius:2px; background:var(--ld-panel); border:1px solid var(--ld-border-strong); display:inline-flex; align-items:center; justify-content:center; color:var(--ld-accent);}
-  #view-resources .res-stuck-card[data-cat="growth"] .res-stuck-icon{background:var(--ld-panel); border-color:#D8D8D5;}
   #view-resources .res-stuck-icon-svg{width:17px; height:17px;}
   #view-resources .res-stuck-text{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px;}
   #view-resources .res-stuck-title{font-size:13.5px; font-weight:700; color:var(--ld-text);}

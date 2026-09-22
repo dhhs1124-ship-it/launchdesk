@@ -726,6 +726,17 @@
       mcState.touched = true;
       var calc = MC.calculate(mcReadForm());
       if(!calc.ok){ mcRender(); showToast('필수 입력을 먼저 채워주세요'); return; }
+      // 오픈 베타 전 단순화(3차) — 비회원은 계산 입력·실행·결과 확인까지는
+      // 전부 막지 않고(요구사항), "저장"을 누른 시점에만 기존 로그인 모달을
+      // 연다. 게스트 메모리 저장(launchdeskStore의 guest 경로)은 더 이상
+      // 쓰지 않는다 — 로그인 후 같은 화면에서 입력값이 그대로 남아있는 채
+      // 다시 "저장"을 누르면 된다(별도 초안 보존 없이도 값이 사라지지 않음).
+      if(window.launchdeskStore && !window.launchdeskStore.isAuthed()){
+        if(typeof window.launchdeskOpenLoginModal === 'function'){
+          window.launchdeskOpenLoginModal({ hint: '로그인하면 계산 결과를 저장하고 다시 불러올 수 있어요.' });
+        }
+        return;
+      }
       if(window.launchdeskStore) window.launchdeskStore.addCalcRecord(mcBuildRecord(calc));
       renderSavedCalcs();
       showToast('계산 결과를 저장했어요', 'success');

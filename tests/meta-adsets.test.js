@@ -699,8 +699,12 @@ test('index.html 패널 위치와 접근성 속성', () => {
   assert.match(sec, /id="metaAdsetsBody" aria-busy="true"/);
   assert.doesNotMatch(sec, /<table/i);
   assert.doesNotMatch(sec, /\p{Extended_Pictographic}/u);
-  // 레거시 #/tools Meta 패널은 그대로
-  assert.equal((INDEX.match(/id="metaOpsPanel"/g) || []).length, 1);
+  // 오픈 베타 전 단순화(3차)로 #/tools의 레거시 "쇼핑몰 운영 현황"/"Meta
+  // 광고 성과" 패널은 완전히 제거됐다(#/dashboard와 중복 + 계산기와
+  // 무관) — 마크업은 사라졌지만 ops-overview.js의 조회·발행 로직은
+  // window.launchdeskOpsSnapshot으로 그대로 남아 #/dashboard가 구독한다.
+  assert.equal((INDEX.match(/id="metaOpsPanel"/g) || []).length, 0);
+  assert.equal((INDEX.match(/id="opsOverviewPanel"/g) || []).length, 0);
 });
 
 test('스타일: 신규 규칙은 기존 토큰만 쓰고 색 리터럴 · good/warn · table이 없다', () => {

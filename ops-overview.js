@@ -31,7 +31,12 @@
    쓰지 않고, orders는 raw_data를 제외한 필요한 컬럼(store_id, ordered_at,
    payment_amount)만 select한다. */
 (function(){
-  var panel = document.getElementById('opsOverviewPanel');
+  // 오픈 베타 전 단순화(3차)로 이 파일이 원래 그리던 #/tools의 "쇼핑몰
+  // 운영 현황"/"Meta 광고 성과" 패널(#opsOverviewPanel 등)은 index.html에서
+  // 제거됐다 — 아래 DOM 참조는 전부 null일 수 있으므로, 이 파일 전체가
+  // (Meta 섹션이 이미 하던 방식 그대로) 모든 참조를 매번 null 체크한다.
+  // 조회·집계·window.launchdeskOpsSnapshot 발행 로직은 한 줄도 바뀌지
+  // 않았다 — home-dashboard.js/meta-adsets.js가 이 스냅샷을 그대로 구독한다.
   var storeSelect = document.getElementById('opsStoreSelect');
   var guestNotice = document.getElementById('opsGuestNotice');
   var noStoreNotice = document.getElementById('opsNoStoreNotice');
@@ -41,7 +46,6 @@
   var monthPaymentEl = document.getElementById('opsMonthPayment');
   var monthCountEl = document.getElementById('opsMonthCount');
   var lastSyncedEl = document.getElementById('opsLastSynced');
-  if(!panel || !storeSelect || !guestNotice || !noStoreNotice || !dataWrap){ return; }
 
   // ---- Meta 광고 성과 패널 — 위 Cafe24 패널에서 선택된 쇼핑몰에 연결된
   // Meta 광고계정의 실제 Insights(supabase/functions/meta-insights). 이 DOM이
@@ -165,37 +169,47 @@
   // 내보낸다 — 조회/집계 로직 자체는 이 파일에 그대로 남고 단 한 곳도
   // 바뀌지 않는다(재사용하는 쪽이 새 네트워크 요청이나 새 계산식을 만들지
   // 않게 하기 위함). 파일 맨 아래 window.launchdeskOpsSnapshot 참고.
-  var currentTopState = 'guest'; // showState()가 매번 갱신
-  var currentMetaState = 'not-connected'; // showMetaState()가 매번 갱신
+  // authed(로그인 여부)는 cafe24 상태와 완전히 분리된 별도 필드다 — Cafe24가
+  // loading/error/not-connected여도, 혹은 store가 아직 없어도 로그인 사용자를
+  // 비회원으로 오인하지 않기 위함(요구사항). window.launchdeskStore.isAuthed()
+  // 값을 그대로 옮겨 담을 뿐 새 인증 로직은 아니다 — hydrateFromSession()이
+  // 매번 갱신한다.
+  var authed = false;
+  var currentCafe24State = 'guest'; // showCafe24State()가 매번 갱신 — 'guest'|'loading'|'not-connected'|'error'|'data'
+  var currentMetaState = 'not-connected'; // showMetaState()가 매번 갱신 — Cafe24 상태와 독립적
   var lastOrderSummary = null; // renderOrderSummary()가 매번 갱신
+  var lastSyncedAt = null; // 선택된 store의 cafe24 connected_accounts.last_synced_at
   var lastMetaPayload = null; // renderMetaData()가 매번 갱신(payload 원본)
+  var lastMetaErrorMessage = null; // renderMetaError()가 매번 갱신 — 예전엔 DOM(metaOpsErrorMsg)에서 다시 읽었으나
+                                    // 그 DOM(#/tools 레거시 패널)이 삭제돼 항상 null이 되는 버그였다. 이제 변수로 직접 들고 있는다.
   var opsSnapshotListeners = [];
   var latestOpsSnapshot = null;
 
   function publishOpsSnapshot(){
-    var store = eligibleStores.filter(function(s){ return String(s.id) === String(selectedStoreId); })[0] || null;
+    var store = myStores.filter(function(s){ return String(s.id) === String(selectedStoreId); })[0] || null;
     latestOpsSnapshot = {
+      authed: authed, // 로그인 여부 — cafe24/meta 상태와 무관하게 이 필드만 보고 판단할 것
       storeId: selectedStoreId, // 광고 세트 패널(meta-adsets.js)이 쇼핑몰 변경을 감지 · 조회할 때 쓴다
       cafe24: {
-        state: currentTopState, // 'guest'|'no-store'|'loading'|'data'
+        state: currentCafe24State, // 'guest'|'loading'|'not-connected'|'error'|'data'
         storeName: store ? store.name : null,
-        lastSyncedAt: store ? store.last_synced_at : null,
+        lastSyncedAt: lastSyncedAt,
         today: lastOrderSummary ? { payment: lastOrderSummary.todayPayment, count: lastOrderSummary.todayCount } : null,
         month: lastOrderSummary ? { payment: lastOrderSummary.monthPayment, count: lastOrderSummary.monthCount } : null
       },
       meta: {
-        state: currentMetaState, // 'not-connected'|'not-selected'|'loading'|'error'|'data'(cafe24 state!=='data'면 의미 없음)
+        state: currentMetaState, // 'not-connected'|'not-selected'|'reconnect-required'|'loading'|'error'|'data' — cafe24 상태와 무관하게 독립적으로 갱신됨
         currency: (lastMetaPayload && lastMetaPayload.account) ? lastMetaPayload.account.currency : null,
         accountName: (lastMetaPayload && lastMetaPayload.account) ? lastMetaPayload.account.name : null,
         today: lastMetaPayload ? lastMetaPayload.today : null,
         month: lastMetaPayload ? lastMetaPayload.month : null,
-        errorMessage: (currentMetaState === 'error' && metaOpsErrorMsg) ? metaOpsErrorMsg.textContent : null
+        errorMessage: currentMetaState === 'error' ? lastMetaErrorMessage : null
       }
     };
     opsSnapshotListeners.forEach(function(cb){ try{ cb(latestOpsSnapshot); }catch(e){ console.warn('[launchdesk] ops snapshot 구독자 오류:', e && e.message); } });
   }
 
-  function showMetaState(state){ // 'not-connected'|'not-selected'|'loading'|'error'|'data'
+  function showMetaState(state){ // 'not-connected'|'not-selected'|'reconnect-required'|'loading'|'error'|'data'
     currentMetaState = state;
     if(!metaPanel){ publishOpsSnapshot(); return; }
     if(metaOpsNotConnected) metaOpsNotConnected.hidden = state !== 'not-connected';
@@ -208,6 +222,7 @@
 
   function renderMetaData(payload){
     lastMetaPayload = payload;
+    lastMetaErrorMessage = null;
     var currency = payload.account && payload.account.currency;
     var today = payload.today || {};
     var month = payload.month || {};
@@ -252,9 +267,11 @@
 
   function renderMetaError(body, fallbackMessage){
     var code = body && body.code;
-    if(metaOpsErrorMsg){
-      metaOpsErrorMsg.textContent = (code && META_ERROR_MESSAGES[code]) || (body && body.error) || fallbackMessage || META_ERROR_MESSAGES.TEMPORARY_ERROR;
-    }
+    // 예전엔 이 텍스트를 #/tools 레거시 패널의 DOM(metaOpsErrorMsg)에 써두고
+    // publishOpsSnapshot()에서 다시 읽어왔는데, 그 DOM이 삭제된 뒤로는 항상
+    // null이 되는 버그였다 — 이제 변수(lastMetaErrorMessage)에 직접 담는다.
+    lastMetaErrorMessage = (code && META_ERROR_MESSAGES[code]) || (body && body.error) || fallbackMessage || META_ERROR_MESSAGES.TEMPORARY_ERROR;
+    if(metaOpsErrorMsg) metaOpsErrorMsg.textContent = lastMetaErrorMessage;
     showMetaState('error');
   }
 
@@ -290,13 +307,16 @@
   // fetchMetaAccounts와 동일하게 provider='meta'만 걸고 RLS로 소유권을
   // 확인하되, 여기서는 이 store_id 하나로 좁혀 단일 행만 조회한다.
   function loadMetaForStore(storeId, mySeq){
-    if(!metaPanel) return;
     metaLastStoreId = storeId;
     showMetaState('loading');
     var sb = client();
     if(!sb) return;
     sb.from('connected_accounts')
-      .select('id, status')
+      // external_account_id도 함께 읽는다 — stores.js(#/account)가 이미 쓰는
+      // 것과 같은 구분: status!=='connected'인데 이 값이 남아있으면 "이미
+      // 광고계정을 선택했던 연결의 인증이 끊긴 것"(재연결 필요)이고, 값이
+      // 없으면 "아직 광고계정을 선택한 적이 없는 것"(최초 선택 대기)이다.
+      .select('id, status, external_account_id')
       .eq('provider', 'meta')
       .eq('store_id', storeId)
       .maybeSingle()
@@ -309,7 +329,10 @@
         }
         var row = res.data;
         if(!row){ showMetaState('not-connected'); return; }
-        if(row.status !== 'connected'){ showMetaState('not-selected'); return; }
+        if(row.status !== 'connected'){
+          showMetaState(row.external_account_id ? 'reconnect-required' : 'not-selected');
+          return;
+        }
         fetchMetaInsights(row.id, mySeq);
       })
       .catch(function(err){
@@ -329,33 +352,36 @@
 
   // ------------------------------------------------------------------ state
   var currentUserId = null;
-  var eligibleStores = []; // [{ id, name, last_synced_at }] — platform=cafe24 & connected_accounts(provider=cafe24,status=connected) 교집합
+  var myStores = []; // [{ id, name }] — user_id/platform=cafe24로 등록한 내 store 전부. cafe24 "연결" 여부와
+                      // 무관하게 store 행 자체를 기준으로 삼는다 — Cafe24 연결 해제(cafe24-disconnect)는
+                      // connected_accounts/orders/oauth_states만 지우고 stores 행과 Meta 연동은 그대로 두므로
+                      // (disconnect_cafe24_integration RPC 주석 참고), "Cafe24만 연결 해제 + Meta는 그대로
+                      // 유지"가 실제로 가능한 상태다. 예전에는 이 목록 자체를 cafe24 연결 여부로 걸러서
+                      // Cafe24가 해제되면 store가 통째로 사라져 Meta 조회까지 함께 끊기는 버그가 있었다.
   var selectedStoreId = null;
   // 로그인/로그아웃(onChange)마다, 그리고 쇼핑몰 선택이 바뀔 때마다 증가 —
   // 응답이 늦게 와서 순서가 뒤바뀌어도(A 로그아웃 직후 B 로그인, 혹은
   // 드롭다운을 빠르게 두 번 바꾼 경우) 가장 마지막 요청의 결과만 반영한다.
   var seq = 0;
 
-  // state: 'guest' | 'no-store' | 'data' | 'loading'(= 셋 다 숨김, 패널
-  // 헤더만 남음 — 로그인/로그아웃 직후 새 데이터가 오기 전까지 이전
-  // 사용자의 흔적이 잠깐이라도 보이지 않게 하는 중간 상태)
-  function showState(state){
-    currentTopState = state;
-    guestNotice.hidden = state !== 'guest';
-    noStoreNotice.hidden = state !== 'no-store';
-    dataWrap.hidden = state !== 'data';
-    storeSelect.hidden = !(state === 'data' && eligibleStores.length > 1);
-    // Meta 패널은 Cafe24 쇼핑몰이 실제로 선택된 경우에만 의미가 있다 —
-    // guest/no-store/loading일 때는 위 Cafe24 안내가 이미 상황을 설명하므로
-    // 통째로 숨긴다(요구사항 13과 별개로, "쇼핑몰이 없는데 Meta 상태만
-    // 보이는" 혼란을 막기 위함).
-    if(metaPanel) metaPanel.hidden = state !== 'data';
+  // cafe24 state: 'guest' | 'loading' | 'not-connected' | 'error' | 'data'
+  // ('data'는 오늘/이번 달 값이 0이어도 그대로 'data'다 — "연결됐지만
+  // 데이터 0건"은 별도 상태가 아니라 today/month의 숫자가 0인 'data'다.
+  // "store를 아예 등록한 적 없음"과 "store는 있지만 cafe24 연결 안 됨"도
+  // 화면 문구가 같아서 둘 다 'not-connected'로 합친다.)
+  function showCafe24State(state){
+    currentCafe24State = state;
+    if(guestNotice) guestNotice.hidden = state !== 'guest';
+    if(noStoreNotice) noStoreNotice.hidden = state !== 'not-connected';
+    if(dataWrap) dataWrap.hidden = state !== 'data';
+    if(storeSelect) storeSelect.hidden = !(myStores.length > 1);
     publishOpsSnapshot();
   }
 
   function populateSelect(){
+    if(!storeSelect) return;
     storeSelect.innerHTML = '';
-    eligibleStores.forEach(function(s){
+    myStores.forEach(function(s){
       var opt = document.createElement('option');
       opt.value = String(s.id);
       opt.textContent = s.name;
@@ -365,24 +391,24 @@
   }
 
   function renderLastSynced(){
-    var store = eligibleStores.filter(function(s){ return String(s.id) === String(selectedStoreId); })[0];
-    lastSyncedEl.textContent = (store && formatSyncTime(store.last_synced_at)) || '아직 없음';
+    if(!lastSyncedEl) return;
+    lastSyncedEl.textContent = formatSyncTime(lastSyncedAt) || '아직 없음';
   }
 
   function renderOrderSummary(summary){
     lastOrderSummary = summary;
-    todayPaymentEl.textContent = formatWon(summary.todayPayment);
-    todayCountEl.textContent = summary.todayCount + '건';
-    monthPaymentEl.textContent = formatWon(summary.monthPayment);
-    monthCountEl.textContent = summary.monthCount + '건';
-    publishOpsSnapshot();
+    if(todayPaymentEl) todayPaymentEl.textContent = formatWon(summary.todayPayment);
+    if(todayCountEl) todayCountEl.textContent = summary.todayCount + '건';
+    if(monthPaymentEl) monthPaymentEl.textContent = formatWon(summary.monthPayment);
+    if(monthCountEl) monthCountEl.textContent = summary.monthCount + '건';
   }
   var EMPTY_SUMMARY = { todayPayment: 0, todayCount: 0, monthPayment: 0, monthCount: 0 };
 
   // 이번 달 1일 00:00:00(KST) ~ 현재 범위를 한 번만 조회한 뒤, 그 결과
   // 안에서 "오늘"(부분집합)과 "이번 달"(전체)을 클라이언트에서 각각
   // 집계한다 — 오늘 범위는 항상 이번 달 범위에 포함되므로 두 번 조회할
-  // 필요가 없다(요구사항 7).
+  // 필요가 없다(요구사항 7). 조회 자체가 실패하면(주문 0건과 구분해)
+  // 'error'로 남기고 가짜 0건 "데이터"로 덮지 않는다.
   function loadOrdersFor(storeId, mySeq){
     var sb = client();
     if(!sb) return;
@@ -403,6 +429,7 @@
         if(res.error){
           console.warn('[launchdesk] ops: orders 조회 실패:', res.error.message);
           renderOrderSummary(EMPTY_SUMMARY);
+          showCafe24State('error');
           return;
         }
         var rows = res.data || [];
@@ -420,30 +447,74 @@
           }
         });
         renderOrderSummary(summary);
+        showCafe24State('data'); // count가 0이어도 그대로 'data' — "연결됨+0건"은 여기서 자연히 표현된다
       })
       .catch(function(err){
         if(mySeq !== seq) return;
         console.warn('[launchdesk] ops: orders 조회 중 오류:', err && err.message);
         renderOrderSummary(EMPTY_SUMMARY);
+        showCafe24State('error');
+      });
+  }
+
+  // 선택된 store의 cafe24 연결 상태만 독립적으로 확인한다 — Meta 조회
+  // (loadMetaForStore)는 이 함수의 결과를 기다리지 않고 selectStore()에서
+  // 항상 별도로, 동시에 시작한다(요구사항: Cafe24 미연결이라는 이유로
+  // Meta 조회가 막히면 안 됨).
+  function loadCafe24ForStore(storeId, mySeq){
+    var sb = client();
+    if(!sb) return;
+    sb.from('connected_accounts')
+      .select('status, last_synced_at')
+      .eq('provider', 'cafe24')
+      .eq('store_id', storeId)
+      .maybeSingle()
+      .then(function(res){
+        if(mySeq !== seq) return;
+        if(res.error){
+          console.warn('[launchdesk] ops: cafe24 connected_accounts 조회 실패:', res.error.message);
+          lastSyncedAt = null;
+          renderLastSynced();
+          showCafe24State('error');
+          return;
+        }
+        var row = res.data;
+        if(!row || row.status !== 'connected'){
+          lastSyncedAt = null;
+          renderLastSynced();
+          showCafe24State('not-connected');
+          return;
+        }
+        lastSyncedAt = row.last_synced_at;
+        renderLastSynced();
+        loadOrdersFor(storeId, mySeq); // 성공하면 그 안에서 showCafe24State('data')
+      })
+      .catch(function(err){
+        if(mySeq !== seq) return;
+        console.warn('[launchdesk] ops: cafe24 connected_accounts 조회 중 오류:', err && err.message);
+        lastSyncedAt = null;
+        renderLastSynced();
+        showCafe24State('error');
       });
   }
 
   function selectStore(storeId){
     selectedStoreId = storeId;
-    renderLastSynced();
     seq += 1;
     var mySeq = seq;
-    renderOrderSummary(EMPTY_SUMMARY); // 새 쇼핑몰로 바뀌는 동안 이전 값이 잠깐이라도 남지 않게 즉시 리셋
-    loadOrdersFor(storeId, mySeq);
-    loadMetaForStore(storeId, mySeq);
+    // 새 쇼핑몰로 바뀌는 동안 이전 값이 잠깐이라도 남지 않게 즉시 리셋.
+    lastOrderSummary = null;
+    renderOrderSummary(EMPTY_SUMMARY);
+    showCafe24State('loading');
+    loadCafe24ForStore(storeId, mySeq);
+    loadMetaForStore(storeId, mySeq); // Cafe24 결과를 기다리지 않고 항상 함께 시작
   }
 
-  // platform='cafe24'인 내 stores와, provider='cafe24' && status='connected'인
-  // connected_accounts를 각각 조회한 뒤 클라이언트에서 교집합을 낸다 —
-  // PostgREST embed 문법에 기대는 대신 stores.js가 이미 쓰고 있는 "두 번
-  // 조회 + 직접 매칭" 방식을 그대로 재사용한다(검증된 패턴, 실패 지점이
-  // 단순함).
-  function loadEligibleCafe24Stores(userId, mySeq){
+  // 로그인 사용자가 등록한 cafe24 플랫폼 store를 전부 가져온다(연결 여부와
+  // 무관 — 위 myStores 주석 참고). 이전에는 connected_accounts와 교집합을
+  // 내 "연결된 store만" 남겼는데, 그러면 Cafe24만 해제한 store가 목록에서
+  // 통째로 사라져 그 store에 남아있는 Meta 연동까지 조회하지 못했다.
+  function loadUserStores(userId, mySeq){
     var sb = client();
     if(!sb) return;
     sb.from('stores')
@@ -454,80 +525,70 @@
         if(mySeq !== seq) return;
         if(storesRes.error){
           console.warn('[launchdesk] ops: stores 조회 실패:', storesRes.error.message);
-          eligibleStores = [];
-          showState('no-store');
+          myStores = [];
+          selectedStoreId = null;
+          showCafe24State('error');
+          showMetaState('not-connected'); // 대상 store 자체를 못 찾았으니 meta도 확인할 대상이 없다(에러 아님)
           return;
         }
-        var cafe24Stores = storesRes.data || [];
-        if(!cafe24Stores.length){
-          eligibleStores = [];
-          showState('no-store');
+        myStores = storesRes.data || [];
+        if(!myStores.length){
+          selectedStoreId = null;
+          showCafe24State('not-connected');
+          showMetaState('not-connected');
           return;
         }
-        var storeIds = cafe24Stores.map(function(s){ return s.id; });
-        sb.from('connected_accounts')
-          .select('store_id, provider, status, last_synced_at')
-          .eq('provider', 'cafe24')
-          .eq('status', 'connected')
-          .in('store_id', storeIds)
-          .then(function(caRes){
-            if(mySeq !== seq) return;
-            if(caRes.error){
-              console.warn('[launchdesk] ops: connected_accounts 조회 실패:', caRes.error.message);
-              eligibleStores = [];
-              showState('no-store');
-              return;
-            }
-            var lastSyncedByStoreId = {};
-            (caRes.data || []).forEach(function(row){
-              lastSyncedByStoreId[String(row.store_id)] = row.last_synced_at;
-            });
-            var previousSelectedId = selectedStoreId;
-            eligibleStores = cafe24Stores
-              .filter(function(s){ return Object.prototype.hasOwnProperty.call(lastSyncedByStoreId, String(s.id)); })
-              .map(function(s){ return { id: s.id, name: s.name, last_synced_at: lastSyncedByStoreId[String(s.id)] }; });
-
-            if(!eligibleStores.length){
-              selectedStoreId = null;
-              showState('no-store');
-              return;
-            }
-
-            populateSelect();
-            showState('data');
-            // 이전에 선택돼 있던 쇼핑몰이 새 목록에도 여전히 있으면 그대로
-            // 유지(사용자가 고른 걸 화면 재진입마다 되돌리지 않기 위해),
-            // 없으면(최초이거나 연결 해제된 경우) 첫 번째를 기본 선택.
-            var stillValid = eligibleStores.some(function(s){ return String(s.id) === String(previousSelectedId); });
-            selectStore(stillValid ? previousSelectedId : eligibleStores[0].id);
-          })
-          .catch(function(err){
-            if(mySeq !== seq) return;
-            console.warn('[launchdesk] ops: connected_accounts 조회 중 오류:', err && err.message);
-            eligibleStores = [];
-            showState('no-store');
-          });
+        populateSelect();
+        // 이전에 선택돼 있던 쇼핑몰이 새 목록에도 여전히 있으면 그대로
+        // 유지(사용자가 고른 걸 화면 재진입마다 되돌리지 않기 위해),
+        // 없으면(최초이거나 store 자체가 삭제된 경우) 첫 번째를 기본 선택.
+        var previousSelectedId = selectedStoreId;
+        var stillValid = myStores.some(function(s){ return String(s.id) === String(previousSelectedId); });
+        selectStore(stillValid ? previousSelectedId : myStores[0].id);
       })
       .catch(function(err){
         if(mySeq !== seq) return;
         console.warn('[launchdesk] ops: stores 조회 중 오류:', err && err.message);
-        eligibleStores = [];
-        showState('no-store');
+        myStores = [];
+        selectedStoreId = null;
+        showCafe24State('error');
+        showMetaState('not-connected');
       });
+  }
+
+  // 로그아웃(또는 세션 없음 확인) 시 화면 메모리에 남아있던 운영 데이터·
+  // 캐시를 전부 지운다 — 그 다음 다른 사용자가 같은 브라우저에서 로그인해도
+  // 이전 사용자의 흔적(주문 요약 · Meta 수치 · 선택된 store)이 한 프레임도
+  // 재사용되지 않는다(요구사항).
+  function clearAllCachedData(){
+    myStores = [];
+    selectedStoreId = null;
+    lastOrderSummary = null;
+    lastSyncedAt = null;
+    lastMetaPayload = null;
+    lastMetaErrorMessage = null;
+    metaLastStoreId = null;
+    currentMetaState = 'not-connected';
   }
 
   // launchdeskStore.onChange가 로그인/로그아웃 확정 시점에 울려주는
   // 이벤트에 편승해, 그 시점의 실제 Supabase 세션을 다시 확인한다 —
   // stores.js의 hydrateFromSession()과 동일한 이유·동일한 방식.
+  //
+  // authed는 매번 window.launchdeskStore.isAuthed()에서 그대로 읽는다 —
+  // 이 파일이 로그인 여부를 독자적으로 판단하지 않고, 앱 전체가 이미 쓰는
+  // 그 값 하나만 따른다(요구사항: 인증 로직 새로 구현 금지). cafe24 상태는
+  // 이 값과 완전히 분리돼 있어 loading/error/not-connected 어느 쪽이어도
+  // authed는 그대로 true로 남는다.
   function hydrateFromSession(){
     var sb = client();
     seq += 1;
     var mySeq = seq;
-    if(!sb){
+    authed = !!(window.launchdeskStore && window.launchdeskStore.isAuthed());
+    if(!sb || !authed){
       currentUserId = null;
-      eligibleStores = [];
-      selectedStoreId = null;
-      showState('guest');
+      clearAllCachedData();
+      showCafe24State('guest');
       return;
     }
     sb.auth.getSession().then(function(res){
@@ -537,18 +598,16 @@
       if(user){
         currentUserId = user.id;
         // 이전 사용자(또는 게스트) 화면이 한 프레임도 남지 않도록, 새
-        // 데이터가 도착하기 전까지는 셋 중 아무 상태도 보여주지 않는다
-        // (요구사항 11: A 로그아웃 → B 로그인 시 A의 흔적이 잠깐이라도
-        // B 화면에 남으면 안 됨).
-        eligibleStores = [];
-        selectedStoreId = null;
-        showState('loading');
-        loadEligibleCafe24Stores(user.id, mySeq);
+        // 데이터가 도착하기 전까지는 이전 캐시를 전부 지운다(요구사항 11:
+        // A 로그아웃 → B 로그인 시 A의 흔적이 잠깐이라도 B 화면에 남으면
+        // 안 됨 / 재로그인·다른 사용자 로그인 시 이전 상태 재사용 금지).
+        clearAllCachedData();
+        showCafe24State('loading');
+        loadUserStores(user.id, mySeq);
       } else {
         currentUserId = null;
-        eligibleStores = [];
-        selectedStoreId = null;
-        showState('guest');
+        clearAllCachedData();
+        showCafe24State('guest');
       }
     });
   }
@@ -556,11 +615,16 @@
   if(window.launchdeskStore){
     window.launchdeskStore.onChange(hydrateFromSession);
   }
-  showState('guest'); // 초기 렌더 — 로그인 여부가 아직 확정되기 전의 기본값(위 onChange가 곧 정확한 상태로 갱신)
+  // 초기 렌더 — 로그인 여부가 아직 확정되기 전의 안전한 기본값(비회원과
+  // 동일하게 취급, 위 onChange가 곧 정확한 상태로 갱신한다).
+  authed = !!(window.launchdeskStore && window.launchdeskStore.isAuthed());
+  showCafe24State(authed ? 'loading' : 'guest');
 
-  storeSelect.addEventListener('change', function(){
-    if(storeSelect.value) selectStore(storeSelect.value);
-  });
+  if(storeSelect){
+    storeSelect.addEventListener('change', function(){
+      if(storeSelect.value) selectStore(storeSelect.value);
+    });
+  }
 
   // "운영도구 화면에 진입할 때"(요구사항 9) 연결된 쇼핑몰 목록을 다시
   // 확인한다 — 로그인 상태 자체는 그대로인데, 그 사이 "내 쇼핑몰"
@@ -579,7 +643,7 @@
   window.addEventListener('hashchange', function(){
     if(!(isToolsRoute() || isDashboardRoute()) || !currentUserId) return;
     seq += 1;
-    loadEligibleCafe24Stores(currentUserId, seq);
+    loadUserStores(currentUserId, seq);
   });
 
   // 다른 화면(홈 대시보드 리뉴얼, home-dashboard.js)이 이미 계산된 Cafe24/
@@ -605,7 +669,7 @@
     refresh: function(){
       if(!currentUserId) return;
       seq += 1;
-      loadEligibleCafe24Stores(currentUserId, seq);
+      loadUserStores(currentUserId, seq);
     }
   };
 })();

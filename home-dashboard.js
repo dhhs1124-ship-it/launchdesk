@@ -23,6 +23,10 @@
   var root = document.getElementById('opsdashRoot');
   if(!root) return;
 
+  var gateEl = document.getElementById('opsdashGuestGate');
+  var gateSignupBtn = document.getElementById('opsdashGateSignup');
+  var gateLoginBtn = document.getElementById('opsdashGateLogin');
+
   var subtitleEl = document.getElementById('opsdashSubtitle');
   var refreshBtn = document.getElementById('opsdashRefreshBtn');
   var kpiOrdersEl = document.getElementById('opsdashKpiOrders');
@@ -36,7 +40,6 @@
   var wholesalersEl = document.getElementById('opsdashWholesalers');
   var setupInquiryEl = document.getElementById('opsdashSetupInquiry');
   var connectionEl = document.getElementById('opsdashConnectionStatus');
-  var nextActionEl = document.getElementById('opsdashNextAction');
 
   function escapeHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
@@ -86,7 +89,9 @@
     if(kpiOrdersEl) kpiOrdersEl.textContent = (cafe24.state === 'data' && cafe24.today) ? formatCount(cafe24.today.count) : '-';
     if(kpiPaymentEl) kpiPaymentEl.textContent = (cafe24.state === 'data' && cafe24.today) ? formatWon(cafe24.today.payment) : '-';
 
-    var metaReady = cafe24.state === 'data' && meta.state === 'data' && meta.today;
+    // Meta KPI는 Cafe24 상태와 무관하다 — Cafe24만 연결 해제된 store도
+    // Meta 연동은 그대로 남아있을 수 있다(요구사항).
+    var metaReady = meta.state === 'data' && meta.today;
     if(kpiSpendEl) kpiSpendEl.textContent = metaReady ? formatMetaMoney(meta.today.spend, meta.currency) : '-';
     if(kpiRoasEl) kpiRoasEl.textContent = metaReady ? formatRoasPercent(meta.today.roas) : '-';
     if(kpiRoasNoteEl) kpiRoasNoteEl.textContent = metaReady ? formatRoasNote(meta.today.roas, meta.currency) : '';
@@ -94,19 +99,28 @@
 
   // -------------------------------------------------------- 오늘의 운영 브리핑
   // 전부 실제 데이터로 판단 가능한 문장만 — "성과가 좋습니다" 같은 근거
-  // 없는 평가는 만들지 않는다(요구사항 7).
+  // 없는 평가는 만들지 않는다(요구사항 7). Cafe24 줄과 Meta 줄은 서로의
+  // 상태를 기다리지 않고 각자 독립적으로 채워진다 — Cafe24만 연결 해제된
+  // store도 Meta 연동은 그대로 남아 있을 수 있다(요구사항).
   function buildBriefLines(snapshot){
     var cafe24 = snapshot.cafe24;
     var meta = snapshot.meta;
     var lines = [];
+    var hasRealData = false;
 
-    if(cafe24.state === 'data' && cafe24.today){
+    if(cafe24.state === 'not-connected'){
+      lines.push('Cafe24를 연결하면 실제 주문과 결제금액을 확인할 수 있어요.');
+    } else if(cafe24.state === 'error'){
+      lines.push(cafe24ErrorLine());
+    } else if(cafe24.state === 'data' && cafe24.today){
+      hasRealData = true;
       lines.push(cafe24.today.count > 0
         ? ('오늘 주문 ' + cafe24.today.count + '건, 결제금액 ' + formatWon(cafe24.today.payment) + '이 발생했습니다.')
-        : '오늘 접수된 주문이 아직 없습니다.');
+        : '오늘 접수된 주문이 없어요.');
     }
 
-    if(cafe24.state === 'data' && meta.state === 'data' && meta.today){
+    if(meta.state === 'data' && meta.today){
+      hasRealData = true;
       var t = meta.today, m = meta.month;
       if(t.spend > 0 || t.purchase_value > 0){
         lines.push('광고비 ' + formatMetaMoney(t.spend, meta.currency) + '로 Meta 광고매출 ' + formatMetaMoney(t.purchase_value, meta.currency) + '이 집계되었습니다.');
@@ -118,11 +132,19 @@
       }
     }
 
-    if(lines.length){
-      lines.push('주문과 광고 데이터를 함께 확인해보세요.');
-    }
+    // "함께 확인해보세요" 트레일러는 실제 데이터 줄이 최소 하나 있을 때만
+    // 붙인다 — not-connected/error 안내 한 줄 뒤에 붙으면 어색하다.
+    if(hasRealData) lines.push('주문과 광고 데이터를 함께 확인해보세요.');
 
-    return lines.slice(0, 3); // 최대 3문장
+    return lines.slice(0, 4);
+  }
+
+  // Cafe24 조회 오류 — 정확한 문구는 고정하되("연결이 끊겼다"고 단정하지
+  // 않음, 연결 버튼 없음), 기존 새로고침 버튼(#opsdashRefreshBtn)으로 다시
+  // 시도할 수 있다는 최소 동선만 같은 줄에 안내한다. 자동 재시도는 하지
+  // 않는다.
+  function cafe24ErrorLine(){
+    return 'Cafe24 주문 데이터를 불러오지 못했어요. 새로고침을 눌러 다시 시도해주세요.';
   }
 
   function renderBrief(snapshot){
@@ -144,19 +166,21 @@
   var META_STATE_EMPTY_MESSAGES = {
     'not-connected': 'Meta 광고 계정을 연결해주세요.',
     'not-selected': '분석할 광고계정을 선택해주세요.',
+    // stores.js(#/account)가 쓰는 것과 같은 문구 — 광고계정을 한 번 선택한
+    // 적이 있는 연결의 인증이 끊긴 경우(요구사항: 인증 만료는 블러 없이
+    // 기존 "다시 연결해주세요" 상태·동선을 그대로 보여준다).
+    'reconnect-required': 'Meta 연결이 만료되었어요. 다시 연결해주세요.',
     'loading': '광고 데이터를 불러오는 중...',
     'error': null // errorMessage를 그대로 사용
   };
 
+  // 광고 상태는 Meta 상태만 본다 — Cafe24 연결 여부와 무관하게 독립적으로
+  // 표시한다(요구사항: Meta 영역이 Cafe24 미연결이라는 이유로 차단되면
+  // 안 됨).
   function renderAdState(snapshot){
     if(!adStateEl) return;
-    var cafe24 = snapshot.cafe24;
     var meta = snapshot.meta;
 
-    if(cafe24.state !== 'data'){
-      adStateEl.innerHTML = '<p class="opsdash-empty-note">쇼핑몰을 연결하면 광고 상태를 확인할 수 있어요.</p>';
-      return;
-    }
     if(meta.state !== 'data'){
       var msg = meta.state === 'error' ? (meta.errorMessage || '광고 데이터를 불러오지 못했습니다.') : (META_STATE_EMPTY_MESSAGES[meta.state] || '광고 데이터가 없습니다.');
       adStateEl.innerHTML = '<p class="opsdash-empty-note">' + escapeHtml(msg) + ' <a href="#/account" style="color:var(--op-accent-ink); font-weight:600;">내 쇼핑몰 관리로 이동</a></p>';
@@ -209,6 +233,8 @@
         stat('주문', formatCount(cafe24.month.count)) +
         stat('결제금액', formatWon(cafe24.month.payment)) +
         '</div>';
+    } else if(cafe24.state === 'error'){
+      html += '<p class="opsdash-empty-note" style="padding:0;">Cafe24 주문 데이터를 불러오지 못했어요.</p>';
     } else {
       html += '<p class="opsdash-empty-note" style="padding:0;">Cafe24 연결 시 확인 가능</p>';
     }
@@ -216,8 +242,9 @@
 
     html += '<div class="opsdash-summary-divider"></div>';
 
+    // 광고(Meta) 그룹은 Cafe24 상태와 무관하다(요구사항).
     html += '<div class="opsdash-summary-group"><div class="opsdash-summary-group-label">광고(Meta)</div>';
-    if(cafe24.state === 'data' && meta.state === 'data' && meta.month){
+    if(meta.state === 'data' && meta.month){
       var m = meta.month;
       html += '<div class="opsdash-summary-stats">' +
         stat('광고비', formatMetaMoney(m.spend, meta.currency)) +
@@ -232,8 +259,8 @@
 
     // Cafe24 결제금액과 Meta 광고매출을 같은 "매출"로 오해하지 않도록 —
     // 광고 그룹에 실제 데이터가 있을 때만 한 줄로 안내(flex-wrap으로 다음
-    // 줄 전체 폭을 차지).
-    if(cafe24.state === 'data' && meta.state === 'data' && meta.month){
+    // 줄 전체 폭을 차지). Cafe24 상태와는 무관하다.
+    if(meta.state === 'data' && meta.month){
       html += '<p style="flex-basis:100%; margin:.4rem 0 0; font-size:.75rem; color:var(--ink-faint);">Meta 광고매출은 Meta 자체 귀속 기준이며, Cafe24 실제 결제금액과 다를 수 있습니다.</p>';
     }
 
@@ -261,10 +288,14 @@
     var meta = snapshot.meta;
 
     var cafe24Connected = cafe24.state === 'data';
-    var cafe24Row = connectionRow(ICON_STORE, 'Cafe24', cafe24Connected ? '연결됨' : '연결 안 됨', cafe24Connected);
+    var cafe24Label = cafe24Connected ? '연결됨' : (cafe24.state === 'error' ? '조회 오류' : '연결 안 됨');
+    var cafe24Row = connectionRow(ICON_STORE, 'Cafe24', cafe24Label, cafe24Connected);
 
-    var metaConnected = cafe24Connected && meta.state === 'data';
-    var metaLabel = metaConnected ? '연결됨' : (meta.state === 'not-selected' ? '광고계정 미선택' : '연결 안 됨');
+    // Meta 연결 여부는 Cafe24 연결 여부와 무관하다(요구사항).
+    var metaConnected = meta.state === 'data';
+    var metaLabel = metaConnected ? '연결됨'
+      : (meta.state === 'not-selected' ? '광고계정 미선택'
+      : (meta.state === 'reconnect-required' ? '연결 만료' : '연결 안 됨'));
     var metaRow = connectionRow(ICON_MEGAPHONE, 'Meta', metaLabel, metaConnected);
 
     var metaAccountRow = (metaConnected && meta.accountName)
@@ -275,47 +306,6 @@
     var syncRow = connectionRow(ICON_SYNC, '주문 동기화', syncOk ? '정상' : '아직 없음', syncOk);
 
     connectionEl.innerHTML = cafe24Row + metaRow + metaAccountRow + syncRow;
-  }
-
-  // -------------------------------------------------------------- 다음 할 일
-  function buildNextActions(snapshot){
-    var cafe24 = snapshot.cafe24;
-    var meta = snapshot.meta;
-    var actions = [];
-
-    if(cafe24.state === 'guest'){
-      actions.push({ title: '로그인하고 시작하기', sub: '로그인하면 쇼핑몰 운영 현황을 확인할 수 있어요', href: '#/login' });
-    } else if(cafe24.state !== 'data'){
-      actions.push({ title: 'Cafe24 쇼핑몰 연결하기', sub: '쇼핑몰을 연결하면 실제 주문 현황을 볼 수 있어요', href: '#/account' });
-    } else if(meta.state === 'not-connected'){
-      actions.push({ title: 'Meta 광고 계정 연결하기', sub: '광고 성과를 함께 확인해보세요', href: '#/account' });
-    } else if(meta.state === 'not-selected'){
-      actions.push({ title: '분석할 광고계정 선택하기', sub: 'Meta 광고계정을 선택하면 성과가 표시돼요', href: '#/account' });
-    } else if(meta.state === 'data'){
-      actions.push({ title: '오늘 운영 데이터 확인하기', sub: '운영 도구에서 더 자세한 현황을 볼 수 있어요', href: '#/tools' });
-    }
-
-    return actions.slice(0, 3);
-  }
-
-  // "다음 할 일"은 이제 별도 카드가 아니라 연결 상태 패널 맨 아래 강조
-  // 행 하나로 합쳐 보여준다(요구사항 13) — rule 로직(buildNextActions)은
-  // 그대로 두고 표시 형식만 compact 1줄로 바꿨다. 후보가 여럿이어도 가장
-  // 우선순위 높은 것 하나만 노출한다.
-  function renderNextAction(snapshot){
-    if(!nextActionEl) return;
-    var actions = buildNextActions(snapshot);
-    if(!actions.length){ nextActionEl.innerHTML = ''; return; }
-    var a = actions[0];
-    // 라벨("다음 할 일")과 실제 액션 제목을 같은 줄에 붙이지 않고 위/아래로
-    // 분리한다(제목/설명이 옆에 붙어 보이는 문제 수정).
-    nextActionEl.innerHTML = '<a class="opsdash-next-action" href="' + a.href + '">' +
-      '<span class="opsdash-next-action-text">' +
-        '<span class="opsdash-next-action-label">다음 할 일</span>' +
-        '<span class="opsdash-next-action-title">' + escapeHtml(a.title) + '</span>' +
-      '</span>' +
-      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>' +
-      '</a>';
   }
 
   // ---------------------------------------------------------------- 도매처
@@ -367,24 +357,80 @@
       '<span class="opsdash-inquiry-note">내 문의 확인 준비중</span>';
   }
 
+  // ------------------------------------------------------------ 비회원 게이트
+  // 로그인 여부는 cafe24.state(예: 'guest')를 추론해 쓰지 않고,
+  // window.launchdeskStore.isAuthed() 하나만 직접 본다 — 앱 전체가 이미
+  // 로그인/로그아웃 판정에 쓰는 바로 그 값이다(새 인증 로직 아님). Cafe24가
+  // loading/error/not-connected여도, store를 아직 등록하지 않았어도 이
+  // 값은 true로 남아 있으므로 로그인 사용자를 비회원으로 오인하지 않는다.
+  //
+  // launchdeskStore.onChange에도 직접 등록해(아래) ops-overview.js의 비동기
+  // 세션 재확인·스냅샷 발행을 기다리지 않고 로그인/로그아웃 "그 순간" 게이트가
+  // 갱신되게 한다 — ops 스냅샷 구독(renderAll)에서도 매번 다시 부르므로 두
+  // 경로 중 하나가 이벤트를 놓쳐도 다른 쪽이 따라잡는다.
+  //
+  // 회원으로 처음 확정될 때만 도매처 · 세팅 대행을 그때 불러온다 — 그전
+  // (비회원)에는 이 화면이 Cafe24 · Meta · plans · ad_margin_links · 도매처
+  // 등 어떤 사용자별 데이터 요청도 보내지 않는다(요구사항).
+  var unlockedOnce = false;
+  function applyAuthGate(){
+    var authed = !!(window.launchdeskStore && window.launchdeskStore.isAuthed());
+    if(gateEl) gateEl.hidden = authed;
+    if(!authed){
+      root.setAttribute('inert', '');
+      root.setAttribute('aria-hidden', 'true');
+      unlockedOnce = false; // 로그아웃하면 다음 로그인 때 다시 한 번 불러오게 리셋
+      return authed;
+    }
+    root.removeAttribute('inert');
+    root.removeAttribute('aria-hidden');
+    if(!unlockedOnce){
+      unlockedOnce = true;
+      renderSetupInquiry();
+      loadWholesalers();
+    }
+    return authed;
+  }
+  if(window.launchdeskStore){
+    window.launchdeskStore.onChange(applyAuthGate);
+  }
+  applyAuthGate(); // 초기 렌더 — 로그인 여부가 아직 확정되기 전의 안전한 기본값(비회원)
+
+  // 무료 회원가입 · 로그인 버튼 — 둘 다 기존 로그인 모달만 연다(새 인증
+  // 로직 없음). 그 모달은 항상 로그인 모드로 열리므로, 회원가입 버튼은
+  // 연 직후 모달 안의 기존 전환 링크(#loginToSignup)를 그대로 한 번
+  // 눌러 회원가입 모드로 바꾼다 — 사용자가 직접 누르는 것과 동일한 경로다.
+  if(gateLoginBtn){
+    gateLoginBtn.addEventListener('click', function(){
+      if(typeof window.launchdeskOpenLoginModal === 'function'){
+        window.launchdeskOpenLoginModal({ hint: '로그인하면 운영 현황에서 Cafe24 주문과 Meta 광고 성과를 확인할 수 있어요.' });
+      }
+    });
+  }
+  if(gateSignupBtn){
+    gateSignupBtn.addEventListener('click', function(){
+      if(typeof window.launchdeskOpenLoginModal !== 'function') return;
+      window.launchdeskOpenLoginModal({ hint: '가입하면 운영 현황에서 Cafe24 주문과 Meta 광고 성과를 확인할 수 있어요.' });
+      var toggle = document.getElementById('loginToSignup');
+      if(toggle) toggle.click();
+    });
+  }
+
   // -------------------------------------------------------------- 렌더 총괄
   function renderAll(snapshot){
     if(!snapshot) return;
+    applyAuthGate();
     renderHeader(snapshot);
     renderKpis(snapshot);
     renderBrief(snapshot);
     renderAdState(snapshot);
     renderMonthSummary(snapshot);
     renderConnectionStatus(snapshot);
-    renderNextAction(snapshot);
   }
 
   if(window.launchdeskOpsSnapshot){
     window.launchdeskOpsSnapshot.subscribe(renderAll);
   }
-
-  renderSetupInquiry();
-  loadWholesalers();
 
   if(refreshBtn){
     refreshBtn.addEventListener('click', function(){
