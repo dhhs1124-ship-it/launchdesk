@@ -22,7 +22,7 @@
   'use strict';
 
   var TERMS_VERSION = '2026-09-18';   // 이용약관 시행일
-  var PRIVACY_VERSION = 'v1.0';       // 개인정보처리방침 버전(시행일 2026-09-18)
+  var PRIVACY_VERSION = 'v1.1';       // 개인정보처리방침 버전(시행일 2026-09-22 — Cafe24/Meta 연동·ad_margin_links 반영)
   var PENDING_KEY = 'ld-pending-policy-consent';
   // OAuth 왕복(구글 동의 화면 포함)이 비정상적으로 오래 걸리는 경우까지
   // 감안한 여유값. 이보다 오래된 pending은 다른 로그인 시도의 잔재일 수

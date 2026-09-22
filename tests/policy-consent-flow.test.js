@@ -27,7 +27,7 @@ const APP_SRC = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 const INDEX_HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 
 const TERMS_VERSION = '2026-09-18';
-const PRIVACY_VERSION = 'v1.0';
+const PRIVACY_VERSION = 'v1.1';
 const USER = { id: 'user-1', email: 'a@example.com' };
 const SESSION = { user: USER };
 
@@ -374,6 +374,20 @@ test('이미 현재 버전 동의가 있는 회원은 게이트 없이 바로 �
   assert.equal(gateOpen(env), false);
   assert.equal(env.supa.consentInserts.length, 0, '이미 동의 이력이 있으면 insert를 시도하지 않는다');
   assert.equal(hydrateStarted(env), true);
+});
+
+test('개인정보처리방침 v1.0에만 동의한 기존 회원은 v1.1 재동의 대상 — 게이트가 뜨고 hydrate는 보류된다', async () => {
+  const env = await boot({
+    session: SESSION,
+    // 코드의 현재 PRIVACY_VERSION(core.PRIVACY_VERSION)은 v1.1이므로, v1.0에만
+    // 동의한 행은 terms_version/privacy_version 둘 다 일치해야 하는 queryHasConsent
+    // 조건에 걸려 "동의 없음"으로 판정돼야 한다.
+    consentRows: [{ user_id: USER.id, terms_version: TERMS_VERSION, privacy_version: 'v1.0', source: 'email_signup' }]
+  });
+  await flush(env);
+  assert.equal(env.core.PRIVACY_VERSION, 'v1.1', '코드 상수가 v1.1인지 먼저 확인');
+  assert.equal(gateOpen(env), true, 'v1.0 동의만 있으면 v1.1 재동의 게이트가 떠야 한다');
+  assert.equal(hydrateStarted(env), false, '재동의 전에는 STEP/계획/마진 기록을 불러오지 않는다');
 });
 
 test('동의 이력 없는 기존 회원 로그인 → 게이트 표시, 그 전에는 hydrate 금지', async () => {

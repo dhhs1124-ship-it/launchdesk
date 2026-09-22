@@ -1,11 +1,13 @@
 -- ============================================================================
 -- LaunchDesk 원격 스키마 읽기 전용 감사 — remote_schema_readonly_audit.sql
 -- ============================================================================
--- 목적: 아래 두 마이그레이션이 원격 DB에 실제로 반영됐는지, 그리고 이 파일들이
+-- 목적: 아래 마이그레이션들이 원격 DB에 실제로 반영됐는지, 그리고 이 파일들이
 -- 의존하는 기존 객체(setup_inquiries, orders, 관리자/도매처/이벤트 RPC들)가
 -- 여전히 그대로인지를 사람이 Supabase SQL Editor에서 한 번 실행해 확인한다.
 --   - supabase/migrations/20260918100000_user_policy_consents.sql
 --   - supabase/migrations/20260918120000_setup_inquiries_consent_rpc.sql
+--   - supabase/migrations/20260922100000_setup_inquiries_privacy_v1_1.sql
+--     (7-4번 체크 — 동의 버전 상수가 v1.1로 갱신됐는지, v1.0 잔존이 없는지)
 --
 -- 이 파일은 기존 supabase/verify/*.sql(테스트 계정으로 실제 INSERT/RPC 호출을
 -- 해보고 BEGIN/ROLLBACK으로 되돌리는 방식)과 성격이 다르다 — 여기서는
@@ -116,6 +118,16 @@ new_fn_grants as (
     (select count(*) from information_schema.routine_privileges
       where routine_schema = 'public' and routine_name = 'submit_setup_inquiry' and grantee = 'PUBLIC'
     ) as public_grant_n
+),
+-- [2026-09-22 개인정보처리방침 v1.1] 버전 드리프트 확인 — 함수 정의 원문
+-- (pg_get_functiondef, 순수 카탈로그 조회라 실행/부작용 없음)에 서버 상수
+-- 'v1.1'만 있고 예전 'v1.0'은 남아있지 않은지. 20260922100000_setup_
+-- inquiries_privacy_v1_1.sql 적용 여부를 이 파일만으로도 확인할 수 있다.
+new_fn_version as (
+  select
+    (select p.oid from new_fn p) is not null as fn_exists,
+    coalesce(pg_get_functiondef((select oid from new_fn)) ~ '''v1\.1''', false) as has_v1_1,
+    coalesce(pg_get_functiondef((select oid from new_fn)) ~ '''v1\.0''', false) as has_v1_0
 ),
 
 -- ---------------------------------------------------------------------------
@@ -328,6 +340,17 @@ from (
   select 7.3, '7-3. submit_setup_inquiry(6개 인자) PUBLIC EXECUTE 권한 없음', '0', public_grant_n::text,
          case when public_grant_n = 0 then 'PASS' else 'FAIL' end
   from new_fn_grants
+
+  union all
+  select 7.4, '7-4. submit_setup_inquiry(6개 인자) 동의 버전 상수 = v1.1(v1.0 잔존 없음, 개인정보처리방침 v1.1)',
+         'v1.1만 존재', case
+           when not fn_exists then '함수 없음'
+           when has_v1_1 and not has_v1_0 then 'v1.1만 존재'
+           when has_v1_1 and has_v1_0 then 'v1.1과 v1.0 모두 존재(비정상)'
+           else 'v1.1 없음'
+         end,
+         case when fn_exists and has_v1_1 and not has_v1_0 then 'PASS' else 'FAIL' end
+  from new_fn_version
 
   union all
   select 8.1, '8-1. setup_inquiries anon/authenticated 테이블 직접 INSERT 권한 없음', '0', n::text,
