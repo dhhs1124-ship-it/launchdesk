@@ -158,6 +158,9 @@
   // 지금 주문 동기화 요청이 나가 있는 store.id 모음 — 쇼핑몰별로 버튼을
   // 따로 잠그기 위함(A 동기화 중이라고 B 버튼까지 잠기면 안 됨).
   var cafe24SyncInFlightStoreIds = {};
+  // 지금 Cafe24 연결 해제 요청이 나가 있는 store.id 모음 — Meta의
+  // metaDisconnectInFlightIds와 같은 목적(카드별 버튼 잠금·중복 클릭 방지).
+  var cafe24DisconnectInFlightStoreIds = {};
   // provider='meta'인 connected_accounts 행을 store_id별로 — { id,
   // status('pending'|'connected'), external_account_id, display_name }.
   // Cafe24와 달리 status가 'connected'가 아닌 값(pending)도 화면에서
@@ -251,20 +254,24 @@
       var isConnected = isCafe24 && !!connectedCafe24StoreIds[String(s.id)];
       var statusHtml = '<div class="store-status' + (isConnected ? ' connected' : '') + '">' +
         (isConnected ? 'Cafe24 연결됨' : 'API 연결 전') + '</div>';
-      // "Cafe24 연결" 버튼은 아직 연결 전인 쇼핑몰에만 — 연결 해제/재연결은
-      // 이번 작업 범위 밖이라, 이미 연결된 카드에는 다시 보여주지 않는다.
+      // "Cafe24 연결" 버튼은 아직 연결 전인 쇼핑몰에만 — 이미 연결된
+      // 카드에는 대신 아래 cafe24DisconnectBtnHtml(연결 해제)을 보여준다.
       var cafe24BtnHtml = (isCafe24 && !isConnected)
         ? '<button type="button" class="btn btn-ghost btn-sm store-cafe24-connect-btn" data-id="' + escapeHtml(s.id) + '">Cafe24 연결</button>'
         : '';
-      // "최근 동기화" 표시 + "주문 동기화" 버튼은 연결된 쇼핑몰에만.
+      // "최근 동기화" 표시 + "주문 동기화"/"연결 해제" 버튼은 연결된 쇼핑몰에만.
       var lastSyncedHtml = '';
       var syncBtnHtml = '';
+      var cafe24DisconnectBtnHtml = '';
       if(isConnected){
         var lastSyncedText = formatSyncTime(cafe24LastSyncedAtByStoreId[String(s.id)]) || '아직 없음';
         lastSyncedHtml = '<div class="store-sync-meta">최근 동기화: ' + escapeHtml(lastSyncedText) + '</div>';
         var isSyncing = !!cafe24SyncInFlightStoreIds[String(s.id)];
         syncBtnHtml = '<button type="button" class="btn btn-ghost btn-sm store-cafe24-sync-btn" data-id="' + escapeHtml(s.id) + '"' +
           (isSyncing ? ' disabled' : '') + '>' + (isSyncing ? '동기화 중...' : '주문 동기화') + '</button>';
+        var isCafe24Disconnecting = !!cafe24DisconnectInFlightStoreIds[String(s.id)];
+        cafe24DisconnectBtnHtml = '<button type="button" class="btn btn-ghost btn-sm store-cafe24-disconnect-btn" data-id="' + escapeHtml(s.id) + '"' +
+          (isCafe24Disconnecting ? ' disabled' : '') + '>' + (isCafe24Disconnecting ? '해제 중...' : '연결 해제') + '</button>';
       }
       // Meta 광고 연결 — Cafe24 쇼핑몰 카드에만 붙인다(요구사항 그대로).
       // 아직 연결 안 됨 → 버튼 하나. 선택 완료(status='connected') →
@@ -338,6 +345,7 @@
           '<div class="store-card-actions">' +
             cafe24BtnHtml +
             syncBtnHtml +
+            cafe24DisconnectBtnHtml +
             '<button type="button" class="btn btn-ghost btn-sm store-edit-btn" data-id="' + escapeHtml(s.id) + '">수정</button>' +
             '<button type="button" class="btn btn-ghost btn-sm store-del-btn" data-id="' + escapeHtml(s.id) + '">삭제</button>' +
           '</div>' +
@@ -443,6 +451,7 @@
       connectedCafe24StoreIds = {};
       cafe24LastSyncedAtByStoreId = {};
       cafe24SyncInFlightStoreIds = {};
+      cafe24DisconnectInFlightStoreIds = {};
       metaAccountsByStoreId = {};
       metaDisconnectInFlightIds = {};
       closeMetaModal(); // 열려 있던 Meta 모달/대상/캐시/제출 상태까지 전부 정리(요구사항 3)
@@ -459,6 +468,7 @@
         connectedCafe24StoreIds = {};
         cafe24LastSyncedAtByStoreId = {};
         cafe24SyncInFlightStoreIds = {}; // 이전 사용자 몫으로 걸려있던 "동기화 중" 잠금도 함께 정리
+        cafe24DisconnectInFlightStoreIds = {};
         metaAccountsByStoreId = {};
         metaDisconnectInFlightIds = {};
         closeMetaModal(); // A 사용자의 열린 모달/광고계정 목록이 B 사용자에게 한 프레임도 보이지 않게
@@ -472,6 +482,7 @@
         connectedCafe24StoreIds = {};
         cafe24LastSyncedAtByStoreId = {};
         cafe24SyncInFlightStoreIds = {};
+        cafe24DisconnectInFlightStoreIds = {};
         metaAccountsByStoreId = {};
         metaDisconnectInFlightIds = {};
         closeMetaModal(); // 로그아웃 시에도 동일하게 정리
@@ -559,6 +570,11 @@
     var syncBtn = e.target.closest('.store-cafe24-sync-btn');
     if(syncBtn && !syncBtn.disabled){
       syncCafe24Orders(syncBtn.getAttribute('data-id'));
+      return;
+    }
+    var cafe24DisconnectBtn = e.target.closest('.store-cafe24-disconnect-btn');
+    if(cafe24DisconnectBtn && !cafe24DisconnectBtn.disabled){
+      disconnectCafe24(cafe24DisconnectBtn.getAttribute('data-id'));
       return;
     }
     var metaConnectBtn = e.target.closest('.store-meta-connect-btn');
@@ -659,6 +675,56 @@
       render();
       showToast('주문 동기화 중 오류가 발생했어요', 'error');
       console.warn('[launchdesk] cafe24-orders-sync 호출 중 오류:', err && err.message);
+    });
+  }
+
+  // ---------------------------------------------------------------- Cafe24 연결 해제
+  // LaunchDesk 내부에 저장된 Cafe24 연결 정보(access/refresh token 포함)와
+  // 불러온 주문 데이터를 지운다(Cafe24 서버 측 앱 권한 revoke는 이번 범위
+  // 밖 — disconnectMeta와 같은 방침). 실제 삭제는 cafe24-disconnect Edge
+  // Function → disconnect_cafe24_integration RPC(단일 트랜잭션)가 담당한다.
+  function disconnectCafe24(storeId){
+    if(!storeId || !currentUserId) return;
+    if(cafe24DisconnectInFlightStoreIds[storeId]) return; // 중복 클릭 방지(버튼도 disabled되지만 한 번 더 방어)
+    if(!window.confirm('Cafe24 연결을 해제하면 저장된 연결 정보와 불러온 주문 데이터가 삭제됩니다. 쇼핑몰 정보와 마진 계산 기록은 유지됩니다.')) return;
+
+    var sb = client();
+    if(!sb) return;
+
+    var seqAtStart = requestSeq;
+    cafe24DisconnectInFlightStoreIds[storeId] = true;
+    render();
+
+    sb.functions.invoke('cafe24-disconnect', {
+      body: { store_id: storeId }
+    }).then(function(res){
+      if(seqAtStart !== requestSeq) return;
+      delete cafe24DisconnectInFlightStoreIds[storeId];
+      render(); // 버튼부터 즉시 원래 상태로
+
+      if(res.error){
+        return readInvokeErrorBody(res.error).then(function(body){
+          if(seqAtStart !== requestSeq) return;
+          showToast((body && body.error) || res.error.message || 'Cafe24 연결 해제에 실패했어요', 'error');
+        });
+      }
+
+      var data = res.data;
+      if(!data || data.ok !== true){
+        showToast((data && data.error) || 'Cafe24 연결 해제에 실패했어요', 'error');
+        return;
+      }
+
+      showToast('Cafe24 연결이 해제되었습니다.', 'success');
+      // 카드를 즉시 "API 연결 전" 상태로 되돌리기 — 전체 새로고침 없이
+      // connected_accounts만 다시 조회한다(기존 fetchConnectedAccounts 재사용).
+      fetchConnectedAccounts(seqAtStart);
+    }).catch(function(err){
+      if(seqAtStart !== requestSeq) return;
+      delete cafe24DisconnectInFlightStoreIds[storeId];
+      render();
+      showToast('Cafe24 연결 해제 중 오류가 발생했어요', 'error');
+      console.warn('[launchdesk] cafe24-disconnect 호출 중 오류:', err && err.message);
     });
   }
 

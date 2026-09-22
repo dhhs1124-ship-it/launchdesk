@@ -389,6 +389,12 @@ verify_jwt = true
 [functions.meta-disconnect]
 verify_jwt = true
 
+# cafe24-disconnect — Cafe24 연동 해제(연결 정보·자격증명·주문 데이터 삭제).
+# meta-disconnect와 같은 이유로 로그인 사용자만 호출해야 하므로 verify_jwt
+# = true.
+[functions.cafe24-disconnect]
+verify_jwt = true
+
 [functions.meta-insights]
 verify_jwt = true
 

@@ -130,9 +130,44 @@ test('Meta 연동 해제 즉시삭제 문구는 실제 meta-disconnect 코드가
   assert.match(fn, /from\("connected_accounts"\)\s*\.delete\(\)/, 'connected_accounts 삭제 호출이 없어졌다면 정책의 "즉시 삭제" 문구를 다시 검토해야 함');
 });
 
-test('Cafe24 연결 정보 보유기간은 인앱 연동 해제가 아니라 이메일 요청 경로로만 설명한다(있지도 않은 버튼을 암시하지 않음)', () => {
-  const cafe24Bullet = PRIVACY_HTML.match(/<li><strong>Cafe24 연결 정보[\s\S]{0,200}?<\/li>/);
+test('Cafe24 연결 정보 보유기간은 이제 인앱 연동 해제로 설명한다(cafe24-disconnect 구현 완료 반영)', () => {
+  const cafe24Bullet = PRIVACY_HTML.match(/<li><strong>Cafe24 연결 정보[\s\S]{0,320}?<\/li>/);
   assert.ok(cafe24Bullet, 'Cafe24 연결 정보 보유기간 항목을 찾지 못함');
-  assert.match(cafe24Bullet[0], /이메일로 삭제를 요청/);
-  assert.doesNotMatch(cafe24Bullet[0], /연동을 해제/, 'Cafe24는 인앱 연동 해제 기능이 없으므로 "연동 해제"를 자체 삭제 경로로 표현하면 안 됨');
+  assert.match(cafe24Bullet[0], /연동을 해제할 때까지 보유/);
+  assert.match(cafe24Bullet[0], /화면에서 Cafe24 연동 해제를 요청하면/);
+  assert.match(cafe24Bullet[0], /즉시 삭제/);
+  assert.match(cafe24Bullet[0], /쇼핑몰 정보와 마진 계산 기록은 연동 해제와 무관하게 유지/);
+  // 이메일 요청만 가능하다는 옛 초안 문구(있지도 않은 버튼을 암시하지 않기 위한 것이었음)는
+  // 실제 기능이 생겼으므로 더 이상 남아 있으면 안 된다.
+  assert.doesNotMatch(cafe24Bullet[0], /이메일로 삭제를 요청/, 'Cafe24도 이제 인앱 연동 해제가 가능하므로 이메일 요청 전용 문구가 남아 있으면 안 됨');
+});
+
+test('셀프서비스 목록(4번·9번 항목)에 Cafe24 연동 해제가 반영되고, Cafe24를 더 이상 이메일 전용 삭제로 단정하지 않는다', () => {
+  const selfServiceParas = PRIVACY_HTML.match(/현재 서비스 화면에서는[\s\S]{0,220}?이용자가 직접 처리할 수 있으며/g) || [];
+  assert.equal(selfServiceParas.length, 2, '셀프서비스 안내 문단(4번·9번 항목)이 정확히 2곳이어야 한다');
+  for (const para of selfServiceParas) {
+    assert.match(para, /Cafe24 연동 해제/, 'Cafe24 연동 해제가 셀프서비스 목록에 없음');
+    assert.match(para, /Meta 연동 해제/, 'Meta 연동 해제 문구가 사라짐(회귀)');
+  }
+});
+
+test('Cafe24 연동 해제 즉시삭제 문구는 실제 cafe24-disconnect RPC(단일 트랜잭션)가 이행한다(정책 약속 ↔ 코드 대조)', () => {
+  const fn = fs.readFileSync(
+    path.join(ROOT, 'supabase', 'functions', 'cafe24-disconnect', 'index.ts'),
+    'utf8'
+  );
+  assert.match(fn, /\.rpc\(\s*"disconnect_cafe24_integration"/, 'cafe24-disconnect가 disconnect_cafe24_integration RPC를 호출하지 않는다');
+  // service_role로 테이블을 하나씩 순차 삭제하는 방식(meta-disconnect 패턴)은
+  // 이 함수에서 금지된다 — 원자성 요구사항 위반.
+  assert.doesNotMatch(fn, /ctx\.supabaseAdmin\s*\n?\s*\.from\("(integration_credentials|connected_accounts|orders|oauth_states)"\)\s*\.delete\(/, 'cafe24-disconnect가 service_role로 테이블을 개별 삭제하고 있다(원자성 요구사항 위반)');
+
+  const migration = fs.readFileSync(
+    path.join(ROOT, 'supabase', 'migrations', '20260922120000_cafe24_disconnect.sql'),
+    'utf8'
+  );
+  assert.match(migration, /delete from public\.integration_credentials/);
+  assert.match(migration, /delete from public\.connected_accounts[\s\S]{0,40}where store_id = p_store_id and provider = 'cafe24'/);
+  assert.match(migration, /delete from public\.orders[\s\S]{0,40}where store_id = p_store_id and provider = 'cafe24'/);
+  assert.match(migration, /delete from public\.oauth_states[\s\S]{0,40}where store_id = p_store_id and provider = 'cafe24'/);
+  assert.match(migration, /set external_store_id = null/);
 });
