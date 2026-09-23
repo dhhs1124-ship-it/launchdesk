@@ -32,52 +32,16 @@
    payment_amount)만 select한다. */
 (function(){
   // 오픈 베타 전 단순화(3차)로 이 파일이 원래 그리던 #/tools의 "쇼핑몰
-  // 운영 현황"/"Meta 광고 성과" 패널(#opsOverviewPanel 등)은 index.html에서
-  // 제거됐다 — 아래 DOM 참조는 전부 null일 수 있으므로, 이 파일 전체가
-  // (Meta 섹션이 이미 하던 방식 그대로) 모든 참조를 매번 null 체크한다.
-  // 조회·집계·window.launchdeskOpsSnapshot 발행 로직은 한 줄도 바뀌지
-  // 않았다 — home-dashboard.js/meta-adsets.js가 이 스냅샷을 그대로 구독한다.
+  // 운영 현황"/"Meta 광고 성과" 패널(#opsOverviewPanel/#metaOpsPanel 등)은
+  // index.html에서 제거됐다 — 그 안에만 있던 상세 KPI/디테일 DOM(오늘·이번
+  // 달 숫자, Meta 상세 필드, 안내 문구 등)은 다시 만들지 않는다(홈
+  // 대시보드가 #opsdashKpis 등 자신의 DOM으로 같은 스냅샷을 이미 그린다).
+  // 유일하게 #opsStoreSelect(쇼핑몰 선택기)만 #/dashboard(#opsdash-header)로
+  // 그대로 옮겨져 살아있다 — id가 같으므로 아래 조회·선택 로직은 전혀
+  // 바꾸지 않았다. 조회·집계·window.launchdeskOpsSnapshot 발행 로직도 한
+  // 줄도 바뀌지 않았다 — home-dashboard.js/meta-adsets.js가 이 스냅샷을
+  // 그대로 구독한다.
   var storeSelect = document.getElementById('opsStoreSelect');
-  var guestNotice = document.getElementById('opsGuestNotice');
-  var noStoreNotice = document.getElementById('opsNoStoreNotice');
-  var dataWrap = document.getElementById('opsDataWrap');
-  var todayPaymentEl = document.getElementById('opsTodayPayment');
-  var todayCountEl = document.getElementById('opsTodayCount');
-  var monthPaymentEl = document.getElementById('opsMonthPayment');
-  var monthCountEl = document.getElementById('opsMonthCount');
-  var lastSyncedEl = document.getElementById('opsLastSynced');
-
-  // ---- Meta 광고 성과 패널 — 위 Cafe24 패널에서 선택된 쇼핑몰에 연결된
-  // Meta 광고계정의 실제 Insights(supabase/functions/meta-insights). 이 DOM이
-  // 없어도(예: 예전 캐시된 index.html) Cafe24 패널은 그대로 동작해야 하므로
-  // 별도 얼리 리턴 없이 아래에서 각 참조를 매번 null 체크한다.
-  var metaPanel = document.getElementById('metaOpsPanel');
-  var metaOpsNotConnected = document.getElementById('metaOpsNotConnected');
-  var metaOpsNotSelected = document.getElementById('metaOpsNotSelected');
-  var metaOpsLoading = document.getElementById('metaOpsLoading');
-  var metaOpsError = document.getElementById('metaOpsError');
-  var metaOpsErrorMsg = document.getElementById('metaOpsErrorMsg');
-  var metaOpsRetryBtn = document.getElementById('metaOpsRetryBtn');
-  var metaOpsDataWrap = document.getElementById('metaOpsDataWrap');
-  var metaOpsDebugInfo = document.getElementById('metaOpsDebugInfo');
-  var metaEls = {
-    todaySpend: document.getElementById('metaTodaySpend'),
-    todayRevenue: document.getElementById('metaTodayRevenue'),
-    todayPurchases: document.getElementById('metaTodayPurchases'),
-    todayRoas: document.getElementById('metaTodayRoas'),
-    todayRoasNote: document.getElementById('metaTodayRoasNote'),
-    todayCtr: document.getElementById('metaTodayCtr'),
-    todayCpc: document.getElementById('metaTodayCpc'),
-    todayCpm: document.getElementById('metaTodayCpm'),
-    monthSpend: document.getElementById('metaMonthSpend'),
-    monthRevenue: document.getElementById('metaMonthRevenue'),
-    monthPurchases: document.getElementById('metaMonthPurchases'),
-    monthRoas: document.getElementById('metaMonthRoas'),
-    monthRoasNote: document.getElementById('metaMonthRoasNote'),
-    monthCtr: document.getElementById('metaMonthCtr'),
-    monthCpc: document.getElementById('metaMonthCpc'),
-    monthCpm: document.getElementById('metaMonthCpm')
-  };
 
   function client(){ return window.launchdeskSupabase || null; }
 
@@ -96,63 +60,17 @@
     return new Date(Date.UTC(y, m, d, 0, 0, 0) - KST_OFFSET_MS);
   }
 
-  // stores.js의 같은 이름 함수와 동일한 방식(각자 다른 최상위 IIFE라 공유
-  // 불가) — connected_accounts.last_synced_at을 항상 한국 시간(KST)
-  // 기준 "2026. 09. 14. 14:30" 형태로.
-  function formatSyncTime(isoString){
-    if(!isoString) return null;
-    var d = new Date(isoString);
-    if(isNaN(d.getTime())) return null;
-    var parts = {};
-    new Intl.DateTimeFormat('ko-KR', {
-      timeZone: 'Asia/Seoul',
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', hour12: false
-    }).formatToParts(d).forEach(function(p){ parts[p.type] = p.value; });
-    var hour = parts.hour === '24' ? '00' : parts.hour;
-    return parts.year + '. ' + parts.month + '. ' + parts.day + '. ' + hour + ':' + parts.minute;
-  }
-  function formatWon(n){ return Math.round(n).toLocaleString('ko-KR') + '원'; }
+  // (예전엔 여기에 formatSyncTime()/formatWon()이 있었다 — #opsLastSynced ·
+  // #opsTodayPayment 등 텍스트 전용 포맷 함수였는데, 그 DOM이 #/tools
+  // 패널과 함께 삭제되며 죽은 코드가 됐다 — 제거했다. lastSyncedAt · 주문
+  // 요약 값 자체는 여전히 스냅샷으로 그대로 내보낸다 — home-dashboard.js가
+  // 자기 포맷 함수로 화면에 그린다.)
 
-  // ---------------------------------------------------------- Meta 포맷 헬퍼
-  // 환율 변환은 절대 하지 않는다 — 광고계정 실제 currency로만 표시(요구사항
-  // 9). Intl이 지원하지 않는/알 수 없는 통화 코드라도 catch에서 ISO 코드
-  // 자체가 보이는 형태로 fallback한다.
-  function formatMetaMoney(amount, currency){
-    var n = Number(amount) || 0;
-    try {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 2 }).format(n);
-    } catch(e){
-      return (currency ? currency + ' ' : '') + n.toLocaleString('en-US');
-    }
-  }
-  // ROAS 보조 설명의 "광고비 1당" 부분 전용 — 소수점 없이(예: "$1", "₩1").
-  function formatMetaMoneyRounded(amount, currency){
-    var n = Number(amount) || 0;
-    try {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n);
-    } catch(e){
-      return (currency ? currency + ' ' : '') + Math.round(n).toLocaleString('en-US');
-    }
-  }
-  // 0 분모라 계산 불가인 지표(서버가 null로 내려줌)는 0이 아니라 "—"로
-  // 구분해서 보여준다 — 데이터 없음(0)과 계산 불가는 다른 의미다.
-  //
-  // 서버는 ROAS를 ratio(purchase_value/spend, 예: 3.379073...)로 내려준다 —
-  // 이 계산/응답은 그대로 두고(백엔드 수정 금지), 한국 쇼핑몰 운영자에게
-  // 익숙한 퍼센트 표시로 UI에서만 변환한다(예: 3.379073 → "338%").
-  function formatMetaRoas(x){ return (x === null || x === undefined) ? '—' : (Math.round(Number(x) * 100).toLocaleString('ko-KR') + '%'); }
-  // 보조 설명 — 원래 ratio를 "광고비 1당 약 얼마의 매출"로 풀어서 보여준다.
-  // roas === null(=spend 0 등 계산 불가)이면 표시할 게 없으므로 빈 문자열.
-  function formatMetaRoasNote(x, currency){
-    if(x === null || x === undefined) return '';
-    var perUnit = formatMetaMoneyRounded(1, currency);
-    var yieldAmount = formatMetaMoney(x, currency);
-    return '광고비 ' + perUnit + '당 약 ' + yieldAmount + '의 Meta 광고매출';
-  }
-  function formatMetaPercent(x){ return (x === null || x === undefined) ? '—' : (Number(x).toFixed(2) + '%'); }
-  function formatMetaMoneyOrDash(x, currency){ return (x === null || x === undefined) ? '—' : formatMetaMoney(x, currency); }
-  function formatMetaCount(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '건'; }
+  // (예전엔 여기에 Meta 포맷 헬퍼 6개(formatMetaMoney 등)가 있었다 —
+  // #metaOpsPanel의 상세 필드를 직접 그리는 용도였는데, 그 DOM이 삭제되며
+  // 죽은 코드가 됐다 — 제거했다. home-dashboard.js가 같은 스냅샷을 자기
+  // 화면에 그릴 때 쓰는 동일 목적의 포맷 함수를 독립적으로 갖고 있다
+  // (이 파일 헤더에 적힌 관례 — 각자 다른 최상위 IIFE라 공유 불가).
 
   // stores.js의 같은 이름 helper와 동일한 이유로 이 IIFE 안에 별도 선언
   // (각자 다른 최상위 IIFE라 공유 불가) — functions.invoke 에러 응답의 JSON
@@ -209,49 +127,18 @@
     opsSnapshotListeners.forEach(function(cb){ try{ cb(latestOpsSnapshot); }catch(e){ console.warn('[launchdesk] ops snapshot 구독자 오류:', e && e.message); } });
   }
 
+  // (#metaOpsPanel 삭제로 여기서 DOM을 직접 그리던 부분은 없앴다 — 상태
+  // 값만 갱신하고 publishOpsSnapshot()으로 내보낸다. 실제 화면은
+  // home-dashboard.js가 이 스냅샷을 구독해 자신의 DOM(#opsdashKpis 등)에
+  // 그린다.)
   function showMetaState(state){ // 'not-connected'|'not-selected'|'reconnect-required'|'loading'|'error'|'data'
     currentMetaState = state;
-    if(!metaPanel){ publishOpsSnapshot(); return; }
-    if(metaOpsNotConnected) metaOpsNotConnected.hidden = state !== 'not-connected';
-    if(metaOpsNotSelected) metaOpsNotSelected.hidden = state !== 'not-selected';
-    if(metaOpsLoading) metaOpsLoading.hidden = state !== 'loading';
-    if(metaOpsError) metaOpsError.hidden = state !== 'error';
-    if(metaOpsDataWrap) metaOpsDataWrap.hidden = state !== 'data';
     publishOpsSnapshot();
   }
 
   function renderMetaData(payload){
     lastMetaPayload = payload;
     lastMetaErrorMessage = null;
-    var currency = payload.account && payload.account.currency;
-    var today = payload.today || {};
-    var month = payload.month || {};
-
-    if(metaEls.todaySpend) metaEls.todaySpend.textContent = formatMetaMoney(today.spend, currency);
-    if(metaEls.todayRevenue) metaEls.todayRevenue.textContent = formatMetaMoney(today.purchase_value, currency);
-    if(metaEls.todayPurchases) metaEls.todayPurchases.textContent = formatMetaCount(today.purchase_count);
-    if(metaEls.todayRoas) metaEls.todayRoas.textContent = formatMetaRoas(today.roas);
-    if(metaEls.todayRoasNote) metaEls.todayRoasNote.textContent = formatMetaRoasNote(today.roas, currency);
-    if(metaEls.todayCtr) metaEls.todayCtr.textContent = formatMetaPercent(today.ctr);
-    if(metaEls.todayCpc) metaEls.todayCpc.textContent = formatMetaMoneyOrDash(today.cpc, currency);
-    if(metaEls.todayCpm) metaEls.todayCpm.textContent = formatMetaMoneyOrDash(today.cpm, currency);
-
-    if(metaEls.monthSpend) metaEls.monthSpend.textContent = formatMetaMoney(month.spend, currency);
-    if(metaEls.monthRevenue) metaEls.monthRevenue.textContent = formatMetaMoney(month.purchase_value, currency);
-    if(metaEls.monthPurchases) metaEls.monthPurchases.textContent = formatMetaCount(month.purchase_count);
-    if(metaEls.monthRoas) metaEls.monthRoas.textContent = formatMetaRoas(month.roas);
-    if(metaEls.monthRoasNote) metaEls.monthRoasNote.textContent = formatMetaRoasNote(month.roas, currency);
-    if(metaEls.monthCtr) metaEls.monthCtr.textContent = formatMetaPercent(month.ctr);
-    if(metaEls.monthCpc) metaEls.monthCpc.textContent = formatMetaMoneyOrDash(month.cpc, currency);
-    if(metaEls.monthCpm) metaEls.monthCpm.textContent = formatMetaMoneyOrDash(month.cpm, currency);
-
-    // Ads Manager 대조용(요구사항 14) — 일반 사용자에겐 작은 보조 텍스트로만.
-    if(metaOpsDebugInfo && payload.account && payload.queried_range){
-      metaOpsDebugInfo.textContent = '기준: ' + payload.account.timezone_name + ' · ' + payload.account.currency +
-        ' · 구매전환: ' + (today.purchase_basis || month.purchase_basis || '데이터 없음') +
-        ' · 이번 달 조회기간: ' + payload.queried_range.month.since + ' ~ ' + payload.queried_range.month.until;
-    }
-
     showMetaState('data');
   }
 
@@ -271,11 +158,8 @@
     // publishOpsSnapshot()에서 다시 읽어왔는데, 그 DOM이 삭제된 뒤로는 항상
     // null이 되는 버그였다 — 이제 변수(lastMetaErrorMessage)에 직접 담는다.
     lastMetaErrorMessage = (code && META_ERROR_MESSAGES[code]) || (body && body.error) || fallbackMessage || META_ERROR_MESSAGES.TEMPORARY_ERROR;
-    if(metaOpsErrorMsg) metaOpsErrorMsg.textContent = lastMetaErrorMessage;
     showMetaState('error');
   }
-
-  var metaLastStoreId = null; // 재시도 버튼이 다시 쓸 마지막 storeId
 
   function fetchMetaInsights(connectedAccountId, mySeq){
     var sb = client();
@@ -307,7 +191,6 @@
   // fetchMetaAccounts와 동일하게 provider='meta'만 걸고 RLS로 소유권을
   // 확인하되, 여기서는 이 store_id 하나로 좁혀 단일 행만 조회한다.
   function loadMetaForStore(storeId, mySeq){
-    metaLastStoreId = storeId;
     showMetaState('loading');
     var sb = client();
     if(!sb) return;
@@ -342,13 +225,9 @@
       });
   }
 
-  if(metaOpsRetryBtn){
-    metaOpsRetryBtn.addEventListener('click', function(){
-      if(!metaLastStoreId) return;
-      seq += 1;
-      loadMetaForStore(metaLastStoreId, seq);
-    });
-  }
+  // (예전엔 여기에 #metaOpsPanel 전용 재시도 버튼 리스너가 있었다 — 그
+  // DOM이 삭제돼 죽은 코드가 됐다 — 제거했다. Meta 조회 실패는 상단
+  // "새로고침"(#opsdashRefreshBtn → refresh())으로 다시 시도할 수 있다.)
 
   // ------------------------------------------------------------------ state
   var currentUserId = null;
@@ -369,15 +248,30 @@
   // 데이터 0건"은 별도 상태가 아니라 today/month의 숫자가 0인 'data'다.
   // "store를 아예 등록한 적 없음"과 "store는 있지만 cafe24 연결 안 됨"도
   // 화면 문구가 같아서 둘 다 'not-connected'로 합친다.)
+  // (#opsGuestNotice/#opsNoStoreNotice/#opsDataWrap은 #/tools 레거시 패널과
+  // 함께 삭제됐다 — home-dashboard.js가 같은 상태를 자기 DOM에 그린다.
+  // #opsStoreSelect만 살아있는 DOM이라 그 hidden 토글은 그대로 둔다.)
   function showCafe24State(state){
     currentCafe24State = state;
-    if(guestNotice) guestNotice.hidden = state !== 'guest';
-    if(noStoreNotice) noStoreNotice.hidden = state !== 'not-connected';
-    if(dataWrap) dataWrap.hidden = state !== 'data';
     if(storeSelect) storeSelect.hidden = !(myStores.length > 1);
     publishOpsSnapshot();
   }
 
+  // Cafe24 · Meta 두 상태를 같은 시점에 새로 맞춰야 하는 지점(쇼핑몰 전환
+  // 직후, stores 재조회 실패/빈 목록)에서만 쓴다. showMetaState()와
+  // showCafe24State()를 따로 두 번 부르면 그 사이에 먼저 publish된 스냅샷에
+  // 아직 안 바뀐 쪽의 이전 상태가 새 storeId와 함께 섞여 나간다 — 두 값을
+  // 먼저 맞추고 단 한 번만 publish해 그 문제를 없앤다.
+  function publishBothStates(cafe24State, metaState){
+    currentCafe24State = cafe24State;
+    currentMetaState = metaState;
+    if(storeSelect) storeSelect.hidden = !(myStores.length > 1);
+    publishOpsSnapshot();
+  }
+
+  // myStores가 바뀔 때(loadUserStores 성공)만 다시 그린다 — 옵션을 만드는
+  // 시점에 selectedStoreId와 같은 id에 opt.selected를 매겨, 조회 중인
+  // 쇼핑몰이 선택값에 정확히 반영되게 한다.
   function populateSelect(){
     if(!storeSelect) return;
     storeSelect.innerHTML = '';
@@ -390,17 +284,12 @@
     });
   }
 
-  function renderLastSynced(){
-    if(!lastSyncedEl) return;
-    lastSyncedEl.textContent = formatSyncTime(lastSyncedAt) || '아직 없음';
-  }
+  // (#opsLastSynced 전용 renderLastSynced()/formatSyncTime()은 그 DOM이
+  // 삭제되며 죽은 코드가 됐다 — 제거했다. lastSyncedAt 값 자체는 그대로
+  // 유지해 스냅샷(cafe24.lastSyncedAt)으로 계속 내보낸다.)
 
   function renderOrderSummary(summary){
     lastOrderSummary = summary;
-    if(todayPaymentEl) todayPaymentEl.textContent = formatWon(summary.todayPayment);
-    if(todayCountEl) todayCountEl.textContent = summary.todayCount + '건';
-    if(monthPaymentEl) monthPaymentEl.textContent = formatWon(summary.monthPayment);
-    if(monthCountEl) monthCountEl.textContent = summary.monthCount + '건';
   }
   var EMPTY_SUMMARY = { todayPayment: 0, todayCount: 0, monthPayment: 0, monthCount: 0 };
 
@@ -474,40 +363,56 @@
         if(res.error){
           console.warn('[launchdesk] ops: cafe24 connected_accounts 조회 실패:', res.error.message);
           lastSyncedAt = null;
-          renderLastSynced();
           showCafe24State('error');
           return;
         }
         var row = res.data;
         if(!row || row.status !== 'connected'){
           lastSyncedAt = null;
-          renderLastSynced();
           showCafe24State('not-connected');
           return;
         }
         lastSyncedAt = row.last_synced_at;
-        renderLastSynced();
         loadOrdersFor(storeId, mySeq); // 성공하면 그 안에서 showCafe24State('data')
       })
       .catch(function(err){
         if(mySeq !== seq) return;
         console.warn('[launchdesk] ops: cafe24 connected_accounts 조회 중 오류:', err && err.message);
         lastSyncedAt = null;
-        renderLastSynced();
         showCafe24State('error');
       });
+  }
+
+  // 주문 · Meta · 동기화 값만 지운다(myStores/selectedStoreId는 건드리지
+  // 않는다) — 쇼핑몰 전환(selectStore) 및 목록 재조회 실패/빈 목록
+  // (loadUserStores)에서 공통으로 쓴다. 이 값들을 지운 "뒤"에 호출자가
+  // showCafe24State()/showMetaState()로 새 상태를 publish해야, loading·
+  // error·not-connected 스냅샷에 이전 쇼핑몰의 주문·광고 성과·오류 메시지가
+  // 단 한 번도 실리지 않는다(요구사항: 쇼핑몰 전환·재조회 실패 시에도
+  // 이전 쇼핑몰의 값이 남으면 안 됨). 로그인/로그아웃 전체 리셋은
+  // clearAllCachedData()가 이 함수 + myStores/selectedStoreId까지 지운다.
+  function clearStoreScopedData(){
+    lastOrderSummary = null;
+    lastSyncedAt = null;
+    lastMetaPayload = null;
+    lastMetaErrorMessage = null;
   }
 
   function selectStore(storeId){
     selectedStoreId = storeId;
     seq += 1;
     var mySeq = seq;
-    // 새 쇼핑몰로 바뀌는 동안 이전 값이 잠깐이라도 남지 않게 즉시 리셋.
-    lastOrderSummary = null;
+    // 새 쇼핑몰로 바뀌는 동안 이전 쇼핑몰의 주문 · Meta 값이 스냅샷에 한
+    // 프레임도 남지 않게, publishBothStates()가 첫 publish를 하기 전에
+    // 전부 지운다. Cafe24 · Meta 상태를 각각 showXState()로 따로 부르지
+    // 않고 publishBothStates()로 한 번에 맞추는 이유: 따로 부르면 첫 번째
+    // 호출의 publish 시점엔 아직 안 바뀐 쪽이 새 storeId와 함께 이전
+    // 쇼핑몰의 상태 그대로 나간다.
+    clearStoreScopedData();
     renderOrderSummary(EMPTY_SUMMARY);
-    showCafe24State('loading');
+    publishBothStates('loading', 'loading');
     loadCafe24ForStore(storeId, mySeq);
-    loadMetaForStore(storeId, mySeq); // Cafe24 결과를 기다리지 않고 항상 함께 시작
+    loadMetaForStore(storeId, mySeq); // Cafe24 결과를 기다리지 않고 항상 함께 시작(내부에서 showMetaState('loading') 재호출 — 중복이지만 안전)
   }
 
   // 로그인 사용자가 등록한 cafe24 플랫폼 store를 전부 가져온다(연결 여부와
@@ -527,15 +432,18 @@
           console.warn('[launchdesk] ops: stores 조회 실패:', storesRes.error.message);
           myStores = [];
           selectedStoreId = null;
-          showCafe24State('error');
-          showMetaState('not-connected'); // 대상 store 자체를 못 찾았으니 meta도 확인할 대상이 없다(에러 아님)
+          clearStoreScopedData(); // 재조회 실패로 이 화면에 남아있던 이전 쇼핑몰 값이 노출되지 않게
+          // 대상 store 자체를 못 찾았으니 meta도 확인할 대상이 없다(에러 아님) —
+          // 두 상태를 showCafe24State()/showMetaState()로 따로 부르면 그 사이에
+          // 먼저 publish되는 스냅샷에 반대쪽의 이전 상태가 남으므로 한 번에 맞춘다.
+          publishBothStates('error', 'not-connected');
           return;
         }
         myStores = storesRes.data || [];
         if(!myStores.length){
           selectedStoreId = null;
-          showCafe24State('not-connected');
-          showMetaState('not-connected');
+          clearStoreScopedData(); // 쇼핑몰이 전부 삭제된 경우도 마찬가지
+          publishBothStates('not-connected', 'not-connected');
           return;
         }
         populateSelect();
@@ -551,8 +459,8 @@
         console.warn('[launchdesk] ops: stores 조회 중 오류:', err && err.message);
         myStores = [];
         selectedStoreId = null;
-        showCafe24State('error');
-        showMetaState('not-connected');
+        clearStoreScopedData();
+        publishBothStates('error', 'not-connected');
       });
   }
 
@@ -563,11 +471,7 @@
   function clearAllCachedData(){
     myStores = [];
     selectedStoreId = null;
-    lastOrderSummary = null;
-    lastSyncedAt = null;
-    lastMetaPayload = null;
-    lastMetaErrorMessage = null;
-    metaLastStoreId = null;
+    clearStoreScopedData();
     currentMetaState = 'not-connected';
   }
 

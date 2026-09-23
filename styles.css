@@ -1073,6 +1073,16 @@
   .opsdash-header{display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:.9rem;}
   .opsdash-header h1, .opsdash-header h2{font-size:1.85rem;}
   .opsdash-header p{margin:.3rem 0 0; font-size:.86rem; color:var(--ink-soft);}
+  /* 쇼핑몰 선택기(#opsStoreSelect) + 새로고침 버튼을 한 그룹으로 묶는다
+     (복구 — 예전엔 #/tools 패널 안에서 새로고침 버튼 하나만 있었다). */
+  .opsdash-header-actions{display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;}
+  /* border-radius 2px — 이 화면 전반의 버튼/입력(.btn, .ws-field input 등)과
+     같은 각진 톤. min-height 44px는 터치 타겟 최소 크기. max-width:100%로
+     쇼핑몰 이름이 길어도 좁은 화면에서 가로 스크롤을 만들지 않는다. */
+  .opsdash-store-select{border:1px solid var(--border-strong); border-radius:2px; background:var(--bg); padding:.5rem .7rem; font-family:var(--f-body); font-size:.84rem; color:var(--ink); min-height:44px; max-width:100%; box-sizing:border-box;}
+  /* 전역 select:focus의 outline:none보다 구체적으로 지정해 Tab 포커스를 선명하게 표시한다. */
+  .opsdash-store-select:focus-visible{outline:2px solid var(--brand); outline-offset:3px;}
+  @media (max-width:639px){ .opsdash-header-actions{width:100%;} .opsdash-store-select{flex:1 1 auto; min-width:0;} }
 
   .opsdash-kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:.85rem; margin-bottom:.9rem;}
   @media (max-width:900px){ .opsdash-kpis{grid-template-columns:repeat(2,1fr);} }
@@ -1462,20 +1472,8 @@
   .desk-ops-card-btn:hover{border-color:var(--ld-accent); background:var(--ld-accent-light);}
   @media (max-width:639px){ .desk-ops-card{padding:16px 18px;} .desk-ops-card-btn{width:100%;} }
 
-  /* 이어서 준비하기 카드(홈, 2026-09 UI 재설계 2차) — 예전 로드맵 패널(퍼센트·원형
-     그래프·진행 바·STEP 00~08 목록·오늘의 팁) 대신 다음 행동 하나만 보여준다.
-     시작 데스크와 같은 --ld-* 토큰만 쓴다. 버튼은 모바일 터치 영역 44px 이상. */
-  .desk-resume{display:flex; align-items:center; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin:0 0 24px; padding:20px 24px; border-radius:3px; background:var(--ld-accent-light); border:1px solid #D8D8D5; min-width:0;}
-  .desk-resume-text{flex:1 1 260px; min-width:0; word-break:keep-all;}
-  .desk-resume-eyebrow{margin:0 0 6px; max-width:none; font-size:12px; font-weight:600; color:var(--ld-accent); letter-spacing:.02em;}
-  .desk-resume h2{display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 4px; font-size:16px; font-weight:700; letter-spacing:-.01em; color:var(--ld-text); line-height:1.4;}
-  .desk-resume-step{font-size:11px; font-weight:700; padding:2px 8px; border-radius:3px; background:var(--ld-panel); color:var(--ld-accent); border:1px solid #D8D8D5; flex:0 0 auto;}
-  .desk-resume-desc{margin:0; max-width:none; font-size:13px; color:var(--ld-muted); line-height:1.6;}
-  .desk-resume-note{margin:8px 0 0; max-width:none; font-size:12px; color:var(--ld-muted); line-height:1.5;}
-  .desk-resume-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:10px 18px; border-radius:2px; background:var(--ld-accent); color:#fff; font-size:13px; font-weight:600; white-space:nowrap; flex:0 0 auto; transition:background .15s;}
-  .desk-resume-btn:hover{background:var(--ld-accent-dark);}
-  .desk-resume.is-complete{background:var(--ld-panel); border-color:var(--ld-border-strong);}
-  @media (max-width:639px){ .desk-resume{padding:18px;} .desk-resume-btn{width:100%;} }
+  /* (이어서 준비하기 카드 .desk-resume*은 오픈 베타 전 단순화(3차)로 #deskResume
+     마크업 자체가 삭제됐다 — 대응 CSS도 함께 제거했다.) */
 
   /* /start 상단 진행 상태(2026-09 UI 재설계 2차) — 통계 3칸·퍼센트·진행 바·범례 제거,
      "완료 N / 7 · 다음 단계 · 이어서 준비하기"만. */

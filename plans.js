@@ -507,16 +507,18 @@
   }
   function renderHome(){
     if(!hasHome) return;
+    if(home.panel) home.panel.hidden = false;
     captureScratch();
     home.body.textContent = '';
     if(home.headNote) home.headNote.textContent = '';
     renderDraftNotice();
 
     if(listState === 'guest'){
-      home.body.appendChild(el('p', { className: 'opsdash-empty-note' }, [
-        '로그인하면 마진 계산기에서 만든 계획을 여기서 확인할 수 있어요. ',
-        el('a', { href: '#/login', className: 'ldplan-inline-link', text: '로그인' })
-      ]));
+      // 이 패널은 이제 #/dashboard(운영 현황) 안에서만 산다 — 비회원은 그
+      // 화면의 로그인 게이트가 이미 안내하므로, 여기서 다시 "로그인하면..."을
+      // 중복으로 보여주지 않고 패널 자체를 숨긴다(요구사항: 비회원 운영
+      // 현황에서는 게이트만 표시하고 계획 패널은 숨김).
+      if(home.panel) home.panel.hidden = true;
       return;
     }
     if(listState === 'loading'){

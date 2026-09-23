@@ -598,10 +598,19 @@
                 <h1 id="opsdashTitle">운영 현황</h1>
                 <p id="opsdashSubtitle">오늘 쇼핑몰과 광고 상태를 한눈에 확인하세요.</p>
               </div>
-              <button type="button" class="btn btn-ghost btn-sm" id="opsdashRefreshBtn">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:.35rem; vertical-align:-2px;"><path d="M20 11A8 8 0 1 0 19 15"/><polyline points="20 4 20 11 13 11"/></svg>
-                새로고침
-              </button>
+              <!-- 쇼핑몰 선택기 복구 — 예전 #/tools "쇼핑몰 운영 현황" 패널
+                   안에만 있던 #opsStoreSelect를 이 화면(#/dashboard)으로
+                   그대로 옮겼다(id 동일 — ops-overview.js의 기존 조회·선택
+                   로직을 새로 만들지 않고 재사용). 소유 쇼핑몰이 2개 이상일
+                   때만 ops-overview.js의 showCafe24State()가 hidden을 푼다. -->
+              <div class="opsdash-header-actions">
+                <label class="sr-only" for="opsStoreSelect">조회할 쇼핑몰 선택</label>
+                <select id="opsStoreSelect" hidden class="opsdash-store-select"></select>
+                <button type="button" class="btn btn-ghost btn-sm" id="opsdashRefreshBtn">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:.35rem; vertical-align:-2px;"><path d="M20 11A8 8 0 1 0 19 15"/><polyline points="20 4 20 11 13 11"/></svg>
+                  새로고침
+                </button>
+              </div>
             </div>
 
             <!-- 오늘 핵심 숫자 — 실제 Cafe24 주문/Meta 광고 데이터만 표시.

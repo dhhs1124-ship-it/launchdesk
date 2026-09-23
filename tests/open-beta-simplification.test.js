@@ -144,6 +144,41 @@ function makeEl(tag){
   };
   return el;
 }
+// 실제 <select>는 (1) option.selected를 세팅하면 다른 option은 자동으로
+// 해제되고 select.value가 그 값으로 동기화되며, (2) 아무 option도 selected가
+// 아닌 채로 새 option이 추가되면 그 option이 기본 선택이 된다(첫 옵션 기본
+// 선택). 일반 makeEl()은 이 동작이 전혀 없어 populateSelect()가 만드는
+// "조회 중인 쇼핑몰 = 선택값" 결과를 검증할 수 없으므로, #opsStoreSelect
+// 전용으로 이 최소한의 <select>/<option> 동기화만 얹는다.
+function makeSelectEl(){
+  const el = makeEl('select');
+  let currentValue = '';
+  Object.defineProperty(el, 'value', {
+    get(){ return currentValue; },
+    set(v){ currentValue = String(v); el.children.forEach((o) => { o._selected = (String(o.value) === currentValue); }); }
+  });
+  const originalAppendChild = el.appendChild.bind(el);
+  el.appendChild = function(opt){
+    // populateSelect()는 opt.selected=true를 appendChild보다 "먼저" 호출한다
+    // (실제 DOM 코드 그대로) — 그 시점엔 아직 아래 defineProperty가 없어 그냥
+    // 평범한 값이므로, 잃어버리지 않게 append 전에 미리 읽어 둔다.
+    const preSelected = !!opt.selected;
+    originalAppendChild(opt);
+    Object.defineProperty(opt, 'selected', {
+      configurable: true,
+      get(){ return !!opt._selected; },
+      set(v){
+        if (v) { el.children.forEach((o) => { o._selected = false; }); opt._selected = true; currentValue = String(opt.value); }
+        else { opt._selected = false; }
+      }
+    });
+    // 명시적으로 selected였던 옵션이 우선이고, 없으면 실제 <select>처럼 아직
+    // 아무 것도 선택 안 된 상태에서만 첫 옵션이 기본 선택된다.
+    if (preSelected || !el.children.some((o) => o._selected)) opt.selected = true;
+    return opt;
+  };
+  return el;
+}
 function makeDocument(){
   const byId = new Map();
   // tools.js는 document.querySelector(...)의 결과(mcRoot)를 null 체크 없이
@@ -153,7 +188,10 @@ function makeDocument(){
   // mcRadio()는 이미 그 null을 안전하게 처리한다).
   return {
     body: makeEl('body'), documentElement: makeEl('html'), activeElement: null,
-    getElementById(id){ if (!byId.has(id)) byId.set(id, makeEl('div')); return byId.get(id); },
+    getElementById(id){
+      if (!byId.has(id)) byId.set(id, id === 'opsStoreSelect' ? makeSelectEl() : makeEl('div'));
+      return byId.get(id);
+    },
     createElement(tag){ return makeEl(tag); },
     querySelector(){ return makeEl('div'); }, querySelectorAll(){ return []; },
     addEventListener(){}, removeEventListener(){}, dispatchEvent(){ return true; }
@@ -683,4 +721,450 @@ test('재로그인(다른 사용자 로그인) 시 이전 사용자의 운영 �
   assert.equal(snap.cafe24.storeName, null);
   assert.equal(snap.cafe24.today, null, 'u1의 주문 캐시가 u2 화면에 재사용되면 안 된다');
   assert.equal(snap.cafe24.state, 'not-connected'); // u2는 등록한 store가 없음
+});
+
+// ================================================== 3) 쇼핑몰 선택기(#opsStoreSelect) 복구
+// 리뷰 문제 1(선택기가 사라져 다중 쇼핑몰 사용자가 전환할 방법이 없음)과
+// 문제 2(전환 직후 스냅샷에 이전 쇼핑몰 값이 남을 수 있음)의 회귀 테스트.
+
+test('index.html: #opsStoreSelect에 접근 가능한 <label for>가 있다', () => {
+  assert.match(INDEX, /<label[^>]*for="opsStoreSelect"[^>]*>/);
+  // #/dashboard(#opsdash-header) 안에 있고, 새로고침 버튼과 함께 묶여 있는지
+  const dashHeaderStart = INDEX.indexOf('id="opsdashTitle"');
+  const dashHeaderEnd = INDEX.indexOf('opsdash-kpis', dashHeaderStart);
+  const header = INDEX.slice(dashHeaderStart, dashHeaderEnd);
+  assert.match(header, /id="opsStoreSelect"/);
+  assert.match(header, /id="opsdashRefreshBtn"/);
+});
+
+test('styles.css: 삭제된 #deskResume 전용 .desk-resume* 규칙이 없다', () => {
+  assert.doesNotMatch(CSS, /\.desk-resume\{/);
+  assert.doesNotMatch(CSS, /\.desk-resume-btn/);
+});
+
+test('ops-overview.js: 복구한 선택기와 무관한 #/tools 레거시 DOM(getElementById)을 더 이상 조회하지 않는다', () => {
+  ['opsGuestNotice', 'opsNoStoreNotice', 'opsDataWrap', 'opsTodayPayment', 'opsTodayCount',
+    'opsMonthPayment', 'opsMonthCount', 'opsLastSynced', 'metaOpsPanel', 'metaOpsNotConnected',
+    'metaOpsNotSelected', 'metaOpsLoading', 'metaOpsError', 'metaOpsErrorMsg', 'metaOpsRetryBtn',
+    'metaOpsDataWrap', 'metaOpsDebugInfo', 'metaTodaySpend'].forEach((id) => {
+    assert.doesNotMatch(OPS_OVERVIEW_SRC, new RegExp("getElementById\\('" + id + "'\\)"), id + '를 더 이상 조회하면 안 된다');
+  });
+  // 유일하게 살아있는 선택기만 그대로 조회한다
+  assert.match(OPS_OVERVIEW_SRC, /getElementById\('opsStoreSelect'\)/);
+});
+
+test('쇼핑몰 0개: 선택기는 숨김 상태다', async () => {
+  const env = await boot({ session: { user: { id: 'u1' } }, stores: [] });
+  await settle();
+  const select = env.doc.getElementById('opsStoreSelect');
+  assert.equal(select.hidden, true);
+});
+
+test('쇼핑몰 1개: 옵션은 1개지만 선택기는 숨김 상태다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [{ id: 1, name: '내 쇼핑몰', platform: 'cafe24', user_id: 'u1' }],
+    connectedAccounts: [{ store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null }],
+    orders: []
+  });
+  await settle();
+  const select = env.doc.getElementById('opsStoreSelect');
+  assert.equal(select.hidden, true);
+  assert.equal(select.children.length, 1);
+});
+
+test('쇼핑몰 2개: 선택기가 보이고, 조회 중인 쇼핑몰이 선택값에 정확히 반영된다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [
+      { id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' },
+      { id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }
+    ],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: null }
+    ],
+    orders: []
+  });
+  await settle();
+  const select = env.doc.getElementById('opsStoreSelect');
+  assert.equal(select.hidden, false);
+  assert.equal(select.children.length, 2);
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  const selectedOpt = select.children.find((o) => o.selected);
+  assert.ok(selectedOpt, '옵션 중 하나는 selected여야 한다');
+  assert.equal(selectedOpt.value, String(snap.storeId), '선택된 옵션 = 실제 조회 중인 storeId');
+});
+
+test('선택기로 A→B 전환하면 Cafe24 · Meta가 B 기준으로 갱신되고, B→A 복귀도 정상 동작한다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [
+      { id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' },
+      { id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }
+    ],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: null }
+    ],
+    orders: [
+      { store_id: 1, ordered_at: new Date().toISOString(), payment_amount: 11111 },
+      { store_id: 2, ordered_at: new Date().toISOString(), payment_amount: 22222 }
+    ]
+  });
+  await settle();
+  let snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '1');
+  assert.equal(snap.cafe24.today.payment, 11111);
+
+  const select = env.doc.getElementById('opsStoreSelect');
+  select.value = '2';
+  select.dispatch('change');
+  await settle();
+  snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2');
+  assert.equal(snap.cafe24.today.payment, 22222);
+  assert.equal(snap.cafe24.storeName, 'B상점');
+
+  select.value = '1';
+  select.dispatch('change');
+  await settle();
+  snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '1');
+  assert.equal(snap.cafe24.today.payment, 11111, 'B→A 복귀 후 A의 값으로 정확히 되돌아와야 한다');
+  assert.equal(snap.cafe24.storeName, 'A상점');
+});
+
+test('선택기로 전환하면 광고 세트 패널도 새로 선택한 쇼핑몰의 store_id로 조회된다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [
+      { id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' },
+      { id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }
+    ],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 1, provider: 'meta', id: 'mA', status: 'connected', external_account_id: 'act_A' },
+      { store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 2, provider: 'meta', id: 'mB', status: 'connected', external_account_id: 'act_B' }
+    ],
+    orders: [],
+    invokeResponses: {
+      'meta-insights': META_INSIGHTS_OK,
+      'meta-adset-insights': { data: { ok: true, campaigns: [] }, error: null }
+    }
+  });
+  await settle();
+  assert.equal(String(env.sandbox.launchdeskOpsSnapshot.getLatest().storeId), '1');
+
+  const select = env.doc.getElementById('opsStoreSelect');
+  select.value = '2';
+  select.dispatch('change');
+  await settle();
+
+  assert.equal(String(env.sandbox.launchdeskOpsSnapshot.getLatest().storeId), '2');
+  const adsetCall = env.supa.invokeCalls.filter((c) => c.name === 'meta-adset-insights').pop();
+  assert.ok(adsetCall, 'meta-adset-insights가 호출돼야 한다');
+  assert.equal(String(adsetCall.body.store_id), '2', '광고 세트 조회는 새로 선택한 쇼핑몰(B)의 store_id를 써야 한다');
+});
+
+test('B로 전환했는데 B가 Cafe24 미연결 + Meta 연결이면, Cafe24는 미연결로 Meta는 정상 데이터로 각각 독립 표시된다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [
+      { id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' },
+      { id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }
+    ],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      // store 2는 cafe24 connected_accounts 행이 아예 없다(미연결) — meta만 연결.
+      { store_id: 2, provider: 'meta', id: 'mB', status: 'connected', external_account_id: 'act_B' }
+    ],
+    orders: [{ store_id: 1, ordered_at: new Date().toISOString(), payment_amount: 11111 }],
+    invokeResponses: { 'meta-insights': META_INSIGHTS_OK }
+  });
+  await settle();
+
+  const select = env.doc.getElementById('opsStoreSelect');
+  select.value = '2';
+  select.dispatch('change');
+  await settle();
+
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2');
+  assert.equal(snap.cafe24.state, 'not-connected');
+  assert.equal(snap.meta.state, 'data');
+  assert.match(env.doc.getElementById('opsdashBriefList').innerHTML, /Cafe24를 연결하면/);
+  assert.equal(env.doc.getElementById('metaAdsetsPanel').hidden, false,
+    'Meta가 정상이면 Cafe24 미연결과 무관하게 광고 세트 패널이 보여야 한다');
+});
+
+test('A → B 전환 순간(비동기 응답 도착 전) 스냅샷에 A의 주문 · Meta 값이 전혀 남지 않는다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [
+      { id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' },
+      { id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }
+    ],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: '2026-09-20T00:00:00Z' },
+      { store_id: 1, provider: 'meta', id: 'mA', status: 'connected', external_account_id: 'act_A' },
+      { store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 2, provider: 'meta', id: 'mB', status: 'connected', external_account_id: 'act_B' }
+    ],
+    orders: [{ store_id: 1, ordered_at: new Date().toISOString(), payment_amount: 55555 }],
+    invokeResponses: { 'meta-insights': META_INSIGHTS_OK }
+  });
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.today.payment, 55555);
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().meta.state, 'data');
+
+  const seenAfterSwitch = [];
+  env.sandbox.launchdeskOpsSnapshot.subscribe((snap) => { seenAfterSwitch.push(snap); });
+  seenAfterSwitch.length = 0; // subscribe()가 즉시 돌려주는 전환 이전 값은 버린다
+
+  const select = env.doc.getElementById('opsStoreSelect');
+  select.value = '2';
+  select.dispatch('change'); // selectStore()는 전부 동기 코드라, 여기서 이미 loading 스냅샷이 publish된다
+
+  assert.ok(seenAfterSwitch.length > 0, '전환 직후 동기적으로 최소 1번은 publish돼야 한다');
+  seenAfterSwitch.forEach((snap) => {
+    assert.equal(String(snap.storeId), '2');
+    // renderOrderSummary(EMPTY_SUMMARY)가 만드는 "0건" 모양 자체는 정상이다
+    // (count 0이어도 그대로 'data'로 표현하는 기존 관례) — 여기서 확인할
+    // 것은 A의 실제 값(55555)이 하나도 안 섞였다는 점이다.
+    assert.equal(snap.cafe24.today.payment, 0, 'A의 주문 금액(55555)이 loading 스냅샷에 남아있으면 안 된다');
+    assert.equal(snap.cafe24.today.count, 0, 'A의 주문 건수가 loading 스냅샷에 남아있으면 안 된다');
+    assert.equal(snap.cafe24.lastSyncedAt, null, 'A의 동기화 시각이 loading 스냅샷에 남아있으면 안 된다');
+    assert.equal(snap.meta.today, null, 'A의 Meta 값이 loading 스냅샷에 남아있으면 안 된다');
+    assert.equal(snap.meta.accountName, null, 'A의 Meta 계정명이 loading 스냅샷에 남아있으면 안 된다');
+  });
+
+  await settle();
+  assert.equal(String(env.sandbox.launchdeskOpsSnapshot.getLatest().storeId), '2');
+});
+
+// 코드 리뷰 후속 수정 — 쇼핑몰 전환/재조회 시 "첫 publish 전에 Cafe24 · Meta
+// 상태를 함께 새 상황으로 맞춘다"(publishBothStates) 회귀 테스트. 위
+// "A → B 전환 순간..." 테스트는 today.payment 등 값만 확인해 통과했지만,
+// 그 값들은 clearStoreScopedData()가 먼저 지워서 이미 0/null이었을 뿐 —
+// state 필드 자체가 이전 쇼핑몰 값과 섞여 있어도 걸러내지 못했다. 아래
+// 두 테스트는 구독자가 받는 모든 스냅샷의 storeId · cafe24.state · meta.state
+// 세 필드가 항상 같은 시점 기준으로 일치하는지 직접 검사한다.
+test('쇼핑몰 전환 직후 구독자가 받는 모든 스냅샷은 storeId · cafe24.state · meta.state가 함께 새 쇼핑몰 기준이다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [
+      { id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' },
+      { id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }
+    ],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 1, provider: 'meta', id: 'mA', status: 'connected', external_account_id: 'act_A' },
+      { store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 2, provider: 'meta', id: 'mB', status: 'connected', external_account_id: 'act_B' }
+    ],
+    orders: [{ store_id: 1, ordered_at: new Date().toISOString(), payment_amount: 11111 }],
+    invokeResponses: { 'meta-insights': META_INSIGHTS_OK }
+  });
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.state, 'data');
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().meta.state, 'data');
+
+  const seen = [];
+  env.sandbox.launchdeskOpsSnapshot.subscribe((snap) => { seen.push(snap); });
+  seen.length = 0; // subscribe()가 즉시 돌려주는 전환 이전 값은 버린다
+
+  const select = env.doc.getElementById('opsStoreSelect');
+  select.value = '2';
+  select.dispatch('change'); // selectStore()는 동기 코드라, loading 스냅샷이 여기서 이미 publish된다
+
+  assert.ok(seen.length > 0, '전환 직후 동기적으로 최소 1번은 publish돼야 한다');
+  seen.forEach((snap) => {
+    assert.equal(String(snap.storeId), '2', 'storeId는 이미 새 쇼핑몰(B)이어야 한다');
+    assert.equal(snap.cafe24.state, 'loading', 'cafe24.state에 이전 쇼핑몰(A)의 값(data)이 섞여 있으면 안 된다');
+    assert.equal(snap.meta.state, 'loading', 'meta.state에 이전 쇼핑몰(A)의 값(data)이 섞여 있으면 안 된다');
+  });
+
+  await settle();
+});
+
+test('stores 재조회가 실패해도 구독자가 받는 모든 스냅샷에서 cafe24.state · meta.state가 항상 짝을 이뤄 발행된다', async () => {
+  const bootOpts = {
+    session: { user: { id: 'u1' } },
+    stores: [{ id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' }],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 1, provider: 'meta', id: 'mA', status: 'connected', external_account_id: 'act_A' }
+    ],
+    orders: [{ store_id: 1, ordered_at: new Date().toISOString(), payment_amount: 12345 }],
+    invokeResponses: { 'meta-insights': META_INSIGHTS_OK }
+  };
+  const env = await boot(bootOpts);
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.state, 'data');
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().meta.state, 'data');
+
+  const seen = [];
+  env.sandbox.launchdeskOpsSnapshot.subscribe((snap) => { seen.push(snap); });
+  seen.length = 0;
+
+  bootOpts.errorTables = ['stores']; // makeSupabase가 opts를 그대로 들고 있어, 다음 stores 조회부터 강제 실패한다
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+
+  assert.ok(seen.length > 0, '재조회 실패 후 최소 1번은 publish돼야 한다');
+  seen.forEach((snap) => {
+    assert.equal(snap.cafe24.state, 'error');
+    assert.equal(snap.meta.state, 'not-connected', 'cafe24가 error로 바뀐 스냅샷에 meta의 이전 값(data)이 남아있으면 안 된다');
+  });
+});
+
+// ---- 지연 응답(stale response) 재현용 테스트 전용 게이트 — 원본 makeSupabase()/
+// filterChain()은 손대지 않는다(다른 테스트에 영향 없음). sb.from('orders')·
+// sb.functions.invoke('meta-insights')를 감싸, 지정한 조건과 일치하는 호출만
+// gate.release()를 부를 때까지 응답을 미룬다 — "A 조회가 B 선택 후 늦게
+// 도착"을 실제 타이밍으로 재현한다.
+function deferred(){
+  let resolve;
+  const promise = new Promise((res) => { resolve = res; });
+  return { promise, resolve };
+}
+function gateOrdersFor(sb, targetStoreId){
+  const originalFrom = sb.from;
+  const gate = deferred();
+  sb.from = function(table){
+    const chain = originalFrom.call(sb, table);
+    if (table !== 'orders') return chain;
+    const originalEq = chain.eq;
+    const originalThen = chain.then;
+    const filters = {};
+    chain.eq = function(col, val){ filters[col] = val; return originalEq.call(chain, col, val); };
+    chain.then = function(res, rej){
+      if (String(filters.store_id) === String(targetStoreId)) {
+        return gate.promise.then(() => originalThen.call(chain, res, rej));
+      }
+      return originalThen.call(chain, res, rej);
+    };
+    return chain;
+  };
+  return { release: gate.resolve, restore(){ sb.from = originalFrom; } };
+}
+function gateMetaInsightsFor(sb, targetConnectedAccountId, lateResponse){
+  const originalInvoke = sb.functions.invoke;
+  const gate = deferred();
+  sb.functions.invoke = function(name, args){
+    const body = args && args.body;
+    if (name === 'meta-insights' && body && String(body.connected_account_id) === String(targetConnectedAccountId)) {
+      return gate.promise.then(() => lateResponse);
+    }
+    return originalInvoke.call(sb.functions, name, args);
+  };
+  return { release: gate.resolve, restore(){ sb.functions.invoke = originalInvoke; } };
+}
+
+test('쇼핑몰 전환 중 A의 Cafe24 주문 응답이 B 선택 후 늦게 도착해도 B 화면 · 스냅샷을 덮어쓰지 않는다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [
+      { id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' },
+      { id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }
+    ],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: null }
+    ],
+    orders: [
+      { store_id: 1, ordered_at: new Date().toISOString(), payment_amount: 11111 },
+      { store_id: 2, ordered_at: new Date().toISOString(), payment_amount: 22222 }
+    ]
+  });
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().storeId, 1);
+
+  const select = env.doc.getElementById('opsStoreSelect');
+  const gate = gateOrdersFor(env.sandbox.launchdeskSupabase, 1); // A(store 1)의 orders 응답을 붙든다
+
+  // A를 다시 선택 — 이번 orders 조회는 gate에 걸려 대기한다.
+  select.value = '1';
+  select.dispatch('change');
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.state, 'loading',
+    '아직 gate를 풀지 않았으니 loading 상태여야 한다');
+
+  // A 응답이 오기 전에 B로 전환 — B의 orders는 gate 대상이 아니라 정상 진행된다.
+  select.value = '2';
+  select.dispatch('change');
+  await settle();
+  let snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2');
+  assert.equal(snap.cafe24.state, 'data');
+  assert.equal(snap.cafe24.today.payment, 22222);
+
+  // 이제야 A의 늦은 응답이 도착한다 — seq가 이미 바뀌어 무시돼야 한다.
+  gate.release();
+  await settle();
+  snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2', 'A의 늦은 응답이 storeId를 되돌리면 안 된다');
+  assert.equal(snap.cafe24.today.payment, 22222, 'A의 늦은 응답이 B의 주문 값을 덮어쓰면 안 된다');
+  assert.equal(snap.cafe24.storeName, 'B상점');
+
+  gate.restore();
+});
+
+test('쇼핑몰 전환 중 A의 Meta 응답이 B 선택 후 늦게 도착해도 B 화면 · 스냅샷을 덮어쓰지 않는다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [
+      { id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' },
+      { id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }
+    ],
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 1, provider: 'meta', id: 'mA', status: 'connected', external_account_id: 'act_A' },
+      { store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: null },
+      { store_id: 2, provider: 'meta', id: 'mB', status: 'connected', external_account_id: 'act_B' }
+    ],
+    orders: [],
+    invokeResponses: { 'meta-insights': META_INSIGHTS_OK }
+  });
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().storeId, 1);
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().meta.state, 'data');
+
+  const select = env.doc.getElementById('opsStoreSelect');
+  // A의 늦은 응답이 "그래도" 도착했을 때 절대 보이면 안 되는, B와 뚜렷이 다른 값.
+  const lateAResponse = {
+    data: {
+      ok: true,
+      account: { name: 'Late A Ads', currency: 'USD', timezone_name: 'Asia/Seoul' },
+      today: { spend: 99999, purchase_value: 99999, purchase_count: 9, roas: 9, ctr: 9, cpc: 9, cpm: 9, purchase_basis: 'x' },
+      month: { spend: 99999, purchase_value: 99999, purchase_count: 9, roas: 9, ctr: 9, cpc: 9, cpm: 9, purchase_basis: 'x' },
+      queried_range: { month: { since: '2026-09-01', until: '2026-09-22' } }
+    },
+    error: null
+  };
+  const gate = gateMetaInsightsFor(env.sandbox.launchdeskSupabase, 'mA', lateAResponse);
+
+  select.value = '1';
+  select.dispatch('change');
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().meta.state, 'loading');
+
+  select.value = '2';
+  select.dispatch('change');
+  await settle();
+  let snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2');
+  assert.equal(snap.meta.state, 'data');
+  assert.notEqual(snap.meta.today.spend, 99999);
+
+  gate.release();
+  await settle();
+  snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2', 'A의 늦은 Meta 응답이 storeId를 되돌리면 안 된다');
+  assert.notEqual(snap.meta.today.spend, 99999, 'A의 늦은 Meta 응답 값이 B 화면에 반영되면 안 된다');
+  assert.notEqual(snap.meta.accountName, 'Late A Ads', 'A의 늦은 Meta 계정명이 B 화면에 반영되면 안 된다');
+
+  gate.restore();
 });
