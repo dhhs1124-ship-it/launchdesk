@@ -94,14 +94,14 @@
 <body>
 
 <div class="scrim" id="scrim"></div>
-<div class="lightbox" id="lightbox">
+<div class="lightbox" id="lightbox" inert aria-hidden="true">
   <div class="lightbox-inner">
     <img id="lightboxImg" src="" alt="">
     <button class="lightbox-close" id="lightboxClose" type="button" aria-label="닫기">✕</button>
   </div>
 </div>
 
-<div class="modal" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+<div class="modal" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle" inert aria-hidden="true">
   <div class="modal-backdrop" id="loginModalBackdrop"></div>
   <div class="modal-panel">
     <button class="modal-close" id="loginModalClose" type="button" aria-label="닫기">✕</button>
@@ -537,16 +537,16 @@
                   <span class="desk-step-text"><b>방향 정하기</b><small>상품 · 고객 · 예산</small></span>
                   <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
                 </a>
-                <a class="desk-step" href="#/start/sourcing">
-                  <span class="desk-step-num">02</span>
-                  <span class="desk-step-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5.5 9 2.5 3 5.5v7l6 3 6-3v-7Z"/><path d="M3 5.5 9 8.5l6-3"/><path d="M9 8.5v7"/></svg></span>
-                  <span class="desk-step-text"><b>상품과 가격 준비</b><small>공급처 · 원가 · 판매가</small></span>
-                  <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
-                </a>
                 <a class="desk-step" href="#/start/setup">
-                  <span class="desk-step-num">03</span>
+                  <span class="desk-step-num">02</span>
                   <span class="desk-step-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="16" height="11" rx="1.5"/><line x1="7" y1="17" x2="13" y2="17"/><line x1="10" y1="14" x2="10" y2="17"/></svg></span>
                   <span class="desk-step-text"><b>쇼핑몰과 판매 설정</b><small>상품 등록 · 결제 · 배송</small></span>
+                  <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
+                </a>
+                <a class="desk-step" href="#/start/sourcing">
+                  <span class="desk-step-num">03</span>
+                  <span class="desk-step-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5.5 9 2.5 3 5.5v7l6 3 6-3v-7Z"/><path d="M3 5.5 9 8.5l6-3"/><path d="M9 8.5v7"/></svg></span>
+                  <span class="desk-step-text"><b>상품과 가격 준비</b><small>공급처 · 원가 · 판매가</small></span>
                   <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
                 </a>
                 <a class="desk-step" href="#/start/orders">
@@ -3894,8 +3894,8 @@
 
       <!-- STEP 1: 플랜 선택 -->
       <div class="setup-step" data-step="1">
-        <div class="setup-plans">
-          <div class="setup-plan selected" data-plan="basic" data-price="79000" data-name="기본 쇼핑몰 세팅">
+        <div class="setup-plans" role="radiogroup" aria-label="플랜 선택">
+          <div class="setup-plan selected" data-plan="basic" data-price="79000" data-name="기본 쇼핑몰 세팅" role="radio" aria-checked="true" tabindex="0" aria-label="기본 쇼핑몰 세팅, ₩79,000">
             <div class="sp-icon">🛠️</div>
             <h3>기본 쇼핑몰 세팅</h3>
             <div class="sp-price">₩79,000</div>
@@ -3910,7 +3910,7 @@
             <p style="font-size:.78rem; color:var(--ink-faint); margin:.7rem 0 0;">별도 디자인 제작은 포함하지 않아요.</p>
             <div class="sp-picked">✓ 선택됨</div>
           </div>
-          <div class="setup-plan" data-plan="integration" data-price="129000" data-name="연동·추적 세팅">
+          <div class="setup-plan" data-plan="integration" data-price="129000" data-name="연동·추적 세팅" role="radio" aria-checked="false" tabindex="-1" aria-label="연동·추적 세팅, ₩129,000">
             <div class="sp-icon">🔗</div>
             <h3>연동·추적 세팅</h3>
             <div class="sp-price">₩129,000</div>
@@ -3924,7 +3924,7 @@
             <p style="font-size:.78rem; color:var(--ink-faint); margin:.7rem 0 0;">계정 생성 · 본인 인증 · 심사 · 계약은 직접 진행해 주세요.</p>
             <div class="sp-picked">✓ 선택됨</div>
           </div>
-          <div class="setup-plan" data-plan="full" data-price="189000" data-name="전체 초기 세팅">
+          <div class="setup-plan" data-plan="full" data-price="189000" data-name="전체 초기 세팅" role="radio" aria-checked="false" tabindex="-1" aria-label="전체 초기 세팅, ₩189,000">
             <span class="sp-tag full">전체</span>
             <div class="sp-icon">📦</div>
             <h3>전체 초기 세팅</h3>
@@ -4092,6 +4092,78 @@
           <p style="font-size:.78rem; color:var(--ink-faint); margin-top:1rem;">메일 앱이 안 열리면 <strong id="setupFallbackEmail">[이메일 주소]</strong>로 위 내용을 직접 보내주세요.</p>
           <button type="button" class="btn btn-ghost" id="setupRestart" style="margin-top:1.4rem;">처음으로 돌아가기</button>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VIEW: 이용 안내 ============ -->
+  <section class="view" id="view-guide" hidden>
+    <div class="content support-page">
+      <header class="support-head">
+        <span class="eyebrow">처음 오셨나요?</span>
+        <h1>런치데스크 이용 안내</h1>
+        <p>쇼핑몰 준비부터 운영 숫자 확인까지, 필요한 곳부터 시작하세요.</p>
+      </header>
+      <div class="support-grid">
+        <section class="support-card">
+          <span class="support-index">01</span>
+          <h2>로그인 없이 시작하기</h2>
+          <p>쇼핑몰 준비 순서를 살펴보고, 자료실의 가이드를 읽고, 마진 계산기에서 직접 계산해볼 수 있어요.</p>
+          <div class="support-actions">
+            <a href="#/start" class="support-link">쇼핑몰 준비 보기 →</a>
+            <a href="#/tools" class="support-link">마진 계산하기 →</a>
+          </div>
+        </section>
+        <section class="support-card">
+          <span class="support-index">02</span>
+          <h2>로그인 후 이어가기</h2>
+          <p>계산 기록과 실행 계획을 저장하고, 쇼핑몰을 등록해 운영 현황을 확인할 수 있어요. 주문과 광고 지표는 해당 계정을 직접 연결한 경우에 표시됩니다.</p>
+          <div class="support-actions">
+            <a href="#/login" class="support-link">로그인하기 →</a>
+            <a href="#/dashboard" class="support-link">운영 현황 보기 →</a>
+          </div>
+        </section>
+        <section class="support-card">
+          <span class="support-index">03</span>
+          <h2>질문이 생겼다면</h2>
+          <p>자료실에서 관련 설명을 찾아보고, 해결되지 않으면 이메일로 질문해주세요. 문의는 로그인하지 않아도 보낼 수 있어요.</p>
+          <div class="support-actions">
+            <a href="#/resources" class="support-link">자료실 보기 →</a>
+            <a href="#/contact" class="support-link">질문 보내기 →</a>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VIEW: 문의하기 ============ -->
+  <section class="view" id="view-contact" hidden>
+    <div class="content support-page">
+      <header class="support-head">
+        <span class="eyebrow">도움이 필요할 때</span>
+        <h1>질문과 문의</h1>
+        <p>쇼핑몰을 준비하며 막힌 점이나 런치데스크 이용 중 불편한 점을 이메일로 보내주세요.</p>
+      </header>
+      <div class="support-grid">
+        <section class="support-card">
+          <h2>초보 사장님 질문</h2>
+          <p>상품, 배송, 쇼핑몰 설정처럼 지금 막힌 부분을 알려주세요. 상황을 구체적으로 적어주시면 답변에 도움이 됩니다.</p>
+          <a class="btn btn-primary" href="mailto:dhhs1124@gmail.com?subject=%5BLaunchDesk%5D%20%EC%87%BC%ED%95%91%EB%AA%B0%20%EC%8B%9C%EC%9E%91%20%EC%A7%88%EB%AC%B8">질문 이메일 보내기</a>
+        </section>
+        <section class="support-card">
+          <h2>서비스 이용 문의</h2>
+          <p>오류가 난 화면 주소, 어떤 버튼을 눌렀는지, 나타난 메시지를 알려주세요. 비밀번호나 인증 코드는 보내지 마세요.</p>
+          <a class="btn btn-ghost" href="mailto:dhhs1124@gmail.com?subject=%5BLaunchDesk%5D%20%EC%84%9C%EB%B9%84%EC%8A%A4%20%EC%98%A4%EB%A5%98%20%EB%AC%B8%EC%9D%98">오류 문의 이메일 보내기</a>
+        </section>
+        <section class="support-card">
+          <h2>택배·도매 제휴 문의</h2>
+          <p>활동 지역과 제공 가능한 서비스, 공개 가능한 업체 정보를 알려주세요. 업체 정보는 확인과 동의를 거친 뒤 소개합니다.</p>
+          <a class="btn btn-ghost" href="mailto:dhhs1124@gmail.com?subject=%5BLaunchDesk%5D%20%ED%83%9D%EB%B0%B0%C2%B7%EB%8F%84%EB%A7%A4%20%EC%A0%9C%ED%9C%B4%20%EB%AC%B8%EC%9D%98">제휴 문의 이메일 보내기</a>
+        </section>
+      </div>
+      <div class="support-note">
+        <p>메일 앱이 열리지 않으면 <a href="mailto:dhhs1124@gmail.com">dhhs1124@gmail.com</a>으로 직접 보내주세요. 문의는 순서대로 확인합니다. 답변 내용은 개별 상황에 따라 달라질 수 있어요.</p>
+        <p>이메일 주소와 문의 내용은 회신을 위해 사용하며, 처리 방식은 <a href="#/privacy">개인정보처리방침</a>에서 확인할 수 있습니다.</p>
       </div>
     </div>
   </section>

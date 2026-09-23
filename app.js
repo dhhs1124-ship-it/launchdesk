@@ -31,6 +31,8 @@
     '/resources':     'view-resources',
     '/wholesale':     'view-wholesale',
     '/services/setup': 'view-services-setup',
+    '/guide':        'view-guide',
+    '/contact':      'view-contact',
     '/account':       'view-account',
     '/admin':         'view-admin',
     '/privacy':       'view-privacy',
@@ -144,9 +146,17 @@
   }
 
   function closeSidebar(){
+    // 실사용 테스트 P2#2 — 서랍이 실제로 열려 있었을 때만 배경을 다시 조작
+    // 가능하게 하고 햄버거 버튼으로 포커스를 돌린다. render()가 라우트
+    // 전환마다 이 함수를 무조건 호출하므로(위 참고), 이 가드가 없으면 서랍을
+    // 연 적 없는 일반 네비게이션에서도 포커스를 매번 햄버거 버튼으로
+    // 빼앗아 간다.
+    var wasOpen = sidebar.classList.contains('open');
     sidebar.classList.remove('open');
     scrim.classList.remove('show');
     navToggle.setAttribute('aria-expanded','false');
+    if(appMain){ appMain.inert = false; appMain.removeAttribute('aria-hidden'); }
+    if(wasOpen) navToggle.focus();
   }
 
   /* staggered entrance — 50ms per item, restarting the count inside
@@ -295,22 +305,44 @@
   var navToggle = document.getElementById('navToggle');
   var sidebar = document.getElementById('sidebar');
   var scrim = document.getElementById('scrim');
+  var sidebarClose = document.getElementById('sidebarClose');
+  // 서랍이 열려 있는 동안 배경(상단바 + 본문)을 inert로 막는다 — #opsdashRoot
+  // 게스트 게이트가 이미 쓰는 것과 같은 패턴(클릭 · Tab · 스크린리더 전부
+  // 차단, 네이티브 기능이라 포커스 트랩을 직접 구현할 필요가 없다). 실사용
+  // 테스트 P2#2: 서랍이 열려도 Tab이 배경 링크로 계속 새 나갔다.
+  var appMain = document.querySelector('.app-main');
   navToggle.addEventListener('click', function(){
     var open = sidebar.classList.toggle('open');
     scrim.classList.toggle('show', open);
     navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if(appMain){
+      if(open){ appMain.inert = true; appMain.setAttribute('aria-hidden', 'true'); }
+      else { appMain.inert = false; appMain.removeAttribute('aria-hidden'); }
+    }
+    if(open && sidebarClose) sidebarClose.focus(); // 서랍 진입 시 포커스를 안으로
   });
   scrim.addEventListener('click', closeSidebar);
   // 2026-09 UI 재설계 1차 — 서랍은 햄버거·스크림 외에 닫기 버튼·Escape·
   // 서랍 안 링크 클릭으로도 닫힌다(같은 경로 링크는 hashchange가 없어
   // render()의 closeSidebar()가 돌지 않으므로 여기서 직접 닫는다).
-  var sidebarClose = document.getElementById('sidebarClose');
   if(sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && sidebar.classList.contains('open')) closeSidebar();
   });
   sidebar.addEventListener('click', function(e){
     if(e.target.closest('a[href]')) closeSidebar();
+  });
+  // 하단 도움말 링크는 클릭 시 해시 경로를 명시적으로 갱신한다.
+  // 이미 보고 있는 경로를 다시 눌렀을 때도 화면을 갱신한다.
+  var sidebarHelpLinks = sidebar.querySelector('.sidebar-links');
+  if(sidebarHelpLinks) sidebarHelpLinks.addEventListener('click', function(e){
+    if(e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var link = e.target.closest('a[href^="#/"]');
+    if(!link || !sidebarHelpLinks.contains(link)) return;
+    e.preventDefault();
+    var href = link.getAttribute('href');
+    if(href.slice(1) === currentPath()) render();
+    else location.hash = href;
   });
   /* 같은 해시 경로 재클릭(2026-09 UI 재설계 2차) — 사이드바·본문의 내부 링크가
      지금 보고 있는 경로(#/dashboard 등)를 다시 가리키면 hashchange가 발생하지
@@ -333,14 +365,30 @@
   /* photo lightbox — event-delegated so it works across every view */
   var lightbox = document.getElementById('lightbox');
   var lightboxImg = document.getElementById('lightboxImg');
+  var lightboxCloseBtn = document.getElementById('lightboxClose');
+  // 실사용 테스트 P2#3 — .lightbox/.modal은 닫힌 상태에서 opacity:0 +
+  // pointer-events:none으로만 숨겨져 있었다(styles.css) — 둘 다 시각 ·
+  // 마우스만 막을 뿐 Tab 순서에서는 안 빠지므로, 닫힌 lightboxClose/
+  // loginModalClose가 그대로 Tab에 잡혔다. inert를 열림 상태에서만 떼서
+  // (#opsdashRoot 게스트 게이트와 동일한 패턴) Tab · 클릭 · 스크린리더 전부
+  // 막는다. 여는 요소로 포커스를 저장해뒀다가 닫을 때 그대로 되돌린다.
+  var lightboxOpener = null;
   function openLightbox(src, alt){
+    lightboxOpener = document.activeElement;
     lightboxImg.src = src;
     lightboxImg.alt = alt || '';
     lightbox.classList.add('open');
+    lightbox.inert = false;
+    lightbox.removeAttribute('aria-hidden');
+    if(lightboxCloseBtn) lightboxCloseBtn.focus();
   }
   function closeLightbox(){
     lightbox.classList.remove('open');
+    lightbox.inert = true;
+    lightbox.setAttribute('aria-hidden', 'true');
     lightboxImg.src = '';
+    if(lightboxOpener && typeof lightboxOpener.focus === 'function') lightboxOpener.focus();
+    lightboxOpener = null;
   }
   document.addEventListener('click', function(e){
     var chip = e.target.closest('.photo-chip');
@@ -401,7 +449,9 @@
     }
     if(PC) PC.clearSignupConsentError();
   }
+  var loginModalOpener = null;
   function openLoginModal(opts){
+    loginModalOpener = document.activeElement;
     loginMode = 'login';
     applyLoginModalMode();
     loginFormWrap.hidden = false;
@@ -416,6 +466,8 @@
       hintEl.hidden = !hint;
     }
     loginModal.classList.add('open');
+    loginModal.inert = false;
+    loginModal.removeAttribute('aria-hidden');
     document.getElementById('loginEmail').focus();
   }
   // 다른 독립 모듈(wholesalers.js 등)이 "로그인이 필요합니다" 상황에서
@@ -426,11 +478,15 @@
   window.launchdeskOpenLoginModal = openLoginModal;
   function closeLoginModal(){
     loginModal.classList.remove('open');
+    loginModal.inert = true;
+    loginModal.setAttribute('aria-hidden', 'true');
     loginForm.reset();
     // 동의 체크박스는 loginForm 밖에 있어(Google 버튼이 모드 구분 없이
     // 참조해야 하므로) 위 reset()이 닿지 않는다 — 항상 미체크로 다시
     // 열리도록 별도로 초기화한다(요구사항 1).
     if(window.launchdeskPolicyConsent) window.launchdeskPolicyConsent.resetSignupConsent();
+    if(loginModalOpener && typeof loginModalOpener.focus === 'function') loginModalOpener.focus();
+    loginModalOpener = null;
   }
   function showLoginNotice(message){
     loginNoticeText.textContent = message || '로그인 기능은 아직 준비 중이에요. 조금만 기다려주세요!';

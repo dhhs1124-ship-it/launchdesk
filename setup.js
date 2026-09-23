@@ -76,8 +76,19 @@
       setupSubmitError.hidden = true;
     }
 
-    function setupSelectPlan(planEl){
-      setupView.querySelectorAll('.setup-plan').forEach(function(p){ p.classList.toggle('selected', p === planEl); });
+    // role="radio" 카드형 플랜 3개 — 실사용 테스트 P2#1: 마우스 click 리스너만 있고
+    // 키보드로는 선택 자체가 불가능했다. 네이티브 라디오 그룹과 동일한 규약(roving
+    // tabindex: 선택된 카드만 tabindex=0, 나머지는 -1 · aria-checked로 선택 상태를
+    // 스크린리더에도 전달)으로 맞춘다 — 화면 표시(.selected)는 그대로 두고 그 위에
+    // 얹는다.
+    function setupSelectPlan(planEl, focusIt){
+      setupView.querySelectorAll('.setup-plan').forEach(function(p){
+        var isSel = (p === planEl);
+        p.classList.toggle('selected', isSel);
+        p.setAttribute('aria-checked', isSel ? 'true' : 'false');
+        p.setAttribute('tabindex', isSel ? '0' : '-1');
+      });
+      if(focusIt) planEl.focus();
       setupSelectedPlan = {
         key: planEl.getAttribute('data-plan'),
         name: planEl.getAttribute('data-name'),
@@ -89,10 +100,28 @@
     }
     // 기본 선택값(기본 쇼핑몰 세팅)을 실제 상태로도 반영
     var initialPlan = setupView.querySelector('.setup-plan.selected') || setupView.querySelector('.setup-plan');
-    if(initialPlan) setupSelectPlan(initialPlan);
+    if(initialPlan) setupSelectPlan(initialPlan, false);
 
-    setupView.querySelectorAll('.setup-plan').forEach(function(planEl){
-      planEl.addEventListener('click', function(){ setupSelectPlan(planEl); });
+    var setupPlanEls = setupView.querySelectorAll('.setup-plan');
+    setupPlanEls.forEach(function(planEl){
+      planEl.addEventListener('click', function(){ setupSelectPlan(planEl, false); });
+      // Enter/Space로 현재 포커스된 카드를 선택(네이티브 버튼과 동일한 활성화 키).
+      planEl.addEventListener('keydown', function(ev){
+        if(ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar'){
+          ev.preventDefault(); // Space의 페이지 스크롤 방지
+          setupSelectPlan(planEl, false);
+          return;
+        }
+        // 방향키 — 네이티브 라디오 그룹처럼 이동과 동시에 선택되고 포커스도 따라간다.
+        var idx = Array.prototype.indexOf.call(setupPlanEls, planEl);
+        var nextIdx = null;
+        if(ev.key === 'ArrowRight' || ev.key === 'ArrowDown') nextIdx = (idx + 1) % setupPlanEls.length;
+        else if(ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') nextIdx = (idx - 1 + setupPlanEls.length) % setupPlanEls.length;
+        if(nextIdx !== null){
+          ev.preventDefault();
+          setupSelectPlan(setupPlanEls[nextIdx], true);
+        }
+      });
     });
 
     var setupGoStep2 = document.getElementById('setupGoStep2');

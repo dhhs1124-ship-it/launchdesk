@@ -40,6 +40,7 @@ function makeEl(tag){
     offsetWidth: 0, offsetParent: null, parentElement: null, firstElementChild: null,
     getAttribute(n){ return Object.prototype.hasOwnProperty.call(this.attrs, n) ? this.attrs[n] : null; },
     setAttribute(n, v){ this.attrs[n] = String(v); },
+    removeAttribute(n){ delete this.attrs[n]; },
     hasAttribute(n){ return Object.prototype.hasOwnProperty.call(this.attrs, n); },
     addEventListener(type, fn){ (this.listeners[type] = this.listeners[type] || []).push(fn); },
     removeEventListener(type, fn){
@@ -54,7 +55,9 @@ function makeEl(tag){
     click(){ return this.dispatch('click'); },
     focus(){}, blur(){}, remove(){}, reset(){}, scrollIntoView(){},
     appendChild(c){ this.children.push(c); c.parentElement = this; return c; },
-    querySelector(){ return null; }, querySelectorAll(){ return []; }, closest(){ return null; }, matches(){ return false; }
+    querySelector(){ return null; }, querySelectorAll(){ return []; }, closest(){ return null; }, matches(){ return false; },
+    get inert(){ return this.hasAttribute('inert'); },
+    set inert(v){ if(v) this.setAttribute('inert', ''); else this.removeAttribute('inert'); }
   };
   el.classList = {
     add(c){ el.classes.add(c); }, remove(c){ el.classes.delete(c); }, contains(c){ return el.classes.has(c); },
