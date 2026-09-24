@@ -42,6 +42,9 @@
   // 줄도 바뀌지 않았다 — home-dashboard.js/meta-adsets.js가 이 스냅샷을
   // 그대로 구독한다.
   var storeSelect = document.getElementById('opsStoreSelect');
+  // 상단 기간 선택 규칙(기간 → KST 날짜 범위 · 동기화 범위 판단)은
+  // ops-period-core.js 순수 모듈에 있다(index.html에서 이 파일보다 먼저 로드).
+  var PC = window.launchdeskOpsPeriodCore;
 
   function client(){ return window.launchdeskSupabase || null; }
 
@@ -103,17 +106,61 @@
   var opsSnapshotListeners = [];
   var latestOpsSnapshot = null;
 
+  // ---------------------------------------------------- 상단 기간 선택 상태
+  // 기간은 보기 설정이라 쇼핑몰을 바꿔도 유지한다. 기간을 바꾸면 DB의
+  // 주문(orders)과 Meta 요약만 다시 읽고, Cafe24 주문 동기화는 하지 않는다
+  // (동기화는 새로고침 — refreshWithSync()에서만).
+  var period = { period: 'today', date: null };
+  var periodSeq = 0;           // 기간이 바뀔 때마다 증가 — 이전 기간의 늦은 응답을 버린다
+  var cafe24Connected = false; // 선택된 쇼핑몰의 Cafe24 연결 여부(주문 조회 실패와 구분)
+  var selectedOrders = null;   // 어제 · 날짜 선택 기간의 { payment, count } — 오늘/이번 달은 lastOrderSummary에서 계산
+  var selectedOrdersError = false;
+  var metaAccountId = null;    // 선택된 쇼핑몰의 Meta connected_accounts.id(기간 변경 재조회용)
+  var metaInflight = false;
+  var metaReqSeq = 0;
+  var metaPeriodKey = null;    // lastMetaPayload가 어느 기간으로 조회됐는지
+  var metaFetchedAt = null;    // Meta 요약을 마지막으로 받은 시각
+  // 선택된 쇼핑몰의 connected_accounts.orders_synced_from — cafe24-orders-sync가
+  // 기록한 "빠짐없이 동기화된 범위"의 시작일(null = 기록 없음). 기간별 주문을
+  // 0건으로 보여도 되는지는 이 기록과 last_synced_at으로만 판단한다.
+  var ordersSyncedFrom = null;
+  var syncingStoreId = null;
+  var syncError = null;        // { storeId, message }
+
+  function periodKey(p){ return p.period + (p.date ? ':' + p.date : ''); }
+
   function publishOpsSnapshot(){
     var store = myStores.filter(function(s){ return String(s.id) === String(selectedStoreId); })[0] || null;
+    var now = Date.now();
+    var range = PC.resolve(period.period, period.date, now);
+    function cov(r){ return PC.coverage(r, lastSyncedAt, ordersSyncedFrom); }
+    var todayOrders = lastOrderSummary ? { payment: lastOrderSummary.todayPayment, count: lastOrderSummary.todayCount, coverage: cov(PC.resolve('today', null, now)) } : null;
+    var monthOrders = lastOrderSummary ? { payment: lastOrderSummary.monthPayment, count: lastOrderSummary.monthCount, coverage: cov(PC.resolve('month', null, now)) } : null;
+    var selOrders = period.period === 'today' ? todayOrders
+      : period.period === 'month' ? monthOrders
+      : (selectedOrders ? { payment: selectedOrders.payment, count: selectedOrders.count, coverage: cov(range) } : null);
+    var metaSelected = null;
+    if(lastMetaPayload){
+      if(period.period === 'today') metaSelected = lastMetaPayload.today || null;
+      else if(period.period === 'month') metaSelected = lastMetaPayload.month || null;
+      else if(metaPeriodKey === periodKey(period)) metaSelected = lastMetaPayload.selected || null;
+    }
     latestOpsSnapshot = {
       authed: authed, // 로그인 여부 — cafe24/meta 상태와 무관하게 이 필드만 보고 판단할 것
       storeId: selectedStoreId, // 광고 세트 패널(meta-adsets.js)이 쇼핑몰 변경을 감지 · 조회할 때 쓴다
+      period: { period: period.period, date: period.date, label: range ? range.label : '', since: range ? range.since : null, until: range ? range.until : null },
       cafe24: {
         state: currentCafe24State, // 'guest'|'loading'|'not-connected'|'error'|'data'
         storeName: store ? store.name : null,
         lastSyncedAt: lastSyncedAt,
-        today: lastOrderSummary ? { payment: lastOrderSummary.todayPayment, count: lastOrderSummary.todayCount } : null,
-        month: lastOrderSummary ? { payment: lastOrderSummary.monthPayment, count: lastOrderSummary.monthCount } : null
+        today: todayOrders,
+        month: monthOrders,
+        // 상단 선택 기간의 주문 — null이면 아직 불러오는 중(또는 조회 실패: selectedError)
+        selected: selOrders,
+        selectedError: period.period !== 'today' && period.period !== 'month' && selectedOrdersError,
+        outsideSync: range ? PC.syncPlan(range, now, lastSyncedAt).outside : false,
+        syncing: !!selectedStoreId && syncingStoreId === selectedStoreId,
+        syncError: (syncError && syncError.storeId === selectedStoreId) ? syncError.message : null
       },
       meta: {
         state: currentMetaState, // 'not-connected'|'not-selected'|'reconnect-required'|'loading'|'error'|'data' — cafe24 상태와 무관하게 독립적으로 갱신됨
@@ -121,6 +168,10 @@
         accountName: (lastMetaPayload && lastMetaPayload.account) ? lastMetaPayload.account.name : null,
         today: lastMetaPayload ? lastMetaPayload.today : null,
         month: lastMetaPayload ? lastMetaPayload.month : null,
+        // 상단 선택 기간의 Meta 요약 — Meta 자체 귀속 기준(Cafe24 주문과 합산하지 않는다)
+        selected: metaSelected,
+        selectedLoading: !!lastMetaPayload && !metaSelected && metaInflight,
+        fetchedAt: metaFetchedAt,
         errorMessage: currentMetaState === 'error' ? lastMetaErrorMessage : null
       }
     };
@@ -136,8 +187,10 @@
     publishOpsSnapshot();
   }
 
-  function renderMetaData(payload){
+  function renderMetaData(payload, key){
     lastMetaPayload = payload;
+    metaPeriodKey = key;
+    metaFetchedAt = new Date().toISOString();
     lastMetaErrorMessage = null;
     showMetaState('data');
   }
@@ -161,12 +214,31 @@
     showMetaState('error');
   }
 
+  // 오늘 · 이번 달은 항상 함께 오고, 어제 · 날짜 선택일 때만 period/date를
+  // 실어 selected를 추가로 받는다. 응답이 오기 전에 기간이 또 바뀌었으면
+  // 그 응답은 쓰지 않고 지금 기간으로 한 번 더 조회한다(겹치는 요청은
+  // metaInflight로 하나만 둔다).
   function fetchMetaInsights(connectedAccountId, mySeq){
     var sb = client();
     if(!sb) return;
-    sb.functions.invoke('meta-insights', { body: { connected_account_id: connectedAccountId } })
+    var myPeriodSeq = periodSeq;
+    var key = periodKey(period);
+    var body = { connected_account_id: connectedAccountId };
+    if(period.period === 'yesterday' || period.period === 'date'){
+      body.period = period.period;
+      if(period.date) body.date = period.date;
+    }
+    var myReq = ++metaReqSeq;
+    metaInflight = true;
+    function settled(){
+      if(myReq === metaReqSeq) metaInflight = false; // 더 새 요청이 있으면 그 요청의 표시는 건드리지 않는다
+      if(mySeq !== seq) return false; // 그 사이 쇼핑몰 선택이 바뀌었으면 버림
+      if(myPeriodSeq !== periodSeq){ fetchMetaInsights(connectedAccountId, mySeq); return false; }
+      return true;
+    }
+    sb.functions.invoke('meta-insights', { body: body })
       .then(function(res){
-        if(mySeq !== seq) return; // 그 사이 쇼핑몰 선택이 바뀌었으면 버림
+        if(!settled()) return;
         if(res.error){
           return readInvokeErrorBody(res.error).then(function(bodyJson){
             if(mySeq !== seq) return;
@@ -178,10 +250,10 @@
           renderMetaError(data, null);
           return;
         }
-        renderMetaData(data);
+        renderMetaData(data, key);
       })
       .catch(function(err){
-        if(mySeq !== seq) return;
+        if(!settled()) return;
         console.warn('[launchdesk] meta-insights 호출 중 오류:', err && err.message);
         renderMetaError(null, null);
       });
@@ -216,6 +288,7 @@
           showMetaState(row.external_account_id ? 'reconnect-required' : 'not-selected');
           return;
         }
+        metaAccountId = row.id;
         fetchMetaInsights(row.id, mySeq);
       })
       .catch(function(err){
@@ -337,12 +410,53 @@
         });
         renderOrderSummary(summary);
         showCafe24State('data'); // count가 0이어도 그대로 'data' — "연결됨+0건"은 여기서 자연히 표현된다
+        loadSelectedOrders(storeId, mySeq);
       })
       .catch(function(err){
         if(mySeq !== seq) return;
         console.warn('[launchdesk] ops: orders 조회 중 오류:', err && err.message);
         renderOrderSummary(EMPTY_SUMMARY);
         showCafe24State('error');
+      });
+  }
+
+  // 상단 기간이 어제 · 날짜 선택일 때만 그 하루(KST)의 주문을 따로 읽는다
+  // (오늘 · 이번 달은 위 이번 달 조회 결과로 충분). DB에 저장된 주문만
+  // 읽고 동기화는 하지 않는다 — 그 날짜가 동기화된 범위인지는
+  // publishOpsSnapshot()이 coverage로 따로 표시한다(0건과 구분).
+  function loadSelectedOrders(storeId, mySeq){
+    selectedOrders = null;
+    selectedOrdersError = false;
+    if(period.period !== 'yesterday' && period.period !== 'date') return;
+    var sb = client();
+    var range = PC.resolve(period.period, period.date, Date.now());
+    if(!sb || !range) return;
+    var myPeriodSeq = periodSeq;
+    var bounds = PC.queryBounds(range);
+    sb.from('orders')
+      .select('store_id, ordered_at, payment_amount')
+      .eq('store_id', storeId)
+      .gte('ordered_at', bounds.gte)
+      .lt('ordered_at', bounds.lt)
+      .limit(5000)
+      .then(function(res){
+        if(mySeq !== seq || myPeriodSeq !== periodSeq) return; // 쇼핑몰·기간이 바뀐 뒤 늦게 온 응답
+        if(res.error){
+          console.warn('[launchdesk] ops: 선택 기간 orders 조회 실패:', res.error.message);
+          selectedOrdersError = true;
+          publishOpsSnapshot();
+          return;
+        }
+        var s = { payment: 0, count: 0 };
+        (res.data || []).forEach(function(r){ s.payment += r.payment_amount || 0; s.count += 1; });
+        selectedOrders = s;
+        publishOpsSnapshot();
+      })
+      .catch(function(err){
+        if(mySeq !== seq || myPeriodSeq !== periodSeq) return;
+        console.warn('[launchdesk] ops: 선택 기간 orders 조회 중 오류:', err && err.message);
+        selectedOrdersError = true;
+        publishOpsSnapshot();
       });
   }
 
@@ -354,7 +468,7 @@
     var sb = client();
     if(!sb) return;
     sb.from('connected_accounts')
-      .select('status, last_synced_at')
+      .select('status, last_synced_at, orders_synced_from')
       .eq('provider', 'cafe24')
       .eq('store_id', storeId)
       .maybeSingle()
@@ -372,7 +486,9 @@
           showCafe24State('not-connected');
           return;
         }
+        cafe24Connected = true;
         lastSyncedAt = row.last_synced_at;
+        ordersSyncedFrom = row.orders_synced_from || null;
         loadOrdersFor(storeId, mySeq); // 성공하면 그 안에서 showCafe24State('data')
       })
       .catch(function(err){
@@ -396,6 +512,13 @@
     lastSyncedAt = null;
     lastMetaPayload = null;
     lastMetaErrorMessage = null;
+    cafe24Connected = false;
+    ordersSyncedFrom = null;
+    selectedOrders = null;
+    selectedOrdersError = false;
+    metaAccountId = null;
+    metaPeriodKey = null;
+    metaFetchedAt = null;
   }
 
   function selectStore(storeId){
@@ -568,12 +691,71 @@
       };
     },
     getLatest: function(){ return latestOpsSnapshot; },
-    // 홈 대시보드의 "새로고침" 버튼 전용 — 이 파일이 이미 갖고 있는 재조회
-    // 함수를 그대로 다시 호출할 뿐, 별도 조회 로직을 새로 만들지 않는다.
+    // DB · Meta 재조회만(동기화 없음) — 화면 재진입 등에서 쓰는 기존 경로.
     refresh: function(){
       if(!currentUserId) return;
       seq += 1;
       loadUserStores(currentUserId, seq);
+    },
+    // 상단 기간 선택 — 저장된 주문과 Meta 요약만 다시 읽는다(주문 동기화 없음).
+    // 잘못된 기간 · 오늘 이후 날짜는 false.
+    setPeriod: function(p, d){
+      var range = PC.resolve(p, d, Date.now());
+      if(!range) return false;
+      if(p === period.period && (range.date || null) === (period.date || null)) return true;
+      period = { period: p, date: range.date || null };
+      periodSeq += 1;
+      if(selectedStoreId && cafe24Connected && currentCafe24State === 'data') loadSelectedOrders(selectedStoreId, seq);
+      else { selectedOrders = null; selectedOrdersError = false; }
+      // 요청이 진행 중이면 그 응답이 기간 불일치를 보고 지금 기간으로 다시 조회한다.
+      if(metaAccountId && !metaInflight) fetchMetaInsights(metaAccountId, seq);
+      publishOpsSnapshot();
+      return true;
+    },
+    // 운영 현황 "새로고침" — 선택된 쇼핑몰의 Cafe24 주문을 실제로 동기화한
+    // 뒤(성공·실패 모두) 주문 · Meta를 다시 조회한다. Cafe24가 연결돼 있지
+    // 않으면 재조회만 한다. 동기화 범위는 ops-period-core.js syncPlan() —
+    // 오늘 − 14일, 이번 달 1일, 선택 기간, 마지막 동기화 날짜 중 가장 이른
+    // 날부터 오늘까지. 동기화된 범위 기록(orders_synced_from)은 함수가 DB에
+    // 남기고, 이어지는 재조회가 그 값을 다시 읽는다(페이지를 닫아도 유지).
+    refreshWithSync: function(){
+      if(!currentUserId) return;
+      var storeId = selectedStoreId;
+      var sb = client();
+      if(!storeId || !cafe24Connected || !sb){ this.refresh(); return; }
+      if(syncingStoreId === storeId) return; // 같은 쇼핑몰 동기화가 이미 진행 중
+      var userAtStart = currentUserId;
+      var plan = PC.syncPlan(PC.resolve(period.period, period.date, Date.now()), Date.now(), lastSyncedAt);
+      syncingStoreId = storeId;
+      syncError = null;
+      publishOpsSnapshot();
+      function done(message){
+        if(syncingStoreId === storeId) syncingStoreId = null;
+        if(message) syncError = { storeId: storeId, message: message };
+        // 그 사이 로그아웃 · 계정 전환이면 아무것도 다시 부르지 않는다. 다른
+        // 쇼핑몰로 바꿨다면 그 쇼핑몰은 이미 새로 조회됐으므로 표시만 갱신한다.
+        if(currentUserId !== userAtStart) return;
+        if(selectedStoreId !== storeId){ publishOpsSnapshot(); return; }
+        seq += 1;
+        loadUserStores(currentUserId, seq);
+      }
+      sb.functions.invoke('cafe24-orders-sync', { body: { store_id: storeId, start_date: plan.start_date, end_date: plan.end_date } })
+        .then(function(res){
+          if(res.error){
+            return readInvokeErrorBody(res.error).then(function(body){
+              done(body && body.code === 'RECONNECT_REQUIRED'
+                ? 'Cafe24 인증이 만료됐어요. 내 쇼핑몰에서 다시 연결해주세요.'
+                : '주문 동기화에 실패했어요. 저장된 주문으로 표시합니다.');
+            });
+          }
+          var data = res.data;
+          if(!data || data.ok !== true){ done('주문 동기화에 실패했어요. 저장된 주문으로 표시합니다.'); return; }
+          done(null);
+        })
+        .catch(function(err){
+          console.warn('[launchdesk] ops: cafe24-orders-sync 호출 중 오류:', err && err.message);
+          done('주문 동기화에 실패했어요. 저장된 주문으로 표시합니다.');
+        });
     }
   };
 })();

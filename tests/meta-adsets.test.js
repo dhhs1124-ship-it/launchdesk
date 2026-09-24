@@ -737,17 +737,19 @@ test('호출 조건: 운영 현황 경로 · storeId · meta.state==="data"만 �
   assert.match(DOM_SRC, /snapshot\.storeId/);
   assert.match(DOM_SRC, /metaState === 'data'/);
   assert.doesNotMatch(DOM_SRC, /cafe24/i);
-  assert.match(DOM_SRC, /becameReady && isDashboardRoute\(\)/);
+  assert.match(DOM_SRC, /if\(ready && isDashboardRoute\(\)\)\{[\s\S]{0,200}if\(becameReady\)\{/);
   assert.match(DOM_SRC, /ctl\.sync\(storeId, authed\)/);
   assert.match(DOM_SRC, /launchdeskStore\.isAuthed\(\)/);
   assert.match(DOM_SRC, /functions\.invoke\('meta-adset-insights'/);
 });
 
-test('ops-overview.js: 스냅샷에 storeId만 추가됐고 Meta 조회 흐름은 그대로다', () => {
+test('ops-overview.js: 스냅샷에 storeId가 한 번만 있고, meta-insights는 connected_account_id(+어제·날짜 선택일 때만 period/date)로 부른다', () => {
   assert.match(OPS_SRC, /storeId: selectedStoreId,/);
   assert.equal((OPS_SRC.match(/storeId: selectedStoreId/g) || []).length, 1);
-  assert.match(OPS_SRC, /sb\.functions\.invoke\('meta-insights', \{ body: \{ connected_account_id: connectedAccountId \} \}\)/);
-  assert.doesNotMatch(OPS_SRC, /meta-adset-insights/); // 신규 함수 호출은 ops-overview가 하지 않는다
+  assert.match(OPS_SRC, /var body = \{ connected_account_id: connectedAccountId \};/);
+  assert.match(OPS_SRC, /if\(period\.period === 'yesterday' \|\| period\.period === 'date'\)\{\s*body\.period = period\.period;/);
+  assert.match(OPS_SRC, /sb\.functions\.invoke\('meta-insights', \{ body: body \}\)/);
+  assert.doesNotMatch(OPS_SRC, /meta-adset-insights/); // 광고 세트 조회는 ops-overview가 하지 않는다
 });
 
 test('index.html 스크립트 순서: ops-overview → core → 연결 파일 → 이후 기존 스크립트', () => {
@@ -765,10 +767,11 @@ test('index.html 패널 위치와 접근성 속성', () => {
   assert.ok(opsPanel > 0 && opsPanel < start && start < triple, [opsPanel, start, triple].join(','));
   const sec = INDEX.slice(start, INDEX.indexOf('</section>', start));
   assert.match(sec, /\bhidden\b/);
-  assert.match(sec, /role="group" aria-label="조회 기간"/);
-  assert.match(sec, /data-madsets-period="today" aria-pressed="true"/);
-  for (const p of ['yesterday', 'month', 'all']) assert.match(sec, new RegExp('data-madsets-period="' + p + '" aria-pressed="false"'));
-  assert.match(sec, /<span class="sr-only">날짜 선택\(하루\)<\/span><input type="date" id="metaAdsetsDate"/);
+  // 기간은 상단 운영 현황 기간을 따르고, "전체"만 이 패널에서 고른다(날짜 입력은 상단에만).
+  assert.match(sec, /role="group" aria-label="광고별 성과 조회 기간"/);
+  assert.match(sec, /data-madsets-scope="top" id="metaAdsetsScopeTop" aria-pressed="true"/);
+  assert.match(sec, /data-madsets-scope="all" aria-pressed="false">전체</);
+  assert.doesNotMatch(sec, /type="date"/);
   assert.match(sec, /id="metaAdsetsStatus" aria-live="polite"/);
   assert.match(sec, /id="metaAdsetsBody" aria-busy="true"/);
   assert.doesNotMatch(sec, /<table/i);
@@ -985,12 +988,17 @@ test('meta-adsets.js: localStorage/sessionStorage를 쓰지 않고, console 호�
   assert.doesNotMatch(DOM_SRC, /localStorage|sessionStorage|indexedDB/);
 });
 
-test('meta-adsets.js: 홈/#tools에서는 조회하지 않는다 — dashboard 경로 + becameReady 게이트를 ensureLinksLoaded도 그대로 쓴다', () => {
-  const idx = DOM_SRC.indexOf('if(becameReady && isDashboardRoute()){');
+test('meta-adsets.js: 홈/#tools에서는 조회하지 않는다 — dashboard 경로 게이트 안에서만 기간 적용, becameReady일 때만 목록 · ensureLinksLoaded', () => {
+  const idx = DOM_SRC.indexOf('if(ready && isDashboardRoute()){');
   assert.ok(idx > -1);
-  const block = DOM_SRC.slice(idx, DOM_SRC.indexOf('}', idx));
-  assert.match(block, /ctl\.ensureList\(\);/);
-  assert.match(block, /ensureLinksLoaded\(\);/);
+  const block = DOM_SRC.slice(idx, DOM_SRC.indexOf('render();', idx));
+  assert.match(block, /applyPeriod\(\);/);
+  assert.match(block, /if\(becameReady\)\{\s*ctl\.ensureList\(\);\s*ensureLinksLoaded\(\);/);
+});
+
+test('meta-adsets.js: 상단 기간이 바뀌면 "전체"를 풀고 그 기간을 따른다', () => {
+  assert.match(DOM_SRC, /if\(key !== lastTopKey\)\{ lastTopKey = key; allMode = false; \}/);
+  assert.match(DOM_SRC, /if\(allMode\) ctl\.setPeriod\('all'\);\s*else ctl\.setPeriod\(topPeriod\.period, topPeriod\.date\);/);
 });
 
 test('meta-adsets.js: 모달 열기/닫기에서 포커스를 저장·복원한다', () => {

@@ -717,6 +717,18 @@ test('기존 meta-insights/index.ts는 이번 작업으로 전혀 참조·수정
   assert.match(OLD_FN_SRC, /cpc: clicks > 0 \? spend \/ clicks : null/);
 });
 
+test('meta-insights: 선택 기간(어제 · 날짜)은 period가 있을 때만 추가 조회하고, 없으면 기존 응답 그대로다', () => {
+  // 구버전 화면(period 없음)과 호환 — today/month는 항상, selected는 선택 기간이 있을 때만
+  assert.match(OLD_FN_SRC, /const selectedRange = resolveSelectedRange\(body\?\.period, body\?\.date, todayStr\);/);
+  assert.match(OLD_FN_SRC, /\.\.\.\(selectedRange \? \{ selected: normalizePeriod\(selectedRow\) \} : \{\}\)/);
+  assert.match(OLD_FN_SRC, /: Promise\.resolve\(null\),/);
+  // today/month 외 기간 · 오늘 이후 · 37개월 밖 · 잘못된 형식은 Meta를 부르기 전에 거부
+  assert.match(OLD_FN_SRC, /if \(period !== "date"\) return null;/);
+  assert.match(OLD_FN_SRC, /code: "FUTURE_DATE"/);
+  assert.match(OLD_FN_SRC, /code: "DATE_TOO_OLD"/);
+  assert.match(OLD_FN_SRC, /code: "INVALID_DATE"/);
+});
+
 test('config.toml에 meta-adset-insights가 로그인 필수(verify_jwt=true)로 등록됐다', () => {
   const cfg = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'config.toml'), 'utf8');
   const idx = cfg.indexOf('[functions.meta-adset-insights]');

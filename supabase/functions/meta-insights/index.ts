@@ -86,6 +86,35 @@ function dateStringInTimeZone(date: Date, timeZone: string): string {
   }).format(date);
 }
 
+// 운영 현황 상단 기간(어제 · 날짜 선택 하루)을 광고계정 시간대의 오늘
+// 기준으로 계산한다. period가 없거나 today/month면 null(추가 조회 없음).
+// Meta Ad Account Insights 레퍼런스: time_range 시작일은 오늘부터 37개월
+// 이전으로 잡을 수 없다 — 경계 당일은 안전하게 제외한다.
+function resolveSelectedRange(
+  period: unknown,
+  date: unknown,
+  todayStr: string
+): { since: string; until: string } | { error: string; code: string } | null {
+  const shift = (ymd: string, months: number, days: number) => {
+    const [y, m, d] = ymd.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1 + months, d + days)).toISOString().slice(0, 10);
+  };
+  if (period === "yesterday") {
+    const y = shift(todayStr, 0, -1);
+    return { since: y, until: y };
+  }
+  if (period !== "date") return null;
+  const valid =
+    typeof date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+    shift(date, 0, 0) === date;
+  if (!valid) return { error: "조회 날짜는 YYYY-MM-DD 형식이어야 합니다.", code: "INVALID_DATE" };
+  const day = date as string;
+  if (day > todayStr) return { error: "오늘 이후 날짜는 조회할 수 없습니다.", code: "FUTURE_DATE" };
+  if (day < shift(todayStr, -37, 1)) return { error: "Meta는 최근 37개월 안의 날짜만 조회할 수 있습니다.", code: "DATE_TOO_OLD" };
+  return { since: day, until: day };
+}
+
 function monthStartStringInTimeZone(date: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -406,7 +435,15 @@ export default {
       const todayStr = dateStringInTimeZone(now, timezoneName);
       const monthStartStr = monthStartStringInTimeZone(now, timezoneName);
 
-      const [todayResult, monthResult] = await Promise.all([
+      // 4-1. (선택) 운영 현황 상단 기간 선택 — period='yesterday'|'date'일 때만
+      //      하루 범위를 한 번 더 조회해 selected로 돌려준다. 생략하면 기존과
+      //      똑같이 today/month만 응답한다(구버전 화면과 호환).
+      const selectedRange = resolveSelectedRange(body?.period, body?.date, todayStr);
+      if (selectedRange && "error" in selectedRange) {
+        return Response.json({ error: selectedRange.error, code: selectedRange.code }, { status: 400 });
+      }
+
+      const [todayResult, monthResult, selectedResult] = await Promise.all([
         fetchMetaJson(
           buildInsightsUrl(externalAccountId, todayStr, todayStr),
           accessToken
@@ -415,9 +452,16 @@ export default {
           buildInsightsUrl(externalAccountId, monthStartStr, todayStr),
           accessToken
         ),
+        selectedRange
+          ? fetchMetaJson(
+              buildInsightsUrl(externalAccountId, selectedRange.since, selectedRange.until),
+              accessToken
+            )
+          : Promise.resolve(null),
       ]);
 
-      for (const result of [todayResult, monthResult]) {
+      for (const result of [todayResult, monthResult, selectedResult]) {
+        if (result === null) continue;
         if (!result.ok) {
           if (result.network) return errorResponse("TEMPORARY_ERROR", 502);
           console.error(
@@ -438,6 +482,9 @@ export default {
       // 에러가 아니라 0 상태로 처리한다(요구사항 13-3).
       const todayRow = (todayResult as { ok: true; data: any }).data?.data?.[0] ?? null;
       const monthRow = (monthResult as { ok: true; data: any }).data?.data?.[0] ?? null;
+      const selectedRow = selectedResult
+        ? (selectedResult as { ok: true; data: any }).data?.data?.[0] ?? null
+        : null;
 
       return Response.json({
         ok: true,
@@ -449,9 +496,11 @@ export default {
         },
         today: normalizePeriod(todayRow),
         month: normalizePeriod(monthRow),
+        ...(selectedRange ? { selected: normalizePeriod(selectedRow) } : {}),
         queried_range: {
           today: { since: todayStr, until: todayStr },
           month: { since: monthStartStr, until: todayStr },
+          ...(selectedRange ? { selected: { since: selectedRange.since, until: selectedRange.until } } : {}),
         },
       });
     } catch (error) {

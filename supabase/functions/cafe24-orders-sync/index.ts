@@ -4,6 +4,7 @@ import {
   getValidCafe24AccessToken,
   cafe24TokenErrorStatus,
 } from "../_shared/cafe24-token.ts";
+import { nextOrdersSyncedFrom } from "../_shared/orders-sync-range.mjs";
 
 const API_VERSION = "2026-09-01";
 const PAGE_LIMIT = 1000;
@@ -159,7 +160,7 @@ export default {
       const { data: account, error: accountError } =
         await ctx.supabase
           .from("connected_accounts")
-          .select("id, external_account_id, status, last_synced_at")
+          .select("id, external_account_id, status, last_synced_at, orders_synced_from")
           .eq("store_id", store.id)
           .eq("provider", "cafe24")
           .eq("status", "connected")
@@ -367,12 +368,21 @@ export default {
       //    ~ 실제 마지막 동기화 시점 사이)의 신규/변경 주문을 다음 증분
       //    동기화가 건너뛰게 된다.
       const reachedToday = end_date === todayKst;
+      //    같은 시점에 "빠짐없이 동기화된 범위"의 시작일도 기록한다(운영 현황이
+      //    이 기록으로 기간별 주문이 채워졌는지 판단한다 — last_synced_at만으로
+      //    과거 범위를 추정하지 않기 위함). 이전 기록과 이어질 때만 합친다.
+      const ordersSyncedFrom = nextOrdersSyncedFrom(
+        account.orders_synced_from,
+        account.last_synced_at,
+        start_date
+      );
 
       if (reachedToday) {
         const { error: syncTimeError } = await ctx.supabaseAdmin
           .from("connected_accounts")
           .update({
             last_synced_at: now.toISOString(),
+            orders_synced_from: ordersSyncedFrom,
             updated_at: new Date().toISOString(),
           })
           .eq("id", account.id);

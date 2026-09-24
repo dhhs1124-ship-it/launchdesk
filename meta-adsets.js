@@ -37,8 +37,13 @@
   var statusEl = document.getElementById('metaAdsetsStatus');
   var refreshBtn = document.getElementById('metaAdsetsRefresh');
   var globalRefreshBtn = document.getElementById('opsdashRefreshBtn');
-  var periodBtns = panel ? panel.querySelectorAll('[data-madsets-period]') : [];
-  var dateInput = document.getElementById('metaAdsetsDate');
+  // 기간은 운영 현황 상단 기간(스냅샷 period)을 따른다. "전체"만 이 패널에서
+  // 따로 고를 수 있고(allMode), 상단 기간을 다시 바꾸면 그 기간으로 돌아온다.
+  var scopeBtns = panel ? panel.querySelectorAll('[data-madsets-scope]') : [];
+  var scopeTopBtn = document.getElementById('metaAdsetsScopeTop');
+  var allMode = false;
+  var topPeriod = { period: 'today', date: null, label: '오늘' };
+  var lastTopKey = null;
   if(!Core || !MarginCore || !panel || !bodyEl || !window.launchdeskOpsSnapshot){ return; }
 
   var toastStack = document.getElementById('toastStack');
@@ -198,15 +203,11 @@
     var view = ctl.getView();
     view.links = buildLinksView(view);
 
-    Array.prototype.forEach.call(periodBtns, function(btn){
-      btn.setAttribute('aria-pressed', btn.getAttribute('data-madsets-period') === view.period ? 'true' : 'false');
+    Array.prototype.forEach.call(scopeBtns, function(btn){
+      var isAll = btn.getAttribute('data-madsets-scope') === 'all';
+      btn.setAttribute('aria-pressed', (isAll === allMode) ? 'true' : 'false');
     });
-    if(dateInput){
-      // 쇼핑몰 전환 등으로 기간이 초기화되면 입력칸도 비운다(이전 날짜가 남지 않게).
-      var picked = view.period === 'date' ? view.date : '';
-      if(dateInput.value !== picked) dateInput.value = picked;
-      dateInput.classList.toggle('is-active', view.period === 'date');
-    }
+    if(scopeTopBtn && scopeTopBtn.textContent !== topPeriod.label) scopeTopBtn.textContent = topPeriod.label;
     bodyEl.setAttribute('aria-busy', (view.status === 'ready' || view.status === 'error') ? 'false' : 'true');
     if(statusEl){
       var text = Core.statusText(view);
@@ -390,38 +391,37 @@
     ctl.sync(storeId, authed);
     var linksChanged = syncLinksStore(storeId, authed);
     if(linksChanged) closeLinkModal(); // 다른 쇼핑몰의 광고 세트를 대상으로 열려 있던 모달을 남기지 않는다
+    // 상단 기간이 바뀌면 "전체"를 풀고 그 기간을 따른다.
+    var p = snapshot && snapshot.period;
+    if(p && p.period){
+      var key = p.period + (p.date ? ':' + p.date : '');
+      if(key !== lastTopKey){ lastTopKey = key; allMode = false; }
+      topPeriod = { period: p.period, date: p.date || null, label: p.label || '' };
+    }
     panel.hidden = !ready;
     var becameReady = ready && !wasReady;
     wasReady = ready;
-    if(becameReady && isDashboardRoute()){
-      ctl.ensureList();
-      ensureLinksLoaded();
+    if(ready && isDashboardRoute()){
+      applyPeriod(); // 바뀐 경우에만 조회(core setPeriod는 같은 기간이면 아무것도 하지 않는다)
+      if(becameReady){
+        ctl.ensureList();
+        ensureLinksLoaded();
+      }
     }
     render();
   }
 
-  Array.prototype.forEach.call(periodBtns, function(btn){
-    btn.addEventListener('click', function(){ ctl.setPeriod(btn.getAttribute('data-madsets-period')); });
-  });
-  if(dateInput){
-    function syncDateBounds(){
-      dateInput.max = Core.localDateString(Date.now());
-      dateInput.min = Core.earliestDateString(Date.now());
-    }
-    syncDateBounds();
-    dateInput.addEventListener('focus', syncDateBounds); // 자정을 넘겨 열어 둔 화면 대비
-    dateInput.addEventListener('change', function(){
-      var v = dateInput.value;
-      if(!v) return;
-      if(v > dateInput.max || v < dateInput.min){
-        // 직접 입력으로 범위를 벗어난 경우 — 조회하지 않고 이유를 알린다.
-        showToast(v > dateInput.max ? '오늘 이후 날짜는 조회할 수 없어요.' : 'Meta는 최근 37개월 안의 날짜만 조회할 수 있어요.', 'error');
-        render();
-        return;
-      }
-      ctl.setPeriod('date', v);
-    });
+  function applyPeriod(){
+    if(allMode) ctl.setPeriod('all');
+    else ctl.setPeriod(topPeriod.period, topPeriod.date);
   }
+  Array.prototype.forEach.call(scopeBtns, function(btn){
+    btn.addEventListener('click', function(){
+      allMode = btn.getAttribute('data-madsets-scope') === 'all';
+      applyPeriod();
+      render();
+    });
+  });
   if(refreshBtn){
     refreshBtn.addEventListener('click', function(){ ctl.refresh(); });
   }

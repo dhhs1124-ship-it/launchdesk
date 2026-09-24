@@ -663,6 +663,15 @@
               <div class="opsdash-header-actions">
                 <label class="sr-only" for="opsStoreSelect">조회할 쇼핑몰 선택</label>
                 <select id="opsStoreSelect" hidden class="opsdash-store-select"></select>
+                <!-- 상단 기간 — Cafe24 주문 카드 · Meta 광고 수치 · 광고별 성과에 함께 적용.
+                     바꿀 때는 저장된 주문 · Meta 요약만 다시 읽고 주문 동기화는 하지 않는다
+                     (동기화는 새로고침에서만). "전체"는 광고별 성과 패널에만 있다. -->
+                <div class="madsets-period opsdash-period" role="group" aria-label="운영 현황 조회 기간">
+                  <button type="button" class="madsets-period-btn" data-ops-period="today" aria-pressed="true">오늘</button>
+                  <button type="button" class="madsets-period-btn" data-ops-period="yesterday" aria-pressed="false">어제</button>
+                  <button type="button" class="madsets-period-btn" data-ops-period="month" aria-pressed="false">이번 달</button>
+                  <label class="madsets-date"><span class="sr-only">날짜 선택(하루)</span><input type="date" id="opsdashPeriodDate" class="madsets-date-input"></label>
+                </div>
                 <button type="button" class="btn btn-ghost btn-sm" id="opsdashRefreshBtn">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:.35rem; vertical-align:-2px;"><path d="M20 11A8 8 0 1 0 19 15"/><polyline points="20 4 20 11 13 11"/></svg>
                   새로고침
@@ -670,26 +679,27 @@
               </div>
             </div>
 
-            <!-- 오늘 핵심 숫자 — 실제 Cafe24 주문/Meta 광고 데이터만 표시.
+            <!-- 선택 기간 핵심 숫자 — 실제 Cafe24 주문/Meta 광고 데이터만 표시.
+                 라벨의 기간 · 안내 문구(동기화 범위 · 기준 · 시각)는 home-dashboard.js가 채운다.
                  가짜 증감률(▲12% 등)은 절대 넣지 않는다(요구사항 6).
                  Cafe24 두 칸은 ops-overview.js loadOrdersFor()가 orders를 주문일 기준으로
                  상태 구분 없이(취소·환불·미입금 포함) 세고 payment_amount를 더한 값이라
                  "매출"·"결제 완료"라고 부르지 않는다. Meta 광고매출·구매와 합치지 않는다. -->
             <div class="opsdash-kpis" id="opsdashKpis">
               <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Cafe24 오늘 주문</div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-</div><div class="opsdash-kpi-note">취소·환불·미입금 주문 포함</div></div>
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label" id="opsdashKpiOrdersLabel">Cafe24 주문 · 오늘</div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-</div><div class="opsdash-kpi-note" id="opsdashKpiOrdersNote">취소·환불·미입금 주문 포함</div></div>
                 <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.68 12.39A2 2 0 0 0 9.64 18H18a2 2 0 0 0 1.95-1.57L21 9H6"/><circle cx="9.5" cy="20.5" r="1"/><circle cx="17.5" cy="20.5" r="1"/></svg></div>
               </div>
               <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Cafe24 오늘 주문금액</div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-</div><div class="opsdash-kpi-note">주문별 결제금액 합계 · 취소·환불 미차감</div></div>
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label" id="opsdashKpiPaymentLabel">Cafe24 주문금액 · 오늘</div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-</div><div class="opsdash-kpi-note" id="opsdashKpiPaymentNote">주문별 결제금액 합계 · 취소·환불 미차감</div></div>
                 <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
               </div>
               <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Meta 오늘 광고비</div><div class="opsdash-kpi-value" id="opsdashKpiSpend">-</div></div>
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label" id="opsdashKpiSpendLabel">Meta 광고비 · 오늘</div><div class="opsdash-kpi-value" id="opsdashKpiSpend">-</div><div class="opsdash-kpi-note" id="opsdashKpiSpendNote"></div></div>
                 <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg></div>
               </div>
               <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Meta 오늘 ROAS</div><div class="opsdash-kpi-value" id="opsdashKpiRoas">-</div><div class="opsdash-kpi-note" id="opsdashKpiRoasNote"></div></div>
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label" id="opsdashKpiRoasLabel">Meta ROAS · 오늘</div><div class="opsdash-kpi-value" id="opsdashKpiRoas">-</div><div class="opsdash-kpi-note" id="opsdashKpiRoasNote"></div></div>
                 <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg></div>
               </div>
             </div>
@@ -726,13 +736,11 @@
               <div class="dash-panel-head madsets-head">
                 <h2 class="madsets-title" id="metaAdsetsTitle">광고별 성과 보기</h2>
                 <div class="madsets-controls">
-                  <div class="madsets-period" role="group" aria-label="조회 기간">
-                    <button type="button" class="madsets-period-btn" data-madsets-period="today" aria-pressed="true">오늘</button>
-                    <button type="button" class="madsets-period-btn" data-madsets-period="yesterday" aria-pressed="false">어제</button>
-                    <button type="button" class="madsets-period-btn" data-madsets-period="month" aria-pressed="false">이번 달</button>
-                    <button type="button" class="madsets-period-btn" data-madsets-period="all" aria-pressed="false">전체</button>
-                    <!-- 하루 단위 날짜 선택 — max(오늘) · min(Meta 37개월 조회 한도)은 meta-adsets.js가 채운다. -->
-                    <label class="madsets-date"><span class="sr-only">날짜 선택(하루)</span><input type="date" id="metaAdsetsDate" class="madsets-date-input"></label>
+                  <!-- 기간은 상단 운영 현황 기간을 따른다. "전체"(조회 가능한 전체 기간)는
+                       이 패널에서만 고를 수 있고 Cafe24 · 상단 Meta 수치에는 적용되지 않는다. -->
+                  <div class="madsets-period" role="group" aria-label="광고별 성과 조회 기간">
+                    <button type="button" class="madsets-period-btn" data-madsets-scope="top" id="metaAdsetsScopeTop" aria-pressed="true">오늘</button>
+                    <button type="button" class="madsets-period-btn" data-madsets-scope="all" aria-pressed="false">전체</button>
                   </div>
                   <button type="button" class="btn btn-ghost btn-sm madsets-refresh" id="metaAdsetsRefresh">새로고침</button>
                 </div>
@@ -4768,6 +4776,7 @@
 <script src="tools.js"></script>
 <script src="setup.js"></script>
 <script src="stores.js"></script>
+<script src="ops-period-core.js"></script>
 <script src="ops-overview.js"></script>
 <script src="meta-adsets-core.js"></script>
 <script src="meta-margin-core.js"></script>

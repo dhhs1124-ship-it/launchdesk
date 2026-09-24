@@ -34,6 +34,17 @@
   var kpiSpendEl = document.getElementById('opsdashKpiSpend');
   var kpiRoasEl = document.getElementById('opsdashKpiRoas');
   var kpiRoasNoteEl = document.getElementById('opsdashKpiRoasNote');
+  var kpiOrdersLabelEl = document.getElementById('opsdashKpiOrdersLabel');
+  var kpiPaymentLabelEl = document.getElementById('opsdashKpiPaymentLabel');
+  var kpiSpendLabelEl = document.getElementById('opsdashKpiSpendLabel');
+  var kpiRoasLabelEl = document.getElementById('opsdashKpiRoasLabel');
+  var kpiOrdersNoteEl = document.getElementById('opsdashKpiOrdersNote');
+  var kpiPaymentNoteEl = document.getElementById('opsdashKpiPaymentNote');
+  var kpiSpendNoteEl = document.getElementById('opsdashKpiSpendNote');
+  var periodDateEl = document.getElementById('opsdashPeriodDate');
+  var periodBtns = root.querySelectorAll ? root.querySelectorAll('[data-ops-period]') : [];
+  var PC = window.launchdeskOpsPeriodCore;
+  var AdsCore = window.launchdeskMetaAdsetsCore; // 날짜 입력 하한(Meta 37개월) 계산 재사용
   var briefListEl = document.getElementById('opsdashBriefList');
   var adStateEl = document.getElementById('opsdashAdState');
   var monthSummaryEl = document.getElementById('opsdashMonthSummary');
@@ -72,29 +83,95 @@
     return '광고비 ' + perUnit + '당 약 ' + formatMetaMoney(x, currency) + '의 Meta 광고매출';
   }
 
+  // 한국시간 "MM.DD HH:MM" — 동기화 · 조회 시각 표시용.
+  function formatKstTime(iso){
+    var ms = iso ? Date.parse(iso) : NaN;
+    if(isNaN(ms)) return '';
+    var s = new Date(ms + 9 * 60 * 60 * 1000).toISOString();
+    return s.slice(5, 7) + '.' + s.slice(8, 10) + ' ' + s.slice(11, 16);
+  }
+
   // ---------------------------------------------------------------- 헤더
+  function periodLabelOf(snapshot){ return (snapshot.period && snapshot.period.label) || '오늘'; }
   function renderHeader(snapshot){
     if(!subtitleEl) return;
     var storeName = snapshot.cafe24.storeName;
-    subtitleEl.textContent = storeName
-      ? (storeName + ' · 오늘 쇼핑몰과 광고 상태를 한눈에 확인하세요.')
-      : '오늘 쇼핑몰과 광고 상태를 한눈에 확인하세요.';
+    var text = periodLabelOf(snapshot) + ' 기준 쇼핑몰과 광고 상태를 확인하세요.';
+    subtitleEl.textContent = storeName ? (storeName + ' · ' + text) : text;
+  }
+
+  // ------------------------------------------------------- 상단 기간 선택
+  function renderPeriodControls(snapshot){
+    var p = snapshot.period || { period: 'today' };
+    Array.prototype.forEach.call(periodBtns, function(btn){
+      btn.setAttribute('aria-pressed', btn.getAttribute('data-ops-period') === p.period ? 'true' : 'false');
+    });
+    if(periodDateEl){
+      var picked = p.period === 'date' ? (p.date || '') : '';
+      if(periodDateEl.value !== picked) periodDateEl.value = picked;
+      periodDateEl.classList.toggle('is-active', p.period === 'date');
+    }
+    if(refreshBtn){
+      var syncing = !!snapshot.cafe24.syncing;
+      refreshBtn.disabled = syncing;
+      refreshBtn.setAttribute('aria-busy', syncing ? 'true' : 'false');
+    }
+  }
+  function syncDateBounds(){
+    if(!periodDateEl) return;
+    periodDateEl.max = PC ? PC.kstDate(Date.now()) : '';
+    if(AdsCore) periodDateEl.min = AdsCore.earliestDateString(Date.now());
   }
 
   // ------------------------------------------------------------ KPI 4개
+  // Cafe24 카드: 선택 기간이 동기화된 범위인지(coverage)에 따라 숫자 대신
+  // "확인 전"을 보여준다 — 동기화되지 않은 날짜를 0건으로 보이지 않게 한다.
+  function cafe24CoverageNote(cafe24){
+    if(cafe24.syncing) return '주문 동기화 중…';
+    if(cafe24.syncError) return cafe24.syncError;
+    var sel = cafe24.selected;
+    var at = formatKstTime(cafe24.lastSyncedAt);
+    if(cafe24.outsideSync) return '최근 3개월보다 오래된 날짜는 주문을 동기화하지 않아요.';
+    if(!sel) return cafe24.selectedError ? '이 기간 주문을 불러오지 못했어요.' : '불러오는 중…';
+    if(sel.coverage === 'none') return at ? ('이 기간 주문은 아직 동기화 전이에요(마지막 동기화 ' + at + '). 새로고침하면 동기화해요.') : '아직 주문을 동기화한 적이 없어요. 새로고침하면 동기화해요.';
+    if(sel.coverage === 'unknown') return '이 기간 일부가 동기화됐는지 확인되지 않았어요. 새로고침하면 이 기간까지 동기화해요.';
+    if(sel.coverage === 'partial') return '마지막 동기화 ' + at + '까지 · 취소·환불·미입금 포함';
+    return '취소·환불·미입금 포함 · 동기화 ' + at;
+  }
+  function cafe24Value(cafe24, fmt){
+    if(cafe24.state !== 'data') return '-';
+    var sel = cafe24.selected;
+    if(!sel || cafe24.outsideSync) return '-';
+    if(sel.coverage === 'none' || sel.coverage === 'unknown') return '확인 전';
+    return fmt(sel);
+  }
   function renderKpis(snapshot){
     var cafe24 = snapshot.cafe24;
     var meta = snapshot.meta;
+    var label = periodLabelOf(snapshot);
 
-    if(kpiOrdersEl) kpiOrdersEl.textContent = (cafe24.state === 'data' && cafe24.today) ? formatCount(cafe24.today.count) : '-';
-    if(kpiPaymentEl) kpiPaymentEl.textContent = (cafe24.state === 'data' && cafe24.today) ? formatWon(cafe24.today.payment) : '-';
+    if(kpiOrdersLabelEl) kpiOrdersLabelEl.textContent = 'Cafe24 주문 · ' + label;
+    if(kpiPaymentLabelEl) kpiPaymentLabelEl.textContent = 'Cafe24 주문금액 · ' + label;
+    if(kpiSpendLabelEl) kpiSpendLabelEl.textContent = 'Meta 광고비 · ' + label;
+    if(kpiRoasLabelEl) kpiRoasLabelEl.textContent = 'Meta ROAS · ' + label;
+
+    if(kpiOrdersEl) kpiOrdersEl.textContent = cafe24Value(cafe24, function(s){ return formatCount(s.count); });
+    if(kpiPaymentEl) kpiPaymentEl.textContent = cafe24Value(cafe24, function(s){ return formatWon(s.payment); });
+    if(kpiOrdersNoteEl) kpiOrdersNoteEl.textContent = cafe24.state === 'data' ? cafe24CoverageNote(cafe24) : '취소·환불·미입금 주문 포함';
+    if(kpiPaymentNoteEl) kpiPaymentNoteEl.textContent = '주문별 결제금액 합계 · 취소·환불 미차감';
 
     // Meta KPI는 Cafe24 상태와 무관하다 — Cafe24만 연결 해제된 store도
-    // Meta 연동은 그대로 남아있을 수 있다(요구사항).
-    var metaReady = meta.state === 'data' && meta.today;
-    if(kpiSpendEl) kpiSpendEl.textContent = metaReady ? formatMetaMoney(meta.today.spend, meta.currency) : '-';
-    if(kpiRoasEl) kpiRoasEl.textContent = metaReady ? formatRoasPercent(meta.today.roas) : '-';
-    if(kpiRoasNoteEl) kpiRoasNoteEl.textContent = metaReady ? formatRoasNote(meta.today.roas, meta.currency) : '';
+    // Meta 연동은 그대로 남아있을 수 있다(요구사항). Meta 광고매출은 Meta
+    // 자체 귀속 기준이라 Cafe24 주문금액과 합산하지 않는다.
+    var sel = meta.state === 'data' ? meta.selected : null;
+    if(kpiSpendEl) kpiSpendEl.textContent = sel ? formatMetaMoney(sel.spend, meta.currency) : (meta.selectedLoading ? '…' : '-');
+    if(kpiRoasEl) kpiRoasEl.textContent = sel ? formatRoasPercent(sel.roas) : (meta.selectedLoading ? '…' : '-');
+    if(kpiRoasNoteEl) kpiRoasNoteEl.textContent = sel ? formatRoasNote(sel.roas, meta.currency) : '';
+    if(kpiSpendNoteEl){
+      kpiSpendNoteEl.textContent = meta.state !== 'data' ? ''
+        : (sel ? ('Meta 귀속 기준 · 조회 ' + formatKstTime(meta.fetchedAt))
+          : (meta.selectedLoading ? '불러오는 중…' : '이 기간 Meta 요약을 불러오지 못했어요.'));
+    }
   }
 
   // -------------------------------------------------------- 오늘의 운영 브리핑
@@ -116,9 +193,15 @@
       hasRealData = true;
       // 집계는 취소·환불·미입금 주문을 구분하지 않는다(ops-overview.js loadOrdersFor) —
       // "발생한 매출"처럼 말하지 않고 마지막 동기화까지 들어온 주문으로만 설명한다.
-      lines.push(cafe24.today.count > 0
-        ? ('Cafe24에 오늘 들어온 주문은 ' + cafe24.today.count + '건, 주문금액 합계는 ' + formatWon(cafe24.today.payment) + '이에요(취소·환불·미입금 포함, 마지막 동기화 기준).')
-        : 'Cafe24에 오늘 들어온 주문이 없어요(마지막 동기화 기준).');
+      // 오늘이 아직 동기화 전이면 0건이라고 말하지 않는다.
+      var tc = cafe24.today.coverage;
+      if(tc === 'none' || tc === 'unknown'){
+        lines.push('Cafe24 오늘 주문은 아직 동기화 전이에요. 새로고침하면 동기화해요.');
+      } else {
+        lines.push(cafe24.today.count > 0
+          ? ('Cafe24에 오늘 들어온 주문은 ' + cafe24.today.count + '건, 주문금액 합계는 ' + formatWon(cafe24.today.payment) + '이에요(취소·환불·미입금 포함, 마지막 동기화 기준).')
+          : 'Cafe24에 오늘 들어온 주문이 없어요(마지막 동기화 기준).');
+      }
     }
 
     if(meta.state === 'data' && meta.today){
@@ -230,7 +313,10 @@
     var html = '';
 
     html += '<div class="opsdash-summary-group"><div class="opsdash-summary-group-label">쇼핑몰</div>';
-    if(cafe24.state === 'data' && cafe24.month){
+    var monthUnsynced = cafe24.state === 'data' && cafe24.month && (cafe24.month.coverage === 'none' || cafe24.month.coverage === 'unknown');
+    if(monthUnsynced){
+      html += '<p class="opsdash-empty-note" style="padding:0;">이번 달 일부 날짜가 동기화됐는지 확인되지 않았어요. 새로고침하면 이번 달 주문을 동기화해요.</p>';
+    } else if(cafe24.state === 'data' && cafe24.month){
       html += '<div class="opsdash-summary-stats">' +
         stat('주문', formatCount(cafe24.month.count)) +
         stat('주문금액', formatWon(cafe24.month.payment)) +
@@ -306,7 +392,9 @@
       : '';
 
     var syncOk = cafe24Connected && cafe24.lastSyncedAt;
-    var syncRow = connectionRow(ICON_SYNC, '주문 동기화', syncOk ? '정상' : '아직 없음', syncOk);
+    var syncText = cafe24.syncing ? '동기화 중…'
+      : (cafe24.syncError ? '동기화 실패' : (syncOk ? formatKstTime(cafe24.lastSyncedAt) : '아직 없음'));
+    var syncRow = connectionRow(ICON_SYNC, '주문 동기화', syncText, !!syncOk && !cafe24.syncError);
 
     connectionEl.innerHTML = cafe24Row + metaRow + metaAccountRow + syncRow;
   }
@@ -424,6 +512,7 @@
     if(!snapshot) return;
     applyAuthGate();
     renderHeader(snapshot);
+    renderPeriodControls(snapshot);
     renderKpis(snapshot);
     renderBrief(snapshot);
     renderAdState(snapshot);
@@ -435,10 +524,38 @@
     window.launchdeskOpsSnapshot.subscribe(renderAll);
   }
 
+  // 새로고침 — 선택된 쇼핑몰의 Cafe24 주문을 실제로 동기화한 뒤 주문 · Meta를
+  // 다시 조회한다(ops-overview.js refreshWithSync). 기간 버튼은 동기화하지 않는다.
   if(refreshBtn){
     refreshBtn.addEventListener('click', function(){
-      if(window.launchdeskOpsSnapshot) window.launchdeskOpsSnapshot.refresh();
+      if(window.launchdeskOpsSnapshot) window.launchdeskOpsSnapshot.refreshWithSync();
       loadWholesalers();
+    });
+  }
+
+  Array.prototype.forEach.call(periodBtns, function(btn){
+    btn.addEventListener('click', function(){
+      if(window.launchdeskOpsSnapshot) window.launchdeskOpsSnapshot.setPeriod(btn.getAttribute('data-ops-period'));
+    });
+  });
+  if(periodDateEl){
+    syncDateBounds();
+    periodDateEl.addEventListener('focus', syncDateBounds); // 자정을 넘겨 열어 둔 화면 대비
+    periodDateEl.addEventListener('change', function(){
+      var v = periodDateEl.value;
+      if(!v) return;
+      var tooNew = v > periodDateEl.max;
+      var tooOld = !!periodDateEl.min && v < periodDateEl.min;
+      if(tooNew || tooOld){
+        // 직접 입력으로 범위를 벗어난 경우 — 조회하지 않고 브라우저 기본 안내로 이유를 알린다.
+        periodDateEl.setCustomValidity(tooNew ? '오늘 이후 날짜는 조회할 수 없어요.' : 'Meta는 최근 37개월 안의 날짜만 조회할 수 있어요.');
+        periodDateEl.reportValidity();
+        periodDateEl.setCustomValidity('');
+        var latest = window.launchdeskOpsSnapshot && window.launchdeskOpsSnapshot.getLatest();
+        if(latest) renderPeriodControls(latest);
+        return;
+      }
+      if(window.launchdeskOpsSnapshot) window.launchdeskOpsSnapshot.setPeriod('date', v);
     });
   }
 })();

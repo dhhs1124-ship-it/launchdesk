@@ -21,6 +21,7 @@ const MARGIN_CALC_SRC = fs.readFileSync(path.join(ROOT, 'margin-calc.js'), 'utf8
 const PLANS_CORE_SRC = fs.readFileSync(path.join(ROOT, 'plans-core.js'), 'utf8');
 const TOOLS_SRC = fs.readFileSync(path.join(ROOT, 'tools.js'), 'utf8');
 const OPS_OVERVIEW_SRC = fs.readFileSync(path.join(ROOT, 'ops-overview.js'), 'utf8');
+const OPS_PERIOD_CORE_SRC = fs.readFileSync(path.join(ROOT, 'ops-period-core.js'), 'utf8');
 const META_ADSETS_CORE_SRC = fs.readFileSync(path.join(ROOT, 'meta-adsets-core.js'), 'utf8');
 const META_MARGIN_CORE_SRC = fs.readFileSync(path.join(ROOT, 'meta-margin-core.js'), 'utf8');
 const META_ADSETS_SRC = fs.readFileSync(path.join(ROOT, 'meta-adsets.js'), 'utf8');
@@ -247,11 +248,13 @@ function makeSupabase(opts){
   }
   function filterChain(rows, tableName){
     const filters = {}; const inFilters = {}; let single = false; let gteCol = null; let gteVal = null; let lim = null;
+    let ltCol = null; let ltVal = null;
     const q = {};
     q.select = () => q;
     q.eq = (c, v) => { filters[c] = v; return q; };
     q.in = (c, arr) => { inFilters[c] = arr; return q; };
     q.gte = (c, v) => { gteCol = c; gteVal = v; return q; };
+    q.lt = (c, v) => { ltCol = c; ltVal = v; return q; };
     q.limit = (n) => { lim = n; return q; };
     q.order = () => q;
     q.maybeSingle = () => { single = true; return q; };
@@ -264,6 +267,7 @@ function makeSupabase(opts){
         matched = matched.filter((r) => inFilters[c].map(String).includes(String(r[c])));
       });
       if (gteCol) matched = matched.filter((r) => new Date(r[gteCol]).getTime() >= new Date(gteVal).getTime());
+      if (ltCol) matched = matched.filter((r) => new Date(r[ltCol]).getTime() < new Date(ltVal).getTime());
       if (lim) matched = matched.slice(0, lim);
       if (single) return { data: matched[0] || null, error: null };
       return { data: matched, error: null };
@@ -338,6 +342,7 @@ async function boot(opts){
   vm.runInContext(MARGIN_CALC_SRC, sandbox, { filename: 'margin-calc.js' });
   vm.runInContext(PLANS_CORE_SRC, sandbox, { filename: 'plans-core.js' });
   vm.runInContext(TOOLS_SRC, sandbox, { filename: 'tools.js' });
+  vm.runInContext(OPS_PERIOD_CORE_SRC, sandbox, { filename: 'ops-period-core.js' });
   vm.runInContext(OPS_OVERVIEW_SRC, sandbox, { filename: 'ops-overview.js' });
   vm.runInContext(META_ADSETS_CORE_SRC, sandbox, { filename: 'meta-adsets-core.js' });
   vm.runInContext(META_MARGIN_CORE_SRC, sandbox, { filename: 'meta-margin-core.js' });
@@ -437,11 +442,14 @@ test('Meta 재연결 필요 상태는 "광고계정 미선택"과 다르게 구�
   assert.match(neverSelected.doc.getElementById('opsdashAdState').innerHTML, /분석할 광고계정을 선택해주세요/);
 });
 
-test('연결됐지만 데이터 0건인 Cafe24 주문은 "연결하세요"가 아니라 실제 빈 상태로 표시된다', async () => {
+// cafe24-orders-sync가 기록한 "빠짐없이 동기화된 범위" 시작일 — 30일 전부터 기록된 상태
+function syncedFrom30d(){ return new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10); }
+
+test('연결됐지만 데이터 0건인 Cafe24 주문은 "연결하세요"가 아니라 실제 빈 상태로 표시된다(오늘 동기화된 경우)', async () => {
   const env = await boot({
     session: { user: { id: 'u1' } },
     stores: [{ id: 1, name: 's', platform: 'cafe24', user_id: 'u1' }],
-    connectedAccounts: [{ store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null }],
+    connectedAccounts: [{ store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: new Date().toISOString(), orders_synced_from: syncedFrom30d() }],
     orders: []
   });
   await settle();
@@ -449,6 +457,21 @@ test('연결됐지만 데이터 0건인 Cafe24 주문은 "연결하세요"가 �
   assert.match(brief, /Cafe24에 오늘 들어온 주문이 없어요\(마지막 동기화 기준\)\./);
   assert.doesNotMatch(brief, /쇼핑몰을 연결하면/);
   assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '0건');
+});
+
+test('한 번도 동기화하지 않은 Cafe24는 0건이 아니라 "확인 전"으로 표시한다', async () => {
+  const env = await boot({
+    session: { user: { id: 'u1' } },
+    stores: [{ id: 1, name: 's', platform: 'cafe24', user_id: 'u1' }],
+    connectedAccounts: [{ store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null }],
+    orders: []
+  });
+  await settle();
+  assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '확인 전');
+  assert.equal(env.doc.getElementById('opsdashKpiPayment').textContent, '확인 전');
+  assert.match(env.doc.getElementById('opsdashKpiOrdersNote').textContent, /아직 주문을 동기화한 적이 없어요/);
+  assert.match(env.doc.getElementById('opsdashBriefList').innerHTML, /오늘 주문은 아직 동기화 전이에요/);
+  assert.doesNotMatch(env.doc.getElementById('opsdashBriefList').innerHTML, /주문이 없어요/);
 });
 
 test('비회원은 마진 계산기 "저장"을 눌러도 게스트 메모리에 저장되지 않고 기존 로그인 모달이 열린다', async () => {
@@ -570,7 +593,8 @@ test('로그인 + Cafe24 · Meta 둘 다 연결: 실제 수치가 KPI · 월간 
     session: { user: { id: 'u1' } },
     stores: [{ id: 1, name: '내 쇼핑몰', platform: 'cafe24', user_id: 'u1' }],
     connectedAccounts: [
-      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: '2026-09-20T00:00:00Z' },
+      // 주문이 들어온 뒤 동기화됐다(오늘 · 주문 시각 이후) — 동기화 전 날짜는 "확인 전"으로 따로 검증한다.
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: new Date(Date.now() + 1000).toISOString(), orders_synced_from: syncedFrom30d() },
       { store_id: 1, provider: 'meta', id: 'm1', status: 'connected', external_account_id: 'act_1' }
     ],
     orders: [{ store_id: 1, ordered_at: new Date().toISOString(), payment_amount: 10000 }]
@@ -609,7 +633,7 @@ test('Cafe24 "연결됐지만 0건"과 "조회 오류"는 서로 다른 문구�
   const emptyEnv = await boot({
     session: { user: { id: 'u1' } },
     stores: [{ id: 1, name: 's', platform: 'cafe24', user_id: 'u1' }],
-    connectedAccounts: [{ store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: null }],
+    connectedAccounts: [{ store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: new Date().toISOString(), orders_synced_from: syncedFrom30d() }],
     orders: []
   });
   await settle();
@@ -629,17 +653,21 @@ test('Cafe24 "연결됐지만 0건"과 "조회 오류"는 서로 다른 문구�
   assert.doesNotMatch(errorBrief, /Cafe24에 오늘 들어온 주문이 없어요/);
 });
 
-test('Cafe24 오늘 주문 KPI는 중복 없이 1쌍이고, 취소·환불·미입금 포함 의미를 표시하며 Meta와 출처가 분리된다', () => {
+test('Cafe24 주문 KPI는 중복 없이 1쌍이고, 취소·환불·미입금 포함 의미를 표시하며 Meta와 출처가 분리된다(라벨에 기간)', () => {
   const dash = INDEX.slice(INDEX.indexOf('id="view-dashboard"'), INDEX.indexOf('id="view-account"'));
   assert.equal((dash.match(/id="opsdashKpiOrders"/g) || []).length, 1);
   assert.equal((dash.match(/id="opsdashKpiPayment"/g) || []).length, 1);
-  assert.match(dash, /Cafe24 오늘 주문<\/div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-<\/div><div class="opsdash-kpi-note">취소·환불·미입금 주문 포함/);
-  assert.match(dash, /Cafe24 오늘 주문금액<\/div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-<\/div><div class="opsdash-kpi-note">주문별 결제금액 합계 · 취소·환불 미차감/);
-  // 상단 Meta 두 칸은 meta-insights의 today 값이다 — 광고별 성과 기간(어제 등)과
-  // 섞여 보이지 않도록 라벨에 기간을 적는다.
-  assert.match(dash, />Meta 오늘 광고비</);
-  assert.match(dash, />Meta 오늘 ROAS</);
+  assert.match(dash, /id="opsdashKpiOrdersLabel">Cafe24 주문 · 오늘<\/div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-<\/div><div class="opsdash-kpi-note" id="opsdashKpiOrdersNote">취소·환불·미입금 주문 포함/);
+  assert.match(dash, /id="opsdashKpiPaymentLabel">Cafe24 주문금액 · 오늘<\/div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-<\/div><div class="opsdash-kpi-note" id="opsdashKpiPaymentNote">주문별 결제금액 합계 · 취소·환불 미차감/);
+  // 상단 Meta 두 칸도 선택 기간을 라벨에 적는다(home-dashboard.js가 기간에 맞춰 바꾼다).
+  assert.match(dash, /id="opsdashKpiSpendLabel">Meta 광고비 · 오늘</);
+  assert.match(dash, /id="opsdashKpiRoasLabel">Meta ROAS · 오늘</);
   assert.doesNotMatch(dash, />오늘 결제금액</);
+  // 상단 기간: 오늘 · 어제 · 이번 달 · 날짜 선택 — "전체"는 상단에 없다
+  const header = dash.slice(dash.indexOf('opsdash-header-actions'), dash.indexOf('id="opsdashKpis"'));
+  for (const p of ['today', 'yesterday', 'month']) assert.match(header, new RegExp('data-ops-period="' + p + '"'));
+  assert.match(header, /id="opsdashPeriodDate"/);
+  assert.doesNotMatch(header, /data-ops-period="all"|>전체</);
 });
 
 const META_INSIGHTS_OK = {
@@ -1185,4 +1213,249 @@ test('쇼핑몰 전환 중 A의 Meta 응답이 B 선택 후 늦게 도착해도 
   assert.notEqual(snap.meta.accountName, 'Late A Ads', 'A의 늦은 Meta 계정명이 B 화면에 반영되면 안 된다');
 
   gate.restore();
+});
+
+// ===================================================== 상단 기간 선택 · 새로고침 동기화
+const OPS_PC = require('../ops-period-core.js');
+function kstNoon(ymd){ return new Date(Date.parse(ymd + 'T12:00:00+09:00')).toISOString(); }
+function metaPayload(extra){
+  return Object.assign({
+    ok: true,
+    account: { name: 'Test Ads', currency: 'KRW', timezone_name: 'Asia/Seoul' },
+    today: { spend: 15000, purchase_value: 45000, purchase_count: 2, roas: 3 },
+    month: { spend: 300000, purchase_value: 900000, purchase_count: 40, roas: 3 }
+  }, extra || {});
+}
+// functions.invoke를 이름별 처리기로 감싼다(호출 기록 포함). 처리기가 없으면 원래 스텁.
+function routeInvoke(sb, handlers){
+  const original = sb.functions.invoke;
+  const calls = [];
+  sb.functions.invoke = function(name, args){
+    const body = args && args.body;
+    calls.push({ name, body });
+    if (handlers[name]) return Promise.resolve(handlers[name](body));
+    return original.call(sb.functions, name, args);
+  };
+  return calls;
+}
+function periodFixture(extraStores){
+  const now = Date.now();
+  const yesterday = OPS_PC.resolve('yesterday', null, now).since;
+  return {
+    session: { user: { id: 'u1' } },
+    stores: [{ id: 1, name: 'A상점', platform: 'cafe24', user_id: 'u1' }].concat(extraStores || []),
+    connectedAccounts: [
+      { store_id: 1, provider: 'cafe24', status: 'connected', last_synced_at: new Date(now + 1000).toISOString(), orders_synced_from: syncedFrom30d() },
+      { store_id: 1, provider: 'meta', id: 'm1', status: 'connected', external_account_id: 'act_1' }
+    ],
+    orders: [
+      { store_id: 1, ordered_at: new Date(now).toISOString(), payment_amount: 10000 },
+      { store_id: 1, ordered_at: kstNoon(yesterday), payment_amount: 5000 }
+    ]
+  };
+}
+
+test('상단 기간(어제): 주문 동기화 없이 저장된 주문 · Meta 요약만 다시 읽고, 카드 라벨과 값이 어제로 바뀐다', async () => {
+  const env = await boot(periodFixture());
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, {
+    'meta-insights': (body) => ({ data: metaPayload(body.period === 'yesterday' ? { selected: { spend: 7000, purchase_value: 14000, purchase_count: 1, roas: 2 } } : {}), error: null })
+  });
+  env.sandbox.launchdeskOpsSnapshot.refresh(); // 감싼 invoke로 Meta 요약을 한 번 받아 둔다
+  await settle();
+  const before = calls.length;
+
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.setPeriod('yesterday'), true);
+  await settle();
+  const after = calls.slice(before);
+  assert.equal(after.filter((c) => c.name === 'cafe24-orders-sync').length, 0, '기간 버튼은 주문 동기화를 하지 않는다');
+  const metaCall = after.filter((c) => c.name === 'meta-insights').pop();
+  assert.equal(metaCall.body.period, 'yesterday');
+
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(snap.period.label, '어제');
+  assert.deepEqual([snap.cafe24.selected.count, snap.cafe24.selected.payment, snap.cafe24.selected.coverage], [1, 5000, 'full']);
+  assert.equal(env.doc.getElementById('opsdashKpiOrdersLabel').textContent, 'Cafe24 주문 · 어제');
+  assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '1건');
+  assert.equal(env.doc.getElementById('opsdashKpiPayment').textContent, '5,000원');
+  assert.equal(env.doc.getElementById('opsdashKpiSpendLabel').textContent, 'Meta 광고비 · 어제');
+  assert.equal(env.doc.getElementById('opsdashKpiSpend').textContent, '₩7,000');
+  assert.match(env.doc.getElementById('opsdashKpiSpendNote').textContent, /^Meta 귀속 기준 · 조회 \d\d\.\d\d \d\d:\d\d$/);
+  // 오늘 이후 · "전체"는 상단 기간으로 받지 않는다
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.setPeriod('all'), false);
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.setPeriod('date', '2999-01-01'), false);
+});
+
+// cafe24-orders-sync가 성공했을 때 DB에 남기는 값을 실제 기록 규칙(_shared/orders-sync-range.mjs)으로 흉내 낸다.
+async function fakeSyncWriter(row){
+  const rule = await import('../supabase/functions/_shared/orders-sync-range.mjs');
+  return (body) => {
+    row.orders_synced_from = rule.nextOrdersSyncedFrom(row.orders_synced_from, row.last_synced_at, body.start_date);
+    row.last_synced_at = new Date().toISOString();
+    return { data: { ok: true, start_date: body.start_date, end_date: body.end_date, fetched: 2, last_synced_at_updated: true }, error: null };
+  };
+}
+
+test('새로고침: Cafe24 주문을 동기화(오늘 − 14일 · 이번 달 1일 · 마지막 동기화 날짜부터 오늘)한 뒤, DB에 기록된 범위를 다시 읽어 판단한다', async () => {
+  const fx = periodFixture();
+  fx.connectedAccounts[0].orders_synced_from = null; // 범위 기록이 아직 없는 연결(마이그레이션 전 동기화)
+  const env = await boot(fx);
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.today.coverage, 'unknown', '기록이 없으면 last_synced_at이 오늘이어도 추정하지 않는다');
+  const lastBefore = fx.connectedAccounts[0].last_synced_at;
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, {
+    'meta-insights': () => ({ data: metaPayload(), error: null }),
+    'cafe24-orders-sync': await fakeSyncWriter(fx.connectedAccounts[0])
+  });
+  const storesBefore = env.supa.callLog.filter((t) => t === 'stores').length;
+  env.sandbox.launchdeskOpsSnapshot.refreshWithSync();
+  await settle();
+
+  const sync = calls.filter((c) => c.name === 'cafe24-orders-sync');
+  assert.equal(sync.length, 1);
+  const plan = OPS_PC.syncPlan(OPS_PC.resolve('today', null, Date.now()), Date.now(), lastBefore);
+  assert.equal(JSON.stringify(sync[0].body), JSON.stringify({ store_id: 1, start_date: plan.start_date, end_date: plan.end_date }));
+  assert.ok(sync[0].body.start_date <= OPS_PC.addDays(plan.end_date, -14));
+  assert.ok(calls.filter((c) => c.name === 'meta-insights').length >= 1, 'Meta 요약도 새로 조회한다');
+  assert.ok(env.supa.callLog.filter((t) => t === 'stores').length > storesBefore, '동기화 뒤 다시 조회한다');
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(snap.cafe24.syncing, false);
+  assert.equal(snap.cafe24.syncError, null);
+  assert.equal(fx.connectedAccounts[0].orders_synced_from, plan.start_date, '함수가 기록한 범위 시작일');
+  assert.equal(snap.cafe24.month.coverage, 'partial', 'DB 기록(이번 달 1일 이전부터)을 읽어 이번 달은 "확인 전"이 아니다');
+});
+
+test('재접속: 새로고침으로 이번 달을 동기화한 뒤 페이지를 새로 열어도 DB 기록으로 이번 달이 확인된 상태로 남는다', async () => {
+  const fx = periodFixture();
+  fx.connectedAccounts[0].orders_synced_from = null;
+  const first = await boot(fx);
+  routeInvoke(first.sandbox.launchdeskSupabase, {
+    'meta-insights': () => ({ data: metaPayload(), error: null }),
+    'cafe24-orders-sync': await fakeSyncWriter(fx.connectedAccounts[0])
+  });
+  first.sandbox.launchdeskOpsSnapshot.refreshWithSync();
+  await settle();
+  assert.equal(first.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.month.coverage, 'partial');
+
+  // 같은 DB 상태로 새 페이지(메모리 없음)
+  const reopened = await boot(fx);
+  const snap = reopened.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(snap.cafe24.month.coverage, 'partial', '다시 열어도 "확인 전"으로 돌아가지 않는다');
+  reopened.sandbox.launchdeskOpsSnapshot.setPeriod('month');
+  await settle();
+  assert.notEqual(reopened.doc.getElementById('opsdashKpiOrders').textContent, '확인 전');
+  assert.doesNotMatch(reopened.doc.getElementById('opsdashMonthSummary').innerHTML, /확인되지 않았어요/);
+});
+
+test('쇼핑몰 전환: A(범위 기록 있음) → B(기록 없음) → A — 각 쇼핑몰의 기록만으로 판단하고 서로 섞이지 않는다', async () => {
+  const fx = periodFixture([{ id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }]);
+  fx.connectedAccounts.push({ store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: new Date(Date.now() + 1000).toISOString(), orders_synced_from: null });
+  fx.orders.push({ store_id: 2, ordered_at: new Date().toISOString(), payment_amount: 22222 });
+  const env = await boot(fx);
+  const select = env.doc.getElementById('opsStoreSelect');
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.today.coverage, 'partial');
+  assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '1건');
+
+  select.value = '2';
+  select.dispatch('change');
+  await settle();
+  let snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2');
+  assert.equal(snap.cafe24.today.coverage, 'unknown', 'A의 기록이 B에 쓰이면 안 된다');
+  assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '확인 전');
+
+  select.value = '1';
+  select.dispatch('change');
+  await settle();
+  snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '1');
+  assert.equal(snap.cafe24.today.coverage, 'partial');
+  assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '1건');
+});
+
+test('새로고침 동기화 실패: 안내를 남기고 저장된 주문으로 다시 조회하며, 진행 중에는 중복 동기화하지 않는다', async () => {
+  const env = await boot(periodFixture());
+  const gate = deferred();
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, {
+    'meta-insights': () => ({ data: metaPayload(), error: null }),
+    'cafe24-orders-sync': () => gate.promise.then(() => ({ data: null, error: { message: 'x', context: { json: async () => ({ error: '실패' }) } } }))
+  });
+  env.sandbox.launchdeskOpsSnapshot.refreshWithSync();
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.syncing, true);
+  assert.equal(env.doc.getElementById('opsdashRefreshBtn').disabled, true);
+  assert.equal(env.doc.getElementById('opsdashKpiOrdersNote').textContent, '주문 동기화 중…');
+  env.sandbox.launchdeskOpsSnapshot.refreshWithSync(); // 진행 중 재클릭
+  assert.equal(calls.filter((c) => c.name === 'cafe24-orders-sync').length, 1);
+
+  gate.resolve();
+  await settle();
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(snap.cafe24.syncing, false);
+  assert.equal(snap.cafe24.syncError, '주문 동기화에 실패했어요. 저장된 주문으로 표시합니다.');
+  assert.equal(snap.cafe24.state, 'data', '저장된 주문은 그대로 다시 조회된다');
+  assert.equal(env.doc.getElementById('opsdashKpiOrdersNote').textContent, '주문 동기화에 실패했어요. 저장된 주문으로 표시합니다.');
+  assert.match(env.doc.getElementById('opsdashConnectionStatus').innerHTML, /동기화 실패/);
+  assert.equal(env.doc.getElementById('opsdashRefreshBtn').disabled, false);
+});
+
+test('동기화 도중 다른 쇼핑몰로 바꾸면, 늦게 끝난 동기화가 새 쇼핑몰 화면을 되돌리거나 오류를 옮기지 않는다', async () => {
+  const fx = periodFixture([{ id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }]);
+  fx.connectedAccounts.push({ store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: new Date(Date.now() + 1000).toISOString() });
+  fx.orders.push({ store_id: 2, ordered_at: new Date().toISOString(), payment_amount: 22222 });
+  const env = await boot(fx);
+  const gate = deferred();
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, {
+    'meta-insights': () => ({ data: metaPayload(), error: null }),
+    'cafe24-orders-sync': () => gate.promise.then(() => ({ data: null, error: { message: 'x' } }))
+  });
+  env.sandbox.launchdeskOpsSnapshot.refreshWithSync(); // A 동기화 시작
+  await settle();
+  const select = env.doc.getElementById('opsStoreSelect');
+  select.value = '2';
+  select.dispatch('change');
+  await settle();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().cafe24.syncing, false, 'B 화면에는 A의 동기화 중 표시가 없다');
+
+  gate.resolve();
+  await settle();
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2');
+  assert.equal(snap.cafe24.today.payment, 22222);
+  assert.equal(snap.cafe24.syncError, null, 'A의 동기화 실패가 B에 표시되면 안 된다');
+  assert.equal(calls.filter((c) => c.name === 'cafe24-orders-sync').length, 1);
+});
+
+test('기간을 빠르게 바꾸면 이전 기간(어제)의 늦은 Meta 응답은 쓰지 않고 지금 기간(이번 달)으로 다시 조회한다', async () => {
+  const env = await boot(periodFixture());
+  const gate = deferred();
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, {
+    'meta-insights': (body) => body.period === 'yesterday'
+      ? gate.promise.then(() => ({ data: metaPayload({ selected: { spend: 7777, purchase_value: 0, purchase_count: 0, roas: 0 } }), error: null }))
+      : { data: metaPayload(), error: null }
+  });
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+  env.sandbox.launchdeskOpsSnapshot.setPeriod('yesterday');
+  await settle();
+  env.sandbox.launchdeskOpsSnapshot.setPeriod('month');
+  await settle();
+  gate.resolve();
+  await settle();
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(snap.period.period, 'month');
+  assert.equal(snap.meta.selected.spend, 300000);
+  assert.equal(env.doc.getElementById('opsdashKpiSpend').textContent, '₩300,000');
+  const last = calls.filter((c) => c.name === 'meta-insights').pop();
+  assert.equal(last.body.period, undefined, '마지막 조회는 이번 달(추가 기간 없음)');
+});
+
+test('선택 날짜가 마지막 동기화 이후면 0건이 아니라 "확인 전"과 동기화 안내를 보여준다', async () => {
+  const fx = periodFixture();
+  fx.connectedAccounts[0].last_synced_at = new Date(Date.now() - 3 * 86400000).toISOString(); // 3일 전 동기화
+  const env = await boot(fx);
+  env.sandbox.launchdeskOpsSnapshot.setPeriod('yesterday');
+  await settle();
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(snap.cafe24.selected.coverage, 'none');
+  assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '확인 전');
+  assert.match(env.doc.getElementById('opsdashKpiOrdersNote').textContent, /아직 동기화 전이에요\(마지막 동기화 \d\d\.\d\d \d\d:\d\d\)/);
 });
