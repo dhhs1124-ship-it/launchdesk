@@ -266,6 +266,9 @@
   .empty-state{text-align:center; padding:3.2rem 1rem; color:var(--ink-faint);}
   .empty-state .es-icon{font-size:2rem; margin-bottom:.8rem;}
   .empty-state p{font-size:.9rem; margin-bottom:1.1rem; color:var(--ink-soft);}
+  /* 도매처 0건 — 전역 p{max-width:66ch} 때문에 문단 박스가 왼쪽에 붙고 버튼만 전체 폭
+     중앙에 오던 어긋남을 문단 가운데 정렬(margin auto)로 맞춘다. */
+  #wholesaleEmptyState p{margin:0 auto 16px; line-height:1.7;}
 
   /* ---------------- toast ---------------- */
   .toast-stack{position:fixed; right:1.2rem; bottom:1.2rem; z-index:120; display:flex; flex-direction:column; gap:.6rem; align-items:flex-end; pointer-events:none;}
