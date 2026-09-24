@@ -606,7 +606,7 @@
           <section class="desk-ops-card" aria-labelledby="deskOpsCardTitle">
             <div class="desk-ops-card-text">
               <h2 id="deskOpsCardTitle">이미 쇼핑몰을 운영 중이신가요?</h2>
-              <p>주문 · 광고 · 연결 상태를 운영 현황에서 확인할 수 있어요.</p>
+              <p>운영을 시작한 뒤에 Cafe24 주문과 Meta 광고 성과를 연결해 볼 수 있어요. 아직 쇼핑몰이 없다면 위의 준비 단계부터 시작해도 괜찮아요.</p>
             </div>
             <a class="desk-ops-card-btn" href="#/dashboard">운영 현황 보기 →</a>
           </section>
@@ -3213,8 +3213,11 @@
             <p>도매처 목록을 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.</p>
             <button type="button" class="btn btn-ghost btn-sm" id="wholesaleRetryBtn">다시 시도</button>
           </div>
+          <!-- 0건(정상 응답)일 때만 보인다 — 조회 실패는 위 #wholesaleErrorState.
+               실제 업체를 예시로 채우지 않고, 지금 쓸 수 있는 자료실 체크리스트로만 안내한다. -->
           <div class="empty-state" id="wholesaleEmptyState" style="padding:2.4rem 1rem;" hidden>
-            <p>아직 등록된 도매처가 없습니다.</p>
+            <p><strong>제휴 도매처 모집 중</strong><br>아직 등록된 도매처가 없습니다. 공급처를 직접 알아볼 때 확인할 질문부터 정리해보세요.</p>
+            <a class="btn btn-ghost btn-sm" href="#/resources/supplier-check-checklist">공급처 확인 질문 체크리스트 보기 →</a>
           </div>
           <div class="empty-state" id="wholesaleFilterEmptyState" style="padding:2.4rem 1rem;" hidden>
             <p>이 카테고리에 등록된 도매처가 없습니다.</p>
