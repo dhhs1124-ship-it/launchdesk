@@ -430,7 +430,7 @@
       if(!calc.ok){
         saveBtn.disabled = true;
         if(planBtn) planBtn.disabled = true;
-        hint.textContent = '필수 입력을 채우면 계획을 만들거나 저장할 수 있어요.';
+        hint.textContent = planBtn ? '필수 입력을 채우면 계획을 만들거나 저장할 수 있어요.' : '필수 입력을 채우면 결과를 저장할 수 있어요.';
         hint.hidden = false;
       } else {
         saveBtn.disabled = false;

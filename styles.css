@@ -748,7 +748,7 @@
   .mc-bd-row{display:flex; justify-content:space-between; gap:.6rem; padding:.15rem 0; font-variant-numeric:tabular-nums;}
   .mc-bd-row span:last-child{font-family:var(--f-mono); color:var(--ink); white-space:nowrap;}
   .mc-bd-row.total{border-top:1px solid var(--border); margin-top:.2rem; padding-top:.3rem; color:var(--ink); font-weight:700;}
-  .mc-actions{display:flex; flex-direction:column; gap:.4rem;}
+  .mc-actions{display:flex; flex-direction:column; gap:.4rem; margin:.7rem 0;}
   .mc-save-hint{font-size:.74rem; color:var(--ink-faint); text-align:center;}
 
   /* -- 간편/상세 모드, 예시 접기, 결과 헤드라인, 광고비 직접입력 (재설계) -- */
@@ -1097,8 +1097,10 @@
   .opsdash-kpi-main{min-width:0;}
   .opsdash-kpi-label{font-size:.75rem; color:var(--ink-faint);}
   .opsdash-kpi-value{font-family:var(--f-display); font-weight:700; font-size:1.5rem; color:var(--ink); font-variant-numeric:tabular-nums; word-break:break-word; margin-top:.3rem;}
-  .opsdash-kpi-note{font-size:.75rem; color:var(--ink-faint); margin-top:.3rem; line-height:1.4;}
+  .opsdash-kpi-note{font-size:.75rem; color:var(--ink-faint); margin-top:.3rem; line-height:1.4; word-break:keep-all;}
   .opsdash-kpi-icon{flex:0 0 auto; width:34px; height:34px; border-radius:2px; background:var(--op-accent-soft); color:var(--op-accent-ink); display:flex; align-items:center; justify-content:center;}
+  /* 390px 2열에서 장식 아이콘이 폭을 차지해 금액이 "₩15,00 / 0"처럼 끊기지 않게(기본 규칙 뒤에 둬야 적용됨) */
+  @media (max-width:480px){ .opsdash-kpi-icon{display:none;} .opsdash-kpi-value{font-size:1.3rem;} }
   .opsdash-kpi-icon svg{width:17px; height:17px;}
 
   .opsdash-row{display:grid; grid-template-columns:2fr 1fr; gap:.9rem; margin-bottom:.9rem; align-items:stretch;}
@@ -1166,6 +1168,10 @@
   .madsets-period-btn{border:none; background:none; min-height:36px; padding:.35rem 1rem; border-radius:2px; font-family:var(--f-body); font-size:.84rem; font-weight:600; color:var(--ink-soft); cursor:pointer;}
   .madsets-period-btn[aria-pressed="true"]{background:var(--brand); color:var(--ink);}
   .madsets-period-btn[aria-pressed="false"]:hover{background:var(--surface-hover);}
+  .madsets-period{flex-wrap:wrap;}
+  .madsets-date{display:flex;}
+  .madsets-date-input{min-height:36px; border:none; border-radius:2px; padding:.3rem .5rem; background:none; font-family:var(--f-body); font-size:.84rem; font-weight:600; color:var(--ink-soft);}
+  .madsets-date-input.is-active{background:var(--brand); color:var(--ink);}
   .madsets-body-wrap{padding:.85rem 1.1rem 1.1rem;}
 
   .madsets-range{margin:0 0 .8rem; font-size:.78rem; color:var(--ink-faint);}
@@ -1240,6 +1246,8 @@
     .madsets-controls{width:100%;}
     .madsets-period{display:grid; grid-template-columns:1fr 1fr; width:100%;}
     .madsets-period-btn{min-height:44px;}
+    .madsets-date{grid-column:1 / -1;}
+    .madsets-date-input{width:100%; min-height:44px;}
     .madsets-refresh{width:100%; justify-content:center; min-height:44px;}
     .madsets-kpis, .madsets-ad-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
     .madsets-toggle{width:100%;}
@@ -1473,6 +1481,16 @@
      재설계 2차). 시작 데스크와 같은 --ld-* 토큰·모서리·간격만 쓴다. */
   .desk-ops-card{display:flex; align-items:center; justify-content:space-between; gap:12px 20px; flex-wrap:wrap; margin:0 0 24px; padding:18px 24px; border-radius:3px; background:var(--ld-panel); border:1px solid var(--ld-border-strong); min-width:0;}
   .desk-ops-card-text{flex:1 1 240px; min-width:0; word-break:keep-all;}
+
+  /* 질문하기 진입점 — 홈 · STEP 이동 패널 · 자료실 끝의 한 줄 안내(#/contact로 이동,
+     제목 기본값은 contact.js가 data-ask-* 속성으로 채운다). */
+  .ask-inline{flex-basis:100%; margin:12px 0 0; max-width:none; font-size:13px; line-height:1.6; color:var(--ink-soft); word-break:keep-all;}
+  .ask-inline a{margin-left:4px; font-weight:700; color:var(--ink); text-decoration:underline; text-underline-offset:3px; white-space:nowrap;}
+  .ask-inline a:hover{color:var(--brand);}
+  .ask-block{margin:0 0 24px;}
+  #view-resources .ask-block{margin:24px 0 0;}
+  #view-start-intro .s0-nav, #view-start-wrapup .s8-nav{flex-wrap:wrap;}
+  #view-start-intro .s0-nav .ask-inline, #view-start-wrapup .s8-nav .ask-inline{margin:0;}
   .desk-ops-card h2{margin:0 0 4px; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--ld-text); line-height:1.4;}
   .desk-ops-card p{margin:0; max-width:none; font-size:13px; color:var(--ld-muted); line-height:1.6;}
   .desk-ops-card-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:9px 16px; border-radius:2px; border:1px solid var(--ld-border-strong); background:var(--ld-panel); color:var(--ld-accent); font-size:13px; font-weight:600; white-space:nowrap; flex:0 0 auto; transition:background .15s, border-color .15s;}
@@ -3736,6 +3754,22 @@
   .support-link{font-size:14px; font-weight:600; text-decoration:underline; text-underline-offset:3px;}
   .support-link:hover{color:var(--brand-ink);}
   .support-card .btn{margin-top:auto; min-height:44px; text-align:center;}
+  .support-contact-form{max-width:780px; padding:clamp(20px,4vw,32px); background:var(--surface); border:1px solid var(--border-strong); border-radius:3px;}
+  .support-form-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px;}
+  .support-field{display:flex; flex-direction:column; gap:8px; min-width:0;}
+  .support-field-wide{grid-column:1 / -1;}
+  .support-field label{font-size:13px; font-weight:600; color:var(--ink);}
+  .support-optional{font-size:12px; font-weight:400; color:var(--ink-soft);}
+  .support-field input,.support-field select,.support-field textarea{width:100%; min-height:44px; padding:11px 12px; background:var(--surface); border:1px solid var(--border-strong); border-radius:2px; color:var(--ink); font:inherit;}
+  .support-field textarea{resize:vertical; min-height:155px; line-height:1.6;}
+  .support-field input:focus-visible,.support-field select:focus-visible,.support-field textarea:focus-visible{outline:2px solid var(--brand); outline-offset:2px;}
+  .support-field-hint{font-size:12px; color:var(--ink-soft);}
+  .support-consent{margin-top:20px;}
+  .support-form-status{max-width:none; margin:12px 0; font-size:13px; color:var(--ink-body);}
+  .support-form-status.is-error{color:var(--badge-a);}
+  .support-submit{min-height:44px;}
+  .support-submit:disabled{opacity:.55; cursor:not-allowed;}
+  .support-trap{position:absolute; left:-9999px; width:1px; height:1px; opacity:0; pointer-events:none;}
   .support-note{margin-top:20px; padding:18px 20px; border:1px solid var(--border); background:var(--sidebar-bg); border-radius:3px;}
   .support-note p{font-size:13px; line-height:1.7; max-width:none; margin:0;}
   .support-note p + p{margin-top:8px;}
@@ -3744,6 +3778,7 @@
   @media (max-width:639px){
     .support-page{padding-top:24px; padding-bottom:40px;}
     .support-grid{grid-template-columns:1fr;}
+    .support-form-grid{grid-template-columns:1fr;}
     .support-card{padding:20px;}
     .support-card .btn{width:100%; justify-content:center;}
   }

@@ -10,6 +10,8 @@ import {
   shouldDowngradeToPending,
   validateAdsetInsightsRequest,
   resolvePeriodRange,
+  isFutureDate,
+  isBeyondLookback,
   normalizeIdentityRow,
   groupAdsetsByCampaign,
   fetchAllInsightsRows,
@@ -33,7 +35,7 @@ import {
 //   code + 한국어 메시지만 내려준다.
 
 type Scope = "adsets" | "ads";
-type Period = "today" | "month";
+type Period = "today" | "yesterday" | "month" | "all" | "date";
 
 interface ConnectedAccountRow {
   id: number;
@@ -109,10 +111,8 @@ export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
     try {
       const body = await req.json().catch(() => ({}));
-      // scope/period/adset_id 형식 검증은 공유 순수 함수 하나로 처리한다
-      // (last_7d/last_14d/last_30d는 광고계정 timezone 기준 설계를 다음 UI
-      // 단계에서 확정한 뒤 추가할 예정이라 이번에는 today/month만 허용하고
-      // 그 외는 임의로 계산하지 않고 명시적으로 거부한다).
+      // scope/period/date/adset_id 형식 검증은 공유 순수 함수 하나로 처리한다
+      // (SUPPORTED_PERIODS 밖의 값은 임의로 계산하지 않고 명시적으로 거부한다).
       const validated = validateAdsetInsightsRequest(body);
       if (!validated.ok) {
         return Response.json(
@@ -120,10 +120,11 @@ export default {
           { status: validated.status }
         );
       }
-      const { store_id, scope, period, adset_id } = validated as {
+      const { store_id, scope, period, date, adset_id } = validated as {
         store_id: string;
         scope: Scope;
         period: Period;
+        date: string | undefined;
         adset_id: string | undefined;
       };
 
@@ -195,7 +196,14 @@ export default {
         return errorResponse("ACCOUNT_UNAVAILABLE", 409);
       }
 
-      const { since, until } = resolvePeriodRange(period, new Date(), timezoneName);
+      const now = new Date();
+      if (period === "date" && isFutureDate(date, now, timezoneName)) {
+        return errorResponse("FUTURE_DATE", 400);
+      }
+      if (period === "date" && isBeyondLookback(date, now, timezoneName)) {
+        return errorResponse("DATE_TOO_OLD", 400);
+      }
+      const { since, until, preset } = resolvePeriodRange(period, now, timezoneName, date);
       const level = scope === "ads" ? "ad" : "adset";
 
       // 5. 실제 Graph API 페이지네이션 조회 — 순수 루프(fetchAllInsightsRows)에
@@ -206,6 +214,7 @@ export default {
           level,
           since,
           until,
+          preset,
           after,
           filteringAdsetId: scope === "ads" ? adset_id : undefined,
         });

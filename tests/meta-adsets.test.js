@@ -313,7 +313,7 @@ test('TTL 5분: 안에서는 호출 없이 캐시, 지나면 다시 호출', asy
   await ctl.ensureList();
   await ctl.ensureList();
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0], { store_id: 's1', scope: 'adsets', period: 'month' });
+  assert.deepEqual(calls[0], { store_id: 's1', scope: 'adsets', period: 'today' });
   tick(Core.TTL_MS - 1);
   await ctl.ensureList();
   assert.equal(calls.length, 1);
@@ -330,19 +330,92 @@ test('동일 요청 in-flight 병합: 동시에 두 번 불러도 호출은 1회
   assert.equal(calls.length, 1);
 });
 
-test('기간 전환: 오늘 1회 호출, 이번 달 복귀는 캐시로 0회', async () => {
+test('기간 전환: 기본은 오늘, 이번 달 1회 호출, 오늘 복귀는 캐시로 0회', async () => {
   const { ctl, calls } = harness(okHandler);
   ctl.setStore('s1');
+  assert.equal(ctl.getView().period, 'today');
   await ctl.ensureList();
-  await ctl.setPeriod('today');
-  assert.equal(calls.length, 2);
-  assert.equal(calls[1].period, 'today');
   await ctl.setPeriod('month');
   assert.equal(calls.length, 2);
-  assert.equal(ctl.getView().period, 'month');
+  assert.equal(calls[1].period, 'month');
+  await ctl.setPeriod('today');
+  assert.equal(calls.length, 2);
+  assert.equal(ctl.getView().period, 'today');
   assert.equal(ctl.getView().status, 'ready');
   await ctl.setPeriod('last_7d'); // 지원하지 않는 기간은 무시
   assert.equal(calls.length, 2);
+});
+
+test('어제 · 전체 · 날짜 선택: 요청 본문과 캐시가 기간(날짜 포함)별로 분리된다', async () => {
+  const { ctl, calls, tick } = harness(okHandler);
+  tick(Date.UTC(2026, 8, 24, 3) - 1000); // 2026-09-24 낮(브라우저 시간대와 무관하게 같은 날)
+  ctl.setStore('s1');
+  await ctl.setPeriod('yesterday');
+  await ctl.setPeriod('all');
+  assert.deepEqual(calls.map((c) => c.period), ['yesterday', 'all']);
+  assert.equal(calls[0].date, undefined);
+
+  await ctl.setPeriod('date', '2026-09-10');
+  assert.deepEqual(calls[2], { store_id: 's1', scope: 'adsets', period: 'date', date: '2026-09-10' });
+  await ctl.toggle('c0-a0'); // 상세(광고별)도 같은 날짜로 요청
+  assert.equal(calls[3].scope, 'ads');
+  assert.equal(calls[3].date, '2026-09-10');
+  await ctl.setPeriod('date', '2026-09-11'); // 다른 날짜는 다른 캐시
+  assert.equal(calls.length, 5);
+  await ctl.setPeriod('date', '2026-09-10'); // 돌아오면 캐시
+  assert.equal(calls.length, 5);
+  assert.equal(ctl.getView().date, '2026-09-10');
+});
+
+test('날짜 선택: 미래 날짜 · 형식 오류는 호출 없이 무시된다', async () => {
+  const { ctl, calls, tick } = harness(okHandler);
+  tick(Date.UTC(2026, 8, 24, 3) - 1000);
+  ctl.setStore('s1');
+  await ctl.setPeriod('date', '2026-09-30');
+  await ctl.setPeriod('date', '2026/09/10');
+  await ctl.setPeriod('date');
+  assert.equal(calls.length, 0);
+  assert.equal(ctl.getView().period, 'today');
+});
+
+test('기간 문구: 카드 목록 · 상세 제목 · 상태 문구가 같은 기간을 표시한다', () => {
+  const list = Core.buildListVm(payload([campaign('1', 'C', 'OUTCOME_SALES', [adset('11', 'S', metrics())])],
+    { range: { period: 'date', since: '2026-09-10', until: '2026-09-10' } }));
+  const view = readyView(list, { period: 'date', date: '2026-09-10', open: { 'c0-a0': true },
+    ads: { 'c0-a0': { status: 'ready', vm: Core.buildAdsVm(adsPayload([])) } } });
+  const html = Core.renderBody(view);
+  assert.match(html, /<p class="madsets-range">선택한 날짜 · 2026-09-10 · 광고계정 시간대 기준/);
+  assert.match(html, /광고별 성과 · 2026-09-10/);
+  assert.match(Core.statusText(view), /^2026-09-10 광고 세트 1개/);
+});
+
+test('전체 기간: "조회 가능한 전체 기간"으로 표시하고 시작일부터라고 표현하지 않는다', () => {
+  const list = Core.buildListVm(payload([campaign('1', 'C', 'OUTCOME_SALES', [adset('11', 'S', metrics())])],
+    { range: { period: 'all', since: null, until: '2026-09-24' } }));
+  const view = readyView(list, { period: 'all' });
+  const html = Core.renderBody(view);
+  assert.match(html, /조회 가능한 전체 기간 · ~ 2026-09-24/);
+  assert.match(html, /최근 37개월 안의 성과를 모두 더한 값/);
+  assert.doesNotMatch(html, /광고 시작일 ~|시작한 날부터|null/);
+  assert.match(Core.statusText(view), /^조회 가능한 전체 기간 광고 세트/);
+});
+
+test('날짜 선택 하한: 37개월 조회 한도 밖 날짜는 호출하지 않는다', async () => {
+  const { ctl, calls, tick } = harness(okHandler);
+  tick(Date.UTC(2026, 8, 24, 3) - 1000);
+  const earliest = Core.earliestDateString(Date.UTC(2026, 8, 24, 3));
+  assert.equal(earliest, '2023-08-25');
+  ctl.setStore('s1');
+  await ctl.setPeriod('date', '2023-08-24');
+  assert.equal(calls.length, 0);
+  await ctl.setPeriod('date', earliest);
+  assert.equal(calls.length, 1);
+});
+
+test('FUTURE_DATE 오류는 다시 시도 버튼 없이 안내만 한다', () => {
+  const html = Core.renderBody({ period: 'date', date: '2026-09-30', status: 'error', code: 'FUTURE_DATE', vm: null, open: {}, ads: {} });
+  assert.match(html, /오늘 이후 날짜는 조회할 수 없어요/);
+  assert.doesNotMatch(html, /data-madsets-retry/);
 });
 
 test('광고 세트 펼침: ads 1회 · 재펼침 0회 · 다른 세트는 1회, 요청 본문에 세트 값이 실린다', async () => {
@@ -351,7 +424,7 @@ test('광고 세트 펼침: ads 1회 · 재펼침 0회 · 다른 세트는 1회,
   await ctl.ensureList();
   await ctl.toggle('c0-a0');
   assert.equal(calls.length, 2);
-  assert.deepEqual(calls[1], { store_id: 's1', scope: 'ads', period: 'month', adset_id: '120220000000011' });
+  assert.deepEqual(calls[1], { store_id: 's1', scope: 'ads', period: 'today', adset_id: '120220000000011' });
   assert.equal(ctl.getView().open['c0-a0'], true);
   assert.equal(ctl.getView().ads['c0-a0'].status, 'ready');
 
@@ -372,7 +445,7 @@ test('기간을 바꾸면 펼침 상태가 초기화된다(자동 ads 호출 없
   ctl.setStore('s1');
   await ctl.ensureList();
   await ctl.toggle('c0-a0');
-  await ctl.setPeriod('today');
+  await ctl.setPeriod('month');
   assert.deepEqual(ctl.getView().open, {});
   assert.equal(calls.filter((c) => c.scope === 'ads').length, 1);
 });
@@ -421,17 +494,17 @@ test('store/user 변경 시 전체 초기화: 캐시 · 펼침 · 기간이 리�
   assert.equal(ctl.setStore('s1'), true);
   await ctl.ensureList();
   await ctl.toggle('c0-a0');
-  await ctl.setPeriod('today');
+  await ctl.setPeriod('month');
   assert.equal(ctl.setStore('s1'), false); // 같은 값 — 아무 일 없음
-  assert.equal(ctl.getView().period, 'today');
+  assert.equal(ctl.getView().period, 'month');
 
   assert.equal(ctl.setStore(null), true); // 로그아웃
   assert.equal(ctl.getStoreId(), null);
   assert.equal(ctl.getView().status, 'idle');
   assert.equal(await ctl.ensureList(), null); // 쇼핑몰 없으면 호출하지 않는다
   const before = calls.length;
-  ctl.setStore('s1'); // 다시 로그인
-  assert.equal(ctl.getView().period, 'month');
+  ctl.setStore('s1'); // 다시 로그인 — 기본 기간(오늘)으로
+  assert.equal(ctl.getView().period, 'today');
   assert.deepEqual(ctl.getView().open, {});
   await ctl.ensureList();
   assert.equal(calls.length, before + 1);
@@ -693,8 +766,9 @@ test('index.html 패널 위치와 접근성 속성', () => {
   const sec = INDEX.slice(start, INDEX.indexOf('</section>', start));
   assert.match(sec, /\bhidden\b/);
   assert.match(sec, /role="group" aria-label="조회 기간"/);
-  assert.match(sec, /data-madsets-period="today" aria-pressed="false"/);
-  assert.match(sec, /data-madsets-period="month" aria-pressed="true"/);
+  assert.match(sec, /data-madsets-period="today" aria-pressed="true"/);
+  for (const p of ['yesterday', 'month', 'all']) assert.match(sec, new RegExp('data-madsets-period="' + p + '" aria-pressed="false"'));
+  assert.match(sec, /<span class="sr-only">날짜 선택\(하루\)<\/span><input type="date" id="metaAdsetsDate"/);
   assert.match(sec, /id="metaAdsetsStatus" aria-live="polite"/);
   assert.match(sec, /id="metaAdsetsBody" aria-busy="true"/);
   assert.doesNotMatch(sec, /<table/i);

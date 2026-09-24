@@ -36,6 +36,9 @@ export const PAGE_LIMIT = 100;
 export const MAX_INSIGHTS_PAGES = 10;
 export const MAX_INSIGHTS_ROWS = 500;
 
+// 광고 세트/광고 조회 기간. last_7d 등 그 외 값은 임의로 계산하지 않고 거부한다.
+export const SUPPORTED_PERIODS = ["today", "yesterday", "month", "all", "date"];
+
 // ---- 전환 이벤트 action_type 우선순위 --------------------------------------
 // PURCHASE_ACTION_PRIORITY는 meta-insights/index.ts에 이미 있는 배열을
 // 그대로 옮긴 것(코드로 확인된 값, 추측 아님).
@@ -75,6 +78,8 @@ export const META_ERROR_MESSAGES = {
   RATE_LIMITED: "Meta 요청이 많아 잠시 후 다시 시도해주세요.",
   ACCOUNT_UNAVAILABLE: "이 광고계정에 접근할 수 없습니다.",
   TEMPORARY_ERROR: "Meta 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+  FUTURE_DATE: "오늘 이후 날짜는 조회할 수 없습니다.",
+  DATE_TOO_OLD: "Meta는 최근 37개월 안의 날짜만 조회할 수 있습니다.",
 };
 
 export function classifyMetaApiError(errorBody) {
@@ -131,14 +136,48 @@ export function monthStartStringInTimeZone(date, timeZone) {
   return `${year}-${month}-01`;
 }
 
-// period('today'|'month')를 실제 since/until 문자열로 바꾼다. 이번 단계에서
-// 지원하는 값은 이 둘뿐이다 — 그 외 값은 호출부(index.ts)에서 요청 자체를
-// 거부한다(임의로 계산해 넘기지 않음).
-export function resolvePeriodRange(period, now, timeZone) {
+// "YYYY-MM-DD"의 하루 전 날짜 문자열. 달력 계산만 하므로 시간대 · DST와 무관하다.
+function previousDateString(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+}
+
+// 실제로 존재하는 달력 날짜인지(2026-02-30 같은 값 거부).
+export function isValidDateString(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+// period를 광고계정 시간대 기준 since/until로 바꾼다. 'all'은 광고 시작일을
+// 조회하지 않으므로 since를 만들지 않고(null) Meta의 date_preset=maximum(최대
+// 37개월, Ad Account Insights 레퍼런스)에 맡긴다 — 시작일을 임의로 정하지
+// 않는다. 'date'는 호출부가 미래 · 37개월 밖 날짜를 먼저 거부한다.
+export function resolvePeriodRange(period, now, timeZone, date) {
   const todayStr = dateStringInTimeZone(now, timeZone);
   if (period === "today") return { since: todayStr, until: todayStr };
+  if (period === "yesterday") {
+    const y = previousDateString(todayStr);
+    return { since: y, until: y };
+  }
+  if (period === "date") return { since: date, until: date };
+  if (period === "all") return { since: null, until: todayStr, preset: "maximum" };
   const monthStartStr = monthStartStringInTimeZone(now, timeZone);
   return { since: monthStartStr, until: todayStr };
+}
+
+export function isFutureDate(date, now, timeZone) {
+  return date > dateStringInTimeZone(now, timeZone);
+}
+
+// Meta Ad Account Insights 레퍼런스: "The start date of the time range cannot be
+// beyond 37 months from the current date." — 경계 당일은 안전하게 제외한다.
+export const META_LOOKBACK_MONTHS = 37;
+export function isBeyondLookback(date, now, timeZone) {
+  const [y, m, d] = dateStringInTimeZone(now, timeZone).split("-").map(Number);
+  const earliest = new Date(Date.UTC(y, m - 1 - META_LOOKBACK_MONTHS, d + 1)).toISOString().slice(0, 10);
+  return date < earliest;
 }
 
 // ---- 전환 이벤트 추출(우선순위 배열의 첫 매치만 사용 — 중복 합산 금지) ------
@@ -416,13 +455,17 @@ export function validateAdsetInsightsRequest(body) {
   if (scope !== "adsets" && scope !== "ads") {
     return { ok: false, status: 400, error: "scope는 'adsets' 또는 'ads'만 지원합니다." };
   }
-  if (period !== "today" && period !== "month") {
+  if (!SUPPORTED_PERIODS.includes(period)) {
     return {
       ok: false,
       status: 400,
-      error: "지원하는 조회 기간은 today 또는 month뿐입니다.",
+      error: "지원하지 않는 조회 기간입니다.",
       code: "UNSUPPORTED_PERIOD",
     };
+  }
+  const date = body && body.date;
+  if (period === "date" && !isValidDateString(date)) {
+    return { ok: false, status: 400, error: "조회 날짜는 YYYY-MM-DD 형식이어야 합니다.", code: "INVALID_DATE" };
   }
   if (scope === "ads") {
     if (!adset_id) {
@@ -432,7 +475,11 @@ export function validateAdsetInsightsRequest(body) {
       return { ok: false, status: 400, error: "올바른 형식의 광고 세트 ID가 아닙니다." };
     }
   }
-  return { ok: true, store_id, scope, period, adset_id: scope === "ads" ? adset_id : undefined };
+  return {
+    ok: true, store_id, scope, period,
+    date: period === "date" ? date : undefined,
+    adset_id: scope === "ads" ? adset_id : undefined,
+  };
 }
 
 // ---- Graph API 요청 URL 빌더 ------------------------------------------------
@@ -449,7 +496,7 @@ export function validateAdsetInsightsRequest(body) {
 // 확인됐다(교정 — 이전 보고의 "objective 미확인"은 오류였음, 최종 보고 3번
 // 참고). filtering 파라미터의 정확한 스키마만 아직 실제 v21 계정으로
 // 검증되지 않았다.
-export function buildInsightsUrl({ accountId, level, since, until, after, filteringAdsetId, apiVersion }) {
+export function buildInsightsUrl({ accountId, level, since, until, preset, after, filteringAdsetId, apiVersion }) {
   const version = apiVersion || GRAPH_API_VERSION;
   const url = new URL(`https://graph.facebook.com/${version}/${accountId}/insights`);
   const identityFields =
@@ -468,7 +515,8 @@ export function buildInsightsUrl({ accountId, level, since, until, after, filter
   ];
   url.searchParams.set("level", level);
   url.searchParams.set("fields", identityFields.concat(perfFields).join(","));
-  url.searchParams.set("time_range", JSON.stringify({ since, until }));
+  if (preset) url.searchParams.set("date_preset", preset);
+  else url.searchParams.set("time_range", JSON.stringify({ since, until }));
   url.searchParams.set("time_increment", "all_days");
   url.searchParams.set("limit", String(PAGE_LIMIT));
   if (after) url.searchParams.set("after", after);

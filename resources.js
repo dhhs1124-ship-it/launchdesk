@@ -519,7 +519,10 @@
       '<span class="res-panel-cat">' + escapeHtml(DATA.CATEGORY_LABEL[resource.category] || '') + '</span></div>' +
       '<h2 class="res-panel-title" tabindex="-1">' + escapeHtml(resource.title) + '</h2>' +
       (guide.intro ? '<p class="res-panel-intro">' + escapeHtml(guide.intro) + '</p>' : '') +
-      guide.blocks.map(blockHtml).join('');
+      guide.blocks.map(blockHtml).join('') +
+      // 가이드 끝 질문하기 — 제목 기본값만 data 속성으로 넘긴다(contact.js, URL에는 싣지 않음).
+      '<p class="ask-inline ask-block">이 가이드에서 궁금한 점이 남았나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="' +
+      escapeHtml('[자료실 · ' + resource.title + '] 질문') + '">질문하기 →</a></p>';
     panelBody.innerHTML = html;
 
     var titleEl = panelBody.querySelector('.res-panel-title');

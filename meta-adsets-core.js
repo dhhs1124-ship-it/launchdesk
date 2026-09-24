@@ -22,7 +22,13 @@
 
   var DASH = '—';
   var TTL_MS = 5 * 60 * 1000;
-  var PERIOD_LABELS = { today: '오늘', month: '이번 달' };
+  // '전체'는 광고 시작일을 조회하지 않으므로 "시작일부터"라고 표현하지 않는다.
+  var PERIOD_LABELS = { today: '오늘', yesterday: '어제', month: '이번 달', all: '조회 가능한 전체 기간', date: '날짜 선택' };
+  var DEFAULT_PERIOD = 'today';
+  // Meta Ad Account Insights 레퍼런스: date_preset=maximum은 최대 37개월치만
+  // 돌려주고, time_range 시작일도 오늘부터 37개월 이전으로는 잡을 수 없다.
+  var META_LOOKBACK_MONTHS = 37;
+  var NOTE_ALL_RANGE = 'Meta가 제공하는 최근 37개월 안의 성과를 모두 더한 값이에요. 광고를 그보다 먼저 시작했다면 37개월 이전 성과는 빠져 있어요. 광고 시작일은 따로 확인하지 않아요.';
 
   var OBJECTIVE_LABELS = {
     OUTCOME_AWARENESS: '인지도',
@@ -44,7 +50,10 @@
     TEMPORARY_ERROR: { message: 'Meta 데이터를 불러오지 못했습니다.', action: 'retry' },
     ACCOUNT_UNAVAILABLE: { message: '이 광고계정에 접근할 수 없습니다.', action: 'link' },
     META_NOT_CONNECTED: { message: 'Meta 광고 계정을 연결해주세요.', action: 'link' },
-    META_ACCOUNT_NOT_SELECTED: { message: '분석할 광고계정을 선택해주세요.', action: 'link' }
+    META_ACCOUNT_NOT_SELECTED: { message: '분석할 광고계정을 선택해주세요.', action: 'link' },
+    FUTURE_DATE: { message: '오늘 이후 날짜는 조회할 수 없어요. 다른 날짜를 골라주세요.', action: 'none' },
+    INVALID_DATE: { message: '조회할 날짜를 다시 골라주세요.', action: 'none' },
+    DATE_TOO_OLD: { message: 'Meta는 최근 37개월 안의 날짜만 조회할 수 있어요.', action: 'none' }
   };
 
   var NOTE_PURCHASE_ABSENT = '이 기간 Meta 응답에 구매 항목이 없어요.';
@@ -261,6 +270,21 @@
     return Promise.resolve({ ok: true, data: r.data });
   }
 
+  // 'date' 기간은 고른 날짜까지 합쳐야 캐시 · 표시가 섞이지 않는다.
+  function periodKey(period, date){ return period === 'date' ? ('date:' + date) : period; }
+  function isDateString(v){ return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v); }
+  function periodLabel(period, date){ return period === 'date' ? String(date || '') : (PERIOD_LABELS[period] || ''); }
+  // 브라우저 기준 오늘(YYYY-MM-DD). 광고계정 시간대 기준 최종 판단은 서버가 한다.
+  function ymd(d){
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function localDateString(ms){ return ymd(new Date(ms)); }
+  // 날짜 선택 하한(브라우저 기준 37개월 전 다음 날 — 경계 하루는 안전하게 뺀다).
+  function earliestDateString(ms){
+    var d = new Date(ms);
+    return ymd(new Date(d.getFullYear(), d.getMonth() - META_LOOKBACK_MONTHS, d.getDate() + 1));
+  }
+
   // ---------------------------------------------------------------- 캐시 키
   function cacheKey(storeId, period, adsetId){
     return String(storeId) + '|' + period + (adsetId ? ('|' + adsetId) : '');
@@ -276,7 +300,8 @@
     var now = opts.now || function(){ return Date.now(); };
     var notify = opts.onChange || function(){};
     var storeId = null;
-    var period = 'month';
+    var period = DEFAULT_PERIOD;
+    var date = null;      // period==='date'일 때만 쓰는 YYYY-MM-DD
     var epoch = 0;        // 초기화/무효화마다 증가 — 이전 세대의 늦은 응답을 버린다
     var cache = {};       // key → { status, at, vm, idByKey, code }
     var inflight = {};    // key → Promise (동일 요청 병합)
@@ -284,11 +309,17 @@
 
     function reset(){ epoch += 1; cache = {}; inflight = {}; open = {}; }
     function fresh(e){ return !!e && e.status === 'ready' && (now() - e.at) < TTL_MS; }
-    function listKey(){ return cacheKey(storeId, period); }
+    function pKey(){ return periodKey(period, date); }
+    function listKey(){ return cacheKey(storeId, pKey()); }
+    function body(extra){
+      var b = { store_id: storeId, scope: 'adsets', period: period };
+      if(period === 'date') b.date = date;
+      return assign(b, extra || {});
+    }
     function setStore(id){
       var next = id === undefined || id === null || id === '' ? null : id;
       if(next === storeId) return false;
-      storeId = next; period = 'month'; reset(); notify();
+      storeId = next; period = DEFAULT_PERIOD; date = null; reset(); notify();
       return true;
     }
 
@@ -321,11 +352,11 @@
 
     function ensureList(){
       if(!storeId) return Promise.resolve(null);
-      return load(listKey(), { store_id: storeId, scope: 'adsets', period: period }, buildListVm);
+      return load(listKey(), body(), buildListVm);
     }
     function ensureAds(adsetId){
-      return load(cacheKey(storeId, period, adsetId),
-        { store_id: storeId, scope: 'ads', period: period, adset_id: adsetId },
+      return load(cacheKey(storeId, pKey(), adsetId),
+        body({ scope: 'ads', adset_id: adsetId }),
         function(d){ return { vm: buildAdsVm(d) }; });
     }
     function adsetIdOf(mk){
@@ -352,9 +383,15 @@
         return ensureList();
       },
       ensureList: ensureList,
-      setPeriod: function(p){
-        if(!PERIOD_LABELS[p] || !storeId || p === period) return Promise.resolve(null);
-        period = p; open = {}; notify();
+      // 'date'는 d(YYYY-MM-DD)가 필요하고 브라우저 기준 오늘 이후 · 37개월
+      // 조회 한도 밖이면 거부한다.
+      setPeriod: function(p, d){
+        if(!PERIOD_LABELS[p] || !storeId) return Promise.resolve(null);
+        if(p === 'date'){
+          if(!isDateString(d) || d > localDateString(now()) || d < earliestDateString(now())) return Promise.resolve(null);
+        } else d = null;
+        if(p === period && d === date) return Promise.resolve(null);
+        period = p; date = d; open = {}; notify();
         return ensureList();
       },
       toggle: function(mk){
@@ -377,6 +414,7 @@
         var e = storeId ? cache[listKey()] : null;
         var view = {
           period: period,
+          date: date,
           status: e ? e.status : 'idle',
           code: e ? e.code : null,
           vm: (e && e.vm) || null,
@@ -388,7 +426,7 @@
             var id = e.idByKey[mk];
             if(!open[id]) return;
             view.open[mk] = true;
-            var a = cache[cacheKey(storeId, period, id)];
+            var a = cache[cacheKey(storeId, pKey(), id)];
             view.ads[mk] = a ? { status: a.status, code: a.code || null, vm: a.vm || null } : { status: 'idle', code: null, vm: null };
           });
         }
@@ -404,7 +442,7 @@
     var count = 0;
     view.vm.campaigns.forEach(function(c){ count += c.adsetCount; });
     if(!count) return '표시할 광고 성과가 없어요.';
-    return PERIOD_LABELS[view.period] + ' 광고 세트 ' + count + '개를 불러왔어요.';
+    return periodLabel(view.period, view.date) + ' 광고 세트 ' + count + '개를 불러왔어요.';
   }
 
   function kpi(label, value){
@@ -413,7 +451,7 @@
 
   function renderError(code, focusKey, retryKind, mk){
     var info = errorInfo(code);
-    var action = info.action === 'link'
+    var action = info.action === 'none' ? '' : info.action === 'link'
       ? '<a class="madsets-error-link" href="' + info.link.href + '" data-mf="' + focusKey + '">' + esc(info.link.text) + '</a>'
       : '<button type="button" class="btn btn-ghost btn-sm" data-madsets-retry="' + retryKind + '"' +
         (mk ? ' data-mk="' + mk + '"' : '') + ' data-mf="' + focusKey + '">다시 시도</button>';
@@ -434,10 +472,10 @@
     }).join('') + '</ul>' + (vm.truncated ? '<p class="madsets-note">' + NOTE_ADS_PARTIAL + '</p>' : '');
   }
 
-  function renderDetail(a, ads, mk){
+  function renderDetail(a, ads, mk, label){
     var h = '<dl class="madsets-detail-list">' + a.detail.map(function(d){ return kpi(d.label, d.value); }).join('') + '</dl>';
     if(a.dataNote) h += '<p class="madsets-datanote">' + esc(a.dataNote) + '</p>';
-    return h + '<div class="madsets-ads"><p class="madsets-ads-title">광고별 성과</p>' + renderAds(ads, mk) + '</div>';
+    return h + '<div class="madsets-ads"><p class="madsets-ads-title">광고별 성과 · ' + esc(label) + '</p>' + renderAds(ads, mk) + '</div>';
   }
 
   // 광고 세트 손익분기 기준 연결 상태 — 원본 Meta adset_id는 여기서도
@@ -498,7 +536,7 @@
         ' aria-expanded="' + (isOpen ? 'true' : 'false') + '" aria-controls="' + detailId + '"' +
         ' aria-labelledby="' + toggleId + ' ' + nameId + '">' + (isOpen ? '상세 접기' : '상세 보기') + '</button>' +
         '<div class="madsets-detail" id="' + detailId + '" role="region" aria-labelledby="' + nameId + '"' + (isOpen ? '' : ' hidden') + '>' +
-        (isOpen ? renderDetail(a, view.ads[mk], mk) : '') + '</div>';
+        (isOpen ? renderDetail(a, view.ads[mk], mk, periodLabel(view.period, view.date)) : '') + '</div>';
     }
     return h + '</div></li>';
   }
@@ -576,8 +614,13 @@
     var vm = view.vm;
     var h = '';
     if(vm.range){
-      h += '<p class="madsets-range">' + esc(vm.range.since + ' ~ ' + vm.range.until) + ' · 광고계정 시간대 기준' +
+      // 카드 · 상세 · 캠페인 합계가 모두 이 한 기간 응답에서 나온다 — 기간 문구도 한 곳.
+      var span = view.period === 'all' ? ('~ ' + vm.range.until)
+        : (vm.range.since === vm.range.until ? vm.range.since : (vm.range.since + ' ~ ' + vm.range.until));
+      var rangeLabel = view.period === 'date' ? '선택한 날짜' : periodLabel(view.period, view.date);
+      h += '<p class="madsets-range">' + esc(rangeLabel + ' · ' + span) + ' · 광고계정 시간대 기준' +
         (vm.timezone ? ' (' + esc(vm.timezone) + ')' : '') + '</p>';
+      if(view.period === 'all') h += '<p class="madsets-note madsets-partial">' + NOTE_ALL_RANGE + '</p>';
     }
     if(vm.truncated) h += '<p class="madsets-note madsets-partial">' + NOTE_LIST_PARTIAL + '</p>';
     if(!vm.campaigns.length) return h + '<p class="madsets-empty">' + MSG_EMPTY_LIST + '</p>';
@@ -587,6 +630,8 @@
   return {
     TTL_MS: TTL_MS,
     PERIOD_LABELS: PERIOD_LABELS,
+    DEFAULT_PERIOD: DEFAULT_PERIOD,
+    periodKey: periodKey, localDateString: localDateString, earliestDateString: earliestDateString,
     fmtMoney: fmtMoney, fmtInt: fmtInt, fmtPercent: fmtPercent, fmtRoas: fmtRoas,
     objectiveLabel: objectiveLabel, displayName: displayName,
     buildListVm: buildListVm, buildAdsVm: buildAdsVm,

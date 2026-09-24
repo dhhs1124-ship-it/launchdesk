@@ -1,0 +1,5 @@
+{
+  "framework": null,
+  "buildCommand": "node scripts/predeploy-privacy-v1_2-gate.js && node --test \"tests/**/*.test.js\" && node scripts/build-static-output.js",
+  "outputDirectory": "dist"
+}

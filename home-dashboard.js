@@ -114,9 +114,11 @@
       lines.push(cafe24ErrorLine());
     } else if(cafe24.state === 'data' && cafe24.today){
       hasRealData = true;
+      // 집계는 취소·환불·미입금 주문을 구분하지 않는다(ops-overview.js loadOrdersFor) —
+      // "발생한 매출"처럼 말하지 않고 마지막 동기화까지 들어온 주문으로만 설명한다.
       lines.push(cafe24.today.count > 0
-        ? ('오늘 주문 ' + cafe24.today.count + '건, 결제금액 ' + formatWon(cafe24.today.payment) + '이 발생했습니다.')
-        : '오늘 접수된 주문이 없어요.');
+        ? ('Cafe24에 오늘 들어온 주문은 ' + cafe24.today.count + '건, 주문금액 합계는 ' + formatWon(cafe24.today.payment) + '이에요(취소·환불·미입금 포함, 마지막 동기화 기준).')
+        : 'Cafe24에 오늘 들어온 주문이 없어요(마지막 동기화 기준).');
     }
 
     if(meta.state === 'data' && meta.today){
@@ -231,8 +233,9 @@
     if(cafe24.state === 'data' && cafe24.month){
       html += '<div class="opsdash-summary-stats">' +
         stat('주문', formatCount(cafe24.month.count)) +
-        stat('결제금액', formatWon(cafe24.month.payment)) +
-        '</div>';
+        stat('주문금액', formatWon(cafe24.month.payment)) +
+        '</div>' +
+        '<p style="margin:.35rem 0 0; font-size:.75rem; color:var(--ink-faint);">취소·환불·미입금 주문 포함 · 주문일 기준</p>';
     } else if(cafe24.state === 'error'){
       html += '<p class="opsdash-empty-note" style="padding:0;">Cafe24 주문 데이터를 불러오지 못했어요.</p>';
     } else {
@@ -261,7 +264,7 @@
     // 광고 그룹에 실제 데이터가 있을 때만 한 줄로 안내(flex-wrap으로 다음
     // 줄 전체 폭을 차지). Cafe24 상태와는 무관하다.
     if(meta.state === 'data' && meta.month){
-      html += '<p style="flex-basis:100%; margin:.4rem 0 0; font-size:.75rem; color:var(--ink-faint);">Meta 광고매출은 Meta 자체 귀속 기준이며, Cafe24 실제 결제금액과 다를 수 있습니다.</p>';
+      html += '<p style="flex-basis:100%; margin:.4rem 0 0; font-size:.75rem; color:var(--ink-faint);">Meta 광고매출·구매는 Meta 자체 귀속 기준이라 Cafe24 주문과 같은 주문이 아니며, 서로 합산하지 않습니다.</p>';
     }
 
     monthSummaryEl.innerHTML = html;

@@ -161,7 +161,11 @@
     error: byId('mcPlanError'), save: byId('mcPlanSave'), discard: byId('mcPlanDiscard'), close: byId('mcPlanClose'),
     ttl: byId('mcPlanTtlNote'), mismatch: byId('mcPlanMismatch'), useCurrent: byId('mcPlanUseCurrent')
   };
-  var hasForm = !!(f.wrap && f.title && f.action && f.date && f.save);
+  // 운영 현황의 "내 계획" 카드(#ldPlanPanel)와 계산기의 "이 조건으로 계획 만들기"
+  // 버튼(#mcPlanOpen)은 현재 화면에서 뺐다 — 저장한 계획을 볼 곳이 없는데 새로
+  // 만들게 두면 막힌 동선이 되므로, 버튼이 없으면 폼(초안 자동 복원 포함)도
+  // 열지 않는다. 기존 계획 데이터(public.plans)는 지우지 않고, 조회도 하지 않는다.
+  var hasForm = !!(f.wrap && f.openBtn && f.title && f.action && f.date && f.save);
   var hasHome = !!(home.panel && home.body);
 
   function nowIso(){ return new Date().toISOString(); }
@@ -801,7 +805,7 @@
       // "불러오는 중"으로 되돌리면 홈이 깜빡이고 안내가 반복 생성된 것처럼 보인다.
       if(prev !== userId || listState !== 'ready') listState = 'loading';
       renderHome();
-      fetchPlans(seq);
+      if(hasHome) fetchPlans(seq); // 목록을 보여줄 카드가 없으면 조회하지 않는다
     } else {
       listState = 'guest';
       renderHome();

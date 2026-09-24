@@ -611,6 +611,8 @@
             <a class="desk-ops-card-btn" href="#/dashboard">운영 현황 보기 →</a>
           </section>
 
+          <p class="ask-inline ask-block">준비하다 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[시작 데스크] 질문">질문하기 →</a></p>
+
         </div>
       </section>
 
@@ -669,22 +671,25 @@
             </div>
 
             <!-- 오늘 핵심 숫자 — 실제 Cafe24 주문/Meta 광고 데이터만 표시.
-                 가짜 증감률(▲12% 등)은 절대 넣지 않는다(요구사항 6). -->
+                 가짜 증감률(▲12% 등)은 절대 넣지 않는다(요구사항 6).
+                 Cafe24 두 칸은 ops-overview.js loadOrdersFor()가 orders를 주문일 기준으로
+                 상태 구분 없이(취소·환불·미입금 포함) 세고 payment_amount를 더한 값이라
+                 "매출"·"결제 완료"라고 부르지 않는다. Meta 광고매출·구매와 합치지 않는다. -->
             <div class="opsdash-kpis" id="opsdashKpis">
               <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">오늘 주문</div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-</div></div>
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Cafe24 오늘 주문</div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-</div><div class="opsdash-kpi-note">취소·환불·미입금 주문 포함</div></div>
                 <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.68 12.39A2 2 0 0 0 9.64 18H18a2 2 0 0 0 1.95-1.57L21 9H6"/><circle cx="9.5" cy="20.5" r="1"/><circle cx="17.5" cy="20.5" r="1"/></svg></div>
               </div>
               <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">오늘 결제금액</div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-</div></div>
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Cafe24 오늘 주문금액</div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-</div><div class="opsdash-kpi-note">주문별 결제금액 합계 · 취소·환불 미차감</div></div>
                 <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
               </div>
               <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Meta 광고비</div><div class="opsdash-kpi-value" id="opsdashKpiSpend">-</div></div>
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Meta 오늘 광고비</div><div class="opsdash-kpi-value" id="opsdashKpiSpend">-</div></div>
                 <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6l-6 4H4z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg></div>
               </div>
               <div class="opsdash-kpi">
-                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">ROAS</div><div class="opsdash-kpi-value" id="opsdashKpiRoas">-</div><div class="opsdash-kpi-note" id="opsdashKpiRoasNote"></div></div>
+                <div class="opsdash-kpi-main"><div class="opsdash-kpi-label">Meta 오늘 ROAS</div><div class="opsdash-kpi-value" id="opsdashKpiRoas">-</div><div class="opsdash-kpi-note" id="opsdashKpiRoasNote"></div></div>
                 <div class="opsdash-kpi-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg></div>
               </div>
             </div>
@@ -722,8 +727,12 @@
                 <h2 class="madsets-title" id="metaAdsetsTitle">광고별 성과 보기</h2>
                 <div class="madsets-controls">
                   <div class="madsets-period" role="group" aria-label="조회 기간">
-                    <button type="button" class="madsets-period-btn" data-madsets-period="today" aria-pressed="false">오늘</button>
-                    <button type="button" class="madsets-period-btn" data-madsets-period="month" aria-pressed="true">이번 달</button>
+                    <button type="button" class="madsets-period-btn" data-madsets-period="today" aria-pressed="true">오늘</button>
+                    <button type="button" class="madsets-period-btn" data-madsets-period="yesterday" aria-pressed="false">어제</button>
+                    <button type="button" class="madsets-period-btn" data-madsets-period="month" aria-pressed="false">이번 달</button>
+                    <button type="button" class="madsets-period-btn" data-madsets-period="all" aria-pressed="false">전체</button>
+                    <!-- 하루 단위 날짜 선택 — max(오늘) · min(Meta 37개월 조회 한도)은 meta-adsets.js가 채운다. -->
+                    <label class="madsets-date"><span class="sr-only">날짜 선택(하루)</span><input type="date" id="metaAdsetsDate" class="madsets-date-input"></label>
                   </div>
                   <button type="button" class="btn btn-ghost btn-sm madsets-refresh" id="metaAdsetsRefresh">새로고침</button>
                 </div>
@@ -734,21 +743,8 @@
               </div>
             </section>
 
-            <!-- 내 계획 — 마진 계산기에서 만든 계획을 재확인일 순으로(지난 날짜·
-                 오늘 → 예정, 완료는 분리) 보여준다. 내용 렌더링·저장은 전부
-                 plans.js(public.plans, RLS 본인 행만). 오픈 베타 전 단순화(3차)로
-                 홈(#/)에서 이 화면(#/dashboard, 주문·광고 성과 아래)으로 옮겼다 —
-                 마크업 자체를 옮긴 것이라 DOM에 #ldPlanPanel은 항상 정확히 1개만
-                 존재한다. .ldplan-* CSS 규칙이 쓰는 --op-accent-ink 등은 이 화면의
-                 .opsdash(#opsdashRoot) 조상에서 이미 정의되므로 별도 .opsdash 래퍼가
-                 더 필요 없다. 비회원 처리는 plans.js renderHome()이 전담 —
-                 listState==='guest'일 때 패널 자체를 숨겨(위 게스트 게이트가 이미
-                 안내하므로 중복 안내 없음) 로그인 사용자에게만 보인다. -->
-            <div class="dash-panel ldplan-panel" id="ldPlanPanel">
-              <div class="dash-panel-head">내 계획 <span class="ldplan-head-note" id="ldPlanHeadNote"></span></div>
-              <div class="ldplan-draft" id="ldPlanDraftNotice" hidden></div>
-              <div id="ldPlanBody"></div>
-            </div>
+            <!-- "내 계획" 카드(#ldPlanPanel)는 제거했다 — 계획 데이터(public.plans)는
+                 지우지 않았고, plans.js는 이 카드가 없으면 목록을 조회하지 않는다. -->
 
             <!-- 하단 3열 — 도매처 / 세팅 대행 / 연결 상태(요구사항 8, 오픈 베타 전
                  단순화 3차로 "다음 할 일" 중복 CTA는 제거). 세팅 대행은 실제 플랜
@@ -1152,6 +1148,7 @@
             <nav class="s0-nav" aria-label="STEP 이동">
               <a class="s0-btn s0-btn-primary" href="#/start/prepare">STEP 01 시작하기 →</a>
               <a class="s0-btn s0-btn-ghost" href="#/start">전체 로드맵 보기</a>
+              <p class="ask-inline">오리엔테이션에서 궁금한 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 00 · 오리엔테이션] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -1429,6 +1426,7 @@
                 <a class="s1-btn s1-btn-ghost s1-nav-prev" href="#/start/intro">← STEP 00 · 오픈 로드맵 확인하기</a>
                 <a class="s1-btn s1-btn-primary s1-nav-next" href="#/start/setup" id="s1Next">STEP 02로 이동 →</a>
               </div>
+              <p class="ask-inline">STEP 01에서 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 01 · 방향 정하기] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -1696,6 +1694,7 @@
                 <a class="s2-btn s2-btn-ghost s2-nav-prev" href="#/start/prepare">← STEP 01 · 무엇을, 누구에게 팔지 정하기</a>
                 <a class="s2-btn s2-btn-primary s2-nav-next" href="#/start/sourcing" id="s2Next">STEP 03 · 판매할 상품과 공급처, 가격 확정하기 →</a>
               </div>
+              <p class="ask-inline">STEP 02에서 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 02 · 사업자 · 플랫폼] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -1970,6 +1969,7 @@
                 <a class="s6-btn s6-btn-ghost s6-nav-prev" href="#/start/orders">← STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기</a>
                 <a class="s6-btn s6-btn-primary s6-nav-next" href="#/start/marketing" id="s6Next">STEP 07 · 첫 유입 만들고 반응 테스트하기 →</a>
               </div>
+              <p class="ask-inline">STEP 06에서 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 06 · 마케팅 인프라 세팅] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -2267,6 +2267,7 @@
                 <a class="s4-btn s4-btn-ghost s4-nav-prev" href="#/start/sourcing">← STEP 03 · 판매할 상품과 공급처, 가격 확정하기</a>
                 <a class="s4-btn s4-btn-primary s4-nav-next" href="#/start/orders" id="s4Next">STEP 05 · 배송·CS 정책 정하고 오픈 준비 마치기 →</a>
               </div>
+              <p class="ask-inline">STEP 04에서 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 04 · 촬영 & 상세페이지] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -2568,6 +2569,7 @@
                 <a class="s7-btn s7-btn-ghost s7-nav-prev" href="#/start/marketing-setup">← STEP 06 · 마케팅 인프라 연결하기</a>
                 <a class="s7-btn s7-btn-primary s7-nav-next" href="#/start/wrapup" id="s7Next">STEP 08 · 오픈 완료, 운영 시작하기 →</a>
               </div>
+              <p class="ask-inline">STEP 07에서 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 07 · 유입 · 반응 테스트] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -2873,6 +2875,7 @@
                 <a class="s5-btn s5-btn-ghost s5-nav-prev" href="#/start/content">← STEP 04 · 상품 상세페이지 완성하기</a>
                 <a class="s5-btn s5-btn-primary s5-nav-next" href="#/start/marketing-setup" id="s5Next">STEP 06 · 마케팅 인프라 연결하기 →</a>
               </div>
+              <p class="ask-inline">STEP 05에서 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 05 · 배송 · CS · 오픈 준비] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -3033,6 +3036,7 @@
                 <a class="s8-btn s8-btn-primary" href="#/dashboard">운영 현황으로 이동 →</a>
                 <a class="s8-btn s8-btn-ghost" href="#/start">쇼핑몰 준비 로드맵 다시 보기</a>
               </div>
+              <p class="ask-inline">STEP 08에서 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 08 · 마무리] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -3114,6 +3118,8 @@
               <p class="res-external-note"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg><span>외부 서비스의 요금과 기능은 변경될 수 있습니다. 이용 전 공식 사이트에서 확인해주세요.</span></p>
               <div class="res-external-grid" id="resExternalGrid"></div>
             </div>
+
+            <p class="ask-inline ask-block">찾는 내용이 없나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[자료실] 질문">질문하기 →</a></p>
           </div>
 
           <div class="res-panel" id="resGuidePanel" hidden>
@@ -3151,6 +3157,8 @@
               <p>조건에 맞는 질문이 없어요.</p>
               <button type="button" class="btn btn-ghost" id="resFaqEmptyReset">전체 보기</button>
             </div>
+
+            <p class="ask-inline ask-block">원하는 답을 찾지 못했나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[자료실 · 초보 사장님 질문] 질문">질문하기 →</a></p>
           </div>
         </div>
       </section>
@@ -3459,6 +3467,7 @@
                 <a class="s3-btn s3-btn-ghost s3-nav-prev" href="#/start/setup">← STEP 02 · 사업자 등록하고 쇼핑몰 플랫폼 만들기</a>
                 <a class="s3-btn s3-btn-primary s3-nav-next" href="#/start/content" id="s3Next">STEP 04 · 상품 상세페이지 완성하기 →</a>
               </div>
+              <p class="ask-inline">STEP 03에서 막힌 점이 있나요? <a href="#/contact" data-ask-category="beginner" data-ask-subject="[STEP 03 · 상품 기획] 질문">질문하기 →</a></p>
             </nav>
 
           </div>
@@ -3475,7 +3484,7 @@
       </div>
 
       <div class="callout">
-        <p><strong>마진 계산기는 로그인 없이도 지금 바로 실제로 계산해볼 수 있어요.</strong> 로그인하면 계산 결과 저장 · 불러오기, 이 조건으로 계획 만들기까지 그대로 이용할 수 있어요.</p>
+        <p><strong>마진 계산기는 로그인 없이도 지금 바로 실제로 계산해볼 수 있어요.</strong> 로그인하면 계산 결과 저장 · 불러오기까지 그대로 이용할 수 있어요.</p>
       </div>
 
       <!-- 오픈 베타 전 단순화(3차)로 "쇼핑몰 운영 현황"(#opsOverviewPanel)과
@@ -3784,12 +3793,13 @@
                   <div class="mc-result-facts" id="mcResultFacts"></div>
                   <div class="mc-result-facts" id="mcResultBreakeven"></div>
 
-                  <!-- 주 행동은 "계획 만들기"(베타 핵심 행동), 계산 기록 저장은
-                       보조 행동으로 약하게. 두 버튼 모두 예시·오류·미계산
-                       상태에서는 숨김/비활성(tools.js mcRender). -->
+                  <!-- 주 행동은 계산 기록 저장. "이 조건으로 계획 만들기"(#mcPlanOpen)는
+                       운영 현황의 "내 계획" 카드를 뺀 뒤로 저장한 계획을 볼 곳이 없어
+                       함께 뺐다(plans.js는 이 버튼이 없으면 계획 폼을 열지 않는다 ·
+                       기존 계획 데이터는 그대로). 예시·오류·미계산 상태에서는
+                       숨김/비활성(tools.js mcRender). -->
                   <div class="mc-actions">
-                    <button type="button" class="btn btn-primary" id="mcPlanOpen" style="width:100%; justify-content:center;">이 조건으로 계획 만들기</button>
-                    <button type="button" class="btn btn-ghost btn-sm mc-secondary-action" id="toolsSaveCalc">결과 저장</button>
+                    <button type="button" class="btn btn-primary" id="toolsSaveCalc" style="width:100%; justify-content:center;">결과 저장</button>
                     <button type="button" class="btn btn-primary" id="mcExampleAdopt" style="width:100%; justify-content:center;" hidden>이 예시를 수정해서 내 상품 계산하기</button>
                     <div class="mc-save-hint" id="mcSaveHint" hidden></div>
                   </div>
@@ -4117,7 +4127,7 @@
         <section class="support-card">
           <span class="support-index">02</span>
           <h2>로그인 후 이어가기</h2>
-          <p>계산 기록과 실행 계획을 저장하고, 쇼핑몰을 등록해 운영 현황을 확인할 수 있어요. 주문과 광고 지표는 해당 계정을 직접 연결한 경우에 표시됩니다.</p>
+          <p>계산 기록을 저장하고, 쇼핑몰을 등록해 운영 현황을 확인할 수 있어요. 주문과 광고 지표는 해당 계정을 직접 연결한 경우에 표시됩니다.</p>
           <div class="support-actions">
             <a href="#/login" class="support-link">로그인하기 →</a>
             <a href="#/dashboard" class="support-link">운영 현황 보기 →</a>
@@ -4126,7 +4136,7 @@
         <section class="support-card">
           <span class="support-index">03</span>
           <h2>질문이 생겼다면</h2>
-          <p>자료실에서 관련 설명을 찾아보고, 해결되지 않으면 이메일로 질문해주세요. 문의는 로그인하지 않아도 보낼 수 있어요.</p>
+          <p>자료실에서 관련 설명을 찾아보고, 해결되지 않으면 이메일로 질문해주세요. 사이트 안 문의는 로그인한 회원만 보낼 수 있어요.</p>
           <div class="support-actions">
             <a href="#/resources" class="support-link">자료실 보기 →</a>
             <a href="#/contact" class="support-link">질문 보내기 →</a>
@@ -4142,28 +4152,57 @@
       <header class="support-head">
         <span class="eyebrow">도움이 필요할 때</span>
         <h1>질문과 문의</h1>
-        <p>쇼핑몰을 준비하며 막힌 점이나 런치데스크 이용 중 불편한 점을 이메일로 보내주세요.</p>
+        <p>쇼핑몰을 준비하다 막힌 점이나 런치데스크 이용 중 불편한 점을 남겨주세요. 문의하기는 회원 전용이에요.</p>
       </header>
-      <div class="support-grid">
-        <section class="support-card">
-          <h2>초보 사장님 질문</h2>
-          <p>상품, 배송, 쇼핑몰 설정처럼 지금 막힌 부분을 알려주세요. 상황을 구체적으로 적어주시면 답변에 도움이 됩니다.</p>
-          <a class="btn btn-primary" href="mailto:dhhs1124@gmail.com?subject=%5BLaunchDesk%5D%20%EC%87%BC%ED%95%91%EB%AA%B0%20%EC%8B%9C%EC%9E%91%20%EC%A7%88%EB%AC%B8">질문 이메일 보내기</a>
-        </section>
-        <section class="support-card">
-          <h2>서비스 이용 문의</h2>
-          <p>오류가 난 화면 주소, 어떤 버튼을 눌렀는지, 나타난 메시지를 알려주세요. 비밀번호나 인증 코드는 보내지 마세요.</p>
-          <a class="btn btn-ghost" href="mailto:dhhs1124@gmail.com?subject=%5BLaunchDesk%5D%20%EC%84%9C%EB%B9%84%EC%8A%A4%20%EC%98%A4%EB%A5%98%20%EB%AC%B8%EC%9D%98">오류 문의 이메일 보내기</a>
-        </section>
-        <section class="support-card">
-          <h2>택배·도매 제휴 문의</h2>
-          <p>활동 지역과 제공 가능한 서비스, 공개 가능한 업체 정보를 알려주세요. 업체 정보는 확인과 동의를 거친 뒤 소개합니다.</p>
-          <a class="btn btn-ghost" href="mailto:dhhs1124@gmail.com?subject=%5BLaunchDesk%5D%20%ED%83%9D%EB%B0%B0%C2%B7%EB%8F%84%EB%A7%A4%20%EC%A0%9C%ED%9C%B4%20%EB%AC%B8%EC%9D%98">제휴 문의 이메일 보내기</a>
-        </section>
+      <!-- 비회원 안내·문의 폼 전환은 contact.js가 로그인 상태로 한다(둘 다
+           처음엔 숨김 — 세션 확인 전 깜빡임 방지). 로그인 링크는 app.js의
+           a[href="#/login"] 위임 핸들러가 기존 로그인 모달로 연다. -->
+      <div class="empty-state" id="contactGuestNotice" hidden>
+        <div class="es-icon">🔒</div>
+        <p>문의하기는 로그인한 회원만 이용할 수 있어요. 로그인하면 계정 이메일로 답변을 받을 수 있어요.</p>
+        <a class="btn btn-primary" href="#/login">로그인</a>
       </div>
+      <form class="support-contact-form" id="contactForm" novalidate hidden>
+        <input class="support-trap" id="contactWebsite" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="support-form-grid">
+          <div class="support-field">
+            <label for="contactCategory">문의 유형 <span aria-hidden="true">*</span></label>
+            <select id="contactCategory" name="category" required>
+              <option value="beginner">쇼핑몰 시작 질문</option>
+              <option value="service">사이트 이용·오류</option>
+              <option value="partner">택배·도매 제휴</option>
+            </select>
+          </div>
+          <div class="support-field">
+            <label for="contactEmail">답변받을 이메일 <span aria-hidden="true">*</span></label>
+            <input id="contactEmail" name="email" type="email" autocomplete="email" maxlength="254" placeholder="example@email.com" required>
+          </div>
+          <div class="support-field">
+            <label for="contactPhone">연락처 <span class="support-optional">선택</span></label>
+            <input id="contactPhone" name="phone" type="tel" autocomplete="tel" maxlength="30" placeholder="전화 연락을 원할 때만 입력해주세요">
+          </div>
+          <div class="support-field">
+            <label for="contactSubject">제목 <span aria-hidden="true">*</span></label>
+            <input id="contactSubject" name="subject" type="text" maxlength="100" required>
+          </div>
+          <div class="support-field support-field-wide">
+            <label for="contactMessage">문의 내용 <span aria-hidden="true">*</span></label>
+            <textarea id="contactMessage" name="message" rows="7" minlength="20" maxlength="3000" placeholder="어떤 점이 궁금한지 자세히 적어주세요. 사이트 오류라면 화면 주소와 오류가 난 과정을 알려주세요. 비밀번호나 인증 코드는 적지 마세요." required></textarea>
+            <span class="support-field-hint">20~3,000자 · 비밀번호나 인증 코드는 보내지 마세요.</span>
+          </div>
+        </div>
+        <div class="consent-block support-consent">
+          <p class="consent-info"><strong>수집 항목</strong> 이메일, 문의 유형·제목·내용, 입력한 경우에만 연락처. <strong>이용 목적</strong> 문의 접수와 답변. <strong>보유 기간</strong> 문의 처리 완료 후 1년이 지나면 운영자가 Gmail에서 받은 문의와 보낸 답장을 늦어도 7일 이내에 휴지통으로 옮기며, 휴지통으로 옮긴 메일은 30일이 지나면 영구 삭제됩니다. <strong>동의 거부 시</strong> 문의 접수가 제한됩니다.</p>
+          <div class="consent-row">
+            <label><input type="checkbox" id="contactConsent" required><span>[필수] 문의 접수를 위한 개인정보 수집·이용 동의</span></label>
+            <a href="#/privacy" target="_blank" rel="noopener">개인정보처리방침 보기</a>
+          </div>
+        </div>
+        <p id="contactFormStatus" class="support-form-status" role="status" aria-live="polite" hidden></p>
+        <button class="btn btn-primary support-submit" id="contactSubmit" type="submit" disabled>문의 보내기</button>
+      </form>
       <div class="support-note">
-        <p>메일 앱이 열리지 않으면 <a href="mailto:dhhs1124@gmail.com">dhhs1124@gmail.com</a>으로 직접 보내주세요. 문의는 순서대로 확인합니다. 답변 내용은 개별 상황에 따라 달라질 수 있어요.</p>
-        <p>이메일 주소와 문의 내용은 회신을 위해 사용하며, 처리 방식은 <a href="#/privacy">개인정보처리방침</a>에서 확인할 수 있습니다.</p>
+        <p>폼을 사용할 수 없다면 <a href="mailto:dhhs1124@gmail.com">dhhs1124@gmail.com</a>으로 직접 보내주세요. 문의는 순서대로 확인합니다. 답변 내용은 개별 상황에 따라 달라질 수 있어요.</p>
       </div>
     </div>
   </section>
@@ -4175,7 +4214,8 @@
         <header class="privacy-head">
           <span class="privacy-badge">개인정보처리방침</span>
           <h1>런치데스크 개인정보처리방침</h1>
-          <p class="privacy-meta">시행일 2026년 9월 22일 · v1.1 · 런치데스크(운영자 김대환)</p>
+          <p class="privacy-meta">시행일 [게시 예정일] · v1.2 · 런치데스크(운영자 김대환)</p>
+          <!-- [공개 전 확정 필요] "[게시 예정일]"을 실제 게시일로 바꾼 뒤 게시할 것 — 15번 항목의 시행일과 동일하게 맞출 것. -->
         </header>
 
         <div class="privacy-layout">
@@ -4217,6 +4257,7 @@
                 <li>쇼핑몰 판매·광고 데이터 연동 — Cafe24 계정 연동을 통한 쇼핑몰 주문 데이터 조회·저장, Meta 광고계정 연동을 통한 광고 성과 조회, 광고 세트 손익분기 기준 연결 기능을 사용하는 경우 그 연결 정보 저장</li>
                 <li>세팅 대행 문의 확인, 상담 및 진행 일정 안내</li>
                 <li>도매처 등록 문의 응대</li>
+                <li>일반 문의(쇼핑몰 시작 질문·사이트 이용 오류·택배/도매 제휴) 접수 및 이메일 답변, 회원 확인 및 발송 횟수 제한</li>
                 <li>서비스 이용 현황 분석 및 서비스 개선(Google Analytics 4를 통한 접속·이용 통계 분석)</li>
               </ul>
             </section>
@@ -4241,6 +4282,7 @@
                     <tr><td>광고 세트 손익분기 기준 연결 정보</td><td>이용자가 직접 연결한 Meta 광고 세트 식별자, 상품 구분용 이름, 연결 시점의 마진 계산 기준(매출·매입원가 등)</td><td>이용자가 광고 세트 손익분기 기준 연결 기능을 사용하는 경우에만 저장(사용하지 않으면 저장되지 않음)</td></tr>
                     <tr><td>세팅 대행 문의</td><td>성함, 연락처, 쇼핑몰 플랫폼, 요청사항, 신청 플랜</td><td>문의 폼 작성 시 이용자가 직접 입력(로그인 여부 무관) · 별도 필수 동의 체크 시에만 접수</td></tr>
                     <tr><td>도매처 등록 문의</td><td>이메일 등 연락처, 도매처 정보, 문의 내용</td><td>문의 폼 작성 시 이용자가 직접 입력</td></tr>
+                    <tr><td>일반 문의(회원 전용)</td><td>답변받을 이메일, 문의 유형, 제목, 문의 내용, 입력한 경우에 한한 연락처, 로그인 계정 이메일</td><td>로그인한 회원이 문의 화면(#/contact)에서 직접 입력(답변받을 이메일은 로그인 계정 이메일이 기본값이며 수정 가능) · 별도 필수 동의 체크 시에만 접수. 로그인 계정 이메일은 회원 확인을 위해 로그인 정보에서 함께 확인됨</td></tr>
                     <tr><td>서비스 이용 기록</td><td>접속 페이지, 서비스 이용 이벤트, 세션 식별자, 최초 유입 경로</td><td>서비스 이용 과정에서 자동 생성</td></tr>
                     <tr><td>자동 분석 정보</td><td>접속 통계 등 Google Analytics 4가 수집하는 분석 정보</td><td>웹사이트 접속 시 자동 수집(11번 항목 참고)</td></tr>
                   </tbody>
@@ -4249,6 +4291,7 @@
               <p>Google 계정으로 로그인하는 경우 이용자는 Google의 인증 화면으로 이동해 본인의 Google 계정으로 직접 인증합니다. 인증이 완료되면 Google이 이메일 주소 등 이용자가 허용한 정보를 서비스의 인증 처리 시스템(Supabase)으로 전달하며, 회사는 이 정보로 회원을 식별하고 로그인을 유지합니다. 이 과정에서 회사가 이용자의 STEP 진행 데이터, 실행 계획, 마진 계산 기록, 광고 기록 등 서비스 이용 데이터를 Google에 별도로 전송하지는 않습니다. 이렇게 전달받아 회사가 보유하는 이메일 등 인증 정보는 Google 계정 연결 해제, 회원 탈퇴 또는 인증 목적 달성 시까지 보관하며, Google이 독자적으로 보유·처리하는 인증 관련 정보는 Google의 개인정보처리방침(<a href="https://policies.google.com/privacy">https://policies.google.com/privacy</a>)에 따릅니다.</p>
               <p>Cafe24·Meta 계정 연동도 구조는 비슷합니다 — 이용자가 Cafe24·Meta의 인증 화면으로 이동해 본인 계정으로 직접 인증하고 연동 권한을 부여하면, 회사는 그 권한(access token)으로 이용자 본인의 쇼핑몰·광고 데이터를 조회해 옵니다. 이 access token은 이용자의 브라우저로 전달되지 않고 회사 서버에만 보관됩니다. Meta 광고 성과(광고비·노출·클릭·구매 등 지표)는 화면에서 조회할 때마다 Meta로부터 그때그때 가져오며, 서버에 별도로 저장하지 않습니다 — 광고 세트 손익분기 기준 연결 정보는 이용자가 그 기능을 직접 사용한 경우에만 저장되는 별개의 기능입니다.</p>
               <p>다만 Cafe24 연동을 통해 조회·저장되는 주문 데이터에는 이용자의 쇼핑몰을 이용한 주문자·수령인의 성명·연락처·배송지 등 제3자(쇼핑몰 고객)의 정보가 포함될 수 있습니다. 이는 이용자가 쇼핑몰 운영자로서 이미 보유한 정보를 서비스가 조회·저장하는 것입니다.</p>
+              <p>일반 문의는 로그인한 회원만 보낼 수 있습니다. 서버는 접수 시 로그인 정보로 회원 여부를 확인하며, 발송 횟수 제한을 위해 로그인 계정 이메일 주소와 문의 내용을 비밀값과 함께 되돌릴 수 없는 방식(해시)으로 변환한 값만 짧은 기간(7일·2일) 저장합니다. 이 값들은 정해진 시각에 자동으로 삭제되는 것이 아니라 이후 새로운 문의가 접수될 때 함께 정리되므로, 그 사이 새 문의가 없으면 기준 기간이 지난 뒤에도 남아 있을 수 있습니다. 문의 원문과 이메일 주소 자체는 데이터베이스에 저장되지 않으며, 실제 메일은 Resend를 통해 운영자 Gmail로 전달됩니다.</p>
             </section>
 
             <section id="pv-4" class="privacy-sec">
@@ -4263,6 +4306,10 @@
                 <li><strong>광고 세트 손익분기 기준 연결 정보</strong> — 연결을 해제하거나 12번 항목의 이메일로 삭제를 요청할 때까지 보유합니다.</li>
                 <li><strong>세팅 대행 문의</strong> — 문의 처리 완료 후 3개월간 보유한 뒤 파기합니다.</li>
                 <li><strong>도매처 등록 문의, 개인정보 관련 이메일 문의·회신 기록</strong> — 문의 처리 완료 후 1년간 보유한 뒤 파기합니다.</li>
+                <li><strong>일반 문의</strong> — 운영자 Gmail에 보관되며, 운영자가 받은 문의와 보낸 답장을 직접 삭제합니다. 문의 처리 완료 후 1년이 지나면 매주 정기 점검을 통해 늦어도 7일 이내에 휴지통으로 옮기고, 휴지통으로 옮긴 메일은 30일이 지나면 Gmail에서 영구 삭제됩니다.</li>
+                <li><strong>일반 문의 발송 기록(Resend)</strong> — 메일 발송을 대행하는 Resend가 발송한 메일 내용과 발송 기록을 Resend의 보관 정책에 따라 30일간 보관합니다. 운영자 Gmail에 보관되는 문의 메일과는 별개입니다.</li>
+                <li><strong>일반 문의 발송 횟수 제한용 이메일 해시값</strong> — 비밀값을 섞어 되돌릴 수 없게 만든 값으로, 접수일 기준 7일이 지난 값은 이후 새 문의가 접수될 때 함께 정리됩니다. 정해진 시각에 자동으로 지워지는 것은 아니라서, 그 사이 새 문의가 없으면 7일이 지난 뒤에도 남아 있을 수 있습니다.</li>
+                <li><strong>일반 문의 중복 발송 방지용 식별자·내용 해시값</strong> — 무작위 식별자와 문의 내용을 되돌릴 수 없게 변환한 값으로, 저장일 기준 2일이 지난 값은 이후 문의가 성공적으로 접수될 때 함께 정리됩니다. 정해진 시각에 자동으로 지워지는 것은 아니라서, 그 사이 성공적으로 접수되는 문의가 없으면 2일이 지난 뒤에도 남아 있을 수 있습니다.</li>
                 <li><strong>Google Analytics 4 분석 정보</strong> — 이벤트 데이터와 사용자 데이터 모두 각각 14개월간 보관되며, 보관 기간 중 새로운 활동이 발생해도 기간이 다시 연장되지 않습니다.</li>
                 <li><strong>브라우저 localStorage에 저장되는 정보</strong> — 이용자가 브라우저 데이터를 삭제하거나 해당 기능에서 초기화할 때까지 보관됩니다. 항목별 세부 사항은 11번 항목의 표를 참고해 주세요.</li>
                 <li><strong>브라우저 sessionStorage에 저장되는 정보</strong> — 브라우저 탭 또는 세션이 종료될 때까지 보관됩니다.</li>
@@ -4286,8 +4333,9 @@
                   </thead>
                   <tbody>
                     <tr><td>Supabase</td><td>회원 인증 처리, 서비스 데이터베이스 저장</td><td>기본 저장 위치는 대한민국(서울, ap-northeast-2 리전)이며, 서비스 운영·보안 관리·기술지원 목적으로 국외 소재 인력 또는 재수탁자가 제한적으로 접근·처리할 수 있습니다 — 자세한 내용은 7번 항목 참고</td></tr>
-                    <tr><td>Google LLC</td><td>웹사이트 이용 통계 분석(Google Analytics 4), 웹폰트(Google Fonts) 제공, 개인정보 관련 문의 이메일(dhhs1124@gmail.com, Gmail) 수신·보관</td><td>국외(미국) — 자세한 내용은 7번 항목 참고. Google 계정 로그인(OAuth)은 위탁이 아닌 외부 인증 서비스 연동이며 3번 항목 참고. 문의 이메일 보유기간은 4번 항목과 동일(세팅 대행 문의 3개월, 그 외 문의 1년)</td></tr>
+                    <tr><td>Google LLC</td><td>웹사이트 이용 통계 분석(Google Analytics 4), 웹폰트(Google Fonts) 제공, 세팅 대행·도매처 등록·일반 문의 이메일(dhhs1124@gmail.com, Gmail) 수신·보관</td><td>국외(미국) — 자세한 내용은 7번 항목 참고. Google 계정 로그인(OAuth)은 위탁이 아닌 외부 인증 서비스 연동이며 3번 항목 참고. 문의 이메일 보유기간은 4번 항목과 동일(세팅 대행 문의 3개월, 도매처 등록·개인정보 관련 문의 1년, 일반 문의는 처리 완료 1년 후 휴지통 이동, 휴지통 이동 30일 후 영구 삭제)</td></tr>
                     <tr><td>Vercel Inc.</td><td>웹사이트 정적 파일 호스팅</td><td>국외(미국) — 자세한 내용은 7번 항목 참고</td></tr>
+                    <tr><td>Resend, Inc.</td><td>일반 문의 이메일 발송 대행</td><td>국외(미국) — Resend는 데이터처리계약(DPA)에 따라 회사를 대신해 일반 문의 메일을 발송하며, 이 과정에서 메일 내용·발송 기록이 미국에 저장·처리되므로 7번 항목(국외 이전)에도 함께 적습니다. Resend의 보관기간은 4번 항목 참고</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -4313,7 +4361,8 @@
                     <tr><td>Google LLC(Google Analytics 4)</td><td>접속 페이지, 이용 이벤트 등 분석 정보</td><td>미국</td><td>서비스 이용 현황 분석</td><td>웹사이트 접속 시 네트워크를 통해 실시간 전송</td><td>이벤트·사용자 데이터 각 14개월(활동 발생 시 재연장 없음)</td></tr>
                     <tr><td>Google LLC(Google Fonts)</td><td>접속 IP 주소(폰트 파일 요청 과정에서 전달될 수 있음)</td><td>미국</td><td>웹사이트 글꼴(Noto Sans KR) 제공</td><td>웹사이트 접속 시 네트워크를 통해 실시간 전송</td><td>회사는 이 정보를 별도로 저장하지 않으며, Google의 처리는 Google 개인정보처리방침에 따릅니다</td></tr>
                     <tr><td>Vercel Inc.</td><td>웹사이트 접속 시 발생하는 접속 기록(IP 주소 등)</td><td>미국</td><td>웹사이트 정적 파일 호스팅</td><td>웹사이트 접속 시 네트워크를 통해 실시간 전송</td><td>서비스 제공·보안 목적 달성 또는 서비스 이용계약 종료 시까지(법령상 의무 또는 Vercel의 보안정책에 따라 필요한 범위는 예외)</td></tr>
-                    <tr><td>Google LLC(Gmail)</td><td>문의 시 이용자가 이메일에 기재한 성함·연락처 등 문의 내용</td><td>미국</td><td>세팅 대행 문의, 도매처 등록 문의, 개인정보 관련 문의 접수·회신</td><td>이용자가 이메일을 보낼 때 네트워크를 통해 전송</td><td>4번 항목과 동일(세팅 대행 문의 3개월, 그 외 문의 1년)</td></tr>
+                    <tr><td>Google LLC(Gmail)</td><td>문의 시 이용자가 이메일에 기재한 성함·연락처 등 문의 내용</td><td>미국</td><td>세팅 대행 문의, 도매처 등록 문의, 일반 문의, 개인정보 관련 문의 접수·회신</td><td>이용자가 이메일을 보낼 때 네트워크를 통해 전송</td><td>4번 항목과 동일(세팅 대행 문의 3개월, 도매처 등록·개인정보 관련 문의 1년, 일반 문의는 처리 완료 1년 후 휴지통 이동, 휴지통 이동 30일 후 영구 삭제)</td></tr>
+                    <tr><td>Resend, Inc.</td><td>이메일 주소(답변받을 이메일·로그인 계정 이메일), 연락처, 문의 유형·제목·내용</td><td>미국</td><td>일반 문의 메일 발송</td><td>문의 제출 시 네트워크를 통해 실시간 전송</td><td>발송한 메일 내용·발송 기록 30일(Resend 보관 정책). 운영자 Gmail 보관은 위 Google LLC(Gmail) 행 참고</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -4323,6 +4372,7 @@
                 <li>Supabase 재수탁자 목록: <a href="https://supabase.com/legal/customer-resources/subprocessor-list">supabase.com/legal/customer-resources/subprocessor-list</a></li>
                 <li>Google 개인정보처리방침: <a href="https://policies.google.com/privacy">policies.google.com/privacy</a></li>
                 <li>Vercel 개인정보처리방침: <a href="https://vercel.com/legal/privacy-policy">vercel.com/legal/privacy-policy</a></li>
+                <li>Resend 데이터 보관 설명: <a href="https://resend.com/security/gdpr">resend.com/security/gdpr</a> · Resend DPA: <a href="https://resend.com/legal/dpa">resend.com/legal/dpa</a></li>
               </ul>
             </section>
 
@@ -4400,14 +4450,18 @@
               <h2>14. 개인정보처리방침 변경</h2>
               <p>이 방침은 법령·정책 또는 서비스 내용 변경에 따라 수정될 수 있습니다. 내용이 변경되는 경우 변경 사항과 시행일을 이 페이지에 게시하는 방법으로 고지합니다.</p>
               <p><strong>v1.0 → v1.1 주요 변경 사항(2026년 9월 22일 시행)</strong> — Cafe24·Meta 계정 연동, Cafe24 주문 데이터, 광고 세트 손익분기 기준 연결 정보의 수집 항목과 처리 방식을 3번 항목에 반영했습니다. 기존에 개인정보처리방침(v1.0)에 동의한 회원은 다음 로그인 시 변경된 방침에 대한 재동의 절차를 거치게 됩니다.</p>
+              <p><strong>v1.1 → v1.2 주요 변경 사항([게시 예정일] 시행)</strong> — 사이트 내 회원 전용 일반 문의 폼(#/contact) 신설에 따라, 일반 문의의 수집 항목·처리 목적·보유기간과 Resend 관련 내용을 2·3·4·6·7번 항목에 반영했습니다. 기존에 개인정보처리방침(v1.1)에 동의한 회원은 다음 로그인 시 변경된 방침에 대한 재동의 절차를 거치게 됩니다.</p>
             </section>
 
             <section id="pv-15" class="privacy-sec">
               <h2>15. 시행일과 버전</h2>
               <ul class="privacy-plain-list">
-                <li>버전: v1.1(이전 버전: v1.0, 2026년 9월 18일 시행)</li>
-                <li>시행일: 2026년 9월 22일</li>
+                <li>버전: v1.2(이전 버전: v1.1, 2026년 9월 22일 시행)</li>
+                <li>시행일: [게시 예정일]</li>
               </ul>
+              <!-- [공개 전 확정 필요] 실제 게시 시점의 날짜로 바꿀 것 — 위 privacy-meta,
+                   14번 항목의 날짜와 반드시 동일하게 맞출 것(세 곳 모두).
+                   tests/privacy-version-consistency.test.js도 이 값을 검사한다. -->
             </section>
 
           </div>
@@ -4704,6 +4758,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 <script src="supabase-client.js"></script>
+<script src="contact.js"></script>
 <script src="product-events.js"></script>
 <script src="utm-acquisition.js"></script>
 <script src="store.js"></script>

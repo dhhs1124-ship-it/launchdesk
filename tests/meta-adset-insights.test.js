@@ -104,15 +104,56 @@ test('store_id 누락은 거부된다', async () => {
   assert.equal(r.ok, false);
 });
 
-test('today/month만 허용하고 last_7d 등은 명시적으로 거부한다(임의 계산 금지)', async () => {
+test('today/yesterday/month/all/date만 허용하고 last_7d 등은 명시적으로 거부한다(임의 계산 금지)', async () => {
   const m = await modPromise;
-  for (const period of ['last_7d', 'last_14d', 'last_30d', 'yesterday', undefined]) {
+  for (const period of ['last_7d', 'last_14d', 'last_30d', 'maximum', undefined]) {
     const r = m.validateAdsetInsightsRequest({ store_id: 's1', scope: 'adsets', period });
     assert.equal(r.ok, false, 'period=' + period);
     assert.equal(r.code, 'UNSUPPORTED_PERIOD');
   }
-  assert.equal(m.validateAdsetInsightsRequest({ store_id: 's1', scope: 'adsets', period: 'today' }).ok, true);
-  assert.equal(m.validateAdsetInsightsRequest({ store_id: 's1', scope: 'adsets', period: 'month' }).ok, true);
+  for (const period of ['today', 'yesterday', 'month', 'all']) {
+    assert.equal(m.validateAdsetInsightsRequest({ store_id: 's1', scope: 'adsets', period }).ok, true, period);
+  }
+});
+
+test('date 기간: 실제 달력 날짜만 허용한다', async () => {
+  const m = await modPromise;
+  const ok = m.validateAdsetInsightsRequest({ store_id: 's1', scope: 'adsets', period: 'date', date: '2026-09-10' });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.date, '2026-09-10');
+  for (const date of [undefined, '2026-9-10', '2026-02-30', '2026-13-01', '20260910']) {
+    const r = m.validateAdsetInsightsRequest({ store_id: 's1', scope: 'adsets', period: 'date', date });
+    assert.equal(r.ok, false, 'date=' + date);
+    assert.equal(r.code, 'INVALID_DATE');
+  }
+  // date는 period=date일 때만 전달된다
+  assert.equal(m.validateAdsetInsightsRequest({ store_id: 's1', scope: 'adsets', period: 'today', date: '2026-09-10' }).date, undefined);
+});
+
+test('resolvePeriodRange: 광고계정 시간대 기준 오늘 · 어제 · 이번 달 · 날짜, 전체는 시작일 없이 maximum', async () => {
+  const m = await modPromise;
+  const now = new Date('2026-09-01T16:30:00Z'); // 서울 9/2 01:30, UTC 9/1
+  assert.deepEqual(m.resolvePeriodRange('today', now, 'Asia/Seoul'), { since: '2026-09-02', until: '2026-09-02' });
+  assert.deepEqual(m.resolvePeriodRange('yesterday', now, 'Asia/Seoul'), { since: '2026-09-01', until: '2026-09-01' });
+  assert.deepEqual(m.resolvePeriodRange('yesterday', now, 'UTC'), { since: '2026-08-31', until: '2026-08-31' }); // 월 경계
+  assert.deepEqual(m.resolvePeriodRange('month', now, 'Asia/Seoul'), { since: '2026-09-01', until: '2026-09-02' });
+  assert.deepEqual(m.resolvePeriodRange('date', now, 'Asia/Seoul', '2026-08-15'), { since: '2026-08-15', until: '2026-08-15' });
+  assert.deepEqual(m.resolvePeriodRange('all', now, 'Asia/Seoul'), { since: null, until: '2026-09-02', preset: 'maximum' });
+  assert.equal(m.isFutureDate('2026-09-02', now, 'Asia/Seoul'), false);
+  assert.equal(m.isFutureDate('2026-09-02', now, 'UTC'), true);
+  // 37개월 조회 한도(서울 오늘 2026-09-02 → 가장 이른 날 2023-08-03)
+  assert.equal(m.isBeyondLookback('2023-08-02', now, 'Asia/Seoul'), true);
+  assert.equal(m.isBeyondLookback('2023-08-03', now, 'Asia/Seoul'), false);
+});
+
+test('전체 기간 URL은 time_range 대신 date_preset=maximum을 쓴다', async () => {
+  const m = await modPromise;
+  const all = new URL(m.buildInsightsUrl({ accountId: 'act_1', level: 'adset', since: null, until: '2026-09-02', preset: 'maximum' }));
+  assert.equal(all.searchParams.get('date_preset'), 'maximum');
+  assert.equal(all.searchParams.has('time_range'), false);
+  const day = new URL(m.buildInsightsUrl({ accountId: 'act_1', level: 'adset', since: '2026-09-01', until: '2026-09-01' }));
+  assert.equal(day.searchParams.has('date_preset'), false);
+  assert.equal(day.searchParams.get('time_range'), JSON.stringify({ since: '2026-09-01', until: '2026-09-01' }));
 });
 
 // ===== 3) 전체 클릭 vs 링크 클릭, 파생 지표 ===================================

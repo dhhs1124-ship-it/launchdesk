@@ -26,15 +26,26 @@
      (서버가 최종 방어선).
 
      [2026-09-18 보안 수정] 동의 "버전" 문자열은 이 파일이 결정하지 않는다
-     — submit_setup_inquiry RPC는 버전 인자를 아예 받지 않고, 함수 안의
-     서버 상수(v1.0)만 저장한다(클라이언트가 임의의 버전 문자열을 보내
-     동의 증빙을 조작할 수 없게 하기 위함). 이 파일은 체크박스가 체크됐다는
-     사실(p_privacy_consent: true)만 보낸다. policy-consent-core.js의
-     PRIVACY_VERSION은 회원가입/게이트 동의 등 다른 기능에서 여전히
-     쓰이므로 이 파일과 무관하게 그대로 둔다 — 개인정보처리방침을 개정할
-     때는 그 상수와 이 RPC 안의 서버 상수를 같은 배포에서 함께 올려야
-     한다(자동으로 동기화되지 않는다). */
+     — 실제로 DB에 저장되는 값은 여전히 RPC 함수 안의 서버 상수
+     (v_consent_version)뿐이고, 클라이언트가 보내는 값은 저장에 절대
+     쓰이지 않는다(클라이언트가 임의의 버전 문자열을 보내 동의 증빙을
+     조작할 수 없게 하기 위한 원래 설계를 그대로 유지).
+
+     [2026-09-23 버전 불일치 차단 추가] 다만 웹 배포(policy-consent-core.js의
+     PRIVACY_VERSION)와 RPC 배포(서버 상수)가 서로 다른 시점에 롤아웃되면,
+     "실제로 화면에 보인 방침 버전과 DB에 기록되는 버전이 다른" 상황이
+     생길 수 있다(예: RPC만 먼저 v1.2로 올라가고 브라우저 캐시가 아직
+     v1.1 화면을 보여주는 동안 접수하면, 서버는 여전히 v1.2로 저장해버림).
+     이를 막기 위해 이 화면이 지금 무슨 버전을 보여주고 있다고 믿는지
+     (p_expected_privacy_version)를 함께 보낸다 — RPC는 이 값을 저장에
+     쓰지 않고, 자신의 서버 상수와 정확히 같은지만 검사해서 다르면
+     PRIVACY_VERSION_MISMATCH로 접수 자체를 거부한다(저장 자체가 아예
+     안 됨). 그래도 "개인정보처리방침을 개정할 때는 이 파일이 참조하는
+     PRIVACY_VERSION 상수와 RPC 안의 서버 상수를 같은 배포에서 함께
+     올려야 한다"는 원칙은 그대로다 — 이 값은 자동 동기화가 아니라
+     "어긋났을 때 잘못된 기록 대신 접수를 거부"하는 안전장치일 뿐이다. */
   var CONTACT_EMAIL = 'dhhs1124@gmail.com';
+  var setupPolicyCore = window.launchdeskPolicyConsentCore;
   var setupView = document.getElementById('view-services-setup');
   if(setupView){
     var setupSelectedPlan = null;
@@ -154,6 +165,7 @@
       if(code === 'INVALID_PHONE') return '연락처를 다시 확인해주세요.';
       if(code === 'INVALID_PLATFORM') return '쇼핑몰 플랫폼 값을 다시 확인해주세요.';
       if(code === 'INVALID_NOTE') return '요청 사항이 너무 길어요. 조금 줄여서 다시 시도해주세요.';
+      if(code === 'PRIVACY_VERSION_MISMATCH') return '페이지가 최신 상태가 아니에요. 새로고침한 뒤 다시 시도해주세요.';
       if(code === 'SUPABASE_UNAVAILABLE') return '지금은 접수할 수 없어요. 네트워크 상태를 확인한 뒤 다시 시도해주세요.';
       return '접수에 실패했어요. 잠시 후 다시 시도해주세요.';
     }
@@ -240,7 +252,12 @@
         p_phone: phone,
         p_platform: platform || null,
         p_note: note || null,
-        p_privacy_consent: true
+        p_privacy_consent: true,
+        // 저장에는 쓰이지 않는다(서버 상수만 저장) — RPC가 자신의 버전과
+        // 다르면 거부하는 데만 쓰는 echo-back 값. 코어 모듈이 어떤 이유로든
+        // 로드되지 않았다면 null을 보내고, RPC는 null도 불일치로 취급해
+        // 거부한다(안전한 쪽으로 실패).
+        p_expected_privacy_version: setupPolicyCore ? setupPolicyCore.PRIVACY_VERSION : null
       }).then(function(res){
         if(res.error){
           console.warn('[launchdesk] 세팅 대행 신청 접수 실패:', res.error.message);

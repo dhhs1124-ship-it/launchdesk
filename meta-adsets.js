@@ -38,6 +38,7 @@
   var refreshBtn = document.getElementById('metaAdsetsRefresh');
   var globalRefreshBtn = document.getElementById('opsdashRefreshBtn');
   var periodBtns = panel ? panel.querySelectorAll('[data-madsets-period]') : [];
+  var dateInput = document.getElementById('metaAdsetsDate');
   if(!Core || !MarginCore || !panel || !bodyEl || !window.launchdeskOpsSnapshot){ return; }
 
   var toastStack = document.getElementById('toastStack');
@@ -200,6 +201,12 @@
     Array.prototype.forEach.call(periodBtns, function(btn){
       btn.setAttribute('aria-pressed', btn.getAttribute('data-madsets-period') === view.period ? 'true' : 'false');
     });
+    if(dateInput){
+      // 쇼핑몰 전환 등으로 기간이 초기화되면 입력칸도 비운다(이전 날짜가 남지 않게).
+      var picked = view.period === 'date' ? view.date : '';
+      if(dateInput.value !== picked) dateInput.value = picked;
+      dateInput.classList.toggle('is-active', view.period === 'date');
+    }
     bodyEl.setAttribute('aria-busy', (view.status === 'ready' || view.status === 'error') ? 'false' : 'true');
     if(statusEl){
       var text = Core.statusText(view);
@@ -396,6 +403,25 @@
   Array.prototype.forEach.call(periodBtns, function(btn){
     btn.addEventListener('click', function(){ ctl.setPeriod(btn.getAttribute('data-madsets-period')); });
   });
+  if(dateInput){
+    function syncDateBounds(){
+      dateInput.max = Core.localDateString(Date.now());
+      dateInput.min = Core.earliestDateString(Date.now());
+    }
+    syncDateBounds();
+    dateInput.addEventListener('focus', syncDateBounds); // 자정을 넘겨 열어 둔 화면 대비
+    dateInput.addEventListener('change', function(){
+      var v = dateInput.value;
+      if(!v) return;
+      if(v > dateInput.max || v < dateInput.min){
+        // 직접 입력으로 범위를 벗어난 경우 — 조회하지 않고 이유를 알린다.
+        showToast(v > dateInput.max ? '오늘 이후 날짜는 조회할 수 없어요.' : 'Meta는 최근 37개월 안의 날짜만 조회할 수 있어요.', 'error');
+        render();
+        return;
+      }
+      ctl.setPeriod('date', v);
+    });
+  }
   if(refreshBtn){
     refreshBtn.addEventListener('click', function(){ ctl.refresh(); });
   }

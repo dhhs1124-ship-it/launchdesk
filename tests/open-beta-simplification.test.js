@@ -41,16 +41,20 @@ test('홈 화면에는 더 이상 이어서 준비하기(#deskResume)도, 내 �
   assert.match(home, /href="#\/dashboard"/);
 });
 
-test('내 계획(#ldPlanPanel)은 DOM에 정확히 1개만 있고, 운영 현황(#/dashboard)의 주문·광고 성과 아래에 있다', () => {
-  assert.equal((INDEX.match(/id="ldPlanPanel"/g) || []).length, 1);
-  const dashStart = INDEX.indexOf('id="view-dashboard"');
-  const dashEnd = INDEX.indexOf('id="view-account"');
-  const dash = INDEX.slice(dashStart, dashEnd);
+test('운영 현황의 내 계획 카드(#ldPlanPanel)는 제거됐고, 광고별 성과 다음에 바로 하단 3열이 온다', () => {
+  assert.doesNotMatch(INDEX, /id="ldPlanPanel"|id="ldPlanBody"|id="ldPlanDraftNotice"/);
+  const dash = INDEX.slice(INDEX.indexOf('id="view-dashboard"'), INDEX.indexOf('id="view-account"'));
   const metaAdsets = dash.indexOf('id="metaAdsetsPanel"');
-  const planPanel = dash.indexOf('id="ldPlanPanel"');
   const triple = dash.indexOf('opsdash-row triple');
-  assert.ok(metaAdsets > 0 && metaAdsets < planPanel && planPanel < triple,
-    [metaAdsets, planPanel, triple].join(','));
+  assert.ok(metaAdsets > 0 && metaAdsets < triple);
+  assert.doesNotMatch(dash.slice(metaAdsets, triple), /class="dash-panel["\s]/); // 사이에 다른 카드 없음
+});
+
+test('계획 만들기: 버튼이 없으면 plans.js는 폼을 열지 않고 계획을 조회하지 않으며, 계획 삭제 코드도 추가되지 않았다', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'plans.js'), 'utf8');
+  assert.match(src, /var hasForm = !!\(f\.wrap && f\.openBtn && /);
+  assert.match(src, /if\(hasHome\) fetchPlans\(seq\);/);
+  assert.equal((src.match(/\.delete\(\)/g) || []).length, 1, '기존 개별 계획 삭제(사용자 조작) 1곳만');
 });
 
 test('마진 계산기 화면(#/tools)에는 더 이상 쇼핑몰 운영 현황 · Meta 광고 성과 패널이 없다', () => {
@@ -59,9 +63,10 @@ test('마진 계산기 화면(#/tools)에는 더 이상 쇼핑몰 운영 현황 
   const toolsView = INDEX.slice(start, end > start ? end : start + 20000);
   assert.doesNotMatch(toolsView, /id="opsOverviewPanel"/);
   assert.doesNotMatch(toolsView, /id="metaOpsPanel"/);
-  // 필수 흐름(계산 입력 → 실행 → 결과 → 저장 → 계획 만들기)은 유지
-  assert.match(toolsView, /id="toolsSaveCalc"/);
-  assert.match(toolsView, /id="mcPlanOpen"/);
+  // 필수 흐름(계산 입력 → 실행 → 결과 → 저장)은 유지. 계획 만들기 버튼은 "내 계획"
+  // 카드 제거와 함께 뺐다(저장한 계획을 볼 곳이 없는 막힌 동선 방지).
+  assert.match(toolsView, /class="btn btn-primary" id="toolsSaveCalc"/);
+  assert.doesNotMatch(toolsView, /id="mcPlanOpen"/);
   // 비회원도 전부 체험 가능하다는 문구로 바뀌었는지(더 이상 "저장됩니다" 단정 아님)
   assert.match(toolsView, /로그인 없이도 지금 바로 실제로 계산해볼 수 있어요/);
 });
@@ -441,7 +446,7 @@ test('연결됐지만 데이터 0건인 Cafe24 주문은 "연결하세요"가 �
   });
   await settle();
   const brief = env.doc.getElementById('opsdashBriefList').innerHTML;
-  assert.match(brief, /오늘 접수된 주문이 없어요\./);
+  assert.match(brief, /Cafe24에 오늘 들어온 주문이 없어요\(마지막 동기화 기준\)\./);
   assert.doesNotMatch(brief, /쇼핑몰을 연결하면/);
   assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '0건');
 });
@@ -609,7 +614,7 @@ test('Cafe24 "연결됐지만 0건"과 "조회 오류"는 서로 다른 문구�
   });
   await settle();
   const emptyBrief = emptyEnv.doc.getElementById('opsdashBriefList').innerHTML;
-  assert.match(emptyBrief, /오늘 접수된 주문이 없어요\./);
+  assert.match(emptyBrief, /Cafe24에 오늘 들어온 주문이 없어요/);
   assert.doesNotMatch(emptyBrief, /불러오지 못했/);
 
   const errorEnv = await boot({
@@ -621,7 +626,20 @@ test('Cafe24 "연결됐지만 0건"과 "조회 오류"는 서로 다른 문구�
   await settle();
   const errorBrief = errorEnv.doc.getElementById('opsdashBriefList').innerHTML;
   assert.match(errorBrief, /Cafe24 주문 데이터를 불러오지 못했어요\./);
-  assert.doesNotMatch(errorBrief, /오늘 접수된 주문이 없어요\./);
+  assert.doesNotMatch(errorBrief, /Cafe24에 오늘 들어온 주문이 없어요/);
+});
+
+test('Cafe24 오늘 주문 KPI는 중복 없이 1쌍이고, 취소·환불·미입금 포함 의미를 표시하며 Meta와 출처가 분리된다', () => {
+  const dash = INDEX.slice(INDEX.indexOf('id="view-dashboard"'), INDEX.indexOf('id="view-account"'));
+  assert.equal((dash.match(/id="opsdashKpiOrders"/g) || []).length, 1);
+  assert.equal((dash.match(/id="opsdashKpiPayment"/g) || []).length, 1);
+  assert.match(dash, /Cafe24 오늘 주문<\/div><div class="opsdash-kpi-value" id="opsdashKpiOrders">-<\/div><div class="opsdash-kpi-note">취소·환불·미입금 주문 포함/);
+  assert.match(dash, /Cafe24 오늘 주문금액<\/div><div class="opsdash-kpi-value" id="opsdashKpiPayment">-<\/div><div class="opsdash-kpi-note">주문별 결제금액 합계 · 취소·환불 미차감/);
+  // 상단 Meta 두 칸은 meta-insights의 today 값이다 — 광고별 성과 기간(어제 등)과
+  // 섞여 보이지 않도록 라벨에 기간을 적는다.
+  assert.match(dash, />Meta 오늘 광고비</);
+  assert.match(dash, />Meta 오늘 ROAS</);
+  assert.doesNotMatch(dash, />오늘 결제금액</);
 });
 
 const META_INSIGHTS_OK = {
