@@ -22,7 +22,7 @@
   'use strict';
 
   var TERMS_VERSION = '2026-09-18';   // 이용약관 시행일
-  var PRIVACY_VERSION = 'v1.2';       // 개인정보처리방침 버전([게시 예정일] 시행 예정 — 회원 전용 일반 문의 폼(Resend) 반영, 게시 전 로컬 준비 단계)
+  var PRIVACY_VERSION = 'v1.3';       // 개인정보처리방침 버전([게시 예정일] 시행 예정 — 광고 기록 Meta 하루 합계 자동 기록 반영, 게시 전 로컬 준비 단계. 공개 중: v1.2(2026-09-24))
   var PENDING_KEY = 'ld-pending-policy-consent';
   // OAuth 왕복(구글 동의 화면 포함)이 비정상적으로 오래 걸리는 경우까지
   // 감안한 여유값. 이보다 오래된 pending은 다른 로그인 시도의 잔재일 수

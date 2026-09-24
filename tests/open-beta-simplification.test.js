@@ -22,6 +22,8 @@ const PLANS_CORE_SRC = fs.readFileSync(path.join(ROOT, 'plans-core.js'), 'utf8')
 const TOOLS_SRC = fs.readFileSync(path.join(ROOT, 'tools.js'), 'utf8');
 const OPS_OVERVIEW_SRC = fs.readFileSync(path.join(ROOT, 'ops-overview.js'), 'utf8');
 const OPS_PERIOD_CORE_SRC = fs.readFileSync(path.join(ROOT, 'ops-period-core.js'), 'utf8');
+const ADLOG_META_SRC = fs.readFileSync(path.join(ROOT, 'adlog-meta.js'), 'utf8');
+const STORES_SRC = fs.readFileSync(path.join(ROOT, 'stores.js'), 'utf8');
 const META_ADSETS_CORE_SRC = fs.readFileSync(path.join(ROOT, 'meta-adsets-core.js'), 'utf8');
 const META_MARGIN_CORE_SRC = fs.readFileSync(path.join(ROOT, 'meta-margin-core.js'), 'utf8');
 const META_ADSETS_SRC = fs.readFileSync(path.join(ROOT, 'meta-adsets.js'), 'utf8');
@@ -342,11 +344,15 @@ async function boot(opts){
   vm.runInContext(MARGIN_CALC_SRC, sandbox, { filename: 'margin-calc.js' });
   vm.runInContext(PLANS_CORE_SRC, sandbox, { filename: 'plans-core.js' });
   vm.runInContext(TOOLS_SRC, sandbox, { filename: 'tools.js' });
+  // stores.js(내 쇼핑몰 화면)는 쇼핑몰 삭제 · 연결 해제 시나리오에서만 싣는다
+  // (기존 테스트의 stores 조회 횟수 기대값을 바꾸지 않기 위함). 실제 순서도 ops-overview.js 앞이다.
+  if (opts.withStores) vm.runInContext(STORES_SRC, sandbox, { filename: 'stores.js' });
   vm.runInContext(OPS_PERIOD_CORE_SRC, sandbox, { filename: 'ops-period-core.js' });
   vm.runInContext(OPS_OVERVIEW_SRC, sandbox, { filename: 'ops-overview.js' });
   vm.runInContext(META_ADSETS_CORE_SRC, sandbox, { filename: 'meta-adsets-core.js' });
   vm.runInContext(META_MARGIN_CORE_SRC, sandbox, { filename: 'meta-margin-core.js' });
   vm.runInContext(META_ADSETS_SRC, sandbox, { filename: 'meta-adsets.js' });
+  vm.runInContext(ADLOG_META_SRC, sandbox, { filename: 'adlog-meta.js' });
   vm.runInContext(HOME_DASHBOARD_SRC, sandbox, { filename: 'home-dashboard.js' });
   vm.runInContext(PLANS_SRC, sandbox, { filename: 'plans.js' });
   await settle();
@@ -1458,4 +1464,387 @@ test('선택 날짜가 마지막 동기화 이후면 0건이 아니라 "확인 �
   assert.equal(snap.cafe24.selected.coverage, 'none');
   assert.equal(env.doc.getElementById('opsdashKpiOrders').textContent, '확인 전');
   assert.match(env.doc.getElementById('opsdashKpiOrdersNote').textContent, /아직 동기화 전이에요\(마지막 동기화 \d\d\.\d\d \d\d:\d\d\)/);
+});
+
+// ===================================================== 광고 기록 — Meta 하루 합계 자동 기록
+// meta-insights 응답: 기간 인자가 있으면 그 하루의 계정 전체 합계(selected)와 조회 범위를 돌려준다.
+function metaDayRoute(sel, opts){
+  opts = opts || {};
+  return (body) => ({
+    data: metaPayload({
+      account: { id: 'act_1', name: 'Test Ads', currency: opts.currency || 'KRW', timezone_name: 'Asia/Seoul' },
+      selected: body.period ? sel : undefined,
+      queried_range: body.period ? { selected: { since: body.date || opts.yesterday || '2026-09-23', until: body.date || opts.yesterday || '2026-09-23' } } : {}
+    }),
+    error: null
+  });
+}
+const DAY_SEL = { spend: 30000, purchase_count: 3, purchase_value: 90000, purchase_value_observed: true, purchase_basis: 'offsite_conversion.fb_pixel_purchase', roas: 3 };
+function adlogInserts(env){
+  return env.supa.writeCalls.filter((w) => w.table === 'tool_records' && w.op === 'insert' && w.payload.tool_type === 'ad_log');
+}
+
+test('광고 기록: "Meta 성과 기록하기"는 선택 쇼핑몰의 계정 전체 어제 합계를 1건 저장하고, 같은 날짜를 다시 누르면 건너뛴다', async () => {
+  const env = await boot(periodFixture());
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, { 'meta-insights': metaDayRoute(DAY_SEL) });
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+  const btn = env.doc.getElementById('adlogMetaBtn');
+  assert.equal(btn.disabled, false);
+  assert.equal(btn.textContent, 'Meta 성과 기록하기(어제)');
+
+  btn.click();
+  await settle();
+  const metaCall = calls.filter((c) => c.name === 'meta-insights').pop();
+  assert.equal(metaCall.body.period, 'yesterday');
+  assert.equal(calls.filter((c) => c.name === 'cafe24-orders-sync').length, 0, 'Cafe24 동기화와 무관하다');
+  let inserts = adlogInserts(env);
+  assert.equal(inserts.length, 1);
+  const data = inserts[0].payload.data;
+  assert.equal(data.meta_auto_key, '1|act_1|2026-09-23');
+  assert.equal(data.source, 'meta_auto');
+  assert.equal(data.spend, 30000);
+  assert.equal(data.revenue, 90000);
+  assert.equal(data.store_id, '1');
+  assert.equal(env.doc.getElementById('adlogMetaStatus').textContent, '2026-09-23 Meta 하루 합계를 기록했어요.');
+  const tbody = env.doc.getElementById('adlogTbody').innerHTML;
+  assert.match(tbody, /Meta 캠페인 전체 합계 <span class="adlog-tag">Meta 자동 · 귀속 구매금액<\/span>/);
+  assert.match(tbody, /₩90,000/);
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩30,000');
+  assert.equal(env.doc.getElementById('adlogSumRoas').textContent, '3.0x');
+
+  btn.click(); // 같은 날짜 다시
+  await settle();
+  inserts = adlogInserts(env);
+  assert.equal(inserts.length, 1, '같은 쇼핑몰 · 광고계정 · 날짜는 다시 저장하지 않는다');
+  assert.equal(env.doc.getElementById('adlogMetaStatus').textContent, '2026-09-23 기록이 이미 있어 건너뛰었어요.');
+});
+
+test('광고 기록: 날짜를 고르면 그 과거 하루를 기록하고, 구매금액 항목이 없으면 매출은 null("—")로 둔다', async () => {
+  const env = await boot(periodFixture());
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, {
+    'meta-insights': metaDayRoute({ spend: 12000, purchase_count: 0, purchase_value: 0, purchase_value_observed: false, purchase_basis: null, roas: 0 })
+  });
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+  const day = env.sandbox.launchdeskMetaAdsetsCore.localDateString(Date.now() - 6 * 86400000);
+  const dateEl = env.doc.getElementById('adlogMetaDate');
+  dateEl.value = day;
+  dateEl.dispatch('change');
+  const btn = env.doc.getElementById('adlogMetaBtn');
+  assert.equal(btn.textContent, 'Meta 성과 기록하기(' + day + ')');
+  btn.click();
+  await settle();
+  const metaCall = calls.filter((c) => c.name === 'meta-insights').pop();
+  assert.equal(metaCall.body.period, 'date');
+  assert.equal(metaCall.body.date, day);
+  const data = adlogInserts(env).pop().payload.data;
+  assert.equal(data.date, day);
+  assert.equal(data.revenue, null);
+  assert.equal(data.purchases, null);
+  const tbody = env.doc.getElementById('adlogTbody').innerHTML;
+  assert.match(tbody, /<td class="num">—<\/td><td class="num ">—<\/td>/, '매출 · ROAS 모두 —');
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩12,000');
+  assert.equal(env.doc.getElementById('adlogSumRoas').textContent, '—', '매출이 없는 기록은 ROAS에서 뺀다');
+
+  // 오늘 · 미래 날짜는 고를 수 없다
+  dateEl.value = env.sandbox.launchdeskMetaAdsetsCore.localDateString(Date.now());
+  dateEl.dispatch('change');
+  assert.equal(dateEl.value, '');
+  assert.match(env.doc.getElementById('adlogMetaStatus').textContent, /어제까지의 과거 날짜/);
+});
+
+test('광고 기록: 다른 탭에서 먼저 저장해 DB가 중복(23505)으로 거부하면 건너뛰었다고 알리고 목록에 넣지 않는다', async () => {
+  const env = await boot(periodFixture());
+  routeInvoke(env.sandbox.launchdeskSupabase, { 'meta-insights': metaDayRoute(DAY_SEL) });
+  const sb = env.sandbox.launchdeskSupabase;
+  const originalFrom = sb.from;
+  sb.from = function(table){
+    const chain = originalFrom.call(sb, table);
+    if (table !== 'tool_records') return chain;
+    chain.insert = () => ({ then: (res, rej) => Promise.resolve({ data: null, error: { code: '23505', message: 'duplicate key' } }).then(res, rej), catch(){} });
+    return chain;
+  };
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+  env.doc.getElementById('adlogMetaBtn').click();
+  await settle();
+  assert.equal(env.doc.getElementById('adlogMetaStatus').textContent, '2026-09-23 기록이 이미 있어 건너뛰었어요.');
+  assert.equal(env.sandbox.launchdeskStore.getAdlogRecords().length, 0);
+  sb.from = originalFrom;
+});
+
+test('광고 기록: 원화가 아닌 광고계정은 자동 기록 버튼을 막고 안내한다', async () => {
+  const env = await boot(periodFixture());
+  routeInvoke(env.sandbox.launchdeskSupabase, { 'meta-insights': metaDayRoute(DAY_SEL, { currency: 'USD' }) });
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+  const btn = env.doc.getElementById('adlogMetaBtn');
+  assert.equal(btn.disabled, true);
+  assert.match(env.doc.getElementById('adlogMetaStatus').textContent, /USD라 원화 기준 광고 기록에 자동으로 넣을 수 없어요/);
+  btn.click();
+  await settle();
+  assert.equal(adlogInserts(env).length, 0);
+});
+
+test('광고 기록 합계: 지금 쇼핑몰의 기록만 계산하고, 쇼핑몰을 알 수 없는 예전 기록 · 삭제된 쇼핑몰 기록은 목록에만(합계 제외), 남아 있는 다른 쇼핑몰 기록은 숨긴다', async () => {
+  const env = await boot(periodFixture([{ id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }]));
+  await settle();
+  const store = env.sandbox.launchdeskStore;
+  store.addAdlogRecord({ id: 1, date: '03.20', name: '옛 소재', spend: 10000, revenue: 50000, channel: '메타' });
+  store.addAdlogRecord({ id: 2, date: '2026-09-20', name: 'A 소재', spend: 20000, revenue: 40000, channel: '메타', store_id: '1' });
+  store.addAdlogRecord({ id: 3, date: '2026-09-20', name: 'B 소재', spend: 99999, revenue: 1, channel: '메타', store_id: '2' });
+  store.addAdlogRecord({ id: 4, date: '2026-09-19', name: '없어진 상점 소재', spend: 77777, revenue: 1, channel: '메타', store_id: '9' });
+  env.sandbox.launchdeskAdlog.render();
+  const tbody = env.doc.getElementById('adlogTbody').innerHTML;
+  assert.match(tbody, /옛 소재 <span class="adlog-tag">쇼핑몰 미지정 · 합계 제외<\/span>/);
+  assert.match(tbody, /A 소재/);
+  assert.doesNotMatch(tbody, /B 소재/, '남아 있는 다른 쇼핑몰(B)의 기록은 숨긴다');
+  assert.match(tbody, /없어진 상점 소재 <span class="adlog-tag">삭제된 쇼핑몰 기록 · 현재 합계 제외<\/span>/);
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩20,000');
+  assert.equal(env.doc.getElementById('adlogSumRoas').textContent, '2.0x');
+  assert.equal(env.doc.getElementById('adlogSumBest').textContent, 'A 소재 (2026-09-20)');
+
+  // 새 수동 기록은 지금 쇼핑몰에 붙는다
+  env.doc.getElementById('adlogDate').value = '09.21';
+  env.doc.getElementById('adlogName').value = '가을 릴스';
+  env.doc.getElementById('adlogSpend').value = '5000';
+  env.doc.getElementById('adlogRevenue').value = '15000';
+  env.doc.getElementById('adlogForm').dispatch('submit');
+  const manual = adlogInserts(env).pop().payload.data;
+  assert.equal(manual.name, '가을 릴스');
+  assert.equal(manual.store_id, '1');
+  assert.equal(manual.source, undefined, '수동 기록에는 자동 기록 표시가 없다');
+});
+
+// ===================================================== 쇼핑몰 삭제 · 연결 해제와 광고 기록
+// stores.js(내 쇼핑몰 화면)를 함께 싣고, DB 쓰기를 기록 · 조작한다.
+//   - tool_records delete: 필터를 기록(실패 주입 가능)
+//   - stores delete: 성공 처리 후 이후 조회에서 그 행을 뺀다
+//   - hide(table, pred): 이후 조회에서 조건에 맞는 행을 뺀다(연결 해제 흉내)
+function storeHarness(env, opts){
+  opts = opts || {};
+  const sb = env.sandbox.launchdeskSupabase;
+  const original = sb.from;
+  const toolDeletes = [];
+  const storeDeletes = [];
+  const hidden = [];
+  const deletedStoreIds = new Set();
+  sb.from = function(table){
+    const chain = original.call(sb, table);
+    const originalThen = chain.then;
+    chain.then = (res, rej) => originalThen.call(chain, (r) => {
+      if (r && Array.isArray(r.data)) {
+        let rows = r.data;
+        if (table === 'stores') rows = rows.filter((s) => !deletedStoreIds.has(String(s.id)));
+        hidden.filter((h) => h.table === table).forEach((h) => { rows = rows.filter((row) => !h.pred(row)); });
+        r = { data: rows, error: r.error };
+      } else if (r && r.data && table === 'connected_accounts' && hidden.some((h) => h.table === table && h.pred(r.data))) {
+        r = { data: null, error: null }; // maybeSingle 결과에서도 숨긴다
+      }
+      return res ? res(r) : r;
+    }, rej);
+    if (table === 'tool_records' || table === 'stores') {
+      chain.delete = () => {
+        const f = {};
+        const q = {
+          eq(c, v){ f[c] = v; return q; },
+          then(res, rej){
+            let result = { data: null, error: null };
+            if (table === 'tool_records') { toolDeletes.push(f); if (opts.failToolDelete) result = { data: null, error: { message: '삭제 실패(테스트)' } }; }
+            else {
+              storeDeletes.push(f);
+              // DB 트리거가 같은 트랜잭션에서 실패한 경우 = 쇼핑몰 삭제 자체가 오류로 되돌아간다
+              if (opts.failStoreDelete) result = { data: null, error: { message: 'trigger failed(테스트)' } };
+              else deletedStoreIds.add(String(f.id));
+            }
+            return Promise.resolve(result).then(res, rej);
+          }
+        };
+        return q;
+      };
+    }
+    return chain;
+  };
+  return { toolDeletes, storeDeletes, hide(table, pred){ hidden.push({ table, pred }); } };
+}
+function clickStoreAction(env, cls, attrs){
+  const target = { closest(sel){ return sel === cls ? { disabled: false, getAttribute(n){ return attrs[n] === undefined ? null : attrs[n]; } } : null; } };
+  (env.doc.getElementById('storesList').listeners.click || []).forEach((fn) => fn({ target }));
+}
+function captureConfirm(env){
+  const msgs = [];
+  env.sandbox.confirm = (m) => { msgs.push(m); return true; };
+  return msgs;
+}
+function lastToast(env){
+  const t = env.doc.getElementById('toastStack').children;
+  return t.length ? t[t.length - 1].textContent : '';
+}
+function seedAdlogAB(env){
+  const s = env.sandbox.launchdeskStore;
+  s.addAdlogRecord({ id: 11, source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-20', store_id: '1', date: '2026-09-20', name: 'A 자동', channel: '메타', spend: 30000, revenue: 90000 });
+  s.addAdlogRecord({ id: 12, store_id: '1', date: '09.20', name: 'A 수동', channel: '메타', spend: 1000, revenue: 2000 });
+  s.addAdlogRecord({ id: 13, source: 'meta_auto', meta_auto_key: '2|act_2|2026-09-20', store_id: '2', date: '2026-09-20', name: 'B 자동', channel: '메타', spend: 5000, revenue: 10000 });
+  s.addAdlogRecord({ id: 14, date: '03.20', name: '옛 기록', channel: '메타', spend: 700, revenue: 1400 });
+  env.sandbox.launchdeskAdlog.render(); // 실제 화면은 저장 직후 표를 다시 그린다
+}
+const adlogNames = (env) => env.sandbox.launchdeskStore.getAdlogRecords().map((r) => r.name).sort();
+function abFixture(){
+  const fx = periodFixture([{ id: 2, name: 'B상점', platform: 'cafe24', user_id: 'u1' }]);
+  fx.connectedAccounts.push({ store_id: 2, provider: 'cafe24', status: 'connected', last_synced_at: new Date().toISOString(), orders_synced_from: null });
+  fx.withStores = true;
+  return fx;
+}
+
+test('쇼핑몰 삭제(A·B): 삭제 전에 안내하고, 쇼핑몰 행 삭제 한 번(DB 트리거가 자동 기록을 같은 트랜잭션에서 삭제)으로 A의 Meta 자동 기록만 없어진다 — A 수동 · B · 미지정 기록은 남아 조회 · 개별 삭제할 수 있다', async () => {
+  const env = await boot(abFixture());
+  const h = storeHarness(env);
+  seedAdlogAB(env);
+  const msgs = captureConfirm(env);
+  clickStoreAction(env, '.store-del-btn', { 'data-id': '1' });
+  await settle();
+
+  assert.match(msgs[0], /이 쇼핑몰의 Meta 자동 광고 기록\(1건\)도 함께 삭제됩니다\. 직접 입력한 광고 기록과 다른 쇼핑몰의 기록은 남습니다\./);
+  assert.equal(JSON.stringify(h.storeDeletes), JSON.stringify([{ id: '1', user_id: 'u1' }]));
+  assert.equal(h.toolDeletes.length, 0, '브라우저는 광고 기록 삭제를 따로 요청하지 않는다(트리거가 처리)');
+  assert.equal(lastToast(env), '쇼핑몰과 그 쇼핑몰의 Meta 자동 광고 기록을 삭제했어요');
+  assert.deepEqual(adlogNames(env), ['A 수동', 'B 자동', '옛 기록'], '화면에서도 A 자동만 빠진다');
+
+  // 운영 현황 다시 읽기 → A가 목록에서 빠지고 B가 선택된다
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(String(snap.storeId), '2');
+  assert.equal(JSON.stringify(snap.storeIds), JSON.stringify(['2']));
+  const tbody = env.doc.getElementById('adlogTbody').innerHTML;
+  assert.match(tbody, /A 수동 <span class="adlog-tag">삭제된 쇼핑몰 기록 · 현재 합계 제외<\/span>/, '다른 쇼핑몰로 옮기지 않고 삭제된 쇼핑몰 기록으로 보인다');
+  assert.match(tbody, /B 자동 <span class="adlog-tag">Meta 자동 · 귀속 구매금액<\/span>/);
+  assert.match(tbody, /옛 기록 <span class="adlog-tag">쇼핑몰 미지정 · 합계 제외<\/span>/);
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩5,000', '합계는 B 기록만');
+
+  env.sandbox.deleteAdlogRecord(12); // 남은 A 수동 기록을 개별 삭제
+  await settle();
+  assert.deepEqual(adlogNames(env), ['B 자동', '옛 기록']);
+  assert.equal(h.toolDeletes.pop()['data->>id'], '12');
+  assert.doesNotMatch(env.doc.getElementById('adlogTbody').innerHTML, /A 수동/);
+});
+
+test('쇼핑몰 삭제가 DB에서 실패하면(트리거 포함 트랜잭션 되돌림) 쇼핑몰과 자동 기록이 모두 남고, 성공으로 알리지 않는다', async () => {
+  const env = await boot(abFixture());
+  const h = storeHarness(env, { failStoreDelete: true });
+  seedAdlogAB(env);
+  captureConfirm(env);
+  clickStoreAction(env, '.store-del-btn', { 'data-id': '1' });
+  await settle();
+  assert.equal(h.storeDeletes.length, 1);
+  assert.equal(h.toolDeletes.length, 0);
+  assert.equal(lastToast(env), '쇼핑몰을 삭제하지 못했어요. 쇼핑몰과 광고 기록은 그대로 남아 있어요. (trigger failed(테스트))');
+  assert.deepEqual(adlogNames(env), ['A 수동', 'A 자동', 'B 자동', '옛 기록'], '자동 기록도 그대로 남는다');
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(JSON.stringify(snap.storeIds), JSON.stringify(['1', '2']), '쇼핑몰 A도 남아 있다');
+  assert.doesNotMatch(env.doc.getElementById('adlogTbody').innerHTML, /삭제된 쇼핑몰 기록/);
+});
+
+test('쇼핑몰 삭제 응답을 받지 못하면(네트워크 오류) 삭제 여부를 단정하지 않고 확인을 안내한다', async () => {
+  const env = await boot(abFixture());
+  const sb = env.sandbox.launchdeskSupabase;
+  const original = sb.from;
+  sb.from = function(table){
+    const chain = original.call(sb, table);
+    if (table === 'stores') chain.delete = () => { const q = { eq(){ return q; }, then(res, rej){ return Promise.reject(new Error('network')).then(res, rej); } }; return q; };
+    return chain;
+  };
+  seedAdlogAB(env);
+  captureConfirm(env);
+  clickStoreAction(env, '.store-del-btn', { 'data-id': '1' });
+  await settle();
+  assert.equal(lastToast(env), '쇼핑몰 삭제 결과를 확인하지 못했어요. 새로고침해 확인해주세요.');
+  assert.deepEqual(adlogNames(env), ['A 수동', 'A 자동', 'B 자동', '옛 기록']);
+});
+
+test('Meta 연결 해제: 안내 후 해제하고 광고 기록은 지우지 않는다 — 해제 후에도 조회 · 개별 삭제할 수 있다', async () => {
+  const env = await boot(abFixture());
+  const h = storeHarness(env);
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, {
+    'meta-insights': () => ({ data: metaPayload(), error: null }),
+    'meta-disconnect': () => {
+      h.hide('connected_accounts', (row) => row.provider === 'meta'); // 해제 후 Meta 연결이 사라진 것처럼
+      return { data: { ok: true }, error: null };
+    }
+  });
+  seedAdlogAB(env);
+  const msgs = captureConfirm(env);
+  clickStoreAction(env, '.store-meta-disconnect-btn', { 'data-connected-account-id': 'm1' });
+  await settle();
+  assert.match(msgs[0], /저장한 광고 기록은 남으며, 광고 기록에서 직접 삭제할 수 있습니다\./);
+  assert.equal(calls.filter((c) => c.name === 'meta-disconnect').length, 1);
+  assert.equal(h.toolDeletes.length, 0, 'Meta 연결 해제는 광고 기록을 지우지 않는다');
+  assert.deepEqual(adlogNames(env), ['A 수동', 'A 자동', 'B 자동', '옛 기록']);
+
+  env.sandbox.launchdeskOpsSnapshot.refresh();
+  await settle();
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(snap.meta.state, 'not-connected');
+  assert.equal(env.doc.getElementById('adlogMetaBtn').disabled, true, '새 자동 기록은 만들 수 없다');
+  assert.match(env.doc.getElementById('adlogTbody').innerHTML, /A 자동/, '해제 후에도 기록은 보인다');
+  env.sandbox.deleteAdlogRecord(11);
+  await settle();
+  assert.ok(!adlogNames(env).includes('A 자동'));
+  assert.equal(h.toolDeletes[0]['data->>id'], '11');
+});
+
+test('Cafe24 연결 해제: 쇼핑몰 행과 Meta 연결이 남는 경우 Meta 자동 기록을 지우지 않는다', async () => {
+  const env = await boot(abFixture());
+  const h = storeHarness(env);
+  const calls = routeInvoke(env.sandbox.launchdeskSupabase, {
+    'meta-insights': () => ({ data: metaPayload(), error: null }),
+    'cafe24-disconnect': () => ({ data: { ok: true }, error: null })
+  });
+  seedAdlogAB(env);
+  captureConfirm(env);
+  clickStoreAction(env, '.store-cafe24-disconnect-btn', { 'data-id': '1' });
+  await settle();
+  assert.equal(calls.filter((c) => c.name === 'cafe24-disconnect').length, 1);
+  assert.equal(h.toolDeletes.length, 0);
+  assert.equal(h.storeDeletes.length, 0);
+  assert.deepEqual(adlogNames(env), ['A 수동', 'A 자동', 'B 자동', '옛 기록']);
+});
+
+test('쇼핑몰 0개: 삭제된 쇼핑몰의 기록과 미지정 기록이 모두 보이고(삭제된 쇼핑몰 기록은 합계 제외) 개별 삭제할 수 있다', async () => {
+  const fx = periodFixture();
+  fx.stores = [];
+  fx.withStores = true;
+  const env = await boot(fx);
+  const h = storeHarness(env);
+  const s = env.sandbox.launchdeskStore;
+  s.addAdlogRecord({ id: 21, store_id: '1', date: '09.20', name: '예전 상점 수동', channel: '메타', spend: 9000, revenue: 18000 });
+  s.addAdlogRecord({ id: 22, source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-19', store_id: '1', date: '2026-09-19', name: '예전 상점 자동', channel: '메타', spend: 8000, revenue: null });
+  s.addAdlogRecord({ id: 23, date: '03.21', name: '미지정 기록', channel: '메타', spend: 1000, revenue: 3000 });
+  env.sandbox.launchdeskAdlog.render();
+  const snap = env.sandbox.launchdeskOpsSnapshot.getLatest();
+  assert.equal(snap.storeId, null);
+  assert.equal(JSON.stringify(snap.storeIds), '[]');
+  const tbody = env.doc.getElementById('adlogTbody').innerHTML;
+  assert.match(tbody, /예전 상점 수동 <span class="adlog-tag">삭제된 쇼핑몰 기록 · 현재 합계 제외<\/span>/);
+  assert.match(tbody, /예전 상점 자동 <span class="adlog-tag">Meta 자동 · 귀속 구매금액<\/span> <span class="adlog-tag">삭제된 쇼핑몰 기록 · 현재 합계 제외<\/span>/);
+  assert.match(tbody, /미지정 기록<\/td>/);
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩1,000', '삭제된 쇼핑몰 기록은 합계에서 뺀다');
+  env.sandbox.deleteAdlogRecord(21);
+  env.sandbox.deleteAdlogRecord(22);
+  await settle();
+  assert.deepEqual(adlogNames(env), ['미지정 기록']);
+  assert.deepEqual(h.toolDeletes.map((f) => f['data->>id']), ['21', '22']);
+});
+
+test('쇼핑몰 목록을 아직 모르거나 조회에 실패하면 store_id가 있는 기록을 "삭제된 쇼핑몰"로 단정하지 않는다', async () => {
+  const fx = periodFixture();
+  fx.errorTables = ['stores'];
+  const env = await boot(fx);
+  env.sandbox.launchdeskStore.addAdlogRecord({ id: 31, store_id: '1', date: '09.20', name: '상점 기록', channel: '메타', spend: 1000, revenue: 2000 });
+  env.sandbox.launchdeskAdlog.render();
+  assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().storeIds, null);
+  assert.doesNotMatch(env.doc.getElementById('adlogTbody').innerHTML, /삭제된 쇼핑몰 기록/);
 });

@@ -987,6 +987,7 @@
   .adlog-sum-card .al-value{font-family:var(--f-display); font-weight:700; font-size:1.3rem; color:var(--ink);}
   .adlog-empty{padding:2rem 1.3rem; text-align:center; color:var(--ink-faint); font-size:.86rem;}
   .adlog-channel{font-family:var(--f-mono); font-size:.68rem; font-weight:700; padding:.15rem .5rem; border-radius:2px; color:#fff;}
+  .adlog-tag{display:inline-block; margin-left:.35rem; padding:.05rem .4rem; border:1px solid var(--border-strong); border-radius:2px; font-size:.68rem; color:var(--ink-faint); white-space:nowrap;}
   .roas-good{color:var(--badge-c); font-weight:700;}
   .roas-mid{color:var(--badge-b); font-weight:700;}
   .roas-low{color:var(--badge-a); font-weight:700;}

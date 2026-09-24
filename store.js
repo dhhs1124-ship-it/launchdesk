@@ -297,6 +297,49 @@
       if(res.error) console.warn('[launchdesk] 광고기록 저장 실패:', res.error.message);
     });
   }
+  // Meta 자동 기록(adlog-meta.js) — 회원만. 같은 meta_auto_key가 이미 목록에
+  // 있으면 요청하지 않고, DB insert가 성공한 뒤에만 목록에 넣는다(두 탭 동시
+  // 저장은 DB 유니크 인덱스가 23505로 거부 → duplicate). 기존 기록은 수정하지 않는다.
+  // 결과: { ok: true } | { ok: false, reason: 'guest'|'duplicate'|'error'|'stale' }
+  function addAutoAdlogRecord(record){
+    if(!state.authed || !state.userId) return Promise.resolve({ ok: false, reason: 'guest' });
+    var dup = state.adlogRecords.some(function(r){ return r && r.meta_auto_key === record.meta_auto_key; });
+    if(dup) return Promise.resolve({ ok: false, reason: 'duplicate' });
+    var sb = client();
+    if(!sb) return Promise.resolve({ ok: false, reason: 'error' });
+    var forUserId = state.userId;
+    return sb.from('tool_records').insert({ user_id: forUserId, tool_type: 'ad_log', data: record })
+      .then(function(res){
+        if(state.userId !== forUserId) return { ok: false, reason: 'stale' }; // 그 사이 로그아웃 · 계정 전환
+        if(res.error){
+          if(res.error.code === '23505') return { ok: false, reason: 'duplicate' };
+          console.warn('[launchdesk] Meta 자동 광고기록 저장 실패:', res.error.message);
+          return { ok: false, reason: 'error' };
+        }
+        state.adlogRecords.unshift(record);
+        return { ok: true };
+      })
+      .catch(function(err){
+        console.warn('[launchdesk] Meta 자동 광고기록 저장 중 오류:', err && err.message);
+        return { ok: false, reason: 'error' };
+      });
+  }
+  // 쇼핑몰 삭제(stores.js deleteStore)와 짝을 이룬다. DB에서는 stores 행 삭제
+  // 트리거(20260924170000_store_delete_meta_auto_adlog.sql)가 같은 트랜잭션에서
+  // 그 쇼핑몰의 Meta 자동 기록(source='meta_auto' · 같은 store_id)만 지운다 — 여기서는
+  // 쇼핑몰 삭제가 성공한 뒤 화면 목록에서만 같은 기록을 뺀다(DB 요청 없음).
+  // 수동 기록 · 다른 쇼핑몰 기록은 건드리지 않는다.
+  function isAutoAdlogFor(storeId){
+    var sid = String(storeId);
+    return function(r){ return !!r && r.source === 'meta_auto' && String(r.store_id) === sid; };
+  }
+  function countAutoAdlogRecordsForStore(storeId){
+    return state.adlogRecords.filter(isAutoAdlogFor(storeId)).length;
+  }
+  function forgetAutoAdlogRecordsForStore(storeId){
+    var match = isAutoAdlogFor(storeId);
+    state.adlogRecords = state.adlogRecords.filter(function(r){ return !match(r); });
+  }
   function removeAdlogRecord(id){
     state.adlogRecords = state.adlogRecords.filter(function(r){ return String(r.id) !== String(id); });
     if(!state.authed || !state.userId) return;
@@ -387,6 +430,9 @@
     clearCalcHistory: clearCalcHistory,
     getAdlogRecords: getAdlogRecords,
     addAdlogRecord: addAdlogRecord,
+    addAutoAdlogRecord: addAutoAdlogRecord,
+    countAutoAdlogRecordsForStore: countAutoAdlogRecordsForStore,
+    forgetAutoAdlogRecordsForStore: forgetAutoAdlogRecordsForStore,
     removeAdlogRecord: removeAdlogRecord,
     hydrate: hydrate,
     resetToGuest: resetToGuest,

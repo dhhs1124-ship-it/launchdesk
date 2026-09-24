@@ -832,38 +832,69 @@
     if(roas >= 2) return 'roas-mid';
     return 'roas-low';
   };
+  // 운영 현황에서 지금 선택한 쇼핑몰(회원 · 쇼핑몰이 있을 때만). ops-overview.js는
+  // 이 파일보다 뒤에 로드되므로 그릴 때마다 읽는다.
+  function opsSnapshot(){ return window.launchdeskOpsSnapshot && window.launchdeskOpsSnapshot.getLatest(); }
+  function selectedAdlogStoreId(){
+    var s = opsSnapshot();
+    return (s && s.authed && s.storeId) ? String(s.storeId) : '';
+  }
+  // 지금 남아 있는 내 쇼핑몰 id 목록 — 불러오기 전 · 실패 · 비회원이면 null(판단 보류).
+  function existingAdlogStoreIds(){
+    var s = opsSnapshot();
+    return (s && s.authed && Array.isArray(s.storeIds)) ? s.storeIds : null;
+  }
+  // 매출이 없는 기록(Meta 응답에 구매금액 항목이 없던 날) — 0과 구분해 "—"로 두고
+  // ROAS 계산에서 뺀다. 예전 수동 기록은 항상 숫자다.
+  function hasRevenue(r){ return typeof r.revenue === 'number' && isFinite(r.revenue); }
+  function adlogRoas(r){ return (hasRevenue(r) && r.spend > 0) ? r.revenue / r.spend : null; }
   function renderAdlog(){
     if(!adlogTbody) return;
-    var list = getAdlogRecords();
+    // 합계는 지금 쇼핑몰의 기록만(store_id 일치). 쇼핑몰이 없으면(비회원 · 쇼핑몰 0개)
+    // 쇼핑몰 미지정 기록끼리. 합계에 넣지 않는 기록도 지울 수 있게 목록에는 남긴다:
+    //   - 쇼핑몰을 알 수 없는 예전 기록 → "쇼핑몰 미지정 · 합계 제외"
+    //   - 이미 삭제된 쇼핑몰의 기록(내 쇼핑몰 목록에 없는 store_id) → "삭제된 쇼핑몰 기록 ·
+    //     현재 합계 제외" — 다른 쇼핑몰로 옮기지 않는다
+    // 지금 남아 있는 다른 쇼핑몰의 기록만 숨긴다(그 쇼핑몰을 선택하면 보인다). 쇼핑몰
+    // 목록을 아직 모르면 store_id가 있는 다른 기록은 삭제 여부를 판단하지 않고 숨긴다.
+    var storeId = selectedAdlogStoreId();
+    var existing = existingAdlogStoreIds();
+    var all = getAdlogRecords();
+    var inScope = function(r){ return String(r.store_id || '') === storeId; };
+    var isOrphan = function(r){ return !!r.store_id && !!existing && existing.indexOf(String(r.store_id)) === -1; };
+    var list = all.filter(function(r){ return inScope(r) || !r.store_id || isOrphan(r); });
+    var scoped = all.filter(function(r){ return inScope(r) && !isOrphan(r); });
     if(!list.length){
-      adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">아직 기록이 없어요 — "+ 기록 추가"로 첫 광고 성과를 남겨보세요.</div></td></tr>';
+      adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">아직 기록이 없어요 — "+ 기록 추가"나 "Meta 성과 기록하기"로 첫 광고 성과를 남겨보세요.</div></td></tr>';
     } else {
       adlogTbody.innerHTML = list.map(function(r){
-        var roas = r.spend > 0 ? (r.revenue / r.spend) : 0;
+        var roas = adlogRoas(r);
         var chanColor = {메타:'var(--badge-a)', 네이버:'var(--badge-c)', 카카오:'var(--badge-b)', 인스타:'var(--badge-d)'}[r.channel] || 'var(--ink-faint)';
+        var auto = r.source === 'meta_auto';
+        var tags = (auto ? ' <span class="adlog-tag">Meta 자동 · 귀속 구매금액</span>' : '') +
+          ((storeId && !r.store_id) ? ' <span class="adlog-tag">쇼핑몰 미지정 · 합계 제외</span>' : '') +
+          (isOrphan(r) ? ' <span class="adlog-tag">삭제된 쇼핑몰 기록 · 현재 합계 제외</span>' : '');
         return '<tr>' +
-          '<td>' + r.date + '</td>' +
-          '<td><span class="adlog-channel" style="background:' + chanColor + '">' + r.channel + '</span></td>' +
-          '<td>' + r.name + '</td>' +
+          '<td>' + escapeHtml(r.date) + '</td>' +
+          '<td><span class="adlog-channel" style="background:' + chanColor + '">' + escapeHtml(r.channel) + '</span></td>' +
+          '<td>' + escapeHtml(r.name) + tags + '</td>' +
           '<td class="num">₩' + Math.round(r.spend).toLocaleString('ko-KR') + '</td>' +
-          '<td class="num">₩' + Math.round(r.revenue).toLocaleString('ko-KR') + '</td>' +
-          '<td class="num ' + roasClass(roas) + '">' + roas.toFixed(1) + 'x</td>' +
-          '<td><button type="button" class="adlog-del" data-id="' + r.id + '">✕</button></td>' +
+          '<td class="num">' + (hasRevenue(r) ? '₩' + Math.round(r.revenue).toLocaleString('ko-KR') : '—') + '</td>' +
+          '<td class="num ' + (roas === null ? '' : roasClass(roas)) + '">' + (roas === null ? '—' : roas.toFixed(1) + 'x') + '</td>' +
+          '<td><button type="button" class="adlog-del" data-id="' + escapeHtml(r.id) + '">✕</button></td>' +
         '</tr>';
       }).join('');
     }
-    var totalSpend = list.reduce(function(s, r){ return s + r.spend; }, 0);
-    var totalRevenue = list.reduce(function(s, r){ return s + r.revenue; }, 0);
-    var avgRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
-    var best = list.slice().sort(function(a, b){
-      var ra = a.spend > 0 ? a.revenue / a.spend : 0;
-      var rb = b.spend > 0 ? b.revenue / b.spend : 0;
-      return rb - ra;
-    })[0];
+    var totalSpend = scoped.reduce(function(s, r){ return s + (Number(r.spend) || 0); }, 0);
+    var withRevenue = scoped.filter(function(r){ return hasRevenue(r) && r.spend > 0; });
+    var revSpend = withRevenue.reduce(function(s, r){ return s + r.spend; }, 0);
+    var revTotal = withRevenue.reduce(function(s, r){ return s + r.revenue; }, 0);
+    var best = withRevenue.slice().sort(function(a, b){ return adlogRoas(b) - adlogRoas(a); })[0];
     document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(totalSpend).toLocaleString('ko-KR');
-    document.getElementById('adlogSumRoas').textContent = avgRoas.toFixed(1) + 'x';
-    document.getElementById('adlogSumBest').textContent = best ? best.name : '—';
+    document.getElementById('adlogSumRoas').textContent = revSpend > 0 ? (revTotal / revSpend).toFixed(1) + 'x' : '—';
+    document.getElementById('adlogSumBest').textContent = best ? (best.name + ' (' + best.date + ')') : '—';
   }
+  window.launchdeskAdlog = { render: renderAdlog };
   if(adlogTbody){
     document.getElementById('adlogForm').addEventListener('submit', function(e){
       e.preventDefault();
@@ -876,6 +907,9 @@
         revenue: parseFloat(document.getElementById('adlogRevenue').value) || 0,
         channel: channelBtn ? channelBtn.getAttribute('data-channel') : '메타'
       };
+      // 새 수동 기록은 지금 선택한 쇼핑몰에 붙인다(쇼핑몰별 합계에 들어가도록).
+      var adlogStore = selectedAdlogStoreId();
+      if(adlogStore) record.store_id = adlogStore;
       if(window.launchdeskStore) window.launchdeskStore.addAdlogRecord(record);
       renderAdlog();
       e.target.reset();

@@ -148,6 +148,9 @@
     latestOpsSnapshot = {
       authed: authed, // 로그인 여부 — cafe24/meta 상태와 무관하게 이 필드만 보고 판단할 것
       storeId: selectedStoreId, // 광고 세트 패널(meta-adsets.js)이 쇼핑몰 변경을 감지 · 조회할 때 쓴다
+      // 지금 남아 있는 내 쇼핑몰 id 목록(문자열) — 광고 기록이 "삭제된 쇼핑몰 기록"을
+      // 구분할 때 쓴다. 목록을 아직 못 불러왔거나 조회에 실패했으면 null(판단 보류).
+      storeIds: storesKnown ? myStores.map(function(s){ return String(s.id); }) : null,
       period: { period: period.period, date: period.date, label: range ? range.label : '', since: range ? range.since : null, until: range ? range.until : null },
       cafe24: {
         state: currentCafe24State, // 'guest'|'loading'|'not-connected'|'error'|'data'
@@ -311,6 +314,7 @@
                       // 유지"가 실제로 가능한 상태다. 예전에는 이 목록 자체를 cafe24 연결 여부로 걸러서
                       // Cafe24가 해제되면 store가 통째로 사라져 Meta 조회까지 함께 끊기는 버그가 있었다.
   var selectedStoreId = null;
+  var storesKnown = false; // myStores를 실제로 불러왔는지(실패 · 로딩 중이면 false)
   // 로그인/로그아웃(onChange)마다, 그리고 쇼핑몰 선택이 바뀔 때마다 증가 —
   // 응답이 늦게 와서 순서가 뒤바뀌어도(A 로그아웃 직후 B 로그인, 혹은
   // 드롭다운을 빠르게 두 번 바꾼 경우) 가장 마지막 요청의 결과만 반영한다.
@@ -554,6 +558,7 @@
         if(storesRes.error){
           console.warn('[launchdesk] ops: stores 조회 실패:', storesRes.error.message);
           myStores = [];
+          storesKnown = false;
           selectedStoreId = null;
           clearStoreScopedData(); // 재조회 실패로 이 화면에 남아있던 이전 쇼핑몰 값이 노출되지 않게
           // 대상 store 자체를 못 찾았으니 meta도 확인할 대상이 없다(에러 아님) —
@@ -563,6 +568,7 @@
           return;
         }
         myStores = storesRes.data || [];
+        storesKnown = true;
         if(!myStores.length){
           selectedStoreId = null;
           clearStoreScopedData(); // 쇼핑몰이 전부 삭제된 경우도 마찬가지
@@ -581,6 +587,7 @@
         if(mySeq !== seq) return;
         console.warn('[launchdesk] ops: stores 조회 중 오류:', err && err.message);
         myStores = [];
+        storesKnown = false;
         selectedStoreId = null;
         clearStoreScopedData();
         publishBothStates('error', 'not-connected');
@@ -593,6 +600,7 @@
   // 재사용되지 않는다(요구사항).
   function clearAllCachedData(){
     myStores = [];
+    storesKnown = false;
     selectedStoreId = null;
     clearStoreScopedData();
     currentMetaState = 'not-connected';
@@ -711,6 +719,31 @@
       if(metaAccountId && !metaInflight) fetchMetaInsights(metaAccountId, seq);
       publishOpsSnapshot();
       return true;
+    },
+    // 광고 기록(adlog-meta.js) 전용 — 선택된 쇼핑몰에 연결된 Meta 광고계정의
+    // 하루(p: 'yesterday' | 'date' + d) 계정 전체 요약만 받아 돌려준다. 화면
+    // 스냅샷은 바꾸지 않는다. 결과의 storeId는 요청한 시점의 쇼핑몰이다.
+    fetchMetaDay: function(p, d){
+      var sb = client();
+      var storeId = selectedStoreId;
+      var accountId = metaAccountId;
+      if(!sb || !storeId || !accountId || currentMetaState !== 'data'){
+        return Promise.resolve({ ok: false, message: 'Meta 광고계정이 연결된 쇼핑몰을 먼저 선택해주세요.' });
+      }
+      var body = { connected_account_id: accountId, period: p };
+      if(p === 'date') body.date = d;
+      return sb.functions.invoke('meta-insights', { body: body })
+        .then(function(res){
+          if(res.error){
+            return readInvokeErrorBody(res.error).then(function(b){
+              var code = b && b.code;
+              return { ok: false, message: (code && META_ERROR_MESSAGES[code]) || (b && b.error) || META_ERROR_MESSAGES.TEMPORARY_ERROR };
+            });
+          }
+          if(!res.data || res.data.ok !== true) return { ok: false, message: META_ERROR_MESSAGES.TEMPORARY_ERROR };
+          return { ok: true, storeId: storeId, data: res.data };
+        })
+        .catch(function(){ return { ok: false, message: META_ERROR_MESSAGES.TEMPORARY_ERROR }; });
     },
     // 운영 현황 "새로고침" — 선택된 쇼핑몰의 Cafe24 주문을 실제로 동기화한
     // 뒤(성공·실패 모두) 주문 · Meta를 다시 조회한다. Cafe24가 연결돼 있지

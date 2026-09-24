@@ -557,7 +557,10 @@
       var id = delBtn.getAttribute('data-id');
       var target = stores.filter(function(s){ return String(s.id) === id; })[0];
       var label = target ? target.name : '이 쇼핑몰';
-      if(!window.confirm('"' + label + '"을(를) 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) return;
+      var ls = window.launchdeskStore;
+      var autoCount = (ls && ls.countAutoAdlogRecordsForStore) ? ls.countAutoAdlogRecordsForStore(id) : 0;
+      if(!window.confirm('"' + label + '"을(를) 삭제할까요? 이 작업은 되돌릴 수 없습니다.\n' +
+        '이 쇼핑몰의 Meta 자동 광고 기록' + (autoCount ? '(' + autoCount + '건)' : '') + '도 함께 삭제됩니다. 직접 입력한 광고 기록과 다른 쇼핑몰의 기록은 남습니다.')) return;
       deleteStore(id);
       return;
     }
@@ -963,7 +966,7 @@
   function disconnectMeta(connectedAccountId){
     if(!connectedAccountId || !currentUserId) return;
     if(metaDisconnectInFlightIds[connectedAccountId]) return; // 중복 클릭 방지(버튼도 disabled되지만 한 번 더 방어)
-    if(!window.confirm('Meta 광고 연결을 해제할까요?\n저장된 Meta 인증 정보가 삭제됩니다.')) return;
+    if(!window.confirm('Meta 광고 연결을 해제할까요?\n저장된 Meta 인증 정보가 삭제됩니다.\n저장한 광고 기록은 남으며, 광고 기록에서 직접 삭제할 수 있습니다.')) return;
 
     var sb = client();
     if(!sb) return;
@@ -1012,16 +1015,23 @@
       .eq('id', id)
       .eq('user_id', currentUserId) // RLS로 이미 막히지만, 클라이언트에서도 스스로 범위를 좁혀둔다
       .then(function(res){
+        // 쇼핑몰 행 삭제 한 번으로 끝난다 — 그 쇼핑몰의 Meta 자동 광고 기록은 DB 트리거가
+        // 같은 트랜잭션에서 함께 지운다(실패하면 쇼핑몰도 지워지지 않고 둘 다 남는다).
         if(res.error){
-          showToast('삭제에 실패했어요: ' + res.error.message, 'error');
+          showToast('쇼핑몰을 삭제하지 못했어요. 쇼핑몰과 광고 기록은 그대로 남아 있어요. (' + res.error.message + ')', 'error');
           return;
         }
         stores = stores.filter(function(s){ return String(s.id) !== String(id); });
         render();
-        showToast('쇼핑몰을 삭제했어요');
+        var ls = window.launchdeskStore;
+        if(ls && ls.forgetAutoAdlogRecordsForStore) ls.forgetAutoAdlogRecordsForStore(id);
+        if(window.launchdeskAdlog) window.launchdeskAdlog.render();
+        showToast('쇼핑몰과 그 쇼핑몰의 Meta 자동 광고 기록을 삭제했어요');
       })
       .catch(function(err){
-        showToast('삭제 중 오류가 발생했어요', 'error');
+        // 응답을 받지 못한 경우 — DB에서 실제로 삭제됐는지 알 수 없으므로 단정하지 않는다.
+        // (삭제됐다면 쇼핑몰과 자동 기록이 함께, 아니면 둘 다 남아 있다 — 트리거는 한 트랜잭션)
+        showToast('쇼핑몰 삭제 결과를 확인하지 못했어요. 새로고침해 확인해주세요.', 'error');
         console.warn('[launchdesk] store 삭제 중 오류:', err && err.message);
       });
   }

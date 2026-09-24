@@ -1,4 +1,4 @@
-/* 개인정보처리방침 v1.2 — 버전 드리프트 방지 테스트. 실행: node --test
+/* 개인정보처리방침 v1.3(로컬 준비 · 공개 중 v1.2) — 버전 드리프트 방지 테스트. 실행: node --test
    (Node 18+ 내장 test runner, 별도 패키지 없음)
 
    여기서 확인하는 것은 딱 하나 — "버전을 나타내는 여러 곳이 서로 어긋나지
@@ -25,35 +25,68 @@ const TERMS_HTML = INDEX_HTML.slice(TERMS_START, TERMS_START + 1000);
 const SETUP_INQUIRY_MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
 const V1_1_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260922100000_setup_inquiries_privacy_v1_1.sql');
 const V1_2_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260923170000_setup_inquiries_privacy_v1_2.sql');
+const V1_3_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260924160000_setup_inquiries_privacy_v1_3.sql');
 
-test('policy-consent-core.js: PRIVACY_VERSION은 v1.2', () => {
-  assert.equal(core.PRIVACY_VERSION, 'v1.2');
+test('policy-consent-core.js: PRIVACY_VERSION은 v1.3', () => {
+  assert.equal(core.PRIVACY_VERSION, 'v1.3');
 });
 
 test('policy-consent-core.js: TERMS_VERSION은 그대로(약관 본문을 고치지 않았으므로)', () => {
   assert.equal(core.TERMS_VERSION, '2026-09-18');
 });
 
-test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.2 · 2026년 9월 24일(실제 게시일)로 코드 상수와 일치', () => {
-  assert.match(PRIVACY_HTML, /시행일 2026년 9월 24일 · v1\.2 · 런치데스크/);
-  assert.match(PRIVACY_HTML, /<li>버전: v1\.2\(이전 버전: v1\.1, 2026년 9월 22일 시행\)<\/li>/);
+test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.3 · 2026년 9월 24일(실제 게시일)로 코드 상수와 일치', () => {
+  assert.match(PRIVACY_HTML, /시행일 2026년 9월 24일 · v1\.3 · 런치데스크/);
+  assert.match(PRIVACY_HTML, /<li>버전: v1\.3\(이전 버전: v1\.2, 2026년 9월 24일 시행\)<\/li>/);
   assert.match(PRIVACY_HTML, /<li>시행일: 2026년 9월 24일<\/li>/);
 });
 
-test('개인정보처리방침 화면: v1.2 시행일이 헤더·14번·15번 세 곳에서 같은 날짜이고, 게시일 자리표시자·안내 주석이 남아 있지 않다', () => {
+test('개인정보처리방침 화면: v1.3 시행일이 헤더·14번·15번 세 곳에서 같은 날짜이고, 게시일 자리표시자·안내 주석이 남아 있지 않으며 이전 버전 이력은 그대로다', () => {
+  assert.match(PRIVACY_HTML, /v1\.2 → v1\.3 주요 변경 사항\(2026년 9월 24일 시행\)/);
   assert.match(PRIVACY_HTML, /v1\.1 → v1\.2 주요 변경 사항\(2026년 9월 24일 시행\)/);
-  // 게시일 3곳이 모두 같은 날짜(헤더 · 14번 변경이력 · 15번 시행일)
-  assert.equal((PRIVACY_HTML.match(/2026년 9월 24일/g) || []).length, 3, 'v1.2 시행일(2026년 9월 24일)이 정확히 3곳에 있어야 한다');
+  assert.match(PRIVACY_HTML, /v1\.0 → v1\.1 주요 변경 사항\(2026년 9월 22일 시행\)/);
+  // v1.3 시행일 3곳(헤더 · 14번 v1.2→v1.3 · 15번 시행일) + v1.2 이력 2곳(14번 v1.1→v1.2 · 15번 이전 버전)
+  assert.equal((PRIVACY_HTML.match(/2026년 9월 24일/g) || []).length, 5);
   assert.doesNotMatch(PRIVACY_HTML, /\[게시 예정일\]/, '게시일 자리표시자가 남아 있으면 안 된다(주석 포함)');
   assert.doesNotMatch(PRIVACY_HTML, /\[공개 전 확정 필요/, '날짜를 채우라는 안내 주석이 남아 있으면 안 된다');
+});
+
+test('v1.3: Meta 성과 기록(광고 기록 저장)의 목적 · 항목 · 보유 · 삭제가 실제 코드와 같게 적혀 있다', () => {
+  // 2번 목적 — 조회뿐 아니라 이용자가 실행한 경우의 저장
+  assert.match(PRIVACY_HTML, /Meta 성과 기록을 실행한 경우 그날의 Meta 광고계정 전체 합계\(하루 광고비·Meta 귀속 구매금액·구매 건수\)를 광고 기록으로 저장/);
+  // 3번 항목 — 저장 항목(광고계정 ID 포함) · 버튼을 누른 경우에만 · 날짜당 1건
+  assert.match(PRIVACY_HTML, /<tr><td>Meta 성과 기록\(광고 기록\)<\/td><td>[^<]*Meta 광고계정 ID[^<]*<\/td><td>[^<]*“Meta 성과 기록하기”를 누른 경우에만[^<]*같은 쇼핑몰·광고계정·날짜는 1건만 저장\)<\/td><\/tr>/);
+  // 4번 보유 — 연동 해제 시 연결 정보는 삭제, 광고 기록은 남아 직접 삭제 · 쇼핑몰 삭제 시 그 쇼핑몰 자동 기록 함께 삭제
+  assert.match(PRIVACY_HTML, /연결 정보와 접근 권한이 즉시 삭제됩니다\. 다만 이용자가 이미 광고 기록으로 저장한 Meta 성과 기록은 연동 해제로 삭제되지 않으며, 광고 기록에서 직접 삭제할 수 있습니다/);
+  assert.match(PRIVACY_HTML, /<strong>Meta 성과 기록[^<]*<\/strong> — 이용자가 직접 삭제하거나, 기록이 속한 쇼핑몰을 삭제하거나, 회원 탈퇴할 때까지 보유합니다\./);
+  assert.match(PRIVACY_HTML, /Meta 연동을 해제해도 이미 저장한 기록\(그 안의 Meta 광고계정 ID 포함\)은 남으며, 연동 해제 후에도 조회하고 직접 삭제할 수 있습니다/);
+  assert.match(PRIVACY_HTML, /쇼핑몰 자체를 삭제하면 그 쇼핑몰의 Meta 성과 기록도 함께 삭제되며, 이용자가 직접 입력한 광고 기록과 다른 쇼핑몰의 기록은 삭제되지 않습니다/);
+  assert.match(PRIVACY_HTML, /쇼핑몰을 삭제하면 그 쇼핑몰의 Meta 성과 기록도 함께 삭제됩니다\.<\/li>/);
+  assert.doesNotMatch(PRIVACY_HTML, /쇼핑몰을 삭제해도 이미 저장한 기록/, '쇼핑몰 삭제 시 남는다는 이전 설명이 남아 있으면 안 된다');
+  // 코드 근거: Meta 연동 해제 · Cafe24 연동 해제는 광고 기록(tool_records)을 지우지 않고(stores 행도
+  // 지우지 않으므로 트리거도 안 돈다), 쇼핑몰 행 삭제 트리거만 그 쇼핑몰의 Meta 자동 기록을 지운다
+  const metaDisconnect = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'meta-disconnect', 'index.ts'), 'utf8');
+  assert.doesNotMatch(metaDisconnect, /tool_records|from\("stores"\)/);
+  const cafe24DisconnectFn = fs.readFileSync(path.join(ROOT, 'supabase', 'functions', 'cafe24-disconnect', 'index.ts'), 'utf8');
+  assert.doesNotMatch(cafe24DisconnectFn, /tool_records/);
+  const cafe24Rpc = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20260922120000_cafe24_disconnect.sql'), 'utf8').replace(/--.*$/gm, '');
+  assert.doesNotMatch(cafe24Rpc, /delete from public\.(stores|tool_records)/);
+  const trig = fs.readFileSync(path.join(ROOT, 'supabase', 'migrations', '20260924170000_store_delete_meta_auto_adlog.sql'), 'utf8');
+  assert.match(trig, /after delete on public\.stores\s+for each row/);
+  assert.match(trig, /where user_id = old\.user_id\s+and tool_type = 'ad_log'\s+and \(data ->> 'source'\) = 'meta_auto'\s+and \(data ->> 'store_id'\) = old\.id::text;/);
+  // 코드 근거: 자동 기록이 실제로 저장하는 필드
+  const adlogMeta = fs.readFileSync(path.join(ROOT, 'adlog-meta.js'), 'utf8');
+  for (const field of ['spend:', 'revenue:', 'purchases:', 'meta_auto_key:', 'store_id:', 'currency:', 'fetched_at:']) {
+    assert.ok(adlogMeta.includes(field), 'adlog-meta.js 저장 필드 누락: ' + field);
+  }
 });
 
 test('이용약관 화면: v1.0 · 2026년 9월 18일 그대로(약관 본문을 고치지 않았으므로 버전을 올리지 않음)', () => {
   assert.match(TERMS_HTML, /시행일 2026년 9월 18일 · v1\.0 · 운영자: LaunchDesk/);
 });
 
-test('세팅 대행 문의 RPC의 서버 동의 버전 상수가 프런트 PRIVACY_VERSION과 일치', () => {
-  const sql = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8');
+test('세팅 대행 문의 RPC의 서버 동의 버전 상수(가장 최근 마이그레이션 v1.3)가 프런트 PRIVACY_VERSION과 일치', () => {
+  const sql = fs.readFileSync(V1_3_MIGRATION_PATH, 'utf8');
   const m = sql.match(/v_consent_version\s+constant\s+text\s*:=\s*'([^']+)'/);
   assert.ok(m, 'v_consent_version 상수를 마이그레이션 파일에서 찾지 못함');
   assert.equal(m[1], core.PRIVACY_VERSION, 'RPC가 저장하는 동의 버전과 policy-consent-core.js의 PRIVACY_VERSION이 어긋납니다');
@@ -149,8 +182,27 @@ test('Cafe24/Meta 연동 정보와 Cafe24 주문 데이터가 수집 항목 표�
   assert.match(PRIVACY_HTML, /Cafe24 주문 데이터/);
 });
 
-test('Meta 광고 성과는 "매 요청마다 조회 · 저장하지 않음"으로 정확히 표현됨(DB 저장으로 오기하지 않음)', () => {
-  assert.match(PRIVACY_HTML, /Meta 광고 성과\(광고비·노출·클릭·구매 등 지표\)는 화면에서 조회할 때마다 Meta로부터 그때그때 가져오며, 서버에 별도로 저장하지 않습니다/);
+test('Meta 광고 성과: 조회한 성과 자체는 저장하지 않고, 이용자가 "Meta 성과 기록하기"를 누른 경우만 하루 합계를 광고 기록으로 저장한다고 정확히 표현됨', () => {
+  assert.match(PRIVACY_HTML, /Meta 광고 성과\(광고비·노출·클릭·구매 등 지표\)는 화면에서 조회할 때마다 Meta로부터 그때그때 가져오며, 조회한 성과 자체는 서버에 저장하지 않습니다\. 다만 이용자가 운영 현황 “광고 기록”에서 “Meta 성과 기록하기”를 직접 누른 경우에는/);
+  assert.match(PRIVACY_HTML, /Cafe24 주문금액과는 다르며 서로 합산하지 않습니다/);
+  assert.doesNotMatch(PRIVACY_HTML, /서버에 별도로 저장하지 않습니다/, 'v1.2의 "저장하지 않음" 단정이 남아 있으면 안 된다');
+});
+
+test('v1.3 마이그레이션: 같은 7인자 시그니처를 CREATE OR REPLACE로 교체하고 서버 상수만 v1.3으로 바꾼다(검증 로직 · 가격 · INSERT · 권한은 v1.2와 동일)', () => {
+  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8');
+  const v13 = fs.readFileSync(V1_3_MIGRATION_PATH, 'utf8');
+  assert.match(v13, /create or replace function public\.submit_setup_inquiry\(\s*p_plan_id text,[\s\S]*?p_privacy_consent boolean default false,\s*p_expected_privacy_version text default null\s*\)/);
+  assert.match(v13, /v_consent_version constant text := 'v1\.3';/);
+  assert.match(v13, /if p_expected_privacy_version is distinct from v_consent_version then\s*raise exception 'PRIVACY_VERSION_MISMATCH';/);
+  assert.doesNotMatch(v13, /drop function/i, '시그니처가 같으므로 DROP이 필요 없다');
+  // v1.2와 본문이 상수 한 줄(과 주석)만 다르다
+  const body = (s) => s.slice(s.indexOf('returns uuid'), s.indexOf('$$;')).replace(/--.*$/gm, '').replace(/\s+/g, ' ').replace(/'v1\.[23]'/, "'VER'");
+  assert.equal(body(v13), body(v12));
+  const sig = '(text, text, text, text, text, boolean, text)';
+  assert.ok(v13.includes(`revoke all on function public.submit_setup_inquiry${sig} from public;`));
+  assert.ok(v13.includes(`grant execute on function public.submit_setup_inquiry${sig} to anon, authenticated;`));
+  // v1.2 파일 자체는 그대로(원격에 이미 적용됨)
+  assert.match(v12, /v_consent_version constant text := 'v1\.2';/);
 });
 
 test('확인되지 않은 사업자등록번호를 임의로 추가하지 않았다(사업자등록 전이므로)', () => {

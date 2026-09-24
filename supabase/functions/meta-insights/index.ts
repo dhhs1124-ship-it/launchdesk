@@ -52,7 +52,12 @@ function toNumber(value: unknown): number | null {
 function pickPurchase(
   actions: MetaActionEntry[] | undefined,
   actionValues: MetaActionEntry[] | undefined
-): { purchase_count: number; purchase_value: number; purchase_basis: string | null } {
+): {
+  purchase_count: number;
+  purchase_value: number;
+  purchase_basis: string | null;
+  purchase_value_observed: boolean;
+} {
   const actionList = Array.isArray(actions) ? actions : [];
   const valueList = Array.isArray(actionValues) ? actionValues : [];
 
@@ -61,15 +66,19 @@ function pickPurchase(
     if (!countEntry) continue;
 
     const valueEntry = valueList.find((a) => a.action_type === basis);
+    const value = valueEntry ? toNumber(valueEntry.value) : null;
     return {
       purchase_count: toNumber(countEntry.value) ?? 0,
-      purchase_value: valueEntry ? toNumber(valueEntry.value) ?? 0 : 0,
+      purchase_value: value ?? 0,
       purchase_basis: basis,
+      // Meta 응답(action_values)에 구매금액 값이 실제로 있었는지 — 없으면
+      // purchase_value의 0은 "측정된 0"이 아니다(광고 기록은 이 값으로 —와 0을 구분).
+      purchase_value_observed: value !== null,
     };
   }
 
   // 그 기간에 세 후보 중 어느 것도 없으면 = 구매전환 0건(에러 아님).
-  return { purchase_count: 0, purchase_value: 0, purchase_basis: null };
+  return { purchase_count: 0, purchase_value: 0, purchase_basis: null, purchase_value_observed: false };
 }
 
 // 광고계정 timezone 기준 날짜 계산 — Asia/Seoul을 하드코딩하지 않고
@@ -304,6 +313,7 @@ interface NormalizedPeriod {
   cpm: number | null;
   purchase_count: number;
   purchase_value: number;
+  purchase_value_observed: boolean;
   roas: number | null;
   purchase_basis: string | null;
 }
@@ -313,7 +323,7 @@ function normalizePeriod(row: any): NormalizedPeriod {
   const spend = toNumber(row?.spend) ?? 0;
   const impressions = toNumber(row?.impressions) ?? 0;
   const clicks = toNumber(row?.clicks) ?? 0;
-  const { purchase_count, purchase_value, purchase_basis } = pickPurchase(
+  const { purchase_count, purchase_value, purchase_basis, purchase_value_observed } = pickPurchase(
     row?.actions,
     row?.action_values
   );
@@ -329,6 +339,7 @@ function normalizePeriod(row: any): NormalizedPeriod {
     cpm: impressions > 0 ? (spend / impressions) * 1000 : null,
     purchase_count,
     purchase_value,
+    purchase_value_observed,
     // ROAS는 Meta의 purchase_roas 필드를 쓰지 않고 서버가 직접 계산한다
     // (분자/분모를 §6에서 고른 basis로 우리가 직접 통제하기 위함).
     roas: spend > 0 ? purchase_value / spend : null,
