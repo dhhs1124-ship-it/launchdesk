@@ -34,18 +34,18 @@ test('policy-consent-core.js: TERMS_VERSION은 그대로(약관 본문을 고치
   assert.equal(core.TERMS_VERSION, '2026-09-18');
 });
 
-test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.2 · [게시 예정일]로 코드 상수와 일치(실제 게시일은 게시 직전에 확정)', () => {
-  assert.match(PRIVACY_HTML, /시행일 \[게시 예정일\] · v1\.2 · 런치데스크/);
+test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.2 · 2026년 9월 24일(실제 게시일)로 코드 상수와 일치', () => {
+  assert.match(PRIVACY_HTML, /시행일 2026년 9월 24일 · v1\.2 · 런치데스크/);
   assert.match(PRIVACY_HTML, /<li>버전: v1\.2\(이전 버전: v1\.1, 2026년 9월 22일 시행\)<\/li>/);
-  assert.match(PRIVACY_HTML, /<li>시행일: \[게시 예정일\]<\/li>/);
+  assert.match(PRIVACY_HTML, /<li>시행일: 2026년 9월 24일<\/li>/);
 });
 
-test('개인정보처리방침 화면: 시행일 자리표시자가 헤더·14번·15번 세 곳(+안내 주석 1곳)에서 동일한 문자열로만 등장(게시 전 날짜 확정 시 일괄 치환 대상)', () => {
-  // HTML 주석(안내문)은 실제 게시 문구가 아니므로 제외하고, 눈에 보이는
-  // 본문에만 정확히 3곳(헤더·14번 변경이력·15번 시행일)에 등장해야 한다.
-  const withoutComments = PRIVACY_HTML.replace(/<!--[\s\S]*?-->/g, '');
-  const placeholderCount = (withoutComments.match(/\[게시 예정일\]/g) || []).length;
-  assert.equal(placeholderCount, 3, '[게시 예정일] 자리표시자 개수가 3(헤더·14번 변경이력·15번 시행일)이 아니다 — 게시 전 날짜 확정 시 빠뜨리는 곳이 없도록 셋 다 같은 문자열이어야 한다');
+test('개인정보처리방침 화면: v1.2 시행일이 헤더·14번·15번 세 곳에서 같은 날짜이고, 게시일 자리표시자·안내 주석이 남아 있지 않다', () => {
+  assert.match(PRIVACY_HTML, /v1\.1 → v1\.2 주요 변경 사항\(2026년 9월 24일 시행\)/);
+  // 게시일 3곳이 모두 같은 날짜(헤더 · 14번 변경이력 · 15번 시행일)
+  assert.equal((PRIVACY_HTML.match(/2026년 9월 24일/g) || []).length, 3, 'v1.2 시행일(2026년 9월 24일)이 정확히 3곳에 있어야 한다');
+  assert.doesNotMatch(PRIVACY_HTML, /\[게시 예정일\]/, '게시일 자리표시자가 남아 있으면 안 된다(주석 포함)');
+  assert.doesNotMatch(PRIVACY_HTML, /\[공개 전 확정 필요/, '날짜를 채우라는 안내 주석이 남아 있으면 안 된다');
 });
 
 test('이용약관 화면: v1.0 · 2026년 9월 18일 그대로(약관 본문을 고치지 않았으므로 버전을 올리지 않음)', () => {

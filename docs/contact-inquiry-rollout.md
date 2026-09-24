@@ -1,26 +1,21 @@
 # 공개 문의 폼 배포 준비
 
-이 코드는 `55017ffafa548967076e459d75d31bb1a74efc28`를 기준으로 작성했다. (2026-09-23 변경: 문의하기는 회원 전용이다 — 비회원에게는 로그인 안내가 보이고 서버도 로그인 토큰으로 비회원을 거부한다. Turnstile은 제거했다.) 회원은 문의 유형, 답변 이메일(로그인 계정 이메일이 기본값), 선택 연락처, 수정 가능한 제목과 내용을 입력한다. 제출은 사이트에서 바로 `contact-inquiry` Edge Function으로 전송하고, 성공한 요청만 운영자 Gmail로 발송한다. DB에는 문의 원문이나 이메일을 저장하지 않는다(이메일은 발송 횟수 제한용 해시만, 그 외에는 중복 발송 방지용 무작위 식별자만 저장 — 아래 "필수 설정" 앞에 있는 0단계 참고).
+이 기능은 커밋 `3c9ea89`(feat: prepare beta inquiries and ad reporting)에 포함돼 있다. **실제 적용 순서는 `docs/privacy-v1-2-rollout.md`의 "통합 출시 순서" 하나만 따른다** — 이 문서는 문의 기능의 설계·설정값·확인 시나리오를 설명한다. (2026-09-23 변경: 문의하기는 회원 전용이다 — 비회원에게는 로그인 안내가 보이고 서버도 로그인 토큰으로 비회원을 거부한다. Turnstile은 제거했다.) 회원은 문의 유형, 답변 이메일(로그인 계정 이메일이 기본값), 선택 연락처, 수정 가능한 제목과 내용을 입력한다. 제출은 사이트에서 바로 `contact-inquiry` Edge Function으로 전송하고, 성공한 요청만 운영자 Gmail로 발송한다. DB에는 문의 원문이나 이메일을 저장하지 않는다(이메일은 발송 횟수 제한용 해시만, 그 외에는 중복 발송 방지용 무작위 식별자만 저장 — 아래 "필수 설정" 앞에 있는 0단계 참고).
 
-## 0. (필수 차단 단계) 방침 확정·게시 — 이 단계 없이는 아래 어떤 단계도 진행하지 않는다
+## 0. 방침과의 관계 — 현재 상태(2026-09-24)
 
-**아래 1~5번(키 설정·DB 적용·함수 배포)은 이 0단계가 끝나기 전까지 순서와 무관하게 전부 보류한다.** 폼이 기술적으로 완성돼 있어도 방침이 실제 처리 흐름을 설명하지 못하면 개인정보를 고지 없이 국외 제3자(Resend)로 보내는 것과 같다.
+- 개인정보처리방침 v1.2 본문(수집 항목·보유기간·Resend 국외 처리위탁 등)은 `index.html` `/privacy`에 확정 반영돼 있고, `policy-consent-core.js`(`PRIVACY_VERSION = 'v1.2'`)·세팅 대행 동의 마이그레이션(`20260923170000`)·관련 테스트도 v1.2로 맞춰져 있다. 실제 게시일은 **2026년 9월 24일(한국시간)**로 확정해 방침 세 곳(헤더·14번·15번)에 반영했다. Turnstile을 제거했으므로 Cloudflare 관련 결정 항목은 없다.
+- 문의 폼 안의 필수 동의 문구(보유 기간 절차)가 방침 본문과 같은 절차로 표현되는지는 `tests/privacy-version-consistency.test.js`가 확인한다.
+- 아래 Secrets 설정·마이그레이션 `20260923160000` 적용·함수 배포는 **현재 공개 중인 v1.1 화면에 영향이 없다**(v1.1 화면은 `contact-inquiry`를 호출하지 않는다). 그래서 방침 공개 전에 먼저 해 둘 수 있고, **오늘(2026-09-24) 세팅 대행 마이그레이션 `20260923170000` 적용·push 전에 반드시 끝내야 한다**(안 끝낸 채 새 화면이 공개되면 문의 전송이 실패한다). 다만 **실제 메일이 발송되는 확인은 v1.2 방침이 공개된 뒤에만 한다** — 방침 공개 전에 실제 문의를 Resend로 보내지 않는다.
 
-1. `docs/contact-inquiry-privacy-draft.md`의 사실관계(수집 항목·보유기간·위탁 현황·국외 이전)를 운영자가 검토한다. 이 문서는 법적 분류(예: 국외 이전 고지 대상 여부, 위탁이냐 제3자 제공이냐)를 확정하지 않는다 — 그 판단과 실제 Resend 계약·설정 확인은 운영자 몫이다.
-2. 새 버전(예: v1.2)과 시행일을 정하고, `index.html`의 `/privacy` 화면 본문에 실제로 반영해 **게시**한다.
-3. `policy-consent-core.js`의 버전 상수, 기존 회원 재동의 흐름, `submit_setup_inquiry` 등 다른 마이그레이션의 버전 표기, 관련 테스트(`tests/privacy-version-consistency.test.js` 등)를 새 버전에 맞춰 함께 갱신한다.
-4. 문의 폼 안의 별도 필수 동의 문구(현재 "보유 기간: 문의 처리 완료 후 1년")가 게시된 방침과 정확히 일치하는지 재확인한다.
-
-이 0단계가 끝나기 전에는 아래 3번(마이그레이션 적용)과 5번(함수 배포)을 실행하지 않는다. 1번(Resend 계정 준비)은 순서상 먼저 해도 무방하지만, **실제로 폼이 동작하게 만드는 3·5번은 0단계 완료 후로 미룬다.**
-
-## 필수 설정 (0단계 완료 후에만 진행)
+## 필수 설정 (순서는 `docs/privacy-v1-2-rollout.md` "통합 출시 순서" B 단계)
 
 1. Resend에서 `launchdesk.co.kr` 발송 도메인을 인증하고, 발송 권한만 있는 API 키를 생성한다. `CONTACT_FROM_EMAIL`은 인증한 도메인의 주소(예: `LaunchDesk <contact@launchdesk.co.kr>`)로 지정한다. 운영자 수신 메일은 코드에 이미 공개된 `dhhs1124@gmail.com`이다.
 2. (삭제됨 — Turnstile 제거. 이미 만들어 둔 Turnstile 위젯·`CONTACT_TURNSTILE_SECRET` Secret이 있다면 더 이상 쓰이지 않으므로 정리해도 된다.)
 3. Supabase Edge Function Secrets에 `RESEND_API_KEY`, `CONTACT_FROM_EMAIL`, `CONTACT_RATE_PEPPER`(충분히 긴 무작위 문자열)를 설정한다. 로컬 개발 중 `http://localhost:3000` 등에서 테스트하려면 `CONTACT_ALLOWED_ORIGINS`에 운영 도메인과 함께 그 origin을 쉼표로 추가한다(설정하지 않으면 운영 도메인만 허용 — 개발용 origin은 소스에 없다). 비밀 키를 소스 파일이나 대화창에 붙여넣지 않는다.
 4. `supabase/migrations/20260923160000_contact_inquiry_rate_limit.sql`을 검토 후 적용하고 `supabase/verify/contact_inquiry_rate_limit_verify.sql`의 모든 항목이 PASS인지 확인한다. **이 파일은 2026-09-23 안에 두 번 다시 썼다(발송 실패 시 재시도 차단 문제 → 동시 요청 시 상한 초과 문제 순으로 수정) — 지금 버전은 테이블 2개(`contact_inquiry_rate_limits`, `contact_inquiry_deliveries`)·함수 5개(`claim_contact_inquiry_attempt`, `release_contact_inquiry_reservation`, `record_contact_inquiry_delivery`, `contact_inquiry_already_delivered`, 그리고 기존 것)다.**
-   - **이 마이그레이션이 원격 DB에 이미 적용됐는지 여부는 이 문서 작성 시점 기준 확인되지 않았다 — 적용 전 반드시 실제 원격 프로젝트에서 `select * from information_schema.tables where table_name in ('contact_inquiry_rate_limits','contact_inquiry_deliveries')`와 `select proname from pg_proc where proname like 'contact_inquiry%' or proname like '%contact_inquiry_attempt%' or proname like '%contact_inquiry_reservation%' or proname like '%contact_inquiry_delivery%'` 등으로 직접 확인할 것.** 이미 적용된 옛 스키마가 있다면 이 파일을 그대로 재실행하지 말고(`create table`이 "이미 존재" 오류로 실패한다) 옛 스키마에서 이 버전으로 옮기는 별도 마이그레이션이 필요하다.
-5. `supabase/config.toml`에서 `contact-inquiry`는 `verify_jwt = true`(회원 전용)다. 다만 게이트웨이의 이 검사는 anon 키 JWT도 통과시키므로, `supabase/functions/contact-inquiry/index.ts`가 access token을 `supabaseAdmin.auth.getUser`로 직접 확인해 비회원을 `401 LOGIN_REQUIRED`로 거부하고, 카테고리별 일일·로그인 계정별 발송 성공 횟수를 원자적으로 확인한다(발송 실패는 이 횟수를 소모하지 않는다 — 아래 "발송 실패·재시도 처리" 참고). 이 함수만 배포한다.
+   - **적용 전 원격 상태는 `supabase/verify/contact_inquiry_preflight_check.sql`(SQL Editor, 조회 전용)로 확인한다.** 결과 행이 없으면 미적용이라 이 파일을 적용하고, 상태 C면 이미 지금 버전이 적용된 것이라 건너뛴다. 상태 A·B(예전 버전)가 나오면 이 파일을 그대로 재실행하지 말고(`create table`이 "이미 존재" 오류로 실패한다) 옛 스키마에서 이 버전으로 옮기는 별도 마이그레이션이 필요하다.
+5. 함수 배포: `npx supabase functions deploy contact-inquiry`(이 PC에는 전역 Supabase CLI가 없으므로 `npx`로 실행한다). `supabase/config.toml`에서 `contact-inquiry`는 `verify_jwt = true`(회원 전용)다. 허용 Origin 기본값은 `https://launchdesk.co.kr`, `https://www.launchdesk.co.kr`뿐이라 Vercel 미리보기 주소에서는 전송이 거부된다(확인은 운영 도메인에서 한다). 다만 게이트웨이의 이 검사는 anon 키 JWT도 통과시키므로, `supabase/functions/contact-inquiry/index.ts`가 access token을 `supabaseAdmin.auth.getUser`로 직접 확인해 비회원을 `401 LOGIN_REQUIRED`로 거부하고, 카테고리별 일일·로그인 계정별 발송 성공 횟수를 원자적으로 확인한다(발송 실패는 이 횟수를 소모하지 않는다 — 아래 "발송 실패·재시도 처리" 참고). 이 함수만 배포한다.
 
 ## 발송 실패·재시도·중복 발송 처리 (2026-09-23, 두 차례 재설계)
 
@@ -48,7 +43,7 @@
 
 ## 공개 전 개인정보 안내 검토
 
-이 섹션은 위 "0. 방침 확정·게시"로 옮겨졌다 — 더 이상 선택적 검토 항목이 아니라 배포를 막는 0단계다.
+위 "0. 방침과의 관계" 참고 — 방침 본문과 게시일(2026년 9월 24일)이 모두 반영돼 있다.
 
 ## 확인 시나리오
 
@@ -62,4 +57,4 @@
 - **동시 요청(스테이징 전용, 자동화 테스트는 이미 완료)**: 같은 이메일로 거의 동시에 2개 탭에서 제출해, 상한 근처에서 실제로 몇 통이 도착하는지 확인 — 1통만 성공하고 1통은 "오늘 문의 가능 횟수를 모두 사용했어요"를 받아야 한다. 이 저장소의 자동화 테스트(`tests/contact-inquiry.test.js`)는 Node 안의 모의 동시성으로 이미 확인했지만, 실제 Postgres 엔진에서의 동시성은 검증하지 못했다(아래 "미검증 사항" 참고) — 스테이징에서 실제로 재현해 볼 것.
 - 390px, 키보드 Tab/Enter, 화면 낭독기의 필드 이름과 결과 안내 확인.
 
-공개 사이트 키가 비어 있으면 전송 버튼은 잠겨 있고 기존 이메일 주소로 직접 문의할 수 있다. 임의 키나 시험 키로 운영 사이트를 열지 않는다.
+전송 버튼은 로그인하지 않았거나 전송 중일 때만 잠긴다(Turnstile 사이트 키 조건은 제거됨). 함수를 부를 수 없거나 전송에 실패하면 폼 아래 안내된 이메일 주소로 직접 문의할 수 있다.

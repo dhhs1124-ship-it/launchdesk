@@ -1,9 +1,15 @@
 # 개인정보처리방침 v1.2 배포 순서 점검 (웹 ↔ RPC 버전 불일치)
 
-이 문서는 `docs/contact-inquiry-privacy-draft.md`가 다루지 않은 부분 —
-"v1.1 → v1.2 전환 도중 웹 프런트와 Supabase RPC가 서로 다른 순간에
-반영되면 무슨 일이 생기는가"만 다룬다. 방침 문구 자체의 적절성·법적
-분류는 그 문서와 `index.html`의 `[공개 전 확정 필요]` 표시를 참고.
+이 문서는 "v1.1 → v1.2 전환 도중 웹 프런트와 Supabase RPC가 서로 다른
+순간에 반영되면 무슨 일이 생기는가"와, 문의 폼·광고 기간 조회까지 포함한
+**v1.2 통합 출시 순서**(맨 아래 "통합 출시 순서")를 다룬다.
+
+(2026-09-24 갱신, 커밋 `3c9ea89` 이후) Turnstile은 제거됐으므로 Cloudflare
+관련 항목은 출시 결정 항목이 아니다. Resend 관련 방침 문구는 `index.html`
+본문에 확정 반영돼 있다. **실제 게시일은 2026년 9월 24일(한국시간)로
+확정해** 헤더·14번·15번 세 곳에 채웠고, 날짜를 채우라는 HTML 주석 2곳도
+지웠다 — 개인정보 배포 검사는 exit 0(OK)이다. 남은 것은 아래 "통합 출시
+순서"의 C-9(커밋)부터다.
 
 ## 왜 "배포 순서"가 문제가 되는가
 
@@ -32,11 +38,11 @@
 
 ### (a) 웹 = v1.1(구버전 캐시), RPC = v1.2(먼저 마이그레이션 적용)
 
-가드 없이 원래 6개 인자 시그니처만 있었다면: 캐시된 v1.1 화면(구
-Resend·Turnstile 설명이 없는 문구)을 보고 동의한 사용자가 제출한 요청도
+가드 없이 원래 6개 인자 시그니처만 있었다면: 캐시된 v1.1 화면(Resend
+설명이 없는 문구)을 보고 동의한 사용자가 제출한 요청도
 서버는 무조건 자기 상수(`v1.2`)로 저장한다 — **"화면은 v1.1을 보여줬는데
 DB에는 v1.2에 동의했다고 기록"**되는 상황. 사용자가 실제로 읽지 않은
-내용(Resend/Cloudflare 관련 조항)에 동의한 것으로 감사 기록에 남는다.
+내용(Resend 관련 조항)에 동의한 것으로 감사 기록에 남는다.
 
 ### (b) 웹 = v1.2(먼저 배포), RPC = v1.1(아직 마이그레이션 전)
 
@@ -98,110 +104,155 @@ PostgREST가 "함수를 찾을 수 없음"으로 실패하므로). 하지만 **�
 
 ## 권장 배포 순서
 
-**RPC(이 마이그레이션)를 먼저 적용하고, 그 직후 웹 프런트를 배포한다.**
+**RPC(이 마이그레이션)를 먼저 적용하고, 그 직후 웹 프런트를 push한다.**
 두 순서 모두 안전(잘못된 기록 없음)은 동일하지만, RPC 먼저 쪽이 실패
-구간이 더 짧고 예측하기 쉽다(마이그레이션 적용은 한 번에 끝나는 반면,
-정적 프런트 배포는 CDN 전파에 추가 시간이 걸릴 수 있음).
+구간이 더 짧고 예측하기 쉽다. 단, 적용과 push 사이에 코드 수정·커밋이
+남아 있으면 그 시간만큼 실패 구간이 늘어나므로, 게시일·테스트·검사·빌드·
+커밋은 **적용 전에** 전부 끝내 둔다(아래 "통합 출시 순서" C·D 단계).
 
-## 이 검사들이 실제 배포 때 자동 실행되는가 — 확인 결과(2026-09-23)
+## 배포 때 자동으로 도는 검사 — 현재 상태(커밋 `3c9ea89`)
 
-**아니다. 지금은 둘 다 수동 검사다.** `node scripts/predeploy-privacy-v1_2-gate.js`도,
-`node --test`도 Vercel 배포 파이프라인에 연결돼 있지 않다 — 개발자가
-배포 직전에 직접 실행해서 exit code를 눈으로 확인해야 한다. (초안
-작성 시 "배포 차단 검사"라는 표현을 썼는데, 정확하지 않은 표현이었다 —
-아래처럼 정정한다.)
-
-**확인한 근거(리포지토리 파일 기준, 읽기 전용)**: `vercel.json`,
-`package.json`, `.github/workflows` 등 빌드 파이프라인을 정의하는
-파일이 이 저장소에 전혀 없었다. Vercel은 `package.json`이 없는
-저장소를 정적 사이트로 간주해 **빌드 단계 자체를 실행하지 않고 파일을
-그대로 배포**하는 것이 기본 동작이다 — 즉 우리 스크립트가 끼어들
-지점이 애초에 없었다.
-
-**확인하지 못한 것(한계)**: 이 환경에는 Vercel CLI가 설치돼 있지
-않고 로그인 상태도 아니라, Vercel 대시보드(Project Settings → Build &
-Output Settings)에 수동으로 Build Command가 설정돼 있을 가능성까지는
-리포지토리 파일만으로 100% 배제할 수 없다. 실제 배포 전에 대시보드에서
-직접 한 번 확인하는 것을 권장한다.
-
-### 자동으로 막으려면 — `vercel.json` 변경안(로컬 작성, 미적용)
-
-리포지토리 루트에 `vercel.json`을 새로 작성했다(**커밋·push 안 함 —
-지금은 로컬에만 존재하는 초안**):
+`vercel.json`이 커밋에 포함돼 있다:
 
 ```json
 {
   "framework": null,
-  "buildCommand": "node scripts/predeploy-privacy-v1_2-gate.js && node --test \"tests/**/*.test.js\"",
-  "outputDirectory": "."
+  "buildCommand": "node scripts/predeploy-privacy-v1_2-gate.js && node --test \"tests/**/*.test.js\" && node scripts/build-static-output.js",
+  "outputDirectory": "dist"
 }
 ```
 
-- `buildCommand`가 0이 아닌 코드로 끝나면 Vercel 빌드 자체가 **실패**
-  처리되고, 실패한 빌드는 프로덕션 URL로 승격되지 않는다(Vercel의
-  일반 동작 — 이 저장소만의 설정이 아니다). 게이트 스크립트가 걸리면
-  전체 빌드가 실패하므로 "게시 안 된 상태가 실수로 배포되는" 상황을
-  실제로 막는다.
-- `outputDirectory: "."`을 명시한 이유: 커스텀 `buildCommand`를 쓰면
-  Vercel이 더 이상 "입력=출력 그대로"를 가정하지 않는다 — 명시하지
-  않으면 `public/` 등 다른 경로를 찾다가 `index.html`을 못 찾고
-  배포 자체가 깨질 수 있다. 이 저장소는 `index.html`이 루트에 그대로
-  있으므로 `"."`로 지정해 기존 정적 배포와 동일하게 유지한다.
-- `framework: null`로 Vercel이 다른 프레임워크로 오인하지 않게 고정.
+- Vercel 빌드는 ① 개인정보 배포 검사 → ② 전체 테스트 → ③ `dist/` 정적
+  빌드 순으로 돈다. 하나라도 실패하면 빌드가 실패하고 프로덕션으로
+  승격되지 않는다. 즉 게시일 자리표시자가 남은 상태로 push했다면 공개
+  사이트는 바뀌지 않는다(자리표시자는 2026-09-24에 모두 채웠다).
+- `scripts/build-static-output.js`는 `index.html`이 `<script src>`로
+  참조하는 로컬 JS와 정적 파일·`assets/`만 `dist/`에 복사한다. `docs/`,
+  `supabase/`, `tests/`, `scripts/`, `*.sql`, `*.patch`, `*.md`는 공개
+  폴더에 들어가지 않는다. `dist/`는 `.gitignore` 대상이다.
+- **리포지토리만으로 확인할 수 없는 것**: Vercel 대시보드(Project Settings
+  → Build & Output Settings)에서 Build Command·Output Directory를 수동으로
+  덮어쓰고 있지 않은지, Node.js 버전이 22 이상인지(`node --test`의
+  `"tests/**/*.test.js"` 패턴은 Node 21 이상에서 동작) — push 전에
+  대시보드에서 직접 확인한다.
+- 로컬 확인 결과(2026-09-24, 게시일 반영 후): 배포 검사 exit 0(OK), 전체
+  테스트 통과, `node scripts/build-static-output.js` 성공.
 
-**로컬 검증(실제로 실행, 원격 없음)**:
-- 지금 상태(리포 그대로, 자리표시자 남아있음) → 전체 저장소 사본을
-  스크래치 디렉터리에 복사해 `buildCommand` 문자열을 그대로 실행 →
-  게이트 스크립트가 9건을 걸어 **exit 1**(BLOCK) 확인.
-- 실제 게시 시점을 흉내 내어(스크래치 사본에서만) `[게시 예정일]`을
-  실제 날짜로, `[공개 전 확정 필요]`류를 결정된 문구로 바꾸고, 그에 맞춰
-  버전/날짜를 하드코딩해 확인하는 관련 테스트도 **함께** 갱신한 뒤
-  다시 실행 → 게이트 통과 + `node --test` 506/506 통과 → **exit 0**
-  확인. (이 저장소의 실제 `index.html`·테스트 파일은 이 과정에서 전혀
-  건드리지 않았다 — 전부 스크래치 사본에서만 수행.)
-- 이 성공 경로가 보여주는 것: 단순히 자리표시자만 다른 문자열로
-  바꾼다고 통과하는 게 아니라, 그 시점에 실제로 확정된 내용과 관련
-  테스트를 함께 갱신해야만 통과한다 — 게이트 스크립트(표면적 자리표시자
-  검사)와 `node --test`(버전 일치·과단정 방지 등 더 깊은 회귀 검사)가
-  서로 다른 층에서 각각 걸어준다는 뜻이다(예: Resend/Cloudflare 법적
-  분류를 얼버무린 문구로만 자리표시자를 지우면 `node --test`의
-  "임의로 단정하지 않는다" 테스트가 별도로 걸린다).
+## 게시일 반영 내역 (2026-09-24 완료)
 
-**이 초안을 적용하려면(지금 하지 않음)**: 1) 이 파일을 실제로 커밋·push한다.
-2) 다음 배포에서 Vercel이 이 `buildCommand`를 실제로 쓰는지 배포 로그로
-확인한다(대시보드에 수동 override가 있으면 무시될 수 있으므로). 3) 이후
-버전(v1.3 등)에서도 이 파일 이름(`predeploy-privacy-v1_2-gate.js`)이
-계속 맞는 검사를 하는지, 아니면 더 일반적인 이름으로 정리할지는 그때
-판단한다 — 지금은 v1.2 전환 자체를 막는 목적에만 한정했다.
+실제 게시일 2026년 9월 24일(한국시간)을 기존 방침의 날짜 표기
+("2026년 9월 22일" 형식)에 맞춰 아래에 **같은 날짜로 한 번에** 반영했다.
 
-## 배포 전 체크리스트
+- `index.html` — 개인정보처리방침 헤더 `시행일 2026년 9월 24일 · v1.2 · …`
+- `index.html` — 14번 `v1.1 → v1.2 주요 변경 사항(2026년 9월 24일 시행)`
+- `index.html` — 15번 `<li>시행일: 2026년 9월 24일</li>`
+- `index.html` — 날짜를 채우라는 `[공개 전 확정 필요]` HTML 주석 2곳(헤더
+  아래·15번 끝) 삭제
+- `tests/privacy-version-consistency.test.js` — 자리표시자 기대값을 실제
+  게시일 기준으로 변경(세 곳이 같은 날짜인지, 자리표시자·안내 주석이 남지
+  않았는지 확인)
+- `supabase/migrations/20260923170000_setup_inquiries_privacy_v1_2.sql`의
+  주석에는 `[게시 예정일]`이 남아 있지만 SQL 주석이라 동작·검사와 무관하다.
+  원격에 적용할 파일 내용은 바꾸지 않았다.
+- 방침의 다른 내용과 버전(v1.2)은 바꾸지 않았다.
 
-1. **`vercel.json` 초안을 적용했다면(위 커밋·push 단계 완료) 자동으로
-   막힌다 — 그렇지 않다면(지금처럼 로컬 초안 상태라면) 수동으로
-   `node scripts/predeploy-privacy-v1_2-gate.js`를 실행해 exit 0(OK)인지
-   직접 확인한다.** `index.html`에 `[게시 예정일]`·`[공개 전 확정 필요]`
-   자리표시자가 하나라도 남아있으면 exit 1로 막는다 — 지금(로컬 준비
-   단계)은 당연히 실패해야 정상이고, 실제 게시일과 Resend·Cloudflare
-   법적 분류를 전부 확정한 뒤에만 통과해야 한다.
-2. `node --test "tests/**/*.test.js"` 전체 통과 확인(파일 간 버전 일치·
-   차단 로직 자체는 이걸로 커버됨 — 단, 실제 Postgres 동작은 여기서
-   검증되지 않는다, 아래 3번 참고).
-3. RPC 마이그레이션을 원격에 적용한 뒤,
-   **`supabase/verify/setup_inquiries_privacy_v1_2_verify.sql`을 실행한다.**
-   ⚠️ 이 파일은 순수 읽기 전용이 아니다 — 실제로 INSERT를 실행했다가
-   마지막에 ROLLBACK하는 검증이다(파일 상단에 동일하게 명시돼 있음).
-   버전 불일치 3종(인자 누락·잘못된 값·구시그니처 호출)이 전부 거부되고
-   행을 남기지 않는지까지 확인한다.
-4. 웹 프런트를 배포한다.
-5. 배포 직후 실제 화면에서 세팅 대행 신청 1건을 제출해 정상 접수되는지
-   확인한다(마이그레이션·프런트 둘 다 반영된 상태에서의 최종 확인).
+## 통합 출시 순서 (v1.2 방침 · 회원 전용 문의 · Meta 광고 기간 조회)
+
+구성 요소별 의존 관계:
+
+| 구성 | 웹보다 늦게 적용되면 | v1.1 화면이 떠 있는 동안 먼저 적용하면 |
+|---|---|---|
+| 문의 Secrets · 마이그레이션 `20260923160000` · 함수 `contact-inquiry` | 새 화면의 문의 전송 실패 | 영향 없음(v1.1 화면은 이 함수를 부르지 않음) |
+| 함수 `meta-adset-insights`(기간 확장) | 새 화면의 어제·전체·날짜 선택 조회 오류(오늘·이번 달은 정상) | 영향 없음(오늘·이번 달 요청은 계속 지원) |
+| 마이그레이션 `20260923170000`(세팅 대행 동의 v1.2) | 새 화면의 세팅 대행 신청 실패 | **v1.1 화면의 세팅 대행 신청 실패**(옛 6개 인자 함수가 삭제됨) |
+
+**v1.1이 멈추는 구간은 하나다**: `20260923170000` 적용 순간부터 새 웹이
+공개될 때까지(Vercel 빌드·배포 시간) 세팅 대행 신청만 실패한다. 잘못된
+동의 버전이 기록되지는 않는다. 공개 후에도 예전 탭을 연 사용자에게는
+"페이지가 최신 상태가 아니에요. 새로고침한 뒤 다시 시도해주세요."가 뜰 수
+있다. 새 웹 공개 후 기존 회원에게 v1.2 재동의 창이 뜨는 것은 의도된
+동작이다.
+
+### A. 원격 상태 확인 — 읽기 전용 SQL (Supabase 대시보드 → SQL Editor)
+
+이 PC에는 Supabase CLI가 없으므로 `supabase migration list`를 필수로 두지
+않는다. 아래 파일은 모두 INSERT/UPDATE/DELETE/DDL이 없는 조회 전용이다.
+
+| 확인 대상 마이그레이션 | 실행할 파일 | 기대 결과 |
+|---|---|---|
+| `20260918100000`, `20260918120000`, `20260922100000`, `20260921100000` | `supabase/verify/remote_schema_readonly_audit.sql` | 전부 PASS(세팅 대행 동의 상수 v1.1) |
+| `20260921230000_ad_margin_links` | `supabase/verify/ad_margin_links_verify.sql` | 전부 PASS |
+| `20260922120000_cafe24_disconnect` | `supabase/verify/cafe24_disconnect_post_apply_readonly.sql` | 전부 PASS |
+| `20260922130000_core_table_privilege_hardening` | `supabase/verify/core_table_privilege_hardening_verify.sql` | 전부 PASS |
+| `20260923160000_contact_inquiry_rate_limit`(적용 전) | `supabase/verify/contact_inquiry_preflight_check.sql` | 결과 행 없음 = 미적용(B-3에서 적용). 상태 C = 이미 지금 버전 적용(B-3 건너뜀). 상태 A·B = 예전 버전이 적용돼 있음 → 그대로 적용하지 말고 멈춘다(파일 주석의 판정표 참고) |
+| `20260923170000_setup_inquiries_privacy_v1_2`(적용 전) | `supabase/verify/setup_inquiry_consent_version_check.sql` | 상수 `v1.1`, 6개 인자 |
+
+- 보조 확인(선택, 조회만): `select version, name from supabase_migrations.schema_migrations order by version;`
+  — CLI(`db push`)로 적용한 것만 기록되고 SQL Editor로 직접 적용한 것은
+  나오지 않으므로, 위 파일 결과를 우선한다.
+- Edge Function 상태: 대시보드 → Edge Functions에서 `contact-inquiry`가
+  아직 없는지, `meta-adset-insights`의 마지막 배포 시각을 확인한다.
+- 위에서 하나라도 FAIL이면 이후 단계로 가지 않는다.
+
+### B. v1.1 화면에 영향 없는 준비 — 오늘(2026-09-24) D 단계 전에 반드시 끝낸다
+
+이 단계들은 공개 중인 v1.1 화면에 영향이 없지만, 끝나지 않은 채 D-13
+push를 하면 새 화면에서 문의 전송·광고 기간(어제·전체·날짜) 조회가 실패한다.
+
+1. Resend에서 `launchdesk.co.kr` 발송 도메인을 인증하고 발송 전용 API 키를
+   만든다.
+2. 대시보드 → Edge Functions → Secrets에 `RESEND_API_KEY`,
+   `CONTACT_FROM_EMAIL`(예: `LaunchDesk <contact@launchdesk.co.kr>`),
+   `CONTACT_RATE_PEPPER`(충분히 긴 무작위 문자열)를 넣는다. 키를
+   소스·대화창에 붙여넣지 않는다.
+3. SQL Editor에서 `supabase/migrations/20260923160000_contact_inquiry_rate_limit.sql`을
+   적용한다(A에서 "결과 행 없음"으로 미적용이 확인된 경우만) → `supabase/verify/contact_inquiry_rate_limit_verify.sql`이
+   전부 PASS인지 확인한다.
+4. 함수 두 개를 배포한다: `npx supabase functions deploy meta-adset-insights`,
+   `npx supabase functions deploy contact-inquiry`
+   (`meta-adset-insights`는 `../_shared/meta-adset-normalize.mjs`를 import하므로
+   대시보드 편집기가 아니라 CLI 배포가 필요하다. `npx`는 전역 설치 없이 CLI를
+   받아 실행한다 — 처음이면 `npx supabase login`, `npx supabase link`가
+   먼저 필요하다.)
+   - 실제 메일 발송 확인은 방침이 공개된 E 단계에서 한다.
+
+### C. 게시일 확정 후 코드 마무리 — `20260923170000` 적용 **전에** 전부 끝낸다
+
+5. (2026-09-24 완료) 위 "게시일 반영 내역"대로 세 곳을 2026년 9월 24일로 바꿨다.
+6. (2026-09-24 로컬 확인) `node --test "tests/**/*.test.js"` → 전부 통과.
+7. (2026-09-24 로컬 확인) `node scripts/predeploy-privacy-v1_2-gate.js` → **exit 0**(OK).
+8. (2026-09-24 로컬 확인) `node scripts/build-static-output.js` → 성공.
+   커밋 직전에 6~8과 `git diff --check`를 한 번 더 실행한다.
+9. 커밋한다(push는 아직 하지 않는다). `git status --short`에 커밋할 변경이
+   남아 있지 않은지 확인한다.
+10. Vercel 대시보드에서 Build Command·Output Directory 덮어쓰기가 없고
+    Node.js 22 이상인지 확인한다.
+
+### D. 전환 — 이 사이에 코드 수정·커밋 작업이 남아 있으면 안 된다
+
+11. SQL Editor에서 `supabase/migrations/20260923170000_setup_inquiries_privacy_v1_2.sql`을
+    적용한다. **여기서부터 v1.1 화면의 세팅 대행 신청이 실패한다.**
+12. `supabase/verify/setup_inquiry_consent_version_check.sql`로 상수 `v1.2`,
+    7개 인자(`p_expected_privacy_version` 포함)인지 확인한다(조회만, 수 초).
+13. 즉시 `git push` → Vercel 빌드 로그에서 ① 배포 검사 OK ② 테스트 통과
+    ③ 빌드 성공 → 프로덕션 승격을 확인한다.
+
+### E. 공개 후 확인
+
+14. `supabase/verify/setup_inquiries_privacy_v1_2_verify.sql` — ⚠️ 순수 읽기
+    전용이 아니다(BEGIN~ROLLBACK 안에서 실제 INSERT). 버전 불일치 3종이
+    거부되고 남는 행이 없는지 확인한다. 공개 후 한가한 시간에 실행한다.
+15. 운영 도메인(`launchdesk.co.kr`)에서 확인한다 — `contact-inquiry`는
+    기본적으로 `https://launchdesk.co.kr`, `https://www.launchdesk.co.kr`만
+    허용하므로 Vercel 미리보기 주소에서는 문의 전송이 거부된다.
+    - 세팅 대행 신청 1건이 정상 접수되는지
+    - 회원 문의 1건이 운영자 Gmail에 도착하는지(실제 메일 발송)
+    - 광고별 성과의 오늘·어제·이번 달·전체·날짜 선택 전환
+    - 기존 회원 로그인 시 v1.2 재동의 창
+    - 이전 탭 새로고침 후 세팅 대행 신청이 정상인지
 
 ## 이 문서가 다루지 않는 것
 
-- 방침 문구의 법적 정확성, Resend/Cloudflare의 위탁·국외이전 분류 —
-  `docs/contact-inquiry-privacy-draft.md`와 `index.html`의
-  `[공개 전 확정 필요]` 표시 참고.
-- 실제 게시일 확정 — `[게시 예정일]` 자리표시자 3곳(헤더·14번·15번)을
-  같은 날짜로 동시에 채워야 한다(`tests/privacy-version-consistency.test.js`가
-  세 곳이 같은 문자열인지만 확인하지, 날짜 값 자체가 맞는지는 사람이
-  확인해야 한다).
+- 방침 문구 자체의 법적 판단 — Resend 관련 문구는 현재 `index.html`
+  본문에 확정 반영된 것을 기준으로 한다(`docs/contact-inquiry-privacy-draft.md`는
+  그 문구를 만들기 전의 사실관계 정리용 초안이다).
