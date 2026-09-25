@@ -19,7 +19,8 @@ select
   -- 적용·오버로드로 옛 상수가 섞여 남아있는지 눈으로 다시 확인할 때 씀).
   (select count(*) from regexp_matches(pg_get_functiondef(p.oid), '''v1\.0''', 'g')) as v1_0_literal_count,
   (select count(*) from regexp_matches(pg_get_functiondef(p.oid), '''v1\.1''', 'g')) as v1_1_literal_count,
-  (select count(*) from regexp_matches(pg_get_functiondef(p.oid), '''v1\.2''', 'g')) as v1_2_literal_count
+  (select count(*) from regexp_matches(pg_get_functiondef(p.oid), '''v1\.2''', 'g')) as v1_2_literal_count,
+  (select count(*) from regexp_matches(pg_get_functiondef(p.oid), '''v1\.3''', 'g')) as v1_3_literal_count
 from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'

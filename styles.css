@@ -902,6 +902,15 @@
   .consent-banner-text h2{font-size:.95rem; font-weight:700; margin:0 0 .3rem; color:var(--ink);}
   .consent-banner-text p{font-size:.82rem; color:var(--ink-soft); margin:0 0 .35rem; line-height:1.6;}
   .consent-banner-status{font-weight:600; color:var(--ink);}
+  /* 분석·광고 측정 각각 선택(meta-pixel.js가 ENABLED일 때만 표시) */
+  .consent-choices{border:0; margin:.35rem 0 .45rem; padding:0; display:grid; gap:.5rem; min-width:0;}
+  .consent-choices[hidden]{display:none;}
+  .consent-choice{display:flex; align-items:flex-start; gap:.6rem; cursor:pointer; min-width:0;}
+  .consent-choice input{flex:0 0 auto; width:20px; height:20px; margin:.1rem 0 0; accent-color:var(--ink);}
+  .consent-choice span{display:flex; flex-direction:column; min-width:0; word-break:keep-all;}
+  .consent-choice b{font-size:.85rem; color:var(--ink); line-height:1.45;}
+  .consent-choice small{font-size:.78rem; color:var(--ink-soft); line-height:1.55;}
+  .consent-choices-note{font-size:.78rem !important; margin:0 !important;}
   .consent-banner-text a{color:var(--accent); text-decoration:underline;}
   .consent-banner-actions{display:flex; gap:.6rem; flex:0 0 auto; flex-wrap:wrap;}
   .consent-banner-actions .btn{min-height:44px;}

@@ -160,26 +160,27 @@
     document.body.style.paddingBottom = '';
   }
 
+  function grantByUser(){
+    var wasGranted = currentStatus === 'granted';
+    saveConsent(core.STATUSES.GRANTED);
+    applyGranted();
+    // 이미 granted였는데 배너를 다시 열어 또 "허용"을 누른 경우(상태 변화 없음)는
+    // 중복 전송 금지 원칙에 따라 page_view를 다시 보내지 않는다.
+    if(!wasGranted && typeof window.launchdeskSendPageView === 'function'){
+      window.launchdeskSendPageView();
+    }
+  }
+  function denyByUser(){
+    saveConsent(core.STATUSES.DENIED);
+    applyDenied();
+    deleteGaCookies();
+  }
+
   if(allowBtn){
-    allowBtn.addEventListener('click', function(){
-      var wasGranted = currentStatus === 'granted';
-      saveConsent(core.STATUSES.GRANTED);
-      applyGranted();
-      hideBanner();
-      // 이미 granted였는데 배너를 다시 열어 또 "허용"을 누른 경우(상태 변화 없음)는
-      // 중복 전송 금지 원칙에 따라 page_view를 다시 보내지 않는다.
-      if(!wasGranted && typeof window.launchdeskSendPageView === 'function'){
-        window.launchdeskSendPageView();
-      }
-    });
+    allowBtn.addEventListener('click', function(){ grantByUser(); hideBanner(); });
   }
   if(denyBtn){
-    denyBtn.addEventListener('click', function(){
-      saveConsent(core.STATUSES.DENIED);
-      applyDenied();
-      deleteGaCookies();
-      hideBanner();
-    });
+    denyBtn.addEventListener('click', function(){ denyByUser(); hideBanner(); });
   }
   if(settingsLink){
     settingsLink.addEventListener('click', function(){
@@ -195,4 +196,14 @@
     showBanner(null); // 저장값 없음(잘못된 JSON·버전 포함) → 배너 표시
   }
   // denied면 아무 것도 하지 않는다 — 배너 숨김 유지, gtag 미정의 유지.
+
+  // 같은 안내창에서 GA4와 Meta 광고 측정을 각각 고르는 "선택 저장"(meta-pixel.js)이
+  // GA4 쪽 결정을 버튼 클릭과 똑같은 경로로 저장할 수 있게 여는 최소 접점.
+  window.launchdeskAnalyticsConsentControl = {
+    getStatus: function(){ return currentStatus; },
+    grant: grantByUser,
+    deny: denyByUser,
+    showBanner: function(){ showBanner(currentStatus ? { status: currentStatus } : null); },
+    hideBanner: hideBanner
+  };
 })();

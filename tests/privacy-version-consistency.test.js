@@ -1,4 +1,4 @@
-/* 개인정보처리방침 v1.3(로컬 준비 · 공개 중 v1.2) — 버전 드리프트 방지 테스트. 실행: node --test
+/* 개인정보처리방침 v1.4(2026-09-25 시행) — 버전 드리프트 방지 테스트. 실행: node --test
    (Node 18+ 내장 test runner, 별도 패키지 없음)
 
    여기서 확인하는 것은 딱 하나 — "버전을 나타내는 여러 곳이 서로 어긋나지
@@ -26,29 +26,103 @@ const SETUP_INQUIRY_MIGRATIONS_DIR = path.join(ROOT, 'supabase', 'migrations');
 const V1_1_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260922100000_setup_inquiries_privacy_v1_1.sql');
 const V1_2_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260923170000_setup_inquiries_privacy_v1_2.sql');
 const V1_3_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260924160000_setup_inquiries_privacy_v1_3.sql');
+const V1_4_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260925100000_setup_inquiries_privacy_v1_4.sql');
 
-test('policy-consent-core.js: PRIVACY_VERSION은 v1.3', () => {
-  assert.equal(core.PRIVACY_VERSION, 'v1.3');
+test('policy-consent-core.js: PRIVACY_VERSION은 v1.4', () => {
+  assert.equal(core.PRIVACY_VERSION, 'v1.4');
 });
 
 test('policy-consent-core.js: TERMS_VERSION은 그대로(약관 본문을 고치지 않았으므로)', () => {
   assert.equal(core.TERMS_VERSION, '2026-09-18');
 });
 
-test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.3 · 2026년 9월 24일(실제 게시일)로 코드 상수와 일치', () => {
-  assert.match(PRIVACY_HTML, /시행일 2026년 9월 24일 · v1\.3 · 런치데스크/);
-  assert.match(PRIVACY_HTML, /<li>버전: v1\.3\(이전 버전: v1\.2, 2026년 9월 24일 시행\)<\/li>/);
-  assert.match(PRIVACY_HTML, /<li>시행일: 2026년 9월 24일<\/li>/);
+test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.4 · 2026년 9월 25일(실제 배포일)로 코드 상수와 일치하고, 세 곳의 날짜가 같다', () => {
+  const has = (s) => assert.ok(PRIVACY_HTML.includes(s), '방침에서 찾지 못함: ' + s);
+  has('시행일 2026년 9월 25일 · v1.4 · 런치데스크');
+  has('<li>버전: v1.4(이전 버전: v1.3, 2026년 9월 24일 시행)</li>');
+  has('<li>시행일: 2026년 9월 25일</li>');
+  has('v1.3 → v1.4 주요 변경 사항(2026년 9월 25일 시행)');
+  // 헤더 · 14번 · 15번 세 곳
+  assert.equal(PRIVACY_HTML.split('2026년 9월 25일').length - 1, 3);
+  assert.ok(!PRIVACY_HTML.includes('[게시 예정일]'), '게시일 자리표시자가 남아 있으면 안 된다(주석 포함)');
+  assert.ok(!PRIVACY_HTML.includes('[공개 전 확정 필요'), '확정 필요 표시가 남아 있으면 안 된다(주석 포함)');
 });
 
-test('개인정보처리방침 화면: v1.3 시행일이 헤더·14번·15번 세 곳에서 같은 날짜이고, 게시일 자리표시자·안내 주석이 남아 있지 않으며 이전 버전 이력은 그대로다', () => {
-  assert.match(PRIVACY_HTML, /v1\.2 → v1\.3 주요 변경 사항\(2026년 9월 24일 시행\)/);
-  assert.match(PRIVACY_HTML, /v1\.1 → v1\.2 주요 변경 사항\(2026년 9월 24일 시행\)/);
-  assert.match(PRIVACY_HTML, /v1\.0 → v1\.1 주요 변경 사항\(2026년 9월 22일 시행\)/);
-  // v1.3 시행일 3곳(헤더 · 14번 v1.2→v1.3 · 15번 시행일) + v1.2 이력 2곳(14번 v1.1→v1.2 · 15번 이전 버전)
-  assert.equal((PRIVACY_HTML.match(/2026년 9월 24일/g) || []).length, 5);
-  assert.doesNotMatch(PRIVACY_HTML, /\[게시 예정일\]/, '게시일 자리표시자가 남아 있으면 안 된다(주석 포함)');
-  assert.doesNotMatch(PRIVACY_HTML, /\[공개 전 확정 필요/, '날짜를 채우라는 안내 주석이 남아 있으면 안 된다');
+test('개인정보처리방침 화면: 이전 버전 이력(v1.0→v1.1, v1.1→v1.2, v1.2→v1.3)과 날짜는 그대로다', () => {
+  const has = (s) => assert.ok(PRIVACY_HTML.includes(s), '방침에서 찾지 못함: ' + s);
+  has('v1.2 → v1.3 주요 변경 사항(2026년 9월 24일 시행)');
+  has('v1.1 → v1.2 주요 변경 사항(2026년 9월 24일 시행)');
+  has('v1.0 → v1.1 주요 변경 사항(2026년 9월 22일 시행)');
+  // 14번 v1.2→v1.3 · 14번 v1.1→v1.2 · 15번 이전 버전(v1.3) 세 곳
+  assert.equal(PRIVACY_HTML.split('2026년 9월 24일').length - 1, 3);
+});
+
+test('v1.4 게시 상태에서는 배포 검사(predeploy gate)가 통과한다', () => {
+  const { spawnSync } = require('node:child_process');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'predeploy-privacy-v1_2-gate.js')], { encoding: 'utf8' });
+  assert.equal(r.status, 0, '배포 검사 실패: ' + r.stderr);
+});
+
+test('v1.4: Meta 픽셀 — 공식 약관·작성지침으로 확인한 사실만 쓰고, 확인 못 한 처리 국가·쿠키 만료일은 추측으로 채우지 않는다', () => {
+  const has = (s) => assert.ok(PRIVACY_HTML.includes(s), '방침에서 찾지 못함: ' + s);
+  // Meta 비즈니스 도구 약관(facebook.com/legal/businesstech)으로 확인한 사실
+  has('Meta 비즈니스 도구 약관에 따라 이 이벤트 데이터를 최대 2년간 보유할 수 있으며');
+  has('Meta 자체의 광고 전달 개선과 Meta 제품의 개선·제공·보호 목적으로도 이용할 수 있으며, 회사는 이 이용에 대해 이용자의 별도 동의를 받습니다');
+  // 개인정보위 처리방침 작성지침의 "제3자가 수집해가는 행태정보" 기재 항목(수집도구 명칭 · 수집해가는
+  // 사업자 · 도구 종류 · 항목 · 목적 · 거부방법)을 표 한 행으로 모두 적는다
+  const thirdPartyTable = PRIVACY_HTML.match(/<caption class="sr-only">제3자가 수집해가는 행태정보<\/caption>[\s\S]*?<\/table>/);
+  assert.ok(thirdPartyTable, '11번 "제3자가 수집해가는 행태정보" 표를 찾지 못함');
+  for (const head of ['수집 도구', '수집해가는 사업자', '도구 종류', '수집해가는 항목', '수집 목적', '거부 방법']) {
+    assert.ok(thirdPartyTable[0].includes('<th scope="col">' + head + '</th>'), '표 머리글 누락: ' + head);
+  }
+  assert.ok(thirdPartyTable[0].includes('<td>Meta 픽셀(픽셀 ID: 1921995005433525)</td><td>Meta Platforms, Inc.(Meta 비즈니스 도구 약관상 계약·처리 주체, 주소: 1 Meta Way, Menlo Park, CA 94025, USA)</td>'));
+  assert.ok(thirdPartyTable[0].includes('안내창에서 선택하지 않기(기본 해제), 푸터 “분석·광고 설정”에서 동의 철회, 브라우저에서 쿠키 차단·삭제'));
+  // 5번에서 제3자 제공·위탁으로 단정하지 않고 사실(직접 수집)과 11번 안내 위치만 적는다
+  has('회사가 보유한 개인정보를 Meta에 넘기는 방식이 아니라 이 웹사이트에 설치된 Meta 픽셀을 통해 Meta Platforms, Inc.가 이용자의 브라우저에서 방문 정보를 직접 수집합니다');
+  assert.ok(!PRIVACY_HTML.includes('중 어느 항목으로 고지할지 법적 분류'), '5번·6번 중 하나로 단정해야 한다는 자리표시자는 작성지침상 전제가 아니므로 두지 않는다');
+  // 7번 국외 이전 표에 Meta 행을 두지 않는다(소재지를 처리 국가로 대신 적지 않음)
+  assert.ok(!PRIVACY_HTML.includes('<tr><td>Meta Platforms, Inc.(Meta 픽셀)</td>'));
+  assert.ok(!PRIVACY_HTML.includes('미국(Meta Platforms, Inc. 소재지)'));
+  has('https://www.facebook.com/legal/businesstech');
+  // 코드와 일치: 픽셀 ID · 동의 전 미로드 · PageView만 · 거부해도 제한 없음 · 저장 키 · 철회 시 쿠키 삭제
+  const metaCore = fs.readFileSync(path.join(ROOT, 'meta-pixel-core.js'), 'utf8');
+  const idStart = metaCore.indexOf("var PIXEL_ID = '") + "var PIXEL_ID = '".length;
+  const pixelId = metaCore.slice(idStart, metaCore.indexOf("'", idStart));
+  assert.equal(pixelId, '1921995005433525');
+  has('Meta 픽셀(픽셀 ID: ' + pixelId + ')');
+  has('동의하기 전에는 관련 스크립트가 불러와지지 않고 어떤 정보도 Meta로 전송되지 않습니다');
+  has('방문 기록(PageView)만 Meta로 전송합니다');
+  has('회원가입·구매 등 다른 이벤트는 전송하지 않습니다');
+  has('동의하지 않더라도 서비스 이용에 제한이 없습니다');
+  has('<td>ld-meta-pixel-consent-v1</td>');
+  assert.ok(metaCore.includes("STORAGE_KEY = 'ld-meta-pixel-consent-v1'"));
+  has('Meta 쿠키(_fbp, _fbc)를 함께 삭제합니다');
+  // 이벤트 데이터 보유(최대 2년)와 브라우저 쿠키 만료는 서로 다른 것으로 구분한다
+  has('이 “최대 2년”은 Meta가 받은 이벤트 데이터의 보유기간이며, 이용자 브라우저에 저장되는 Meta 쿠키(_fbp, _fbc)의 만료 시점과는 별개입니다');
+  has('① Meta가 받은 이벤트 데이터는 Meta 비즈니스 도구 약관에 따라 최대 2년간 보유될 수 있습니다. ② 이용자 브라우저에 저장되는 _fbp·_fbc 쿠키는 이와 별개로, Meta 픽셀이 쿠키를 만들 때 정한 만료 시점까지 브라우저에 남습니다.');
+  // 확인하지 못한 쿠키 만료 일수·실제 처리 국가를 지어내지 않는다
+  PRIVACY_HTML.split('\n').filter((l) => /_fbp|_fbc/.test(l)).forEach((l) => {
+    assert.ok(!/(_fbp|_fbc)[^<]{0,120}[0-9]+\s*(일|개월|days)/.test(l), '확인하지 않은 쿠키 만료 기간을 적지 않는다: ' + l.trim().slice(0, 80));
+  });
+  // 운영자 결정(2026-09-24): 7번 국외 이전 표에는 넣지 않고 11번 안내를 가리키는 한 줄만 둔다
+  has('Meta 픽셀을 통해 Meta Platforms, Inc.가 이용자의 브라우저에서 직접 수집하는 방문 정보는 회사가 보유한 개인정보를 옮기는 위 표와 구조가 달라, 11번 항목의 “제3자가 수집해가는 행태정보”에서 안내합니다.</p>');
+  const pv7 = PRIVACY_HTML.slice(PRIVACY_HTML.indexOf('<section id="pv-7"'), PRIVACY_HTML.indexOf('<section id="pv-8"'));
+  assert.ok(!/<td>Meta/.test(pv7), '7번 표에 Meta 행을 두지 않는다');
+  assert.ok(!pv7.includes('소재지'), '법인 소재지를 처리 국가처럼 적지 않는다');
+});
+
+test('v1.4 동의 안내창의 Meta 항목은 수집해가는 사업자 · 항목 · 목적 · Meta 보유기간을 함께 알린다', () => {
+  const metaChoice = INDEX_HTML.match(/<input type="checkbox" id="consentChoiceMeta">[\s\S]*?<\/label>/);
+  assert.ok(metaChoice);
+  for (const s of ['Meta Platforms, Inc.', '방문한 화면 주소·IP 주소·브라우저 식별값(쿠키)', '광고 성과 측정', 'Meta의 광고 전달·제품 개선', 'Meta 보유 최대 2년']) {
+    assert.ok(metaChoice[0].includes(s), '안내창 Meta 항목에 없음: ' + s);
+  }
+});
+
+test('v1.4: 분석·광고 설정 명칭이 방침과 실제 화면(meta-pixel.js)에서 같다', () => {
+  assert.ok(PRIVACY_HTML.includes('푸터의 <strong>분석·광고 설정</strong>'));
+  const metaUi = fs.readFileSync(path.join(ROOT, 'meta-pixel.js'), 'utf8');
+  assert.ok(metaUi.includes("settingsLink.textContent = '분석·광고 설정'"));
 });
 
 test('v1.3: Meta 성과 기록(광고 기록 저장)의 목적 · 항목 · 보유 · 삭제가 실제 코드와 같게 적혀 있다', () => {
@@ -85,8 +159,8 @@ test('이용약관 화면: v1.0 · 2026년 9월 18일 그대로(약관 본문을
   assert.match(TERMS_HTML, /시행일 2026년 9월 18일 · v1\.0 · 운영자: LaunchDesk/);
 });
 
-test('세팅 대행 문의 RPC의 서버 동의 버전 상수(가장 최근 마이그레이션 v1.3)가 프런트 PRIVACY_VERSION과 일치', () => {
-  const sql = fs.readFileSync(V1_3_MIGRATION_PATH, 'utf8');
+test('세팅 대행 문의 RPC의 서버 동의 버전 상수(가장 최근 마이그레이션 v1.4)가 프런트 PRIVACY_VERSION과 일치', () => {
+  const sql = fs.readFileSync(V1_4_MIGRATION_PATH, 'utf8');
   const m = sql.match(/v_consent_version\s+constant\s+text\s*:=\s*'([^']+)'/);
   assert.ok(m, 'v_consent_version 상수를 마이그레이션 파일에서 찾지 못함');
   assert.equal(m[1], core.PRIVACY_VERSION, 'RPC가 저장하는 동의 버전과 policy-consent-core.js의 PRIVACY_VERSION이 어긋납니다');
@@ -203,6 +277,21 @@ test('v1.3 마이그레이션: 같은 7인자 시그니처를 CREATE OR REPLACE�
   assert.ok(v13.includes(`grant execute on function public.submit_setup_inquiry${sig} to anon, authenticated;`));
   // v1.2 파일 자체는 그대로(원격에 이미 적용됨)
   assert.match(v12, /v_consent_version constant text := 'v1\.2';/);
+});
+
+test('v1.4 마이그레이션: 같은 7인자 시그니처를 CREATE OR REPLACE로 교체하고 서버 상수만 v1.4로 바꾼다(검증 로직 · 가격 · INSERT · 권한은 v1.3과 동일) · v1.3 파일은 그대로', () => {
+  const v13 = fs.readFileSync(V1_3_MIGRATION_PATH, 'utf8');
+  const v14 = fs.readFileSync(V1_4_MIGRATION_PATH, 'utf8');
+  assert.match(v14, /create or replace function public\.submit_setup_inquiry\(\s*p_plan_id text,[\s\S]*?p_privacy_consent boolean default false,\s*p_expected_privacy_version text default null\s*\)/);
+  assert.match(v14, /v_consent_version constant text := 'v1\.4';/);
+  assert.match(v14, /if p_expected_privacy_version is distinct from v_consent_version then\s*raise exception 'PRIVACY_VERSION_MISMATCH';/);
+  assert.doesNotMatch(v14, /drop function/i);
+  // v1.3과 본문이 상수 한 줄(과 주석)만 다르다
+  const body = (s) => s.slice(s.indexOf('returns uuid'), s.indexOf('$$;')).replace(/--.*$/gm, '').replace(/\s+/g, ' ').replace(/'v1\.[34]'/, "'VER'");
+  assert.equal(body(v14), body(v13));
+  const tail = (s) => s.slice(s.indexOf('$$;')).replace(/--.*$/gm, '').replace(/\s+/g, ' ');
+  assert.equal(tail(v14), tail(v13), '권한(REVOKE/GRANT) 부분이 v1.3과 같아야 한다');
+  assert.match(v13, /v_consent_version constant text := 'v1\.3';/);
 });
 
 test('확인되지 않은 사업자등록번호를 임의로 추가하지 않았다(사업자등록 전이므로)', () => {
