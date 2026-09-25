@@ -415,6 +415,10 @@
         <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h14M2 7l1.5-4h11L16 7M2 7v8h14V7"/><path d="M6 15v-4h6v4"/><path d="M2 7a3 3 0 0 0 6 0M8 7a3 3 0 0 0 6 0"/></svg>
         도매처 찾기
       </a>
+      <a data-match="/couriers" href="#/couriers">
+        <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="4" width="9" height="9" rx="1"/><path d="M10.5 7h3l3 3v3h-6"/><circle cx="5" cy="14" r="1.5"/><circle cx="13" cy="14" r="1.5"/></svg>
+        택배 집하 상담
+      </a>
       <a data-match="/resources" href="#/resources">
         <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg>
         자료실
@@ -2722,8 +2726,13 @@
                       </ul>
                       <div class="s5-warn">
                         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
-                        <p>택배기사 연락처나 특정 지역의 최저가 정보는 시점 · 지역마다 달라 여기서는 제공하지 않습니다. 지역별 택배기사를 연결해주는 기능은 이후 추가될 수 있는 별도 기능이며, 아직 제공되지 않습니다.</p>
+                        <p>기사님이 알려주신 지역과 실제 집하 가능 여부는 다를 수 있어요. 최저가나 계약 조건은 제공하지 않으니 전화로 직접 확인해 주세요.</p>
                       </div>
+                      <a class="s5-service" href="#/couriers">
+                        <span class="s5-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="4" width="9" height="9" rx="1"/><path d="M10.5 7h3l3 3v3h-6"/><circle cx="5" cy="14" r="1.5"/><circle cx="13" cy="14" r="1.5"/></svg></span>
+                        <span class="s5-service-text"><b>우리 지역 택배 집하 상담하기</b><small>기사님이 알려주신 지역과 연락처 보기</small></span>
+                        <svg class="s5-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
+                      </a>
                       <a class="s5-service" href="#/resources" data-resource-cat="cs">
                         <span class="s5-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h14M2 7l1.5-4h11L16 7M2 7v8h14V7"/><path d="M6 15v-4h6v4"/><path d="M2 7a3 3 0 0 0 6 0M8 7a3 3 0 0 0 6 0"/></svg></span>
                         <span class="s5-service-text"><b>택배 계약 방법이 궁금하다면</b><small>자료실에서 계약 절차 · 확인 항목을 더 자세히 볼 수 있어요</small></span>
@@ -3235,6 +3244,51 @@
             <p>이 카테고리에 등록된 도매처가 없습니다.</p>
           </div>
           <div class="resource-grid" id="wholesaleGrid" hidden></div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: 택배 집하 상담 — 공개 동의를 받은 연락처만 기재 ============ -->
+      <section class="view" id="view-couriers" hidden>
+        <div class="content">
+          <span class="eyebrow">배송 준비</span>
+          <div class="page-head">
+            <h1>택배 집하 상담</h1>
+            <p class="page-lead">지역별 택배 집하 상담 연락처를 모았어요. 내 지역의 기사님께 직접 문의해 보세요.</p>
+          </div>
+          <p class="courier-notice">아래 내용은 기사님이 알려주신 집하 가능 지역과 조건입니다. 런치데스크가 택배 계약이나 요금을 보장하는 것은 아니에요. 실제 집하 가능 여부·최소 물량·요금은 연락할 때 직접 확인해 주세요.</p>
+          <div class="resource-grid courier-grid">
+            <article class="info-card courier-card">
+              <h2>로젠택배 <span class="tag">과천 · 안양</span></h2>
+              <p>과천·안양 지역 집하. 1개부터 집하 가능하다고 안내받았어요.</p>
+              <a class="courier-call" href="tel:01083525257" aria-label="로젠택배 과천 안양 담당자 010-8352-5257로 전화하기">010-8352-5257 →</a>
+            </article>
+            <article class="info-card courier-card">
+              <h2>로젠택배 (북·동안산지점) <span class="tag">안산 · 화성 일부</span></h2>
+              <p>안산시 상록구 전지역, 화성 세솔동·비봉면·팔탄면 일부 지역. 최소 수량은 없으며 자세한 조건은 각 기사님과 협의해 주세요.</p>
+              <a class="courier-call" href="tel:01092459866" aria-label="로젠택배 북 동안산지점 010-9245-9866으로 전화하기">010-9245-9866 →</a>
+            </article>
+            <article class="info-card courier-card">
+              <h2>택배 집하 상담 · 황호성 소장 <span class="tag">영등포 · 중구 · 종로</span></h2>
+              <p>영등포구·중구·종로구 택배 계약 및 픽업 상담. 동대문 사입도 도움을 드릴 수 있다고 안내받았어요. 택배사는 문의 시 확인해 주세요.</p>
+              <a class="courier-call" href="tel:01054037580" aria-label="황호성 소장 010-5403-7580으로 전화하기">010-5403-7580 →</a>
+            </article>
+            <article class="info-card courier-card">
+              <h2>롯데택배 <span class="tag">인천 (영종도 제외)</span></h2>
+              <p>영종도를 제외한 인천 지역. 물량과 관계없이 집하 가능하다고 안내받았어요.</p>
+              <a class="courier-call" href="tel:01079207517" aria-label="롯데택배 인천 담당자 010-7920-7517로 전화하기">010-7920-7517 →</a>
+            </article>
+            <article class="info-card courier-card">
+              <h2>롯데택배 용인상현대리점 <span class="tag">용인</span></h2>
+              <p>용인 지역 전체 협의 가능. 물량에 따라 인근 지역도 협의할 수 있다고 안내받았어요.</p>
+              <a class="courier-call" href="tel:01022425235" aria-label="롯데택배 용인상현대리점 010-2242-5235로 전화하기">010-2242-5235 →</a>
+            </article>
+            <article class="info-card courier-card">
+              <h2>롯데택배 <span class="tag">구리 · 남양주 · 하남 · 경기 광주</span></h2>
+              <p>구리·남양주·하남·경기도 광주 지역 집하 상담. 단가는 연락하여 협의해 주세요.</p>
+              <a class="courier-call" href="tel:01065511548" aria-label="롯데택배 구리 남양주 하남 경기 광주 담당자 010-6551-1548로 전화하기">010-6551-1548 →</a>
+            </article>
+          </div>
+          <p class="courier-foot">등록 내용 변경이나 연락처 삭제를 원하시면 <a href="#/contact">문의하기</a>에서 알려주세요.</p>
         </div>
       </section>
 
