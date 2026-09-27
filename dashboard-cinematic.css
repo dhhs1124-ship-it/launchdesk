@@ -1,0 +1,144 @@
+/* Operations dashboard. Values and access are supplied by the existing modules. */
+body.dashboard-view, body.dashboard-view .app-main { background:#0d0f10; }
+body.dashboard-view .topbar {
+  --ld-panel:#121517; --ld-text:#f8f8f8; --ld-muted:#b5b9ba;
+  --ld-muted-bg:#292c2f; --ld-border-strong:#35393c;
+  background:#121517; border-bottom-color:#35393c;
+}
+body.dashboard-view .topbar .btn.topbar-login { background:#24282a; color:#f6f6f6; border-color:#45494b; }
+body.dashboard-view .sidebar { background:#111416; border-right:1px solid #303538; }
+body.dashboard-view .side-nav a.nav-current { background:#33251e; color:#ffa66f; border-left-color:#ff8a4b; border-radius:9px; }
+body.dashboard-view .side-nav a.nav-current svg { color:#ff9e62; }
+body.dashboard-view footer { background:#0d0f10; border-top-color:#303538; }
+body.dashboard-view footer, body.dashboard-view footer a, body.dashboard-view footer button { color:#c5c8c9; }
+body.dashboard-view footer .footer-meta { color:#a9adae; }
+
+#view-dashboard {
+  --bg:#0d0f10; --sidebar-bg:#222729;
+  --ink:#f8f8f8; --ink-body:#cbd2d2; --ink-soft:#bec8c9; --ink-faint:#aab5b6;
+  --surface:#171b1d; --surface-hover:#252b2e;
+  --border:#353c3f; --border-strong:#414a4d;
+  --accent:#ff8a4b; --accent-ink:#ffbc91; --accent-soft:#37271e;
+  --brand:#ff8a4b; --brand-ink:#ffbc91; --brand-soft:#37271e;
+  --badge-c:#a3d2a8; --badge-c-bg:#1e3729;
+  --badge-b:#ffca86; --badge-a:#ffaaa1;
+  color:#f8f8f8;
+}
+#view-dashboard .content { max-width:1430px; padding-top:34px; }
+#view-dashboard .opsdash { --op-accent:#ff8a4b; --op-accent-soft:#38291f; --op-accent-ink:#ffbc91; }
+#view-dashboard .opsdash-eyebrow { display:block; margin:0 0 10px; color:#ffac76; font-size:11px; font-weight:800; letter-spacing:.1em; }
+#view-dashboard .btn-primary { border-radius:8px; background:#ff8a4b; color:#27180f; font-weight:800; }
+#view-dashboard .btn-primary:hover { background:#ffab77; }
+#view-dashboard .btn-ghost { border-color:#525b5e; border-radius:8px; background:#222729; color:#f7f8f8; }
+#view-dashboard .btn-ghost:hover { border-color:#ffac76; color:#ffbf94; }
+
+#view-dashboard .opsdash-guest-gate { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; min-height:242px; gap:18px; overflow:hidden; padding:28px 36px; border:1px solid #493d37; border-radius:15px; background:radial-gradient(circle at 82% 50%,#39261d 0,#1c1c1d 36%,#141719 76%); }
+#view-dashboard .opsdash-guest-gate-text, #view-dashboard .opsdash-guest-gate-actions { position:relative; z-index:1; max-width:63%; }
+#view-dashboard .opsdash-guest-gate-text { flex:0 1 auto; }
+#view-dashboard .opsdash-guest-gate-text h2 { color:#fff; font-size:clamp(24px,3vw,34px); line-height:1.3; letter-spacing:-.045em; }
+#view-dashboard .opsdash-guest-gate-text p { max-width:none; color:#c4cdcd; font-size:13px; }
+#view-dashboard .opsdash-guest-gate-actions .btn { min-height:42px; padding:9px 17px; }
+#view-dashboard .opsdash-guest-art { position:absolute; right:0; bottom:-12px; width:37%; height:100%; object-fit:contain; object-position:center bottom; pointer-events:none; }
+#view-dashboard #opsdashRoot[inert] { opacity:.6; }
+#view-dashboard #opsdashRoot[inert] .opsdash-header-art { display:none; }
+
+#view-dashboard .opsdash-header { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; min-height:218px; gap:26px; overflow:hidden; margin:0 0 17px; padding:28px 34px; border:1px solid #493d37; border-radius:15px; background:radial-gradient(circle at 80% 45%,#37251d 0,#1b1d1e 36%,#141719 76%); }
+#view-dashboard .opsdash-header > div:not(.opsdash-header-actions) { position:relative; z-index:1; max-width:67%; }
+#view-dashboard .opsdash-header h1 { color:#fff; font-size:clamp(31px,4vw,46px); line-height:1.2; letter-spacing:-.05em; }
+#view-dashboard .opsdash-header p { margin-top:9px; color:#c5cece; font-size:14px; }
+#view-dashboard .opsdash-header-actions { position:relative; z-index:1; justify-content:flex-start; max-width:74%; gap:8px; }
+#view-dashboard .opsdash-header-art { position:absolute; right:0; bottom:-15px; width:35%; height:100%; object-fit:contain; object-position:center bottom; pointer-events:none; }
+#view-dashboard .opsdash-store-select { min-height:42px; border-color:#525b5e; border-radius:8px; background:#202527; color:#f7f8f8; }
+#view-dashboard .madsets-period { border-color:#50595c; border-radius:9px; background:#1d2224; }
+#view-dashboard .madsets-period-btn { border-radius:7px; color:#cbd3d4; font-size:12px; }
+#view-dashboard .madsets-period-btn[aria-pressed="true"] { background:#ff8a4b; color:#27180f; }
+#view-dashboard .madsets-period-btn[aria-pressed="false"]:hover { color:#fff; }
+#view-dashboard .madsets-date-input { color-scheme:dark; color:#e4e9e9; }
+#view-dashboard .madsets-date-input.is-active { border-radius:7px; background:#ff8a4b; color:#27180f; color-scheme:light; }
+#view-dashboard #adlogMetaDate { background:#1d2224; border-radius:7px; }
+
+#view-dashboard .opsdash-kpis { gap:12px; margin-bottom:13px; }
+#view-dashboard .opsdash-kpi { min-width:0; min-height:156px; padding:19px; border-color:#3d4548; border-radius:11px; background:#171b1d; }
+#view-dashboard .opsdash-kpi-label { color:#c0c9ca; font-size:12px; }
+#view-dashboard .opsdash-kpi-value { margin-top:10px; color:#fff; font-size:clamp(23px,2.4vw,32px); line-height:1.2; }
+#view-dashboard .opsdash-kpi-note { margin-top:11px; color:#b1bdbf; font-size:11px; line-height:1.55; }
+#view-dashboard .opsdash-kpi-icon { width:39px; height:39px; border:1px solid #5f422e; border-radius:9px; color:#ffbf95; }
+#view-dashboard .opsdash-kpi-icon svg { width:20px; height:20px; }
+#view-dashboard .dash-panel { border-color:#3d4548; border-radius:12px; background:#171b1d; }
+#view-dashboard .opsdash .dash-panel-head { padding:15px 19px; border-color:#333a3c; color:#fff; font-size:15px; }
+#view-dashboard .opsdash-head-icon { color:#ffae7c; }
+#view-dashboard .opsdash-ops-panel, #view-dashboard .madsets-panel, #view-dashboard .opsdash-row { margin-bottom:13px; }
+#view-dashboard .opsdash-subhead { padding:13px 19px 4px; color:#f1f4f4; }
+#view-dashboard .opsdash-brief-list, #view-dashboard .opsdash-adstate, #view-dashboard .opsdash-summary { padding:14px 19px; }
+#view-dashboard .opsdash-ops-divider, #view-dashboard .opsdash-ops-hr { background:#3d4548; }
+#view-dashboard .opsdash-brief-item { color:#d3d9d9; }
+#view-dashboard .opsdash-empty-note { color:#b4bfc0; }
+#view-dashboard .opsdash-adstate-label { color:#c1cbcc; }
+#view-dashboard .opsdash-adstate-value, #view-dashboard .opsdash-stat-value { color:#fff; }
+#view-dashboard .opsdash-pill { border-radius:14px; }
+#view-dashboard .opsdash-pill.good { background:#203b2b; color:#a7deb0; }
+#view-dashboard .opsdash-pill.warn { background:#3c2a1d; color:#ffd092; }
+#view-dashboard .opsdash-pill.neutral { background:#292f31; color:#d0d8d9; }
+#view-dashboard .opsdash-service-tier { border-radius:13px; }
+#view-dashboard .opsdash-see-all, #view-dashboard .madsets-error-link { color:#ffbd92; }
+#view-dashboard .opsdash-see-all:hover, #view-dashboard .madsets-error-link:hover { color:#ffdec7; }
+#view-dashboard .opsdash-wholesaler-row, #view-dashboard .opsdash-service-row, #view-dashboard .opsdash-connection-row { border-color:#353d40; }
+
+#view-dashboard .madsets-adset-card { border-radius:10px; background:#1d2224; }
+#view-dashboard .madsets-ad { border-radius:8px; background:#252a2c; }
+#view-dashboard .madsets-toggle { border-radius:7px; background:#222729; }
+#view-dashboard .madsets-toggle:hover { background:#303638; }
+#view-dashboard .madsets-body-wrap { padding:17px 19px; }
+#view-dashboard .adlog-form { border-color:#62422e; border-radius:9px; background:#29221e; }
+#view-dashboard .adlog-chan-btn { border-radius:7px; }
+#view-dashboard .adlog-chan-btn.active { border-color:#ff8a4b; background:#3c2a20; color:#ffbf95; }
+#view-dashboard .ws-field label { color:#d4dddd; }
+#view-dashboard .ws-field input { border-color:#505a5c; border-radius:7px; background:#121719; color:#fff; }
+#view-dashboard .ws-field input::placeholder { color:#aeb9bb; opacity:1; }
+#view-dashboard .tbl-wrap { border-radius:9px; }
+#view-dashboard thead th { background:#252b2d; color:#cbd4d4; }
+#view-dashboard tbody td { color:#d0d8d8; }
+#view-dashboard .adlog-summary { gap:11px; }
+#view-dashboard .adlog-sum-card { border-radius:9px; background:#202527; }
+#view-dashboard .adlog-sum-card .al-value { color:#fff; }
+
+/* This dialog sits outside the route section. */
+body.dashboard-view #marginLinkModal {
+  --bg:#111618; --ink:#f8f8f8; --ink-soft:#bdc6c7;
+  --surface:#1b2022; --surface-hover:#292e30;
+  --border:#353c3f; --border-strong:#485155;
+  --brand:#ff8a4b; --brand-soft:#38281e; --accent-ink:#ffbd92;
+}
+body.dashboard-view #marginLinkModal .modal-panel { border-radius:12px; }
+body.dashboard-view #marginLinkModal .modal-close { color:#fff; }
+body.dashboard-view #marginLinkModal .btn-primary { color:#26180f; }
+
+@media (max-width:1000px) {
+  #view-dashboard .opsdash-header-actions { max-width:100%; }
+  #view-dashboard .opsdash-header-art { opacity:.42; width:39%; }
+  #view-dashboard .opsdash-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:680px) {
+  #view-dashboard .content { padding:20px 16px 42px; }
+  #view-dashboard .opsdash-guest-gate { min-height:365px; justify-content:flex-start; padding:23px 23px 175px; }
+  #view-dashboard .opsdash-guest-gate-text, #view-dashboard .opsdash-guest-gate-actions { max-width:100%; }
+  #view-dashboard .opsdash-guest-gate-text h2 { font-size:24px; }
+  #view-dashboard .opsdash-guest-art { right:-8px; bottom:-8px; width:68%; height:173px; }
+  #view-dashboard .opsdash-header { min-height:0; padding:24px 23px 192px; gap:22px; }
+  #view-dashboard .opsdash-header > div:not(.opsdash-header-actions) { max-width:100%; }
+  #view-dashboard .opsdash-header-art { right:-8px; bottom:-10px; width:67%; height:172px; opacity:1; }
+  #view-dashboard .opsdash-header-actions { width:100%; }
+  #view-dashboard .opsdash-header-actions .opsdash-period { order:2; width:100%; }
+  #view-dashboard .opsdash-header-actions #opsdashRefreshBtn { order:3; width:100%; justify-content:center; }
+  #view-dashboard .opsdash-store-select { width:100%; }
+  #view-dashboard .opsdash-kpi { min-height:153px; padding:15px; }
+  #view-dashboard .opsdash-kpi-value { font-size:24px; }
+  #view-dashboard .opsdash-ops-split { flex-direction:column; }
+  #view-dashboard .opsdash-ops-divider { width:auto; height:1px; margin:0 19px; }
+  #view-dashboard .opsdash-summary { gap:15px; }
+  #view-dashboard .opsdash-summary-divider { display:none; }
+  #view-dashboard .opsdash-row.triple { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:375px) {
+  #view-dashboard .opsdash-kpis { grid-template-columns:minmax(0,1fr); }
+}

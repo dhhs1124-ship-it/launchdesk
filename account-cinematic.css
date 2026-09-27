@@ -1,0 +1,59 @@
+/* Account view shares the dark workspace palette used by the new home and directory. */
+body.account-view, body.account-view .app-main { background:#0d0f10; }
+body.account-view .topbar {
+  --ld-panel:#121517; --ld-text:#f8f8f8; --ld-muted:#b5b9ba;
+  --ld-muted-bg:#292c2f; --ld-border-strong:#35393c;
+  background:#121517; border-bottom-color:#35393c;
+}
+body.account-view .topbar .btn.topbar-login { background:#24282a; color:#f6f6f6; border-color:#45494b; }
+body.account-view .sidebar { background:#111416; border-right:1px solid #303538; }
+body.account-view .side-nav a.nav-current { background:#33251e; color:#ffa66f; border-left-color:#ff8a4b; border-radius:9px; }
+body.account-view .side-nav a.nav-current svg { color:#ff9e62; }
+body.account-view footer { background:#0d0f10; border-top-color:#303538; }
+body.account-view footer, body.account-view footer a, body.account-view footer button { color:#c5c8c9; }
+
+#view-account {
+  --ink:#f8f8f8; --ink-body:#cbd0d0; --ink-soft:#bdc5c6; --ink-faint:#9aa4a5;
+  --surface:#171b1d; --surface-hover:#252b2e;
+  --border:#353c3f; --border-strong:#394043;
+  --accent:#ff8a4b; --accent-ink:#ffb386; --accent-soft:#35271e;
+  --brand:#ff8a4b; --brand-ink:#ffb386; --brand-soft:#39281f;
+  color:#f8f8f8;
+}
+#view-account .content { max-width:1430px; padding-top:34px; }
+#view-account .dash-head { min-height:235px; padding:36px 40px; border:1px solid #394043; border-radius:15px; background:radial-gradient(circle at 92% 15%,#39281f,#1b1d1e 50%,#141719 85%); }
+#view-account .account-eyebrow { display:block; margin:0 0 12px; color:#ffa66d; font-size:11px; font-weight:800; letter-spacing:.12em; }
+#view-account .dash-head h1 { color:#fff; font-size:clamp(34px,4vw,50px); line-height:1.2; letter-spacing:-.05em; }
+#view-account .dash-head p { max-width:610px; margin:12px 0 0; color:#c3c9c9; font-size:14px; line-height:1.7; }
+#view-account .account-quicklinks { display:flex; flex-wrap:wrap; gap:9px; margin-top:23px; }
+#view-account .account-quicklinks a { display:inline-flex; align-items:center; min-height:41px; padding:9px 15px; border:1px solid #715039; border-radius:8px; color:#ffb386; background:#30241e; font-size:12px; font-weight:750; text-decoration:none; }
+#view-account .account-quicklinks a:hover { border-color:#ff9f68; background:#422f24; }
+#view-account .account-quicklinks a:focus-visible, #view-account .store-card a:focus-visible { outline:2px solid #ff9f68; outline-offset:3px; }
+#view-account .stores-toolbar { margin-top:24px; }
+#view-account #storeAddBtn { min-height:43px; border-radius:8px; color:#25160f; font-weight:800; }
+#view-account .store-list { gap:12px; }
+#view-account .store-card { min-width:0; padding:20px 22px; border-color:#394043; border-radius:11px; background:#171b1d; }
+#view-account .store-card:hover { border-color:#ff9e65; }
+#view-account .store-name { color:#fff; font-size:16px; }
+#view-account .store-platform-badge { border-radius:12px; padding:4px 8px; }
+#view-account .store-url, #view-account .store-status, #view-account .store-sync-meta { overflow-wrap:anywhere; }
+#view-account .store-url { white-space:normal; }
+#view-account .store-card-actions .btn { min-height:38px; border-radius:7px; }
+#view-account #storesEmpty, #view-account #storesGuestNotice { margin-top:22px; padding:34px 20px; border:1px solid #394043; border-radius:12px; background:#171b1d; }
+#view-account #storesEmpty p, #view-account #storesGuestNotice p { color:#cbd0d0; }
+
+/* The sign-up invitation appears after the free-to-browse starting point. */
+#view-home .desk-hero-signup { display:inline-flex; align-items:center; min-height:36px; margin-top:9px; color:#ffe0c9; font-size:12px; font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+#view-home .desk-hero-signup:hover { color:#fff; }
+#view-home .desk-hero-signup:focus-visible { outline:2px solid #ffb386; outline-offset:3px; }
+body.is-authed #view-home .desk-hero-signup { display:none; }
+
+@media (max-width:680px) {
+  #view-account .content { padding:20px 16px 42px; }
+  #view-account .dash-head { min-height:0; padding:25px 23px; }
+  #view-account .dash-head h1 { font-size:34px; }
+  #view-account .dash-head p { font-size:12px; }
+  #view-account .account-quicklinks a { flex:1 1 auto; justify-content:center; }
+  #view-account .store-card-actions { justify-content:flex-start; }
+  #view-home .desk-hero-signup { margin-top:6px; }
+}

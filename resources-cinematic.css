@@ -1,0 +1,125 @@
+/* Resources index, guides and FAQ share the dark LaunchDesk design. */
+body.resources-view, body.resources-view .app-main { background:#0d0f10; }
+body.resources-view .topbar {
+  --ld-panel:#121517; --ld-text:#f8f8f8; --ld-muted:#b5b9ba;
+  --ld-muted-bg:#292c2f; --ld-border-strong:#35393c;
+  background:#121517; border-bottom-color:#35393c;
+}
+body.resources-view .topbar .btn.topbar-login { background:#24282a; color:#f6f6f6; border-color:#45494b; }
+body.resources-view .sidebar { background:#111416; border-right:1px solid #303538; }
+body.resources-view .side-nav a.nav-current { background:#33251e; color:#ffa66f; border-left-color:#ff8a4b; border-radius:9px; }
+body.resources-view .side-nav a.nav-current svg { color:#ff9e62; }
+body.resources-view footer { background:#0d0f10; border-top-color:#303538; }
+body.resources-view footer, body.resources-view footer a, body.resources-view footer button { color:#c5c8c9; }
+body.resources-view footer .footer-meta { color:#a9adae; }
+
+#view-resources {
+  --ld-text:#f6f7f6; --ld-muted:#b9c2c3; --ld-panel:#171b1d;
+  --ld-muted-bg:#242a2c; --ld-border:#353c3f; --ld-border-strong:#3d4548;
+  --ld-accent:#ff8a4b; --ld-accent-mid:#ee9462; --ld-accent-dark:#ffba91; --ld-accent-light:#36271e;
+  --ink:#f6f7f6; --ink-body:#cbd0d0; --ink-soft:#b9c2c3; --ink-faint:#a1abad;
+  --surface:#171b1d; --surface-hover:#252b2e; --border:#353c3f; --border-strong:#3d4548;
+  --accent:#ff8a4b; --accent-ink:#ffba91; --accent-soft:#36271e;
+  --brand:#ff8a4b; --brand-ink:#ffba91; --brand-soft:#36271e;
+  color:#f6f7f6;
+}
+#view-resources .content { max-width:1430px; padding-top:34px; }
+#view-resources .res-hero { position:relative; display:flex; align-items:center; min-height:285px; overflow:hidden; margin-bottom:20px; border:1px solid #3e3835; border-radius:16px; background:radial-gradient(circle at 80% 50%,#3a251b 0,#1d1d1d 33%,#141719 72%); }
+#view-resources .res-hero-copy { position:relative; z-index:1; width:66%; padding:34px 38px; }
+#view-resources .res-hero .res-eyebrow { margin:0 0 11px; font-size:11px; font-weight:800; letter-spacing:.1em; color:#ffab74; }
+#view-resources .res-head { padding:0; }
+#view-resources .res-head h1 { margin:0 0 11px; color:#fff; font-size:clamp(30px,3.8vw,48px); line-height:1.23; letter-spacing:-.05em; }
+#view-resources .res-hero .res-lead { max-width:none; margin:0; color:#c8cdcd; font-size:15px; }
+#view-resources .res-hero-caption { display:inline-block; margin-top:19px; padding:5px 11px; border:1px solid #65412c; border-radius:16px; background:#38271e; color:#ffc49d; font-size:11px; font-weight:700; }
+#view-resources .res-hero-art { position:absolute; right:2%; bottom:-14px; width:37%; height:100%; object-fit:contain; object-position:center bottom; filter:drop-shadow(0 14px 18px rgba(0,0,0,.35)); }
+#view-resources > .content > .res-search-wrap { max-width:none; margin:0 0 30px; }
+#view-resources .res-search { height:54px; border-radius:10px; background:#1b2022; color:#f8f8f8; }
+#view-resources .res-search::placeholder { color:#a9b3b5; opacity:1; }
+#view-resources .res-search:focus { border-color:#ff9e64; box-shadow:0 0 0 3px rgba(255,138,75,.15); }
+
+#view-resources .res-section-label { margin-bottom:12px; color:#ffad79; font-size:12px; font-weight:800; letter-spacing:.04em; }
+#view-resources .res-stuck-section, #view-resources .res-featured-wrap { margin-bottom:32px; }
+#view-resources .res-stuck-grid { gap:12px; }
+#view-resources .res-stuck-card { min-height:110px; padding:18px; border-radius:11px; background:#171b1d; }
+#view-resources .res-stuck-card:hover, #view-resources .res-stuck-card:focus-visible { border-color:#ff9f68; background:#202325; }
+#view-resources .res-stuck-icon { width:40px; height:40px; border-color:#594032; border-radius:10px; background:#39291f; color:#ffb386; }
+#view-resources .res-stuck-icon-svg { width:21px; height:21px; }
+#view-resources .res-stuck-title { color:#fff; font-size:14px; }
+#view-resources .res-stuck-keywords { color:#b7c1c2; font-size:11px; }
+#view-resources .res-stuck-arrow { color:#ffab75; }
+
+#view-resources .res-featured-grid { gap:12px; }
+#view-resources .res-card { min-width:0; min-height:178px; gap:10px; padding:21px; border-radius:11px; background:#171b1d; }
+#view-resources .res-card:hover, #view-resources .res-card:focus-visible { border-color:#ff9f68; background:#1e2224; }
+#view-resources .res-card h3 { color:#fff; font-size:16px; line-height:1.45; }
+#view-resources .res-card p { color:#bac3c4; line-height:1.65; }
+#view-resources .res-card-icon { width:22px; height:22px; color:#ffa66d; }
+#view-resources .res-badge { border-radius:14px; background:#292f31; color:#d4d8d9; }
+#view-resources .res-badge-guide { background:#3a281e; color:#ffc097; }
+#view-resources .res-card-action { color:#ffba91; }
+#view-resources .res-card:hover .res-card-action { color:#ffd2b3; }
+
+#view-resources .res-faq-preview { margin:0 0 32px; padding:24px; border:1px solid #3d4548; border-radius:13px; background:#181d1f; }
+#view-resources .res-faq-preview .res-eyebrow { margin:0 0 5px; color:#ffae78; font-size:11px; font-weight:800; letter-spacing:.08em; }
+#view-resources .res-faq-preview-title { color:#fff; font-size:20px; letter-spacing:-.04em; }
+#view-resources .res-faq-preview .res-lead { margin:0 0 17px; color:#bcc5c6; font-size:12px; }
+#view-resources .res-faq-preview-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-bottom:17px; }
+#view-resources .res-faq-preview-item { height:100%; min-height:58px; border-radius:8px; background:#222729; }
+#view-resources .res-faq-preview-item:hover { border-color:#ff9f68; }
+#view-resources .res-faq-preview-q { color:#eff2f2; font-size:12px; }
+#view-resources .res-faq-preview .btn-ghost { border-radius:8px; color:#ffba91; }
+
+#view-resources .res-cat-tabs { gap:8px; margin:0 0 18px; }
+#view-resources .res-cat-tab { min-height:38px; border-radius:21px; font-size:12px; }
+#view-resources .res-cat-tab:hover { border-color:#ff9f68; color:#fff; }
+#view-resources .res-cat-tab.active { background:#36271e; border-color:#ff8a4b; color:#ffba91; }
+#view-resources .res-cat-tab:focus-visible, #view-resources .res-panel-back:focus-visible { outline:2px solid #ffb386; outline-offset:2px; }
+#view-resources .res-empty-state { padding:36px 18px; border:1px solid #3d4548; border-radius:11px; background:#171b1d; }
+#view-resources .res-external-wrap { border-top-color:#3d4548; }
+#view-resources .res-external-note { color:#bac3c4; }
+#view-resources .res-faq-search-item { border-radius:9px; }
+#view-resources .ask-inline a { color:#ffba91; }
+
+/* Guide and FAQ routes open directly on the reading surface. */
+#view-resources.res-reading-view .res-hero, #view-resources.res-reading-view > .content > .res-search-wrap { display:none; }
+#view-resources .res-panel { max-width:780px; }
+#view-resources .res-panel-back { color:#c3cbcc; }
+#view-resources .res-panel-close { border-radius:8px; }
+#view-resources .res-panel-title { color:#fff; font-size:clamp(24px,3vw,32px); letter-spacing:-.04em; }
+#view-resources .res-panel-intro { color:#c8d0d1; }
+#view-resources .res-panel-p, #view-resources .res-panel-list li, #view-resources .res-panel-numbered li { color:#e0e5e5; }
+#view-resources .res-panel-h3, #view-resources .res-step-title { color:#fff; }
+#view-resources .res-step, #view-resources .res-check-item, #view-resources .res-faq-item { border-radius:10px; }
+#view-resources .res-formula-row, #view-resources .res-metric-summary, #view-resources .res-sources-list li { border-radius:9px; }
+#view-resources .res-note { border:1px solid #57412e; border-radius:8px; }
+#view-resources .res-cta, #view-resources .res-cta:hover { border-radius:8px; color:#23170f; }
+#view-resources .res-cta:hover { background:#ffab77; }
+#view-resources .res-step-num, #view-resources .res-flow-step::before { color:#23170f; }
+#view-resources .res-check-item.checked .res-check-box::after { border-color:#23170f; }
+#view-resources .res-jump:hover { color:#23170f; }
+#view-resources .res-flow-step, #view-resources .res-metric-chip, #view-resources .res-metric-stat { border-radius:8px; }
+#view-resources .res-metric-chip-result .res-metric-term, #view-resources .res-metric-chip-result .res-metric-value { color:#23170f; }
+#view-resources .res-faq-item { background:#171b1d; }
+#view-resources .res-faq-result-count { color:#c3cbcc; }
+
+@media (max-width:680px) {
+  #view-resources .content { padding:20px 16px 42px; }
+  #view-resources .res-hero { min-height:340px; align-items:flex-start; }
+  #view-resources .res-hero-copy { width:100%; padding:23px 23px 193px; }
+  #view-resources .res-head h1 { font-size:31px; }
+  #view-resources .res-hero .res-lead { font-size:12px; }
+  #view-resources .res-hero-art { right:-6px; bottom:-10px; width:70%; height:175px; }
+  #view-resources .res-search { height:49px; font-size:13px; }
+  #view-resources .res-stuck-grid, #view-resources .res-featured-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #view-resources .res-stuck-card { min-height:145px; flex-direction:column; align-items:flex-start; justify-content:space-between; padding:14px; }
+  #view-resources .res-stuck-arrow { align-self:flex-end; }
+  #view-resources .res-card { min-height:194px; padding:16px; }
+  #view-resources .res-card h3 { font-size:13px; }
+  #view-resources .res-card p { font-size:11px; }
+  #view-resources .res-faq-preview { padding:18px; }
+  #view-resources .res-faq-preview-list { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:380px) {
+  #view-resources .res-stuck-grid, #view-resources .res-featured-grid { grid-template-columns:minmax(0,1fr); }
+  #view-resources .res-stuck-card { min-height:85px; flex-direction:row; align-items:center; }
+}

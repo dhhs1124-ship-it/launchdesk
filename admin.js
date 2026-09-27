@@ -173,6 +173,7 @@
     { key: 'members',               label: '회원' },
     { key: 'stores',                label: '쇼핑몰' },
     { key: 'wholesalers',           label: '도매처' },
+    { key: 'couriers',              label: '택배사' },
     { key: 'wholesaler-inquiries',  label: '도매처 등록 문의' },
     { key: 'setup-inquiries',       label: '세팅 대행 문의' },
     { key: 'content',               label: '콘텐츠' },
@@ -304,6 +305,7 @@
     members: renderMembersSection,
     stores: renderStoresSection,
     wholesalers: renderWholesalersSection,
+    couriers: function(container){ window.launchdeskCourierAdmin.render(container); },
     'wholesaler-inquiries': renderWholesalerInquiriesSection,
     'setup-inquiries': renderSetupInquiriesSection,
     beta: renderBetaOverviewSection

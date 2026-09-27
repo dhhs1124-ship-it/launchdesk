@@ -473,6 +473,7 @@
   if(faqBackBtn) faqBackBtn.addEventListener('click', function(){ location.hash = '/resources'; });
 
   function showFaqScreen(openId){
+    root.classList.add('res-reading-view');
     indexEl.hidden = true;
     panelEl.hidden = true;
     if(faqScreenEl) faqScreenEl.hidden = false;
@@ -534,6 +535,7 @@
   }
 
   function showIndex(){
+    root.classList.remove('res-reading-view');
     panelEl.hidden = true;
     if(faqScreenEl) faqScreenEl.hidden = true;
     indexEl.hidden = false;
@@ -541,6 +543,7 @@
   function showGuide(slug){
     var resource = renderGuidePanel(slug);
     if(!resource){ showIndex(); return; }
+    root.classList.add('res-reading-view');
     indexEl.hidden = true;
     if(faqScreenEl) faqScreenEl.hidden = true;
     panelEl.hidden = false;

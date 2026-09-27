@@ -104,6 +104,7 @@
     { slug: 'product-list-sheet', title: '상품리스트 구글시트', summary: '상품 업로드 전 정리용 구글시트', category: 'product', type: 'template', tags: ['상품리스트', '템플릿', '구글시트'], href: 'https://docs.google.com/spreadsheets/d/1UPIM38BJntGWCMSjGTeLFwc8wdyJuFzH/edit?usp=sharing', external: true },
     { slug: 'sample-list-sheet', title: '샘플리스트 구글시트', summary: '샘플 구할 때 작성용 구글시트', category: 'product', type: 'template', tags: ['샘플리스트', '템플릿', '구글시트'], href: 'https://docs.google.com/spreadsheets/d/1cDeCnfxtyonZyI_sXxNIeSemL-sDYpkE/edit?usp=sharing', external: true },
     { slug: 'margin-calculator', title: 'LaunchDesk 마진 계산기', summary: '수수료 · 배송비 · 광고비까지 반영한 실제 예상 잔액을 계산합니다.', category: 'product', type: 'tool', tags: ['마진계산기', '수익', '계산기'], href: '#/tools', toolsTarget: 'calc' },
+    { slug: 'photo-outsourcing-checklist', title: '상품 촬영 방식과 대행 전 확인할 것', summary: '직접 촬영 · 모델 촬영 · 촬영 대행을 비교하고 요청 사항을 정리합니다.', category: 'product', type: 'guide', tags: ['상품촬영', '촬영대행', '상세페이지'] },
     { slug: 'detail-page-structure', title: '상세페이지 기획 기본 구조', summary: '전환율을 고려한 상세페이지의 기본 뼈대를 정리했어요.', category: 'product', type: 'guide', tags: ['상세페이지', '기획', '전환율'] },
     { slug: 'sinsangmarket', title: '신상마켓', summary: '동대문 도매 브랜드를 모바일로 확인 · 사입하는 대표 앱', category: 'product', type: 'external', tags: ['사입', '동대문', '패션'], href: 'https://sinsangmarket.kr/' },
     { slug: 'sellerocean', title: '셀러오션', summary: '사입삼촌 구인 · 셀러 커뮤니티', category: 'product', type: 'external', tags: ['사입', '커뮤니티', '패션'], href: 'https://cafe.naver.com/soho' },
@@ -112,6 +113,7 @@
 
     // ---- operation · 판매 운영 ----
     { slug: 'shipping-policy-checklist', title: '배송 정책 준비 체크리스트', summary: '배송비 · 마감시간 · 지연 안내 기준을 미리 정합니다.', category: 'operation', type: 'checklist', tags: ['배송', '배송비', '정책', '체크리스트'] },
+    { slug: 'shipping-contract-checklist', title: '택배 계약 전 확인할 항목', summary: '단가 · 수거 시간 · 최소 물량 · 반품 회수 조건을 비교합니다.', category: 'operation', type: 'checklist', tags: ['택배계약', '집하', '발송', '체크리스트'] },
     { slug: 'return-exchange-checklist', title: '교환 · 반품 기준 준비', summary: '교환 · 반품 가능 기간과 배송비 부담 기준을 정합니다.', category: 'operation', type: 'checklist', tags: ['교환', '반품', '환불', '체크리스트'] },
     { slug: 'cs-script-examples', title: '자주 쓰는 CS 응대 예시', summary: '배송 · 교환 · 반품 · 품절 문의 답변 예시 모음', category: 'operation', type: 'guide', tags: ['CS', '고객응대', '스크립트'] },
     { slug: 'review-points-basics', title: '리뷰 수집과 적립금 운영 기본', summary: '리뷰 유도와 적립금 지급 기준의 기본 구조를 정리했어요.', category: 'operation', type: 'guide', tags: ['리뷰', '적립금', '재구매'] },
@@ -123,6 +125,7 @@
     // ---- growth · 광고와 성장 ----
     { slug: 'ad-before-start', title: '광고비를 쓰기 전 확인할 7가지', summary: '광고를 켜기 전에 마진 · 추적 · 페이지 준비를 먼저 확인합니다.', category: 'growth', type: 'checklist', tags: ['광고', '광고비', '체크리스트'] },
     { slug: 'meta-ads-start', title: 'Meta 광고 처음 시작하기', summary: '화면 위치 대신 바뀌지 않는 운영 원칙을 정리했어요.', category: 'growth', type: 'guide', tags: ['메타광고', '페이스북', '인스타그램', '광고'] },
+    { slug: 'instagram-content-starter', title: '인스타그램 첫 콘텐츠 운영 예시', summary: '스토리 · 릴스 · 피드 · 하이라이트를 어떤 역할로 쓸지 예시로 정리합니다.', category: 'growth', type: 'guide', tags: ['인스타그램', '스토리', '릴스', '피드', '콘텐츠'] },
     { slug: 'naver-shopping-ads-start', title: '네이버 쇼핑광고 처음 시작하기', summary: '상품명 · 이미지 · 가격 경쟁력부터 점검합니다.', category: 'growth', type: 'guide', tags: ['네이버쇼핑광고', '네이버', '광고'] },
     { slug: 'ad-creative-checklist', title: '광고 소재 체크리스트', summary: '소재를 올리기 전에 확인할 7가지 기준', category: 'growth', type: 'checklist', tags: ['광고소재', '크리에이티브', '체크리스트'] },
     { slug: 'ad-metrics', title: '광고 숫자 읽는 법', summary: 'CTR · CPC · CVR · CPA · ROAS 계산식과 읽는 법', category: 'growth', type: 'guide', tags: ['CTR', 'CPC', 'CVR', 'CPA', 'ROAS', '지표'] },
@@ -408,6 +411,12 @@
     'supplier-check-checklist': { intro: '공급처는 한 곳만 보지 말고 최소 2~3곳을 비교하세요. 단가 · 조건이 비슷해 보여도 배송 · 대응 속도에서 차이가 큰 경우가 많습니다.', blocks: [
       { t: 'checklist', items: ['사입가 또는 공급가(부가세 포함 여부까지 확인)', '배송비와 배송 조건(택배사 · 리드타임)', '최소 주문수량(MOQ)', '반품 · 교환 조건', '품절 시 대응 방식(재입고 일정, 대체 상품 여부)', '세금계산서 발행 가능 여부', '상품 정보(이미지 · 상세정보) 제공 범위'] }
     ] },
+    'photo-outsourcing-checklist': { intro: '상품에 필요한 장면을 먼저 적고, 촬영 방식과 대행 여부를 정해보세요.', blocks: [
+      { t: 'list', items: ['직접 촬영 — 바로 시작할 수 있지만 결과가 촬영 환경과 역량에 따라 달라집니다.', '모델 촬영 — 착용·사용 장면을 보여주기 좋지만 섭외가 필요합니다.', '촬영 대행 — 전문 촬영과 편집을 맡길 수 있지만 비용과 일정을 조율해야 합니다.'] },
+      { t: 'h3', text: '대행 전 확인할 것' },
+      { t: 'checklist', items: ['필요한 사진 목록과 사용 채널 정리', '견적에 포함된 촬영 컷 수·수정 횟수·납기 확인', '원본과 보정본의 사용 범위 확인', '여러 곳의 견적과 작업 사례 비교', '가능하다면 소규모 테스트 촬영으로 결과물 확인'] },
+      { t: 'cta', label: '상세페이지 구성 순서 보기', slug: 'detail-page-structure' }
+    ] },
     'detail-page-structure': { intro: '상세페이지는 고객이 구매를 결정하는 마지막 단계입니다. 아래 순서를 기본 뼈대로 삼아 채워보세요.', blocks: [
       { t: 'numbered', items: ['첫 화면 — 상품이 무엇인지, 누구를 위한 것인지 3초 안에 보이게', '핵심 장점 — 한 문장으로 이해되는 가장 큰 이점부터', '상세 스펙 — 사이즈 · 소재 · 용량 · 사용법 등 구매 판단에 필요한 정보', '신뢰 요소 — 실제 사용 장면, 후기, 제작 · 소싱 과정 등', '구매 조건 — 가격, 배송비, 배송 기간, 교환 · 반품 기준을 명확히', '마무리 CTA — 지금 구매해야 할 이유와 행동 유도 문구'] },
       { t: 'note', text: '사진 품질과 정보량이 부족하면 아무리 좋은 상품도 설득력이 떨어집니다. 순서보다 "고객이 궁금해할 질문에 빠짐없이 답했는가"가 더 중요합니다.' }
@@ -415,6 +424,12 @@
 
     'shipping-policy-checklist': { intro: '배송 정책은 상세페이지와 고객센터 안내에 동일하게 표시돼야 합니다. 정책이 바뀌면 두 곳 모두 함께 수정하세요.', blocks: [
       { t: 'checklist', items: ['배송비 기준(무료배송 조건 포함 여부) 정하기', '택배사 · 평균 배송 소요일 확인하기', '도서산간 · 제주 추가 배송비 기준 정하기', '배송 지연 시 안내 방법 정하기', '출고 마감 시간(당일발송 기준) 정하기', '파손 · 분실 시 처리 기준 정하기'] }
+    ] },
+    'shipping-contract-checklist': { intro: '현재 발송 물량에 맞는 방식부터 비교하고, 계약 조건은 실제 담당자에게 확인해보세요.', blocks: [
+      { t: 'list', items: ['편의점 택배 — 소량 발송부터 시작할 수 있지만 직접 접수해야 합니다.', '택배사 정식 계약 — 수거와 단가를 협의할 수 있지만 물량 조건이 있을 수 있습니다.'] },
+      { t: 'h3', text: '계약 전 질문할 항목' },
+      { t: 'checklist', items: ['기본 운임과 추가 비용', '실제 집하 가능 지역과 수거 시간', '최소 발송 물량과 정산 주기', '반품 회수 가능 여부와 비용', '도서산간 등 추가 요금', '송장 출력 방식과 연동 가능 여부'] },
+      { t: 'note', text: '상담 화면의 지역 안내와 실제 집하 가능 여부가 다를 수 있으니 계약 전 전화로 확인하세요.' }
     ] },
     'return-exchange-checklist': { intro: '전자상거래법상 기본 청약철회 기간 등 법정 기준을 벗어나는 정책은 만들 수 없습니다. 정확한 법적 기준은 관련 법령이나 플랫폼 공지를 확인하세요.', blocks: [
       { t: 'checklist', items: ['교환 · 반품 가능 기간(수령일 기준 며칠) 정하기', '단순 변심과 상품 하자를 구분하는 기준 정하기', '반품 배송비를 누가 부담하는지(단순 변심 vs 하자) 정하기', '교환 · 반품 불가 상품(위생용품 등)이 있다면 명시하기', '환불 처리 소요일 안내 문구 준비하기'] }
@@ -875,6 +890,13 @@
       { t: 'list', items: ['전환 추적(픽셀 · 전환 API) 준비를 먼저 끝내기', '명확한 판매 목표(전환 · 트래픽 등) 하나를 선택하기', '첫 테스트에서 변수(소재 · 타깃 · 문구)를 한 번에 너무 많이 나누지 않기', '소재별로 결과를 구분해서 확인하기', '데이터가 충분히 쌓이기 전에 성급하게 예산을 늘리거나 중단하지 않기', '소재 · 예산 · 결과를 광고 기록에 남기기'] },
       { t: 'note', text: '광고 관리자의 메뉴 위치와 심사 기준은 변경될 수 있으므로, 진행 전 Meta 공식 고객센터 · 광고 관리자 도움말을 함께 확인해주세요.' },
       { t: 'cta', label: '광고 기록 남기기', href: '#/dashboard' }
+    ] },
+    'instagram-content-starter': { intro: '아래 구성은 첫 홍보를 시작할 때 참고할 수 있는 예시입니다. 고정된 게시 횟수나 성과를 보장하지 않습니다.', blocks: [
+      { t: 'h3', text: '첫 콘텐츠를 고르는 순서' },
+      { t: 'numbered', items: ['처음 보는 사람이 상품을 이해할 수 있는 대표 이미지나 짧은 사용 장면을 고릅니다.', '고객이 궁금해할 크기·사용법·구성 정보를 한 게시물에 정리합니다.', '게시물의 반응과 문의를 확인하고 다음 콘텐츠에서 답할 질문을 하나 고릅니다.'] },
+      { t: 'h3', text: '형식별 사용 예시' },
+      { t: 'list', items: ['피드 — 상품 특징과 실제 사용 사진을 프로필에 남깁니다.', '릴스 — 짧은 사용 장면이나 전후 비교를 보여줍니다.', '스토리 — 새 소식이나 자주 받는 질문에 답합니다.', '하이라이트 — 구매 방법과 배송 안내를 모아둡니다.'] },
+      { t: 'note', text: '판매 글만 반복하기보다 활용법·후기 요약·실제 사용 장면처럼 고객에게 도움이 되는 내용을 함께 테스트하세요.' }
     ] },
     'naver-shopping-ads-start': { intro: '클릭률만 보지 말고 실제 주문과 이익까지 함께 확인하세요.', blocks: [
       { t: 'list', items: ['상품명과 카테고리가 정확한지 확인하기', '대표 이미지와 가격 경쟁력 확인하기', '배송비까지 포함한 최종 가격 기준으로 비교하기', '상품 정보 품질(옵션 · 상세정보 누락 여부) 확인하기', '클릭 후 연결되는 상세페이지가 정확한지 확인하기'] },

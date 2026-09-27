@@ -69,6 +69,19 @@
     return CATEGORY_LABEL_BY_VALUE[value] || value;
   }
 
+  // Search the published rows already returned by the server. No additional
+  // requests or private supplier data are involved in typing a query.
+  function filterPublishedWholesalers(items, category, query){
+    var term = trimOrEmpty(query).toLowerCase();
+    return (items || []).filter(function(w){
+      if(category && w.category !== category) return false;
+      if(!term) return true;
+      var text = [w.name, categoryLabel(w.category), w.summary, w.main_products, w.min_order_condition]
+        .map(function(part){ return String(part || ''); }).join(' ').toLowerCase();
+      return text.indexOf(term) !== -1;
+    });
+  }
+
   // ------------------------------------------------------------------ 유틸
   function trimOrEmpty(v){
     return (typeof v === 'string') ? v.trim() : '';
@@ -231,6 +244,7 @@
     CATEGORIES: CATEGORIES,
     categoryLabel: categoryLabel,
     isValidCategory: isValidCategory,
+    filterPublishedWholesalers: filterPublishedWholesalers,
     fetchPublishedWholesalers: fetchPublishedWholesalers,
     submitWholesalerInquiry: submitWholesalerInquiry,
     fetchMyInquiries: fetchMyInquiries
@@ -248,6 +262,9 @@
   var emptyEl = document.getElementById('wholesaleEmptyState');
   var filterEmptyEl = document.getElementById('wholesaleFilterEmptyState');
   var retryBtn = document.getElementById('wholesaleRetryBtn');
+  var searchEl = document.getElementById('wholesaleSearch');
+  var resetBtn = document.getElementById('wholesaleFilterReset');
+  var resultStatusEl = document.getElementById('wholesaleResultStatus');
   if(!grid || !filterTabsEl || !loadingEl || !errorEl || !emptyEl || !filterEmptyEl){ return; }
 
   // showToast: app.js/tools.js/stores.js와 동일한 방식으로 이 파일 안에서
@@ -278,6 +295,7 @@
     emptyEl.hidden = state !== 'empty';
     filterEmptyEl.hidden = state !== 'filtered-empty';
     grid.hidden = state !== 'data';
+    if(resultStatusEl && state !== 'data' && state !== 'filtered-empty') resultStatusEl.textContent = '';
   }
 
   function cardHtml(w){
@@ -303,11 +321,10 @@
   }
 
   function renderFiltered(){
-    if(allItems == null){ setState('error'); return; }
+    if(allItems == null) return;
     if(allItems.length === 0){ setState('empty'); return; }
-    var filtered = currentCategory
-      ? allItems.filter(function(w){ return w.category === currentCategory; })
-      : allItems;
+    var filtered = filterPublishedWholesalers(allItems, currentCategory, searchEl ? searchEl.value : '');
+    if(resultStatusEl) resultStatusEl.textContent = filtered.length + '개 도매처';
     if(filtered.length === 0){ setState('filtered-empty'); return; }
     grid.innerHTML = filtered.map(cardHtml).join('');
     setState('data');
@@ -337,6 +354,22 @@
 
   if(retryBtn) retryBtn.addEventListener('click', loadWholesalers);
 
+  filterTabsEl.querySelectorAll('.filter-tab').forEach(function(tab){
+    tab.setAttribute('aria-pressed', tab.classList.contains('active') ? 'true' : 'false');
+  });
+
+  if(searchEl) searchEl.addEventListener('input', renderFiltered);
+  if(resetBtn) resetBtn.addEventListener('click', function(){
+    currentCategory = null;
+    if(searchEl) searchEl.value = '';
+    filterTabsEl.querySelectorAll('.filter-tab').forEach(function(tab){
+      var active = tab.getAttribute('data-filter') === 'all';
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    renderFiltered();
+  });
+
   filterTabsEl.addEventListener('click', function(e){
     var btn = e.target.closest('.filter-tab');
     if(!btn) return;
@@ -345,6 +378,9 @@
     // — 여기서는 실제로 무엇을 보여줄지만 다시 계산한다.
     var fkey = btn.getAttribute('data-filter');
     currentCategory = (fkey === 'all') ? null : fkey;
+    filterTabsEl.querySelectorAll('.filter-tab').forEach(function(tab){
+      tab.setAttribute('aria-pressed', tab === btn ? 'true' : 'false');
+    });
     renderFiltered();
   });
 

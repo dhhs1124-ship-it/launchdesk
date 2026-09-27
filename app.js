@@ -143,7 +143,10 @@
       var m = a.getAttribute('data-match');
       var exact = a.hasAttribute('data-exact');
       var active = exact ? path === m : (!!m && m !== '/' && path.indexOf(m) === 0);
+      if(m === '/start' && path === '/start/intro') active = false;
       a.classList.toggle('nav-current', active);
+      if(active) a.setAttribute('aria-current','page');
+      else a.removeAttribute('aria-current');
     });
   }
 
@@ -200,6 +203,24 @@
 
   function render(){
     var path = currentPath();
+    document.body.classList.toggle('chapter03-view', path === '/start/sourcing');
+    document.body.classList.toggle('chapter04-view', path === '/start/content');
+    document.body.classList.toggle('chapter05-view', path === '/start/orders');
+    document.body.classList.toggle('chapter06-view', path === '/start/marketing-setup');
+    document.body.classList.toggle('chapter07-view', path === '/start/marketing');
+    document.body.classList.toggle('chapter08-view', path === '/start/wrapup');
+    document.body.classList.toggle('chapter02-view', path === '/start/setup');
+    document.body.classList.toggle('home-view', path === '/');
+    document.body.classList.toggle('start-overview-view', path === '/start');
+    document.body.classList.toggle('tools-view', path === '/tools');
+    document.body.classList.toggle('wholesale-view', path === '/wholesale');
+    document.body.classList.toggle('chapter00-view', path === '/start/intro');
+    document.body.classList.toggle('couriers-view', path === '/couriers');
+    document.body.classList.toggle('resources-view', path === '/resources' || path.indexOf('/resources/') === 0);
+    document.body.classList.toggle('services-view', path === '/services/setup');
+    document.body.classList.toggle('dashboard-view', path === '/dashboard');
+    document.body.classList.toggle('account-view', path === '/account');
+    document.body.classList.toggle('chapter01-view', path === '/start/prepare');
     document.querySelectorAll('.view').forEach(function(v){ v.hidden = true; v.classList.remove('fade-in'); });
     // 자료실 내부 가이드 상세는 #/resources/<slug> 하위 경로로 연다(2026-09
     // 자료실 전면 재설계) — BUILT에 가이드 하나하나를 등록하지 않고, "/resources/로
@@ -417,6 +438,9 @@
   var loginPwConfirmField = document.getElementById('loginPwConfirmField');
   var loginPwConfirm = document.getElementById('loginPwConfirm');
   var loginMode = 'login'; // 'login' | 'signup' — 같은 모달/폼을 토글
+  function trackSignupStep(name, params){
+    if(typeof gtag === 'function') gtag('event', name, params || {});
+  }
   /* Supabase SDK는 실제 로그인 제출이 아니어도(예: 탭이 다시 포커스를
      받아 세션을 재검증할 때) 'SIGNED_IN' 이벤트를 다시 쏠 수 있다. 그걸
      "방금 사용자가 로그인 버튼을 눌렀다"로 착각하면, 레거시/게스트 병합
@@ -454,8 +478,9 @@
   var loginModalOpener = null;
   function openLoginModal(opts){
     loginModalOpener = document.activeElement;
-    loginMode = 'login';
+    loginMode = (opts && opts.mode === 'signup') ? 'signup' : 'login';
     applyLoginModalMode();
+    if(loginMode === 'signup') trackSignupStep('signup_form_open');
     loginFormWrap.hidden = false;
     loginNotice.hidden = true;
     // 선택적 한 줄 안내(예: plans.js — "로그인 후 작성한 내용을 확인하고
@@ -699,6 +724,7 @@
       var signupPCCore = window.launchdeskPolicyConsentCore;
       var signupPC = window.launchdeskPolicyConsent;
       if(signupPC && signupPCCore) signupPC.stashPending(signupPCCore.SOURCES.EMAIL_SIGNUP);
+      trackSignupStep('signup_form_submit');
       sb.auth.signUp({ email: email, password: password }).then(function(res){
         reenable();
         if(res.error){
@@ -706,6 +732,7 @@
           showToast(getAuthErrorMessage(res.error));
           return;
         }
+        trackSignupStep('sign_up', { method: 'email' });
         var immediateSession = res.data && res.data.session;
         if(!immediateSession && signupPC){
           // Confirm email이 켜져 있어 세션이 아직 없다 — 이 pending을 다른
@@ -734,6 +761,7 @@
     e.preventDefault();
     loginMode = (loginMode === 'signup') ? 'login' : 'signup';
     applyLoginModalMode();
+    if(loginMode === 'signup') trackSignupStep('signup_form_open');
     // 모드 전환 시 오래된 pending을 정리한다(요구사항 3) — 정상 흐름에서는
     // 이미 각 실패/완료 경로에서 비워지지만, 방어적으로 한 번 더 비운다.
     if(window.launchdeskPolicyConsent) window.launchdeskPolicyConsent.clearPending();
@@ -744,7 +772,10 @@
     // 로그인 상태에서도 href="#/login" 자체는 그대로 두되(마크업 최소 변경),
     // 실제 이동은 항상 막고 — 모달은 비로그인일 때만 연다(상단바 "내 계정"
     // 클릭 시 로그인 모달이 다시 뜨지 않도록).
-    if(loginLink){ e.preventDefault(); if(!isAuthed) openLoginModal(); }
+    if(loginLink){
+      e.preventDefault();
+      if(!isAuthed) openLoginModal({ mode: loginLink.getAttribute('data-auth-mode') === 'signup' ? 'signup' : 'login' });
+    }
   });
 
   /* toast — used only for things that genuinely just happened locally
@@ -852,6 +883,36 @@
   function recomputeProgress(){
     var completed = getCompleted();
     var prog = computeStepProgress(completed);
+    var homeProgress = document.getElementById('deskProgressLabel');
+    if(homeProgress) homeProgress.textContent = '완료 ' + prog.done + ' / ' + prog.total + ' · STEP 01~07 기준';
+    var homeTitle = document.getElementById('deskStatusTitle');
+    if(homeTitle) homeTitle.textContent = prog.next
+      ? 'STEP ' + prog.next.num + ' · ' + prog.next.label
+      : 'STEP 01~07을 모두 완료했어요';
+    document.querySelectorAll('#view-home [data-home-step]').forEach(function(row){
+      var stepPath = row.getAttribute('data-home-step');
+      row.classList.toggle('is-done', completed.indexOf(stepPath) !== -1);
+      row.classList.toggle('is-next', !!prog.next && prog.next.route === stepPath);
+      var stepLink = row.querySelector('a');
+      if(stepLink){
+        if(prog.next && prog.next.route === stepPath) stepLink.setAttribute('aria-current', 'step');
+        else stepLink.removeAttribute('aria-current');
+      }
+    });
+    document.querySelectorAll('#view-home .desk-step').forEach(function(card){
+      var stepPath = card.getAttribute('href').slice(1);
+      card.classList.toggle('is-done', completed.indexOf(stepPath) !== -1);
+      card.classList.toggle('is-next', !!prog.next && prog.next.route === stepPath);
+    });
+    var homeNext = document.getElementById('deskNextLink');
+    if(homeNext){
+      var nextStep = prog.next;
+      homeNext.href = '#' + (nextStep ? nextStep.route : '/start/wrapup');
+      var homeNextText = document.getElementById('deskNextText');
+      if(homeNextText) homeNextText.textContent = nextStep
+        ? (prog.done === 0 ? 'STEP ' + nextStep.num + ' 시작하기' : 'STEP ' + nextStep.num + ' 이어서 준비하기')
+        : '오픈 완료 확인하기';
+    }
     // (사이드바 "창업 준비 N%" 미니 진행 바(#progressPct/#progressFillSide)는 2026-09
     //  UI 재설계 2차에서 제거 — 진행 정보는 /start와 홈 카드에서만 보여준다.)
 
@@ -861,6 +922,35 @@
     if(ssDone) ssDone.textContent = prog.done;
     var ssTotal = document.getElementById('startStatusTotal');
     if(ssTotal) ssTotal.textContent = prog.total;
+    var startProgressBar = document.getElementById('startProgressBar');
+    if(startProgressBar){
+      startProgressBar.setAttribute('aria-valuenow', String(prog.done));
+      startProgressBar.setAttribute('aria-valuemax', String(prog.total));
+    }
+    var startProgressFill = document.getElementById('startProgressFill');
+    if(startProgressFill) startProgressFill.style.width = prog.pct + '%';
+    document.querySelectorAll('#view-start [data-start-step]').forEach(function(item){
+      var route = item.getAttribute('data-start-step');
+      item.classList.toggle('is-done', completed.indexOf(route) !== -1);
+      item.classList.toggle('is-next', !!prog.next && prog.next.route === route);
+      if(prog.next && prog.next.route === route) item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+    });
+    var nextTasks = document.getElementById('startNextTasks');
+    if(nextTasks){
+      var nextRoute = prog.next ? prog.next.route : '/start/wrapup';
+      var nextCard = Array.from(document.querySelectorAll('#chapterGrid .guide-card[data-chapter]')).find(function(card){
+        return card.getAttribute('data-chapter') === nextRoute;
+      });
+      if(nextCard){
+        nextTasks.replaceChildren();
+        nextCard.querySelectorAll('.cc-points li').forEach(function(point){
+          var task = document.createElement('li');
+          task.textContent = point.textContent;
+          nextTasks.appendChild(task);
+        });
+      }
+    }
     var ssNext = document.getElementById('startStatusNext');
     var ssLink = document.getElementById('startStatusLink');
     if(prog.next){
@@ -873,6 +963,9 @@
     document.querySelectorAll('.guide-card[data-chapter]').forEach(function(card){
       var path = card.getAttribute('data-chapter');
       var isDone = completed.indexOf(path) !== -1;
+      card.classList.toggle('is-next', !!prog.next && prog.next.route === path);
+      var cardHead = card.querySelector('.gc-head');
+      if(cardHead) cardHead.setAttribute('aria-expanded', card.classList.contains('open') ? 'true' : 'false');
       var check = card.querySelector('.cc-check');
       if(check) check.hidden = !isDone;
       var link = card.querySelector('.gc-link');
@@ -1311,6 +1404,7 @@
   var profileName = document.getElementById('profileName');
   var profileDayEl = document.getElementById('profileDay');
   var topbarLoginBtn = document.getElementById('topbarLoginBtn');
+  var deskNavAuth = document.getElementById('deskNavAuth');
   var isAuthed = false;
 
   function renderAuthUI(session){
@@ -1348,6 +1442,7 @@
         topbarLoginBtn.textContent = '내 계정';
         topbarLoginBtn.setAttribute('href', '#/account');
       }
+      if(deskNavAuth){ deskNavAuth.textContent = '내 계정'; deskNavAuth.setAttribute('href', '#/account'); }
     } else {
       profileAvatarLetter.textContent = '?';
       profileName.textContent = '로그인을 해주세요';
@@ -1357,6 +1452,7 @@
         topbarLoginBtn.textContent = '로그인';
         topbarLoginBtn.setAttribute('href', '#/login');
       }
+      if(deskNavAuth){ deskNavAuth.textContent = '로그인'; deskNavAuth.setAttribute('href', '#/login'); }
     }
   }
   // profiles 테이블에 현재 사용자 행이 있는지만 참고로 확인(콘솔 로그만,
@@ -1523,8 +1619,15 @@
     if(gcHead){
       var card = gcHead.closest('.guide-card');
       var wasOpen = card.classList.contains('open');
-      document.querySelectorAll('.guide-card.open').forEach(function(c){ if(c !== card) c.classList.remove('open'); });
+      document.querySelectorAll('.guide-card.open').forEach(function(c){
+        if(c !== card){
+          c.classList.remove('open');
+          var head = c.querySelector('.gc-head');
+          if(head) head.setAttribute('aria-expanded', 'false');
+        }
+      });
       card.classList.toggle('open', !wasOpen);
+      gcHead.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
       return;
     }
     var chanBtn = e.target.closest('.adlog-chan-btn');

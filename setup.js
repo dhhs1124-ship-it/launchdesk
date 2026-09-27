@@ -103,8 +103,7 @@
       setupSelectedPlan = {
         key: planEl.getAttribute('data-plan'),
         name: planEl.getAttribute('data-name'),
-        price: parseInt(planEl.getAttribute('data-price'), 10),
-        icon: planEl.querySelector('.sp-icon') ? planEl.querySelector('.sp-icon').textContent : '🛠️'
+        price: parseInt(planEl.getAttribute('data-price'), 10)
       };
       var goBtn = document.getElementById('setupGoStep2');
       if(goBtn) goBtn.textContent = setupSelectedPlan.name + ' 신청하기 →';
@@ -141,7 +140,7 @@
       var iconEl = document.getElementById('setupSummaryIcon');
       var nameEl = document.getElementById('setupSummaryName');
       var metaEl = document.getElementById('setupSummaryMeta');
-      if(iconEl) iconEl.textContent = setupSelectedPlan.icon;
+      if(iconEl) iconEl.setAttribute('data-plan', setupSelectedPlan.key);
       if(nameEl) nameEl.textContent = setupSelectedPlan.name;
       if(metaEl) metaEl.textContent = '₩' + setupSelectedPlan.price.toLocaleString('ko-KR') + '원';
       clearConsentError();

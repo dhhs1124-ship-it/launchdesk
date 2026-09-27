@@ -380,6 +380,8 @@
       hero.classList.toggle('deficit', r.isDeficit);
       hero.classList.toggle('zero', !r.isDeficit && r.postAd === 0);
       byId('mcResultHeroSub').textContent = r.adMode === 'none' ? '광고비는 반영하지 않았어요' : '광고비까지 뺀 금액이에요';
+      var ratioValue = byId('mcRatioValue');
+      if(ratioValue) ratioValue.textContent = MC.fmtPct(r.ratio);
 
       byId('mcResultFacts').innerHTML = mcResultFactsHtml(calc.input, r);
       byId('mcResultBreakeven').innerHTML = mcBreakevenHtml(calc.input, r);

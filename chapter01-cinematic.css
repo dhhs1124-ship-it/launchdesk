@@ -1,0 +1,127 @@
+/* STEP 01 appearance. Worksheet, tabs, saved input order and navigation stay intact. */
+body.chapter01-view, body.chapter01-view .app-main { background:#0d0f10; }
+body.chapter01-view .topbar {
+  --ld-panel:#121517; --ld-text:#f8f8f8; --ld-muted:#b5b9ba;
+  --ld-muted-bg:#292c2f; --ld-border-strong:#35393c;
+  background:#121517; border-bottom-color:#35393c;
+}
+body.chapter01-view .topbar .btn.topbar-login { background:#24282a; color:#f6f6f6; border-color:#45494b; }
+body.chapter01-view .sidebar { background:#111416; border-right:1px solid #303538; }
+body.chapter01-view .side-nav a.nav-current { background:#33251e; color:#ffa66f; border-left-color:#ff8a4b; border-radius:9px; }
+body.chapter01-view .side-nav a.nav-current svg { color:#ff9e62; }
+body.chapter01-view footer { background:#0d0f10; border-top-color:#303538; }
+body.chapter01-view footer, body.chapter01-view footer a, body.chapter01-view footer button { color:#c5c8c9; }
+body.chapter01-view footer .footer-meta { color:#a9adae; }
+
+#view-start-prepare {
+  --bg:#0d0f10; --ld-bg:#0d0f10;
+  --ink:#f8f8f8; --ink-body:#d3d9d9; --ink-soft:#bfc9ca; --ink-faint:#aeb9bb;
+  --surface:#171b1d; --surface-hover:#252b2e;
+  --border:#353c3f; --border-strong:#414a4d;
+  --accent:#ff8a4b; --accent-ink:#ffbc91; --accent-soft:#38281e;
+  --brand:#ff8a4b; --brand-ink:#ffbc91; --brand-soft:#38281e;
+  --ld-text:#f8f8f8; --ld-muted:#bbc6c7; --ld-panel:#171b1d;
+  --ld-muted-bg:#242a2c; --ld-border:#353c3f; --ld-border-strong:#414a4d;
+  --ld-accent:#ff8a4b; --ld-accent-mid:#d58051; --ld-accent-dark:#ffb98d; --ld-accent-light:#39291f;
+  color:#f8f8f8;
+}
+#view-start-prepare .content { max-width:1430px; padding-top:34px; }
+#view-start-prepare .s1 { gap:18px; }
+#view-start-prepare .s1-head { position:relative; min-height:273px; overflow:hidden; padding:32px 36px; border:1px solid #453c38; border-radius:15px; background:radial-gradient(circle at 78% 50%,#3a281e 0,#1d1f20 35%,#141719 75%); }
+#view-start-prepare .s1-head > :not(.s1-hero-art) { position:relative; z-index:1; max-width:66%; }
+#view-start-prepare .s1-crumb { color:#c2cacc; }
+#view-start-prepare .s1-crumb a { color:#d3d9da; }
+#view-start-prepare .s1-eyebrow { margin-bottom:11px; padding:0; border:0; background:none; color:#ffab74; font-size:11px; font-weight:800; letter-spacing:.08em; }
+#view-start-prepare .s1-head h1 { margin:0 0 12px; color:#fff; font-size:clamp(30px,3.8vw,45px); line-height:1.24; letter-spacing:-.055em; }
+#view-start-prepare .s1-lead { max-width:620px; color:#cbd2d2; font-size:14px; line-height:1.7; }
+#view-start-prepare .s1-hero-art { position:absolute; right:0; bottom:-17px; width:37%; height:100%; object-fit:contain; object-position:center bottom; pointer-events:none; filter:drop-shadow(0 13px 18px rgba(0,0,0,.3)); }
+
+#view-start-prepare .s1-tabbar { padding:0; border-bottom-color:#42494c; }
+#view-start-prepare .tab-btn { font-size:14px; }
+#view-start-prepare .tab-btn.active { color:#ffb98d; border-bottom-color:#ff8a4b; }
+#view-start-prepare .tab-btn:focus-visible { outline:2px solid #ffaf7b; outline-offset:2px; }
+#view-start-prepare .s1-card, #view-start-prepare .s1-panel-guide, #view-start-prepare .worksheet, #view-start-prepare .s1-nav { border-color:#3d4548; border-radius:12px; background:#171b1d; }
+#view-start-prepare .s1-card { padding:21px; }
+#view-start-prepare .s1-card h3 { color:#fff; font-size:14px; }
+#view-start-prepare .s1-panel-guide.active { padding:28px 30px; }
+#view-start-prepare .s1-guide-intro { margin-bottom:25px; padding-bottom:22px; border-bottom:1px solid #3c4447; }
+#view-start-prepare .s1-guide-intro h2 { margin-bottom:9px; color:#fff; font-size:21px; letter-spacing:-.04em; }
+#view-start-prepare .s1-guide-intro p { color:#c8d1d1; font-size:13px; }
+#view-start-prepare .s1-guide-intro strong { color:#fff; }
+#view-start-prepare .s1-section { gap:17px; padding-bottom:24px; margin-bottom:24px; }
+#view-start-prepare .s1-num { display:inline-grid; place-items:center; flex:0 0 33px; width:33px; height:33px; padding:0; border:1px solid #62412c; border-radius:8px; background:#39291f; color:#ffbf92; font-size:11px; }
+#view-start-prepare .s1-section h3 { margin:4px 0 8px; color:#fff; font-size:16px; }
+#view-start-prepare .s1-summary, #view-start-prepare .s1-note { color:#c8d0d0; }
+#view-start-prepare .s1-q li { color:#e2e6e6; }
+#view-start-prepare .s1-q em { color:#b9c3c4; }
+#view-start-prepare .s1-more summary { color:#ffba8f; }
+#view-start-prepare .s1-more-body { border:1px solid #3a4345; border-radius:8px; }
+#view-start-prepare .s1-more-body p { color:#d0d7d7; }
+#view-start-prepare .s1-quote { color:#e7ecec; }
+#view-start-prepare .s1-budget > div { border:1px solid #363e40; border-radius:7px; }
+#view-start-prepare .s1-budget dd { color:#bec9c9; }
+#view-start-prepare .s1-industry { border-radius:10px; }
+#view-start-prepare .s1-industry-head h3 { color:#fff; }
+#view-start-prepare .s1-industry-head p { color:#c4cdce; }
+#view-start-prepare .s1-industry .acc-head .at { color:#f0f3f3; }
+#view-start-prepare .s1-industry .acc-item.open .acc-head .at, #view-start-prepare .s1-industry .acc-item.open .acc-chev { color:#ffb98d; }
+#view-start-prepare .s1-industry .acc-body-inner { background:#202527; }
+#view-start-prepare .s1-industry .acc-body-inner p { color:#d6dcdc; }
+#view-start-prepare .s1-miss, #view-start-prepare .s1-guest { border-color:#695239; border-radius:9px; background:#2d251d; }
+#view-start-prepare .s1-miss h3 { color:#ffd093; }
+#view-start-prepare .s1-miss li { color:#e8dfd1; }
+#view-start-prepare .s1-miss li::before { color:#ffb46d; }
+#view-start-prepare .s1-guest, #view-start-prepare .s1-guest-body p { color:#f5d9b5; }
+#view-start-prepare .s1-guest-btn { border-color:#cf8c5e; border-radius:7px; color:#ffd3ac; }
+#view-start-prepare .s1-guest-btn:hover { background:#493122; }
+#view-start-prepare .s1-btn { border-radius:8px; }
+#view-start-prepare .s1-btn-primary, #view-start-prepare .s1:not(.is-complete) .s1-nav-next { background:#ff8a4b; color:#26170e; font-weight:800; }
+#view-start-prepare .s1-btn-primary:hover, #view-start-prepare .s1:not(.is-complete) .s1-nav-next:hover { background:#ffaf7b; }
+#view-start-prepare .s1-btn-ghost { color:#d5dcdc; }
+#view-start-prepare .s1-btn-ghost:hover { color:#ffbf95; background:#28201d; }
+
+#view-start-prepare .worksheet { padding:24px 28px 8px; }
+#view-start-prepare .s1-ws-head h2 { color:#fff; font-size:20px; }
+#view-start-prepare .s1-ws-head p, #view-start-prepare .s1-ws-help, #view-start-prepare .s1-ws-note { color:#bdc8c8; }
+#view-start-prepare .s1-ws-body label { color:#f5f7f7; }
+#view-start-prepare .s1-ws-body label small { color:#b8c3c4; }
+#view-start-prepare .s1-ws-mark, #view-start-prepare .s1-progress-check { border-color:#6b7678; color:#d3dada; }
+#view-start-prepare .s1-ws-item.done .s1-ws-mark, #view-start-prepare .s1-progress-items li.done .s1-progress-check { color:#28170f; }
+#view-start-prepare .worksheet-input { border-color:#50595b; border-radius:8px; background:#111618; color:#f6f8f8; }
+#view-start-prepare .worksheet-input::placeholder { color:#a7b3b5; opacity:1; }
+#view-start-prepare .worksheet-input:focus { border-color:#ffad77; box-shadow:0 0 0 3px rgba(255,138,75,.14); }
+#view-start-prepare .s1-decide li { color:#e2e7e7; }
+#view-start-prepare .s1-decide li span { color:#ffb98d; opacity:1; }
+#view-start-prepare .s1-side-hint, #view-start-prepare .s1-progress-items li, #view-start-prepare .s1-tips-list li { color:#bfc9ca; }
+#view-start-prepare .s1-progress-badge, #view-start-prepare .s1-progress-done { border-radius:15px; }
+#view-start-prepare .s1-progress-done, #view-start-prepare .s1-nav-status.done { border-color:#5a4231; }
+#view-start-prepare .s1-progress-bar { height:7px; border-radius:7px; }
+#view-start-prepare .s1-progress-check svg, #view-start-prepare .s1-ws-mark svg { color:#28170f; }
+#view-start-prepare .s1-tips-icon { border-radius:8px; }
+#view-start-prepare .s1-help { border:1px solid #61432f; border-radius:11px; background:#29211d; color:#f6f7f7; }
+#view-start-prepare .s1-help h3 { color:#fff; }
+#view-start-prepare .s1-help p { color:#cbd2d2; }
+#view-start-prepare .s1-help .desk-help-btn { border-radius:8px; border-color:#65452f; background:#39291f; color:#ffc399; }
+#view-start-prepare .s1-nav-status { border-radius:8px; color:#d0d8d8; }
+#view-start-prepare .s1-nav-status b { color:#ffbd92; }
+#view-start-prepare .s1-nav-status.done { color:#ffbd92; }
+#view-start-prepare .ask-inline { color:#bcc7c8; }
+#view-start-prepare .ask-inline a { color:#ffbc91; }
+
+@media (max-width:1099px) {
+  #view-start-prepare .s1-head { min-height:241px; }
+}
+@media (max-width:680px) {
+  #view-start-prepare .content { padding:20px 16px 42px; }
+  #view-start-prepare .s1-head { min-height:365px; padding:23px 23px 190px; }
+  #view-start-prepare .s1-head > :not(.s1-hero-art) { max-width:100%; }
+  #view-start-prepare .s1-head h1 { font-size:30px; }
+  #view-start-prepare .s1-lead { font-size:12px; }
+  #view-start-prepare .s1-hero-art { right:-6px; bottom:-8px; width:70%; height:170px; }
+  #view-start-prepare .s1-panel-guide.active { padding:18px; }
+  #view-start-prepare .s1-guide-intro h2 { font-size:18px; }
+  #view-start-prepare .s1-section { gap:10px; }
+  #view-start-prepare .s1-num { flex-basis:29px; width:29px; height:29px; }
+  #view-start-prepare .worksheet { padding:18px 17px 6px; }
+  #view-start-prepare .s1-nav { padding:18px; }
+}

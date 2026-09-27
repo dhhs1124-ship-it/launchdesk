@@ -843,7 +843,7 @@ test('FAQS: matchesFaqQuery는 토큰 AND 검색이고 질문 · 답변 · 태�
 });
 
 test('FAQS: RESOURCES 카드 개수 · 검색에는 FAQ가 전혀 섞이지 않는다', () => {
-  assert.equal(data.RESOURCES.length, 34, 'RESOURCES 카드 수가 바뀜(FAQ가 섞였을 가능성)');
+  assert.equal(data.RESOURCES.length, 37, 'RESOURCES 카드 수가 바뀜(FAQ가 섞였을 가능성)');
   data.RESOURCES.forEach((r) => assert.ok(!data.FAQS.some((f) => f.id === r.slug), 'FAQ id가 RESOURCES.slug와 겹침: ' + r.slug));
   // matchesQuery(RESOURCES용)는 FAQS 텍스트를 전혀 보지 않는다 — FAQ 전용 문구로 검색해도
   // 그 문구가 우연히 다른 자료에도 있지 않은 한 RESOURCES에서는 찾아지지 않아야 한다.
