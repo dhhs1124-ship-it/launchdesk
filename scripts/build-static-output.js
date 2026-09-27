@@ -30,6 +30,7 @@ function staticFilesFor(source){
 }
 const STATIC_FILES = staticFilesFor(html);
 const STATIC_DIRS = ['assets'];
+const { buildSeoPages } = require('./build-seo-pages.js');
 
 if(require.main === module){
   fs.rmSync(OUT, { recursive: true, force: true });
@@ -42,6 +43,8 @@ if(require.main === module){
     fs.cpSync(path.join(ROOT, dir), path.join(OUT, dir), { recursive: true });
   }
 
-  console.log(`OK: 파일 ${STATIC_FILES.length}개 + 디렉터리 ${STATIC_DIRS.length}개를 ${path.relative(ROOT, OUT)}/ 로 복사했습니다.`);
+  const seoPageCount = buildSeoPages(OUT);
+
+  console.log(`OK: 파일 ${STATIC_FILES.length}개 + 디렉터리 ${STATIC_DIRS.length}개 + 검색 페이지 ${seoPageCount}개를 ${path.relative(ROOT, OUT)}/ 로 복사했습니다.`);
 }
 module.exports = { staticFilesFor };
