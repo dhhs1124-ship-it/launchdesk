@@ -100,7 +100,7 @@
   var pendingLegacyCategory = null; // STEP02~07 딥링크가 남겨둔 옛 카테고리(변환 전)
 
   function currentPath(){
-    return location.hash.replace(/^#/, '') || '/';
+    return location.hash.replace(/^#/, '') || document.body.getAttribute('data-route') || '/';
   }
   function isResourcesRoute(path){
     return path === '/resources' || path.indexOf('/resources/') === 0;
@@ -550,8 +550,12 @@
     gaEvent('resource_open', DATA.buildOpenPayload(slug, resource.type, resource.category));
   }
 
-  if(panelClose) panelClose.addEventListener('click', function(){ location.hash = '/resources'; });
-  if(panelBack) panelBack.addEventListener('click', function(){ location.hash = '/resources'; });
+  function returnToResourceIndex(){
+    if(document.body.getAttribute('data-route')) location.assign('/#/resources');
+    else location.hash = '/resources';
+  }
+  if(panelClose) panelClose.addEventListener('click', returnToResourceIndex);
+  if(panelBack) panelBack.addEventListener('click', returnToResourceIndex);
 
   // 체크리스트 항목 클릭 → 시각적 체크 토글만(저장하지 않음 — 새로고침하면
   // 초기화된다. 서버/localStorage 저장은 이번 범위 밖).

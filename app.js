@@ -79,7 +79,7 @@
 
   function currentPath(){
     var h = location.hash.replace(/^#/, '');
-    return h || '/';
+    return h || document.body.getAttribute('data-route') || '/';
   }
 
   // TITLES엔 /resources/<slug> 형태의 가이드 하나하나를 등록하지 않으므로(위
@@ -322,7 +322,16 @@
     }
   }
 
-  window.addEventListener('hashchange', render);
+  window.addEventListener('hashchange', function(){
+    // 검색용 실제 경로에서 옛 해시 링크를 누르면 루트 앱 URL로 이동한다.
+    // 그렇지 않으면 /guides/slug/#/tools처럼 가이드 canonical 아래에
+    // 다른 화면이 표시될 수 있다. 인증 콜백 해시는 절대 여기서 옮기지 않는다.
+    if(document.body.getAttribute('data-route') && location.hash.indexOf('#/') === 0){
+      location.replace('/' + location.hash);
+      return;
+    }
+    render();
+  });
 
   /* mobile sidebar drawer */
   var navToggle = document.getElementById('navToggle');

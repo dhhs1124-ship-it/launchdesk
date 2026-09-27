@@ -757,7 +757,7 @@
        화면 자체라 탭 활성화가 필요 없다 — hashchange 시 화면 전환·스크롤은
        app.js render()가 항상 처리하므로, 이미 /tools에 있을 때(hashchange가
        일어나지 않는 경우)만 이 자리에서 스크롤을 올려준다. */
-    function onToolsRoute(){ return (location.hash.replace(/^#/, '') || '/') === '/tools'; }
+    function onToolsRoute(){ return (location.hash.replace(/^#/, '') || document.body.getAttribute('data-route') || '/') === '/tools'; }
     document.addEventListener('click', function(e){
       var a = e.target.closest('a[data-tools-target="calc"]');
       if(a && onToolsRoute()) window.scrollTo(0, 0);

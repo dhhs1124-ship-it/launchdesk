@@ -14,11 +14,20 @@ test('each public search page has distinct metadata, useful content and a discov
     assert.ok(home.includes(`href="${page.route}"`), `missing homepage link to ${page.route}`);
     assert.ok(sitemap.includes(`https://launchdesk.co.kr${page.route}`), `missing sitemap entry for ${page.route}`);
     assert.ok(html.includes(`<link rel="canonical" href="https://launchdesk.co.kr${page.route}">`));
-    assert.ok(html.includes(`<h1>${page.heading}</h1>`));
-    assert.ok(html.includes(data.getGuide(page.slug).intro));
-    assert.ok(html.includes(`href="${page.actionHref}"`));
+    assert.ok(html.includes('<base href="/">'), 'internal assets and links resolve from site root');
+    assert.ok(html.includes(`data-route="${page.appRoute}"`));
     assert.ok(html.includes('<meta name="description"'));
     assert.ok(!html.includes('name="robots" content="noindex"'));
+    if(page.appRoute === '/tools'){
+      assert.ok(html.includes('<section class="view" id="view-tools">'));
+      assert.ok(html.includes('id="toolsSaveCalc"'));
+      assert.ok(html.includes('<h1>마진 계산기</h1>'));
+    } else {
+      assert.ok(html.includes('<section class="view res-reading-view" id="view-resources">'));
+      assert.ok(html.includes('<div class="res-panel" id="resGuidePanel">'));
+      assert.ok(html.includes(data.getGuide(page.slug).intro));
+      assert.ok(html.includes('<div id="resIndex" hidden>'));
+    }
   }
   assert.equal(new Set(PAGES.map(page => page.route)).size, PAGES.length);
 });
