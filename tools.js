@@ -44,6 +44,9 @@
   var MC = window.launchdeskMarginCalc;
   var mcRoot = document.querySelector('.tools-pane[data-tools-tab="calc"]');
   var mcEls = null;
+  // 성공적인 계산 결과를 본 방문자 수: 입력마다 mcRender()가 실행되므로
+  // 페이지 로드당 1회만 기록한다. 예시 모드는 실제 사용자 계산에서 제외.
+  var mcResultViewTracked = false;
   var mcState = {
     mode: 'simple',      // 'simple' | 'detailed' — 표시 모드일 뿐, 입력값·계산에는 영향 없음
     adMode: 'none',       // 'none' | 'rate' | 'amount' — margin-calc.js에 그대로 넘어가는 값
@@ -368,6 +371,14 @@
     byId('mcResultWrap').hidden = !calc.ok;
 
     if(calc.ok){
+      if(mcState.touched && mcState.exampleKey === null && !mcResultViewTracked &&
+         window.launchdeskAnalyticsConsentControl &&
+         window.launchdeskAnalyticsConsentControl.getStatus() === 'granted' &&
+         typeof gtag === 'function'){
+        // 금액 · 원가 · 수수료 등 사업 정보는 분석으로 보내지 않는다.
+        gtag('event', 'margin_calculator_result_view', { tool_name: 'tools_margin_calculator' });
+        mcResultViewTracked = true;
+      }
       var r = calc.result;
       // 가장 중요한 결과 먼저 — "약 ○○원이 남아요" / 적자면 그 문장으로 대체
       var heroVal = byId('mcResPostAdHero');

@@ -58,6 +58,13 @@
     if(hash.indexOf('#/') === 0){
       return hash.replace(/^#/, '') || '/';
     }
+    if(hash) return '/'; // 인증 콜백 등 비라우트 해시는 깨끗한 주소에서도 제외
+    // 검색 가능한 실제 경로의 HTML에는 빌드가 허용된 앱 라우트만 넣는다.
+    // 경로 문자열을 그대로 보내지 않고 세 가지만 고정 허용하여 개인정보가
+    // 포함된 임의 경로나 인증 콜백 주소가 DB로 흘러가지 않게 한다.
+    var appRoute = document.body && document.body.getAttribute('data-route');
+    if(appRoute === '/tools' || appRoute === '/resources/marketplace-vs-own' ||
+       appRoute === '/resources/supplier-check-checklist') return appRoute;
     return '/';
   }
 
