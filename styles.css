@@ -904,16 +904,18 @@
      하단 고정 바 — 모달이 아니라 페이지 조작을 막지 않는 region이다.
      z-index는 모달(110)보다 위(130)에 둬서 다른 화면 어디서든 계속 보이고
      조작 가능하게 한다. */
-  .consent-banner{position:fixed; left:0; right:0; bottom:0; z-index:130; background:var(--surface); border-top:1px solid var(--border-strong); padding:1rem 1.4rem; display:flex; align-items:center; justify-content:space-between; gap:1.2rem 1.6rem; flex-wrap:wrap;}
+  .consent-banner{position:fixed; left:0; right:0; bottom:0; z-index:130; background:var(--surface); border-top:1px solid var(--border-strong); padding:1rem 1.4rem; display:flex; align-items:center; justify-content:space-between; gap:1.2rem 1.6rem; flex-wrap:wrap; max-height:85vh; overflow-y:auto; overscroll-behavior:contain;}
   .consent-banner[hidden]{display:none;}
   .consent-banner-text{flex:1 1 320px; min-width:220px;}
   .consent-banner-text h2{font-size:.95rem; font-weight:700; margin:0 0 .3rem; color:var(--ink);}
   .consent-banner-text p{font-size:.82rem; color:var(--ink-soft); margin:0 0 .35rem; line-height:1.6;}
   .consent-banner-status{font-weight:600; color:var(--ink);}
-  /* 분석·광고 측정 각각 선택(meta-pixel.js가 ENABLED일 때만 표시) */
+  /* 분석·광고 측정·방문 행동 분석 각각 선택(meta-pixel.js가 ENABLED일 때만 표시).
+     항목이 셋이라 작은 화면에서 버튼이 밀려나지 않게 배너 자체를 화면의 85%까지만 키우고 스크롤한다. */
   .consent-choices{border:0; margin:.35rem 0 .45rem; padding:0; display:grid; gap:.5rem; min-width:0;}
   .consent-choices[hidden]{display:none;}
   .consent-choice{display:flex; align-items:flex-start; gap:.6rem; cursor:pointer; min-width:0;}
+  .consent-choice[hidden]{display:none;} /* 긴급 중단으로 Meta·Clarity 항목을 숨길 때 display:flex가 hidden을 덮지 않게 */
   .consent-choice input{flex:0 0 auto; width:20px; height:20px; margin:.1rem 0 0; accent-color:var(--ink);}
   .consent-choice span{display:flex; flex-direction:column; min-width:0; word-break:keep-all;}
   .consent-choice b{font-size:.85rem; color:var(--ink); line-height:1.45;}
@@ -923,13 +925,14 @@
   .consent-banner-actions{display:flex; gap:.6rem; flex:0 0 auto; flex-wrap:wrap;}
   .consent-banner-actions .btn{min-height:44px;}
   @media (max-width:480px){
-    .consent-banner{flex-direction:column; align-items:stretch; padding:1rem;}
+    .consent-banner{flex-direction:column; flex-wrap:nowrap; align-items:stretch; padding:1rem;}
     /* P3: flex-direction이 column이 되면 .consent-banner-text의 원래
        flex:1 1 320px(가로 기준 flex-basis)가 세로축(main axis)에 그대로
        적용돼 실제 글자 높이와 무관하게 320px 높이 + 빈 공간을 강제로
        만들었다 — 세로 레이아웃에서는 flex-basis를 콘텐츠 높이에 맡긴다. */
     .consent-banner-text{flex:1 1 auto; min-width:0;}
-    .consent-banner-actions{width:100%;}
+    /* 배너가 화면 85%를 넘겨 스크롤될 때도 버튼은 항상 보이도록 아래에 붙인다. */
+    .consent-banner-actions{width:100%; position:sticky; bottom:0; background:var(--surface); padding-top:.6rem;}
     .consent-banner-actions .btn{flex:1 1 auto; width:100%; justify-content:center;}
   }
 

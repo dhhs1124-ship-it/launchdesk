@@ -85,14 +85,14 @@
       .select('id')
       .eq('user_id', userId)
       .eq('terms_version', core.TERMS_VERSION)
-      .eq('privacy_version', core.PRIVACY_VERSION)
-      .maybeSingle()
+      .in('privacy_version', core.ACCEPTED_PRIVACY_VERSIONS)
+      .limit(1)
       .then(function(res){
         if(res.error){
           console.warn('[launchdesk] 동의 이력 확인 실패:', res.error.message);
           return { ok: false, dbError: true };
         }
-        return { ok: !!res.data };
+        return { ok: !!(res.data && res.data.length) };
       })
       .catch(function(err){
         console.warn('[launchdesk] 동의 이력 확인 중 오류:', err && err.message);

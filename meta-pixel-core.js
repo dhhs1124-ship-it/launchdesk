@@ -8,8 +8,9 @@
    한쪽을 허용/거부해도 다른 쪽은 바뀌지 않는다.
 
    ENABLED: 개인정보처리방침 v1.4(2026년 9월 25일 시행, Meta 픽셀 선택 동의 반영)와
-   함께 true로 켰다. false로 바꾸면 안내창은 GA4 전용으로 돌아가고, 저장값이
-   granted여도 스크립트를 로드하지 않는다(긴급 중단 스위치).
+   함께 true로 켰다. false로 바꾸면 Meta 항목이 빠지고(안내창은 GA4 전용, Clarity가 켜져 있으면
+   clarity-consent.js가 GA4 + Clarity 창으로 연다), 저장값이 granted여도 스크립트를
+   로드하지 않는다(긴급 중단 스위치 — Clarity와는 서로 독립).
    공개 절차는 docs/meta-pixel-rollout.md 참고. */
 (function(root, factory){
   var api = factory();

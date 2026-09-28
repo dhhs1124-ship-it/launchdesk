@@ -13,7 +13,8 @@
      launchdeskAnalyticsConsentControl), 이 파일은 Meta 쪽만 저장·적용한다.
    - meta-pixel-core.js의 ENABLED가 false면 아무 것도 하지 않는다 — 안내창은
      기존 GA4 전용 모습 그대로다(개인정보처리방침 게시 전 안전장치,
-     docs/meta-pixel-rollout.md).
+     docs/meta-pixel-rollout.md). 다만 Clarity가 켜져 있으면 clarity-consent.js가 같은 창을
+     GA4 + Clarity 두 항목으로 직접 연다(Meta 긴급 중단이 Clarity를 끄지 않는다).
 
    PageView:
    - 해시 라우팅이라 실제 페이지 로드가 없으므로, 첫 화면 1회 + hashchange마다

@@ -22,7 +22,15 @@
   'use strict';
 
   var TERMS_VERSION = '2026-09-18';   // 이용약관 시행일
-  var PRIVACY_VERSION = 'v1.4';       // 개인정보처리방침 버전(2026-09-25 시행 — Meta 픽셀 광고 성과 측정(선택 동의) 반영. 이전: v1.3(2026-09-24))
+  var PRIVACY_VERSION = 'v1.5';       // 게시 중인 개인정보처리방침 버전(2026-09-28 시행 — 방문 행동 분석(Microsoft Clarity, 선택 동의) 반영. 이전: v1.4(2026-09-25)). 새 동의 이력에는 이 값을 기록한다.
+  // 필수 동의를 다시 받지 않아도 되는 방침 버전. v1.5는 안내창에서 따로 동의받는 선택 항목(Clarity)만
+  // 더해 필수 수집 항목·목적이 v1.4와 같으므로, v1.4에 동의한 회원은 재동의 없이 통과한다.
+  // 필수 처리 범위가 바뀌는 개정에서는 이 목록을 새 버전 하나로 다시 시작한다.
+  var ACCEPTED_PRIVACY_VERSIONS = ['v1.4', 'v1.5'];
+  // 세팅 대행 문의 RPC(submit_setup_inquiry)의 서버 상수(supabase/migrations 최신 setup_inquiries_privacy_*.sql)와
+  // 같아야 하는 값. RPC는 이 값과 정확히 같을 때만 접수하고 자기 상수만 저장한다. 필수 처리 범위가
+  // 그대로인 v1.5에서는 마이그레이션을 새로 만들지 않았으므로 v1.4다(docs/clarity-rollout.md).
+  var SETUP_INQUIRY_PRIVACY_VERSION = 'v1.4';
   var PENDING_KEY = 'ld-pending-policy-consent';
   // OAuth 왕복(구글 동의 화면 포함)이 비정상적으로 오래 걸리는 경우까지
   // 감안한 여유값. 이보다 오래된 pending은 다른 로그인 시도의 잔재일 수
@@ -71,6 +79,8 @@
   return {
     TERMS_VERSION: TERMS_VERSION,
     PRIVACY_VERSION: PRIVACY_VERSION,
+    ACCEPTED_PRIVACY_VERSIONS: ACCEPTED_PRIVACY_VERSIONS,
+    SETUP_INQUIRY_PRIVACY_VERSION: SETUP_INQUIRY_PRIVACY_VERSION,
     PENDING_KEY: PENDING_KEY,
     PENDING_TTL_MS: PENDING_TTL_MS,
     SOURCES: SOURCES,

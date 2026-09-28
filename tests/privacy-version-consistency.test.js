@@ -1,4 +1,4 @@
-/* 개인정보처리방침 v1.4(2026-09-25 시행) — 버전 드리프트 방지 테스트. 실행: node --test
+/* 개인정보처리방침 v1.5(2026-09-28 시행) — 버전 드리프트 방지 테스트. 실행: node --test
    (Node 18+ 내장 test runner, 별도 패키지 없음)
 
    여기서 확인하는 것은 딱 하나 — "버전을 나타내는 여러 곳이 서로 어긋나지
@@ -28,36 +28,39 @@ const V1_2_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260923170
 const V1_3_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260924160000_setup_inquiries_privacy_v1_3.sql');
 const V1_4_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260925100000_setup_inquiries_privacy_v1_4.sql');
 
-test('policy-consent-core.js: PRIVACY_VERSION은 v1.4', () => {
-  assert.equal(core.PRIVACY_VERSION, 'v1.4');
+test('policy-consent-core.js: PRIVACY_VERSION은 v1.5', () => {
+  assert.equal(core.PRIVACY_VERSION, 'v1.5');
 });
 
 test('policy-consent-core.js: TERMS_VERSION은 그대로(약관 본문을 고치지 않았으므로)', () => {
   assert.equal(core.TERMS_VERSION, '2026-09-18');
 });
 
-test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.4 · 2026년 9월 25일(실제 배포일)로 코드 상수와 일치하고, 세 곳의 날짜가 같다', () => {
+test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.5 · 2026년 9월 28일(실제 배포일)로 코드 상수와 일치하고, 세 곳의 날짜가 같다', () => {
   const has = (s) => assert.ok(PRIVACY_HTML.includes(s), '방침에서 찾지 못함: ' + s);
-  has('시행일 2026년 9월 25일 · v1.4 · 런치데스크');
-  has('<li>버전: v1.4(이전 버전: v1.3, 2026년 9월 24일 시행)</li>');
-  has('<li>시행일: 2026년 9월 25일</li>');
-  has('v1.3 → v1.4 주요 변경 사항(2026년 9월 25일 시행)');
+  has('시행일 2026년 9월 28일 · v1.5 · 런치데스크');
+  has('<li>버전: v1.5(이전 버전: v1.4, 2026년 9월 25일 시행)</li>');
+  has('<li>시행일: 2026년 9월 28일</li>');
+  has('v1.4 → v1.5 주요 변경 사항(2026년 9월 28일 시행)');
   // 헤더 · 14번 · 15번 세 곳
-  assert.equal(PRIVACY_HTML.split('2026년 9월 25일').length - 1, 3);
+  assert.equal(PRIVACY_HTML.split('2026년 9월 28일').length - 1, 3);
   assert.ok(!PRIVACY_HTML.includes('[게시 예정일]'), '게시일 자리표시자가 남아 있으면 안 된다(주석 포함)');
   assert.ok(!PRIVACY_HTML.includes('[공개 전 확정 필요'), '확정 필요 표시가 남아 있으면 안 된다(주석 포함)');
 });
 
-test('개인정보처리방침 화면: 이전 버전 이력(v1.0→v1.1, v1.1→v1.2, v1.2→v1.3)과 날짜는 그대로다', () => {
+test('개인정보처리방침 화면: 이전 버전 이력(v1.0→v1.1, v1.1→v1.2, v1.2→v1.3, v1.3→v1.4)과 날짜는 그대로다', () => {
   const has = (s) => assert.ok(PRIVACY_HTML.includes(s), '방침에서 찾지 못함: ' + s);
   has('v1.2 → v1.3 주요 변경 사항(2026년 9월 24일 시행)');
   has('v1.1 → v1.2 주요 변경 사항(2026년 9월 24일 시행)');
   has('v1.0 → v1.1 주요 변경 사항(2026년 9월 22일 시행)');
-  // 14번 v1.2→v1.3 · 14번 v1.1→v1.2 · 15번 이전 버전(v1.3) 세 곳
-  assert.equal(PRIVACY_HTML.split('2026년 9월 24일').length - 1, 3);
+  has('v1.3 → v1.4 주요 변경 사항(2026년 9월 25일 시행)');
+  // 14번 v1.2→v1.3 · 14번 v1.1→v1.2 두 곳
+  assert.equal(PRIVACY_HTML.split('2026년 9월 24일').length - 1, 2);
+  // 14번 v1.3→v1.4 · 15번 이전 버전(v1.4) 두 곳
+  assert.equal(PRIVACY_HTML.split('2026년 9월 25일').length - 1, 2);
 });
 
-test('v1.4 게시 상태에서는 배포 검사(predeploy gate)가 통과한다', () => {
+test('v1.5 게시 상태에서는 배포 검사(predeploy gate)가 통과한다', () => {
   const { spawnSync } = require('node:child_process');
   const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'predeploy-privacy-v1_2-gate.js')], { encoding: 'utf8' });
   assert.equal(r.status, 0, '배포 검사 실패: ' + r.stderr);
@@ -159,11 +162,11 @@ test('이용약관 화면: v1.0 · 2026년 9월 18일 그대로(약관 본문을
   assert.match(TERMS_HTML, /시행일 2026년 9월 18일 · v1\.0 · 운영자: LaunchDesk/);
 });
 
-test('세팅 대행 문의 RPC의 서버 동의 버전 상수(가장 최근 마이그레이션 v1.4)가 프런트 PRIVACY_VERSION과 일치', () => {
+test('세팅 대행 문의 RPC의 서버 동의 버전 상수(가장 최근 마이그레이션 v1.4)가 프런트 SETUP_INQUIRY_PRIVACY_VERSION과 일치', () => {
   const sql = fs.readFileSync(V1_4_MIGRATION_PATH, 'utf8');
   const m = sql.match(/v_consent_version\s+constant\s+text\s*:=\s*'([^']+)'/);
   assert.ok(m, 'v_consent_version 상수를 마이그레이션 파일에서 찾지 못함');
-  assert.equal(m[1], core.PRIVACY_VERSION, 'RPC가 저장하는 동의 버전과 policy-consent-core.js의 PRIVACY_VERSION이 어긋납니다');
+  assert.equal(m[1], core.SETUP_INQUIRY_PRIVACY_VERSION, 'RPC가 저장하는 동의 버전과 policy-consent-core.js의 SETUP_INQUIRY_PRIVACY_VERSION이 어긋납니다');
 });
 
 test('과거 setup_inquiries 마이그레이션 파일 자체는 수정하지 않았다(이미 원격에 적용됐으므로)', () => {
@@ -238,9 +241,9 @@ test('v1.2 GRANT/REVOKE는 새 7인자 시그니처를 대상으로 하고, anon
   assert.ok(v12.includes(`grant execute on function public.submit_setup_inquiry${newSig} to anon, authenticated;`), '새 시그니처 대상 GRANT 문이 없거나 anon/authenticated 권한이 달라졌다');
 });
 
-test('setup.js는 RPC 호출 시 p_expected_privacy_version으로 PRIVACY_VERSION을 보내고, 불일치 오류를 사용자에게 안내한다', () => {
+test('setup.js는 RPC 호출 시 p_expected_privacy_version으로 SETUP_INQUIRY_PRIVACY_VERSION을 보내고, 불일치 오류를 사용자에게 안내한다', () => {
   const setupJs = fs.readFileSync(path.join(ROOT, 'setup.js'), 'utf8');
-  assert.match(setupJs, /p_expected_privacy_version:\s*setupPolicyCore\s*\?\s*setupPolicyCore\.PRIVACY_VERSION\s*:\s*null/, 'setup.js가 RPC 호출에 p_expected_privacy_version을 보내지 않는다(버전 불일치 차단이 동작하지 않음)');
+  assert.match(setupJs, /p_expected_privacy_version:\s*setupPolicyCore\s*\?\s*setupPolicyCore\.SETUP_INQUIRY_PRIVACY_VERSION\s*:\s*null/, 'setup.js가 RPC 호출에 p_expected_privacy_version을 보내지 않는다(버전 불일치 차단이 동작하지 않음)');
   assert.match(setupJs, /PRIVACY_VERSION_MISMATCH/, "setup.js가 PRIVACY_VERSION_MISMATCH 오류를 친절한 문구로 안내하지 않는다");
 });
 
@@ -292,6 +295,29 @@ test('v1.4 마이그레이션: 같은 7인자 시그니처를 CREATE OR REPLACE�
   const tail = (s) => s.slice(s.indexOf('$$;')).replace(/--.*$/gm, '').replace(/\s+/g, ' ');
   assert.equal(tail(v14), tail(v13), '권한(REVOKE/GRANT) 부분이 v1.3과 같아야 한다');
   assert.match(v13, /v_consent_version constant text := 'v1\.3';/);
+});
+
+test('v1.5는 세팅 대행 RPC 마이그레이션을 만들지 않는다 — 필수 처리 범위가 v1.4와 같고, 새 마이그레이션은 접수 라벨만 바꿀 뿐 기존 기록은 바꾸지 않는다', () => {
+  const files = fs.readdirSync(SETUP_INQUIRY_MIGRATIONS_DIR).filter((f) => /^\d+_setup_inquiries_privacy_v[\d_]+\.sql$/.test(f)).sort();
+  assert.equal(files[files.length - 1], '20260925100000_setup_inquiries_privacy_v1_4.sql', '가장 최근 세팅 대행 마이그레이션은 v1.4다(v1.5용을 만들었다면 SETUP_INQUIRY_PRIVACY_VERSION과 setup.js도 함께 올려야 한다)');
+  assert.equal(core.SETUP_INQUIRY_PRIVACY_VERSION, 'v1.4');
+  assert.notEqual(core.SETUP_INQUIRY_PRIVACY_VERSION, core.PRIVACY_VERSION, '게시 방침(v1.5)과 RPC 상수(v1.4)가 다른 것은 의도한 상태다 — 같아지면 RPC 마이그레이션이 필요하다는 뜻');
+  // 마이그레이션은 함수 교체뿐 — 저장된 신청 행의 동의 버전을 고치는 UPDATE는 어느 버전에도 없다
+  files.forEach((f) => {
+    const sql = fs.readFileSync(path.join(SETUP_INQUIRY_MIGRATIONS_DIR, f), 'utf8').replace(/--.*$/gm, '');
+    assert.doesNotMatch(sql, /update\s+public\.setup_inquiries/i, f + ': 기존 신청 행의 동의 기록을 소급 수정하면 안 된다');
+  });
+});
+
+test('v1.5 방침 14번: 필수 동의 재수집을 요구하지 않는다고 적고, 코드(ACCEPTED_PRIVACY_VERSIONS)와 일치한다', () => {
+  const para = PRIVACY_HTML.match(/<p><strong>v1\.4 → v1\.5 주요 변경 사항\(2026년 9월 28일 시행\)<\/strong>[\s\S]*?<\/p>/);
+  assert.ok(para, '14번 v1.4 → v1.5 문단을 찾지 못함');
+  assert.match(para[0], /이 개정은 안내창에서 별도로 동의받는 선택 항목만 더한 것이라 필수 수집 항목·목적이 그대로이므로, v1\.4에 동의한 회원에게 재동의를 요구하지 않습니다/);
+  assert.doesNotMatch(para[0], /재동의 절차를 거치게 됩니다/);
+  assert.deepEqual(Array.from(core.ACCEPTED_PRIVACY_VERSIONS), ['v1.4', 'v1.5']);
+  assert.ok(core.ACCEPTED_PRIVACY_VERSIONS.includes(core.PRIVACY_VERSION), '게시 중인 버전도 통과해야 한다');
+  // 이전 개정(v1.0~v1.3 → 다음 버전)의 재동의 안내는 그대로 남는다
+  assert.equal((PRIVACY_HTML.match(/재동의 절차를 거치게 됩니다/g) || []).length, 4);
 });
 
 test('확인되지 않은 사업자등록번호를 임의로 추가하지 않았다(사업자등록 전이므로)', () => {

@@ -256,7 +256,7 @@
         // 다르면 거부하는 데만 쓰는 echo-back 값. 코어 모듈이 어떤 이유로든
         // 로드되지 않았다면 null을 보내고, RPC는 null도 불일치로 취급해
         // 거부한다(안전한 쪽으로 실패).
-        p_expected_privacy_version: setupPolicyCore ? setupPolicyCore.PRIVACY_VERSION : null
+        p_expected_privacy_version: setupPolicyCore ? setupPolicyCore.SETUP_INQUIRY_PRIVACY_VERSION : null
       }).then(function(res){
         if(res.error){
           console.warn('[launchdesk] 세팅 대행 신청 접수 실패:', res.error.message);

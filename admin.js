@@ -552,6 +552,7 @@
 
     var overlay = document.createElement('div');
     overlay.className = 'modal open';
+    overlay.setAttribute('data-clarity-mask', 'true'); // Clarity 녹화에서 이름·연락처 등을 가린다
     overlay.id = 'adminInqDetailModal';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
@@ -835,6 +836,7 @@
 
     var overlay = document.createElement('div');
     overlay.className = 'modal open';
+    overlay.setAttribute('data-clarity-mask', 'true'); // Clarity 녹화에서 이름·연락처 등을 가린다
     overlay.id = 'adminWhEditModal';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
@@ -1084,6 +1086,7 @@
 
     var overlay = document.createElement('div');
     overlay.className = 'modal open';
+    overlay.setAttribute('data-clarity-mask', 'true'); // Clarity 녹화에서 이름·연락처 등을 가린다
     overlay.id = 'adminSetupInqDetailModal';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
@@ -1359,6 +1362,7 @@
 
     var overlay = document.createElement('div');
     overlay.className = 'modal open';
+    overlay.setAttribute('data-clarity-mask', 'true'); // Clarity 녹화에서 이름·연락처 등을 가린다
     overlay.id = 'adminMemberDetailModal';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
@@ -1706,6 +1710,7 @@
 
     var overlay = document.createElement('div');
     overlay.className = 'modal open';
+    overlay.setAttribute('data-clarity-mask', 'true'); // Clarity 녹화에서 이름·연락처 등을 가린다
     overlay.id = 'adminStoreDetailModal';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
