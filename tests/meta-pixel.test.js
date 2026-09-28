@@ -21,7 +21,7 @@ const GA_CORE_SRC = fs.readFileSync(path.join(ROOT, 'analytics-consent-core.js')
 const GA_UI_SRC = fs.readFileSync(path.join(ROOT, 'analytics-consent.js'), 'utf8');
 const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const PIXEL_ID = '1921995005433525';
-const META_KEY = 'ld-meta-pixel-consent-v1';
+const META_KEY = 'ld-meta-pixel-consent-v2';
 const GA_KEY = 'ld-analytics-consent-v1';
 
 const ENABLED_CORE_SRC = CORE_SRC;
@@ -87,8 +87,10 @@ function boot(opts = {}){
     navigate(hash){ location.hash = hash; (winListeners.hashchange || []).forEach(fn => fn()); }
   };
 }
-const granted = () => JSON.stringify({ status: 'granted', version: 1, updatedAt: '2026-09-24T00:00:00.000Z' });
-const denied = () => JSON.stringify({ status: 'denied', version: 1, updatedAt: '2026-09-24T00:00:00.000Z' });
+const granted = () => JSON.stringify({ status: 'granted', version: 2, updatedAt: '2026-09-24T00:00:00.000Z' });
+const denied = () => JSON.stringify({ status: 'denied', version: 2, updatedAt: '2026-09-24T00:00:00.000Z' });
+const gaGranted = () => JSON.stringify({ status: 'granted', version: 1 });
+const gaDenied = () => JSON.stringify({ status: 'denied', version: 1 });
 
 test('배포 소스는 ENABLED=true이고 픽셀 ID는 1921995005433525', () => {
   assert.match(CORE_SRC, /var ENABLED = true;/);
@@ -106,7 +108,7 @@ test('긴급 중단 스위치(ENABLED=false) — 안내창은 GA4 전용으로 �
   b.els.analyticsConsentAllow.click();
   assert.equal(b.metaScripts().length, 0);
   assert.equal(typeof b.sandbox.fbq, 'undefined');
-  const b2 = boot({ disabled: true, storage: { [GA_KEY]: granted() } });
+  const b2 = boot({ disabled: true, storage: { [GA_KEY]: gaGranted() } });
   assert.equal(b2.els.analyticsConsentBanner.hidden, true, 'GA4 결정 후 재방문 시 Meta 때문에 안내창이 다시 뜨지 않는다');
 });
 
@@ -186,7 +188,7 @@ test('모두 허용: 스크립트 1회, autoConfig 끔, init에 고급 매칭 �
 });
 
 test('GA4만 결정된 기존 방문자: Meta 선택을 위해 안내창을 한 번 띄우고, GA4 체크는 저장값대로', () => {
-  const b = boot({ storage: { [GA_KEY]: granted() } });
+  const b = boot({ storage: { [GA_KEY]: gaGranted() } });
   assert.equal(b.els.analyticsConsentBanner.hidden, false);
   assert.equal(b.els.consentChoiceGa.checked, true);
   assert.equal(b.els.consentChoiceMeta.checked, false);
@@ -198,13 +200,13 @@ test('GA4만 결정된 기존 방문자: Meta 선택을 위해 안내창을 한 
 });
 
 test('둘 다 결정된 재방문: 안내창 없음', () => {
-  const b = boot({ storage: { [GA_KEY]: denied(), [META_KEY]: denied() } });
+  const b = boot({ storage: { [GA_KEY]: gaDenied(), [META_KEY]: denied() } });
   assert.equal(b.els.analyticsConsentBanner.hidden, true);
   assert.equal(b.metaScripts().length, 0);
 });
 
 test('저장된 허용 상태: 첫 화면 1회, 같은 화면 연속 재실행은 무시, 다른 화면 → 돌아오기는 각각 1회', () => {
-  const b = boot({ hash: '#/', storage: { [GA_KEY]: granted(), [META_KEY]: granted() } });
+  const b = boot({ hash: '#/', storage: { [GA_KEY]: gaGranted(), [META_KEY]: granted() } });
   assert.equal(b.els.analyticsConsentBanner.hidden, true);
   assert.equal(b.pageViews(), 1);
   b.navigate('#/');
@@ -217,18 +219,18 @@ test('저장된 허용 상태: 첫 화면 1회, 같은 화면 연속 재실행�
 });
 
 test('인증 콜백 해시·OAuth 복귀 쿼리가 주소에 있으면 PageView를 보내지 않는다(토큰이 URL과 함께 전송되는 것 방지)', () => {
-  const b1 = boot({ hash: '#access_token=abc&refresh_token=def&type=signup', storage: { [GA_KEY]: granted(), [META_KEY]: granted() } });
+  const b1 = boot({ hash: '#access_token=abc&refresh_token=def&type=signup', storage: { [GA_KEY]: gaGranted(), [META_KEY]: granted() } });
   assert.equal(b1.pageViews(), 0);
   b1.navigate('#/start');
   assert.equal(b1.pageViews(), 1);
-  const b2 = boot({ hash: '#/', search: '?code=xyz', storage: { [GA_KEY]: granted(), [META_KEY]: granted() } });
+  const b2 = boot({ hash: '#/', search: '?code=xyz', storage: { [GA_KEY]: gaGranted(), [META_KEY]: granted() } });
   assert.equal(b2.pageViews(), 0);
-  const b3 = boot({ hash: '#/', search: '?utm_source=meta&utm_campaign=beta', storage: { [GA_KEY]: granted(), [META_KEY]: granted() } });
+  const b3 = boot({ hash: '#/', search: '?utm_source=meta&utm_campaign=beta', storage: { [GA_KEY]: gaGranted(), [META_KEY]: granted() } });
   assert.equal(b3.pageViews(), 1, 'UTM만 있는 주소는 정상 전송');
 });
 
 test('Meta 철회(선택 저장에서 해제): consent revoke, 이후 이동해도 전송 없음, _fbp/_fbc 삭제, GA4는 그대로 · 재허용은 재삽입 없이 grant', () => {
-  const b = boot({ hash: '#/', storage: { [GA_KEY]: granted(), [META_KEY]: granted() } });
+  const b = boot({ hash: '#/', storage: { [GA_KEY]: gaGranted(), [META_KEY]: granted() } });
   b.cookies._fbp = 'fb.1.123'; b.cookies._fbc = 'fb.1.456'; b.cookies._ga = 'keep';
   b.els.analyticsSettingsLink.click();
   b.els.consentChoiceMeta.checked = false;
@@ -248,13 +250,13 @@ test('Meta 철회(선택 저장에서 해제): consent revoke, 이후 이동해�
   assert.equal(b.pageViews(), 2, '재허용 시 지금 화면(#/start) 1회');
 });
 
-test('픽셀로 보내는 호출은 PageView뿐이고 이메일·토큰 같은 값을 싣지 않는다(회원가입 이벤트 없음)', () => {
-  const b = boot({ hash: '#/', storage: { [GA_KEY]: granted(), [META_KEY]: granted() } });
+test('방문에서는 PageView만 기록하고 개인정보·회원가입 이벤트를 보내지 않는다', () => {
+  const b = boot({ hash: '#/', storage: { [GA_KEY]: gaGranted(), [META_KEY]: granted() } });
   b.navigate('#/account'); b.navigate('#/start');
   const events = b.calls().filter(c => c[0] === 'track' || c[0] === 'trackCustom');
   assert.ok(events.every(c => c[1] === 'PageView' && c.length === 2));
   assert.doesNotMatch(JSON.stringify(b.calls()), /@|token|password/i);
-  assert.doesNotMatch(UI_SRC.replace(/\/\*[\s\S]*?\*\//g, ''), /CompleteRegistration|trackCustom|Lead|em:|ph:/);
+  assert.doesNotMatch(UI_SRC.replace(/\/\*[\s\S]*?\*\//g, ''), /CompleteRegistration|trackCustom|em:|ph:/);
 });
 
 test('index.html: Meta 기본 코드·noscript 추적 이미지를 직접 넣지 않고, 로더는 analytics-consent.js 다음에 로드하며 안내창은 하나다', () => {
@@ -275,7 +277,7 @@ test('core: 저장값 파싱은 형식·버전이 다르면 null, 안전 주소 
   const core = require('../meta-pixel-core.js');
   assert.equal(core.parse(null), null);
   assert.equal(core.parse('{bad'), null);
-  assert.equal(core.parse(JSON.stringify({ status: 'granted', version: 2 })), null);
+  assert.equal(core.parse(JSON.stringify({ status: 'granted', version: 1 })), null);
   assert.equal(core.parse(granted()).status, 'granted');
   assert.equal(core.isSafeLocation('#/start', ''), true);
   assert.equal(core.isSafeLocation('', ''), true);
@@ -283,4 +285,31 @@ test('core: 저장값 파싱은 형식·버전이 다르면 null, 안전 주소 
   assert.equal(core.isSafeLocation('#/', '?error=access_denied'), false);
   assert.equal(core.routeOf(''), '/');
   assert.equal(core.PIXEL_ID, PIXEL_ID);
+});
+
+
+test('실제 문의 완료 전에는 Lead가 없고, 명시적 호출 시 선택 동의가 있는 안전한 주소에서만 전송한다', () => {
+  const b = boot({ hash: '#/services/setup', storage: { [META_KEY]: granted() } });
+  assert.equal(b.calls().filter(c => c[2] === 'Lead').length, 0);
+  b.sandbox.launchdeskMetaPixel.trackSetupLead();
+  assert.deepEqual(JSON.parse(JSON.stringify(b.calls().filter(c => c[2] === 'Lead'))), [['trackSingle', PIXEL_ID, 'Lead']]);
+  const deniedBoot = boot({ hash: '#/services/setup', storage: { [META_KEY]: denied() } });
+  deniedBoot.sandbox.launchdeskMetaPixel.trackSetupLead();
+  assert.equal(deniedBoot.calls().filter(c => c[2] === 'Lead').length, 0);
+  const unsafe = boot({ hash: '#access_token=secret', storage: { [META_KEY]: granted() } });
+  unsafe.sandbox.launchdeskMetaPixel.trackSetupLead();
+  assert.equal(unsafe.calls().filter(c => c[2] === 'Lead').length, 0);
+});
+
+test('기존 PageView 전용 허용은 새 Lead 동의로 승계하지 않고 기존 거부는 유지한다', () => {
+  const oldGranted = JSON.stringify({ status: 'granted', version: 1 });
+  const oldDenied = JSON.stringify({ status: 'denied', version: 1 });
+  const a = boot({ storage: { 'ld-meta-pixel-consent-v1': oldGranted, [GA_KEY]: gaGranted() } });
+  assert.equal(a.els.analyticsConsentBanner.hidden, false);
+  assert.equal(a.metaScripts().length, 0);
+  assert.equal(a.els.consentChoiceMeta.checked, false);
+  const b = boot({ storage: { 'ld-meta-pixel-consent-v1': oldDenied, [GA_KEY]: gaGranted() } });
+  assert.equal(b.els.analyticsConsentBanner.hidden, true);
+  assert.equal(b.status(META_KEY), 'denied');
+  assert.equal(b.metaScripts().length, 0);
 });

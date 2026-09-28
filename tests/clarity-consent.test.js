@@ -25,7 +25,7 @@ const GA_UI_SRC = read('analytics-consent.js');
 const INDEX = read('index.html');
 const PROJECT_ID = 'yp7ibyta96';
 const TAG_URL = 'https://www.clarity.ms/tag/' + PROJECT_ID;
-const KEYS = { ga: 'ld-analytics-consent-v1', meta: 'ld-meta-pixel-consent-v1', clarity: 'ld-clarity-consent-v1' };
+const KEYS = { ga: 'ld-analytics-consent-v1', meta: 'ld-meta-pixel-consent-v2', clarity: 'ld-clarity-consent-v1' };
 
 const PRIVACY_START = INDEX.indexOf('<!-- ============ VIEW: 개인정보처리방침 ============ -->');
 const TERMS_START = INDEX.indexOf('<section class="view" id="view-terms"');
@@ -103,6 +103,8 @@ function boot(opts = {}){
 }
 const granted = () => JSON.stringify({ status: 'granted', version: 1, updatedAt: '2026-09-28T00:00:00.000Z' });
 const denied = () => JSON.stringify({ status: 'denied', version: 1, updatedAt: '2026-09-28T00:00:00.000Z' });
+const metaGranted = () => JSON.stringify({ status: 'granted', version: 2 });
+const metaDenied = () => JSON.stringify({ status: 'denied', version: 2 });
 
 test('배포 소스: ENABLED=true, 프로젝트 ID yp7ibyta96, 저장 키는 GA4·Meta와 다르다', () => {
   const core = require('../clarity-consent-core.js');
@@ -131,7 +133,7 @@ test('동의 전(신규 방문자): 안내창에 Clarity 항목이 기본 해제
 });
 
 test('기존 방문자가 GA4·Meta를 이미 허용했어도 Clarity는 "선택 안 함"으로 시작 — 안내창이 다시 뜨고, 스크립트는 없다', () => {
-  const b = boot({ storage: { [KEYS.ga]: granted(), [KEYS.meta]: granted() } });
+  const b = boot({ storage: { [KEYS.ga]: granted(), [KEYS.meta]: metaGranted() } });
   assert.equal(b.els.analyticsConsentBanner.hidden, false, 'Clarity 결정을 받기 위해 한 번 다시 띄운다');
   assert.equal(b.els.consentChoiceGa.checked, true);
   assert.equal(b.els.consentChoiceMeta.checked, true);
@@ -149,7 +151,7 @@ test('기존 방문자가 GA4·Meta를 이미 허용했어도 Clarity는 "선택
 });
 
 test('GA4·Meta·Clarity 모두 결정된 재방문: 안내창 없음, denied면 스크립트 없음', () => {
-  const b = boot({ storage: { [KEYS.ga]: denied(), [KEYS.meta]: denied(), [KEYS.clarity]: denied() } });
+  const b = boot({ storage: { [KEYS.ga]: denied(), [KEYS.meta]: metaDenied(), [KEYS.clarity]: denied() } });
   assert.equal(b.els.analyticsConsentBanner.hidden, true);
   assert.equal(b.clarityScripts().length, 0);
   assert.equal(typeof b.sandbox.clarity, 'undefined');
@@ -207,7 +209,7 @@ test('모두 허용: 셋 다 허용 · Clarity 스크립트 1회 — 다시 열�
 });
 
 test('저장된 허용: 첫 화면에서 바로 로드, 이후 이동·hashchange에도 재삽입 없음', () => {
-  const b = boot({ storage: { [KEYS.ga]: denied(), [KEYS.meta]: denied(), [KEYS.clarity]: granted() } });
+  const b = boot({ storage: { [KEYS.ga]: denied(), [KEYS.meta]: metaDenied(), [KEYS.clarity]: granted() } });
   assert.equal(b.els.analyticsConsentBanner.hidden, true);
   assert.equal(b.clarityScripts().length, 1);
   b.navigate('#/start'); b.navigate('#/');
@@ -215,7 +217,7 @@ test('저장된 허용: 첫 화면에서 바로 로드, 이후 이동·hashchang
 });
 
 test('철회(선택 저장에서 해제): clarity stop, 거부 신호(consentv2 denied)는 보내지 않음, Clarity 쿠키·세션값 삭제, GA4·다른 쿠키는 그대로', () => {
-  const b = boot({ storage: { [KEYS.ga]: granted(), [KEYS.meta]: denied(), [KEYS.clarity]: granted() }, session: { _cltk: 'abc' } });
+  const b = boot({ storage: { [KEYS.ga]: granted(), [KEYS.meta]: metaDenied(), [KEYS.clarity]: granted() }, session: { _cltk: 'abc' } });
   b.cookies._clck = 'u|2|x'; b.cookies._clsk = 's|1'; b.cookies._ga = 'keep';
   assert.equal(b.clarityScripts().length, 1);
   b.els.analyticsSettingsLink.click();
@@ -237,7 +239,7 @@ test('철회(선택 저장에서 해제): clarity stop, 거부 신호(consentv2 
 });
 
 test('철회 뒤 같은 화면에서 재허용: 태그를 새로 불러오고, 그 사이 이동에는 로드가 없다', () => {
-  const b = boot({ storage: { [KEYS.clarity]: granted(), [KEYS.ga]: denied(), [KEYS.meta]: denied() } });
+  const b = boot({ storage: { [KEYS.clarity]: granted(), [KEYS.ga]: denied(), [KEYS.meta]: metaDenied() } });
   assert.equal(b.clarityScripts().length, 1);
   b.els.analyticsSettingsLink.click();
   b.els.consentChoiceClarity.checked = false;
@@ -252,7 +254,7 @@ test('철회 뒤 같은 화면에서 재허용: 태그를 새로 불러오고, �
 });
 
 test('모두 허용하지 않음으로 철회: Clarity도 멈추고 쿠키 삭제', () => {
-  const b = boot({ storage: { [KEYS.ga]: granted(), [KEYS.meta]: granted(), [KEYS.clarity]: granted() } });
+  const b = boot({ storage: { [KEYS.ga]: granted(), [KEYS.meta]: metaGranted(), [KEYS.clarity]: granted() } });
   b.cookies._clck = 'u'; b.cookies._clsk = 's';
   b.els.analyticsSettingsLink.click();
   b.els.analyticsConsentDeny.click();
@@ -269,13 +271,13 @@ test('로드 전에 거부한 경우 stop 호출은 없다(불러온 적 없으�
 });
 
 test('인증 콜백 해시·OAuth 복귀 쿼리가 주소에 있으면 로드하지 않고, 안전한 화면으로 이동하면 그때 로드한다(토큰이 URL과 함께 전송되는 것 방지)', () => {
-  const b1 = boot({ hash: '#access_token=abc&refresh_token=def&type=signup', storage: { [KEYS.clarity]: granted(), [KEYS.ga]: denied(), [KEYS.meta]: denied() } });
+  const b1 = boot({ hash: '#access_token=abc&refresh_token=def&type=signup', storage: { [KEYS.clarity]: granted(), [KEYS.ga]: denied(), [KEYS.meta]: metaDenied() } });
   assert.equal(b1.clarityScripts().length, 0);
   b1.navigate('#/start');
   assert.equal(b1.clarityScripts().length, 1);
-  const b2 = boot({ hash: '#/', search: '?code=xyz', storage: { [KEYS.clarity]: granted(), [KEYS.ga]: denied(), [KEYS.meta]: denied() } });
+  const b2 = boot({ hash: '#/', search: '?code=xyz', storage: { [KEYS.clarity]: granted(), [KEYS.ga]: denied(), [KEYS.meta]: metaDenied() } });
   assert.equal(b2.clarityScripts().length, 0);
-  const b3 = boot({ hash: '#/', search: '?utm_source=meta&utm_campaign=beta', storage: { [KEYS.clarity]: granted(), [KEYS.ga]: denied(), [KEYS.meta]: denied() } });
+  const b3 = boot({ hash: '#/', search: '?utm_source=meta&utm_campaign=beta', storage: { [KEYS.clarity]: granted(), [KEYS.ga]: denied(), [KEYS.meta]: metaDenied() } });
   assert.equal(b3.clarityScripts().length, 1, 'UTM만 있는 주소는 정상 로드');
 });
 

@@ -4,7 +4,7 @@
    값을 쓴다. 브라우저에서는 window.launchdeskClarityCore 로, Node에서는
    module.exports 로 노출된다(meta-pixel-core.js와 같은 방식).
 
-   GA4(ld-analytics-consent-v1)·Meta(ld-meta-pixel-consent-v1)와는 저장 키·상태가
+   GA4(ld-analytics-consent-v1)·Meta(ld-meta-pixel-consent-v2)와는 저장 키·상태가
    완전히 따로다 — 그 둘의 동의값을 Clarity 동의로 간주하지 않으며, 한쪽을
    바꿔도 다른 쪽은 바뀌지 않는다. 그래서 이미 GA4·Meta를 결정한 기존 방문자도
    Clarity는 "아직 결정 안 함"에서 시작해 안내창을 한 번 더 본다.

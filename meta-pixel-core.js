@@ -21,8 +21,10 @@
 
   var ENABLED = true;
   var PIXEL_ID = '1921995005433525';
-  var STORAGE_KEY = 'ld-meta-pixel-consent-v1';
-  var CURRENT_VERSION = 1;
+  // v1 동의는 PageView 전용이었다. Lead까지 허용하는 새 범위에는 재동의가 필요하다.
+  var STORAGE_KEY = 'ld-meta-pixel-consent-v2';
+  var LEGACY_STORAGE_KEY = 'ld-meta-pixel-consent-v1';
+  var CURRENT_VERSION = 2;
   var STATUSES = { GRANTED: 'granted', DENIED: 'denied' };
 
   // 저장값이 없거나 형식·버전이 다르면 전부 null("아직 결정 안 함").
@@ -89,6 +91,7 @@
     ENABLED: ENABLED,
     PIXEL_ID: PIXEL_ID,
     STORAGE_KEY: STORAGE_KEY,
+    LEGACY_STORAGE_KEY: LEGACY_STORAGE_KEY,
     CURRENT_VERSION: CURRENT_VERSION,
     STATUSES: STATUSES,
     parse: parse,

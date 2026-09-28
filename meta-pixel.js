@@ -4,7 +4,7 @@
    - 동의(granted)가 저장돼 있기 전에는 connect.facebook.net 스크립트를
      붙이지 않고 fbq도 정의하지 않는다 — 어떤 이벤트도 나가지 않는다.
      noscript 추적 이미지도 두지 않는다.
-   - GA4 분석 동의와는 저장 키가 따로다(ld-meta-pixel-consent-v1). 안내창은
+   - GA4 분석 동의와는 저장 키가 따로다(ld-meta-pixel-consent-v2). 안내창은
      하나(#analyticsConsentBanner)지만 두 항목을 체크박스로 각각 고른다:
        "모두 허용하지 않음" → GA4·Meta 둘 다 거부
        "선택 저장"         → 체크한 항목만 허용, 나머지는 거부
@@ -28,7 +28,7 @@
      (core.isSafeLocation) — 픽셀은 현재 URL 전체를 함께 전송하기 때문이다.
    - 자동 이벤트 설정(버튼 클릭·페이지 메타데이터 수집)은 autoConfig false로
      끄고, 고급 매칭(이메일 등) 값은 init에 넘기지 않는다.
-   - 회원가입(CompleteRegistration) 등 PageView 외 이벤트는 보내지 않는다. */
+   - 실제 세팅 대행 문의 RPC 성공 후 Lead만 추가로 보낸다. 개인정보 필드는 싣지 않는다. */
 (function(){
   'use strict';
   var core = window.launchdeskMetaPixelCore;
@@ -54,7 +54,18 @@
   function readConsent(){
     var raw = null;
     try{ raw = localStorage.getItem(core.STORAGE_KEY); }catch(e){}
-    return core.parse(raw);
+    var current = core.parse(raw);
+    if(current) return current;
+    // 이전 PageView 동의를 새 Lead 범위의 허용으로 승격하지 않는다.
+    // 이전에 거부한 사람의 선택은 존중해 재동의 창을 다시 띄우지 않는다.
+    try{
+      var old = JSON.parse(localStorage.getItem(core.LEGACY_STORAGE_KEY));
+      if(old && old.version === 1 && old.status === core.STATUSES.DENIED){
+        saveConsent(core.STATUSES.DENIED);
+        return core.parse(localStorage.getItem(core.STORAGE_KEY));
+      }
+    }catch(e){}
+    return null;
   }
   function saveConsent(status){
     try{ localStorage.setItem(core.STORAGE_KEY, core.serialize(status)); }catch(e){}
@@ -85,6 +96,14 @@
     if(!core.isSafeLocation(location.hash, location.search)) return;
     if(!tracker.shouldSend(core.routeOf(location.hash))) return;
     window.fbq('track', 'PageView');
+  }
+
+  function trackSetupLead(){
+    if(currentStatus !== core.STATUSES.GRANTED || !loaded || typeof window.fbq !== 'function') return;
+    if(!core.isSafeLocation(location.hash, location.search)) return;
+    // 호출자는 setup.js의 submit_setup_inquiry RPC 성공 경로뿐이다.
+    // 신청자 이름, 전화번호, 요청 내용이나 플랜 값은 전달하지 않는다.
+    window.fbq('trackSingle', core.PIXEL_ID, 'Lead');
   }
 
   function applyGranted(){
@@ -172,6 +191,7 @@
   syncChoices();
 
   window.launchdeskMetaPixel = {
-    getStatus: function(){ return currentStatus; }
+    getStatus: function(){ return currentStatus; },
+    trackSetupLead: trackSetupLead
   };
 })();

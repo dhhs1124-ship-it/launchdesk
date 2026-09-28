@@ -385,33 +385,33 @@ test('이미 현재 버전 동의가 있는 회원은 게이트 없이 바로 �
   assert.equal(hydrateStarted(env), true);
 });
 
-test('개인정보처리방침 v1.0에만 동의한 기존 회원은 v1.5 재동의 대상 — 게이트가 뜨고 hydrate는 보류된다', async () => {
+test('개인정보처리방침 v1.0에만 동의한 기존 회원은 v1.6 재동의 대상 — 게이트가 뜨고 hydrate는 보류된다', async () => {
   const env = await boot({
     session: SESSION,
-    // 코드의 현재 PRIVACY_VERSION(core.PRIVACY_VERSION)은 v1.5이므로, v1.0에만
+    // 코드의 현재 PRIVACY_VERSION(core.PRIVACY_VERSION)은 v1.6이므로, v1.0에만
     // 동의한 행은 terms_version/privacy_version 둘 다 일치해야 하는 queryHasConsent
     // 조건에 걸려 "동의 없음"으로 판정돼야 한다.
     consentRows: [{ user_id: USER.id, terms_version: TERMS_VERSION, privacy_version: 'v1.0', source: 'email_signup' }]
   });
   await flush(env);
-  assert.equal(env.core.PRIVACY_VERSION, 'v1.5', '코드 상수가 v1.5인지 먼저 확인');
-  assert.equal(gateOpen(env), true, 'v1.0 동의만 있으면 v1.5 재동의 게이트가 떠야 한다');
+  assert.equal(env.core.PRIVACY_VERSION, 'v1.6', '코드 상수가 v1.6인지 먼저 확인');
+  assert.equal(gateOpen(env), true, 'v1.0 동의만 있으면 v1.6 재동의 게이트가 떠야 한다');
   assert.equal(hydrateStarted(env), false, '재동의 전에는 STEP/계획/마진 기록을 불러오지 않는다');
 });
 
-test('v1.4에 동의한 회원은 v1.5(선택 항목 Clarity만 추가) 공개 후에도 재동의 없이 통과 — 게이트도 insert도 없다', async () => {
+test('v1.4에 동의한 회원은 v1.6(선택 항목 Clarity만 추가) 공개 후에도 재동의 없이 통과 — 게이트도 insert도 없다', async () => {
   const env = await boot({
     session: SESSION,
     consentRows: [{ user_id: USER.id, terms_version: TERMS_VERSION, privacy_version: 'v1.4', source: 'email_signup' }]
   });
   await flush(env);
-  assert.deepEqual(Array.from(env.core.ACCEPTED_PRIVACY_VERSIONS), ['v1.4', 'v1.5']);
+  assert.deepEqual(Array.from(env.core.ACCEPTED_PRIVACY_VERSIONS), ['v1.4', 'v1.5', 'v1.6']);
   assert.equal(gateOpen(env), false, 'v1.4 동의는 필수 동의 범위가 같아 그대로 유효하다');
   assert.equal(env.supa.consentInserts.length, 0, '재동의 기록을 새로 만들지 않는다');
   assert.equal(hydrateStarted(env), true);
 });
 
-test('v1.3 이하에만 동의한 회원은 v1.4의 필수 범위 변경 때문에 여전히 재동의 대상이고, 새 동의는 게시 중인 v1.5로 기록된다', async () => {
+test('v1.3 이하에만 동의한 회원은 v1.4의 필수 범위 변경 때문에 여전히 재동의 대상이고, 새 동의는 게시 중인 v1.6로 기록된다', async () => {
   const env = await boot({
     session: SESSION,
     consentRows: [{ user_id: USER.id, terms_version: TERMS_VERSION, privacy_version: 'v1.3', source: 'email_signup' }]
@@ -424,7 +424,7 @@ test('v1.3 이하에만 동의한 회원은 v1.4의 필수 범위 변경 때문�
   env.doc.getElementById('gateConsentSubmit').dispatch('click');
   await flush(env);
   assert.equal(env.supa.consentInserts.length, 1);
-  assert.equal(env.supa.consentInserts[0].privacy_version, 'v1.5', '사용자가 실제로 본 방침 버전을 기록한다');
+  assert.equal(env.supa.consentInserts[0].privacy_version, 'v1.6', '사용자가 실제로 본 방침 버전을 기록한다');
   assert.equal(gateOpen(env), false);
 });
 

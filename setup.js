@@ -230,6 +230,13 @@
         if(typeof gtag === 'function'){
           gtag('event', 'setup_form_complete', { plan_key: setupSelectedPlan.key });
         }
+        // 접수 RPC가 성공한 뒤에만 Lead를 기록한다. Meta 선택 동의가 없으면
+        // 픽셀 로더가 아무것도 보내지 않는다. 고객 입력값은 전달하지 않는다.
+        if(window.launchdeskMetaPixel && typeof window.launchdeskMetaPixel.trackSetupLead === 'function'){
+          try{ window.launchdeskMetaPixel.trackSetupLead(); }catch(e){
+            console.warn('[launchdesk] Meta Lead 이벤트 전송 시도 실패');
+          }
+        }
       }
 
       function finalizeFailure(code){

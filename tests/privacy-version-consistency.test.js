@@ -29,7 +29,7 @@ const V1_3_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260924160
 const V1_4_MIGRATION_PATH = path.join(SETUP_INQUIRY_MIGRATIONS_DIR, '20260925100000_setup_inquiries_privacy_v1_4.sql');
 
 test('policy-consent-core.js: PRIVACY_VERSION은 v1.5', () => {
-  assert.equal(core.PRIVACY_VERSION, 'v1.5');
+  assert.equal(core.PRIVACY_VERSION, 'v1.6');
 });
 
 test('policy-consent-core.js: TERMS_VERSION은 그대로(약관 본문을 고치지 않았으므로)', () => {
@@ -38,12 +38,12 @@ test('policy-consent-core.js: TERMS_VERSION은 그대로(약관 본문을 고치
 
 test('개인정보처리방침 화면: 헤더/버전 섹션이 v1.5 · 2026년 9월 28일(실제 배포일)로 코드 상수와 일치하고, 세 곳의 날짜가 같다', () => {
   const has = (s) => assert.ok(PRIVACY_HTML.includes(s), '방침에서 찾지 못함: ' + s);
-  has('시행일 2026년 9월 28일 · v1.5 · 런치데스크');
-  has('<li>버전: v1.5(이전 버전: v1.4, 2026년 9월 25일 시행)</li>');
+  has('시행일 2026년 9월 28일 · v1.6 · 런치데스크');
+  has('<li>버전: v1.6(이전 버전: v1.5, 2026년 9월 28일 시행)</li>');
   has('<li>시행일: 2026년 9월 28일</li>');
   has('v1.4 → v1.5 주요 변경 사항(2026년 9월 28일 시행)');
   // 헤더 · 14번 · 15번 세 곳
-  assert.equal(PRIVACY_HTML.split('2026년 9월 28일').length - 1, 3);
+  assert.equal(PRIVACY_HTML.split('2026년 9월 28일').length - 1, 5);
   assert.ok(!PRIVACY_HTML.includes('[게시 예정일]'), '게시일 자리표시자가 남아 있으면 안 된다(주석 포함)');
   assert.ok(!PRIVACY_HTML.includes('[공개 전 확정 필요'), '확정 필요 표시가 남아 있으면 안 된다(주석 포함)');
 });
@@ -57,7 +57,7 @@ test('개인정보처리방침 화면: 이전 버전 이력(v1.0→v1.1, v1.1→
   // 14번 v1.2→v1.3 · 14번 v1.1→v1.2 두 곳
   assert.equal(PRIVACY_HTML.split('2026년 9월 24일').length - 1, 2);
   // 14번 v1.3→v1.4 · 15번 이전 버전(v1.4) 두 곳
-  assert.equal(PRIVACY_HTML.split('2026년 9월 25일').length - 1, 2);
+  assert.equal(PRIVACY_HTML.split('2026년 9월 25일').length - 1, 1);
 });
 
 test('v1.5 게시 상태에서는 배포 검사(predeploy gate)가 통과한다', () => {
@@ -94,11 +94,11 @@ test('v1.4: Meta 픽셀 — 공식 약관·작성지침으로 확인한 사실�
   assert.equal(pixelId, '1921995005433525');
   has('Meta 픽셀(픽셀 ID: ' + pixelId + ')');
   has('동의하기 전에는 관련 스크립트가 불러와지지 않고 어떤 정보도 Meta로 전송되지 않습니다');
-  has('방문 기록(PageView)만 Meta로 전송합니다');
-  has('회원가입·구매 등 다른 이벤트는 전송하지 않습니다');
+  has('세팅 대행 문의가 서버에 성공적으로 저장된 뒤 접수 완료 여부(Lead)를 Meta로 전송합니다');
+  has('회원가입·구매 이벤트를 보내지 않습니다');
   has('동의하지 않더라도 서비스 이용에 제한이 없습니다');
-  has('<td>ld-meta-pixel-consent-v1</td>');
-  assert.ok(metaCore.includes("STORAGE_KEY = 'ld-meta-pixel-consent-v1'"));
+  has('<td>ld-meta-pixel-consent-v2</td>');
+  assert.ok(metaCore.includes("STORAGE_KEY = 'ld-meta-pixel-consent-v2'"));
   has('Meta 쿠키(_fbp, _fbc)를 함께 삭제합니다');
   // 이벤트 데이터 보유(최대 2년)와 브라우저 쿠키 만료는 서로 다른 것으로 구분한다
   has('이 “최대 2년”은 Meta가 받은 이벤트 데이터의 보유기간이며, 이용자 브라우저에 저장되는 Meta 쿠키(_fbp, _fbc)의 만료 시점과는 별개입니다');
@@ -314,7 +314,7 @@ test('v1.5 방침 14번: 필수 동의 재수집을 요구하지 않는다고 �
   assert.ok(para, '14번 v1.4 → v1.5 문단을 찾지 못함');
   assert.match(para[0], /이 개정은 안내창에서 별도로 동의받는 선택 항목만 더한 것이라 필수 수집 항목·목적이 그대로이므로, v1\.4에 동의한 회원에게 재동의를 요구하지 않습니다/);
   assert.doesNotMatch(para[0], /재동의 절차를 거치게 됩니다/);
-  assert.deepEqual(Array.from(core.ACCEPTED_PRIVACY_VERSIONS), ['v1.4', 'v1.5']);
+  assert.deepEqual(Array.from(core.ACCEPTED_PRIVACY_VERSIONS), ['v1.4', 'v1.5', 'v1.6']);
   assert.ok(core.ACCEPTED_PRIVACY_VERSIONS.includes(core.PRIVACY_VERSION), '게시 중인 버전도 통과해야 한다');
   // 이전 개정(v1.0~v1.3 → 다음 버전)의 재동의 안내는 그대로 남는다
   assert.equal((PRIVACY_HTML.match(/재동의 절차를 거치게 됩니다/g) || []).length, 4);
