@@ -177,7 +177,7 @@ test('원자적 claim 쿼리 체인이 정확한 조건으로 존재한다', () 
   assert.match(src, /\.eq\("provider",\s*"cafe24"\)/, 'provider=cafe24 조건이 없음');
   assert.match(src, /\.is\("used_at",\s*null\)/, 'used_at IS NULL 조건이 없음');
   assert.match(src, /\.gt\("expires_at",\s*nowIso\)/, 'expires_at > now 조건이 없음');
-  assert.match(src, /\.select\("store_id,mall_id"\)/, 'RETURNING(select) 대상이 없음');
+  assert.match(src, /\.select\("store_id,mall_id,return_origin"\)/, 'RETURNING(select) 대상이 없음');
   assert.match(src, /\.maybeSingle\(\)/, 'maybeSingle()이 없음');
 });
 
@@ -219,11 +219,12 @@ test('로그에 state 원문 · code · access_token · refresh_token이 남지 
 });
 
 test('기존 성공 · 실패 리다이렉트(goBack 상태값)가 그대로 유지된다', () => {
-  assert.match(src, /goBack\("denied"\)/, 'denied 리다이렉트가 없음');
-  assert.match(src, /goBack\("server_error"\)/, 'server_error 리다이렉트가 없음');
-  assert.match(src, /goBack\("token_error"\)/, 'token_error 리다이렉트가 없음');
-  assert.match(src, /goBack\("connected"\)/, 'connected 리다이렉트가 없음');
+  assert.match(src, /goBack\("denied", returnOrigin\)/, 'denied 리다이렉트가 없음');
+  assert.match(src, /goBack\("server_error", returnOrigin\)/, 'server_error 리다이렉트가 없음');
+  assert.match(src, /goBack\("token_error", returnOrigin\)/, 'token_error 리다이렉트가 없음');
+  assert.match(src, /goBack\("connected", returnOrigin\)/, 'connected 리다이렉트가 없음');
   assert.match(src, /\?cafe24=\$\{encodeURIComponent\(status\)\}#\/account/, 'cafe24 상태 쿼리 URL 형식이 바뀜');
+  assert.match(src, /returnOrigin \? `\$\{returnOrigin\}\/\?cafe24=/, 'LaunchROAS 복귀 주소가 없음');
 });
 
 test('claim에 성공한 요청만 토큰 교환을 시작한다는 주석 · 구조가 남아있다(회귀 방지)', () => {
