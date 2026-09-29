@@ -4,10 +4,16 @@
   var PUBLISHABLE_KEY = 'sb_publishable_hu9XkhXJKyoWVL7zMQD8_g_iMmDymMK';
   var byId = function(id){ return document.getElementById(id); };
   var core = window.LaunchRoasCore;
+  var periods = window.launchdeskOpsPeriodCore;
   var policy = window.launchdeskPolicyConsentCore;
   var sb = window.supabase && window.supabase.createClient(PROJECT_URL, PUBLISHABLE_KEY);
   var userId = null, stores = [], requestId = 0, signupMode = false, syncing = false;
   var signupPending = false;
+  var dashboardReady = false, period = {kind:'today',date:null}, selectedCafe = null, selectedMeta = null;
+  var viewState = {cafe:null,meta:null}, listeners = [];
+  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),metaAccount:selectedMeta,metaData:viewState.meta}; }
+  function publish(){ listeners.forEach(function(fn){try{fn(context());}catch(e){console.warn('[launchroas] 구독자 오류',e);}}); }
+  window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());}};
   function message(id, value){ byId(id).textContent = value || ''; }
   function won(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '원'; }
   function metaMoney(n, currency){
@@ -23,12 +29,14 @@
     message('orderNote', '연결 상태 확인 전'); message('adNote', '광고계정 상태 확인 전');
     message('cafeStatus', '연결 상태를 확인하고 있어요.'); message('metaStatus', '연결 상태를 확인하고 있어요.');
     message('lastSync', ''); message('metaPurchase', '');
+    ['briefList','adState','monthSummary','connectionSummary'].forEach(function(id){byId(id).replaceChildren();});
+    viewState = {cafe:null,meta:null}; selectedCafe = null; selectedMeta = null;
   }
   function signedOut(){
-    requestId++; userId = null; stores = []; signupPending = false;
+    requestId++; userId = null; stores = []; signupPending = false; dashboardReady = false;
     byId('loginPanel').hidden = false; byId('dashboard').hidden = true; byId('consentGate').hidden = true;
     byId('accountEmail').hidden = true; byId('logout').hidden = true;
-    byId('password').value = ''; byId('refresh').disabled = false; syncing = false; resetCards();
+    byId('password').value = ''; byId('refresh').disabled = false; syncing = false; resetCards(); publish();
   }
   async function hasConsent(id){
     var result = await sb.from('user_policy_consents').select('id').eq('user_id',id)
@@ -42,7 +50,9 @@
   }
   async function signedIn(user){
     if(!user || user.is_anonymous){ signedOut(); return; }
-    userId = user.id; var id = ++requestId;
+    if(dashboardReady && userId === user.id) return;
+    dashboardReady = false; stores = []; userId = user.id; var id = ++requestId;
+    byId('storeSelect').replaceChildren(); byId('storeSelect').value=''; resetCards(); publish();
     byId('loginPanel').hidden = true; byId('dashboard').hidden = true; byId('consentGate').hidden = true;
     byId('accountEmail').textContent = user.email || '로그인됨';
     byId('workspaceEmail').textContent = user.email || '로그인됨';
@@ -60,7 +70,9 @@
       message('gateMessage', consent.error ? '동의 이력을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.' : '필수 동의 항목을 확인해 주세요.');
       return;
     }
+    dashboardReady = true;
     byId('dashboard').hidden = false;
+    publish();
     await loadStores(id);
   }
   async function loadStores(id){
@@ -77,6 +89,7 @@
       option.value = store.id; option.textContent = store.name; select.appendChild(option);
     });
     if(stores.some(function(store){return String(store.id) === previousStoreId;})) select.value = previousStoreId;
+    publish();
     if(!stores.length){
       message('pageMessage', '이 계정에 연결된 Cafe24 쇼핑몰이 없어요. 런치데스크에서 위에 표시된 같은 계정으로 로그인한 뒤 등록해 주세요.');
       message('cafeStatus', '쇼핑몰 없음'); message('metaStatus', '쇼핑몰을 등록한 뒤 확인할 수 있어요.');
@@ -102,52 +115,99 @@
     var rows = result.data || [];
     var cafe = rows.find(function(r){ return r.provider === 'cafe24'; });
     var meta = rows.find(function(r){ return r.provider === 'meta'; });
+    selectedCafe = cafe || null; selectedMeta = meta || null; publish();
     await Promise.all([loadOrders(storeId, cafe, id), loadMeta(meta, id)]);
+  }
+  function addLine(id, text){var p = document.createElement('p');p.textContent = text;byId(id).appendChild(p);}
+  function showOverview(){
+    ['briefList','adState','monthSummary','connectionSummary'].forEach(function(id){byId(id).replaceChildren();});
+    var cafe = viewState.cafe, meta = viewState.meta;
+    if(cafe && cafe.connected){
+      addLine('connectionSummary','Cafe24 · 연결됨' + (cafe.syncedAt ? ' · 마지막 동기화 '+time(cafe.syncedAt) : ''));
+      if(cafe.selected && cafe.coverage !== 'none' && cafe.coverage !== 'unknown'){
+        addLine('briefList',periods.resolve(period.kind,period.date,Date.now()).label + ' Cafe24 주문 '+cafe.selected.count+'건 · 주문금액 '+won(cafe.selected.amount)+' (취소·환불·미입금 포함)');
+      } else addLine('briefList','선택 기간 주문은 동기화 범위를 확인할 수 없어요. 주문 동기화 · 다시 조회를 눌러 주세요.');
+      if(cafe.month && cafe.monthCoverage !== 'none' && cafe.monthCoverage !== 'unknown')
+        addLine('monthSummary','Cafe24 · 이번 달 주문 '+cafe.month.count+'건 · 주문금액 '+won(cafe.month.amount));
+      else addLine('monthSummary','Cafe24 · 이번 달 주문 동기화 범위를 확인해 주세요.');
+    } else {
+      addLine('briefList',cafe && cafe.error ? 'Cafe24 주문 조회에 실패했어요.' : 'Cafe24 연결 후 주문을 확인할 수 있어요.');
+      addLine('connectionSummary',cafe && cafe.error ? 'Cafe24 · 조회 오류' : 'Cafe24 · 연결 안 됨');
+      addLine('monthSummary','Cafe24 · 연결 후 확인 가능');
+    }
+    if(meta && meta.today){
+      var t = meta.today, m = meta.month || {}, currency = meta.account && meta.account.currency;
+      addLine('connectionSummary','Meta · 연결됨' + (meta.account && meta.account.name ? ' · '+meta.account.name : ''));
+      addLine('adState','오늘 ROAS '+(t.roas == null ? '—' : Math.round(t.roas*100).toLocaleString('ko-KR')+'%'));
+      addLine('adState','이번 달 ROAS '+(m.roas == null ? '—' : Math.round(m.roas*100).toLocaleString('ko-KR')+'%'));
+      if(Number(t.spend)>0 && Number(t.purchase_count)===0) addLine('adState','광고비가 사용되고 있지만 오늘 Meta 구매가 없습니다.');
+      else if(t.roas != null && m.roas != null) addLine('adState',t.roas>m.roas?'오늘 광고 효율이 이번 달 평균보다 높습니다.':t.roas<m.roas?'오늘 광고 효율이 이번 달 평균보다 낮습니다.':'오늘 광고 효율이 이번 달 평균과 비슷합니다.');
+      addLine('briefList','Meta 오늘 광고비 '+metaMoney(t.spend,currency)+' · 귀속 구매금액 '+(t.purchase_value_observed?metaMoney(t.purchase_value,currency):'측정되지 않음'));
+      addLine('monthSummary','Meta · 이번 달 광고비 '+metaMoney(m.spend,currency)+' · 귀속 구매금액 '+(m.purchase_value_observed?metaMoney(m.purchase_value,currency):'측정되지 않음')+' · 구매 '+(Number(m.purchase_count)||0)+'건');
+    } else {
+      addLine('adState',meta && meta.error ? 'Meta 성과 조회에 실패했어요.' : 'Meta 광고계정 연결 후 확인 가능');
+      addLine('monthSummary','Meta · 연결 후 확인 가능');
+      addLine('connectionSummary',selectedMeta && selectedMeta.status !== 'connected' ? 'Meta · 연결 확인 필요' : 'Meta · 연결 안 됨');
+    }
   }
   async function loadOrders(storeId, account, id){
     if(!account || account.status !== 'connected'){
       message('cafeStatus', 'Cafe24가 연결되지 않았어요.'); message('orderNote', '연결 전');
+      viewState.cafe = {connected:false}; showOverview();
       return;
     }
     var now = Date.now();
+    var range = periods.resolve(period.kind,period.date,now), month = periods.resolve('month',null,now);
     message('lastSync', account.last_synced_at ? '마지막 주문 동기화: ' + time(account.last_synced_at) : '동기화 기록 없음');
-    if(!core.hasTodayCoverage(account.last_synced_at, now)){
-      message('cafeStatus', '오늘 주문 동기화 전이에요. 위의 주문 동기화 · 다시 조회를 눌러 주세요.');
-      message('orderNote', '오늘 동기화 전'); return;
-    }
+    var bounds = periods.queryBounds(range), monthBounds = periods.queryBounds(month);
     var result = await sb.from('orders').select('ordered_at,payment_amount')
-      .eq('store_id',storeId).gte('ordered_at',core.kstStartIso(now))
-      .lt('ordered_at',new Date(Date.parse(core.kstStartIso(now)) + 86400000).toISOString()).limit(5001);
+      .eq('store_id',storeId).gte('ordered_at',monthBounds.gte < bounds.gte ? monthBounds.gte : bounds.gte)
+      .lt('ordered_at',monthBounds.lt > bounds.lt ? monthBounds.lt : bounds.lt).limit(5001);
     if(id !== requestId) return;
-    if(result.error){ message('cafeStatus','주문 조회에 실패했어요.'); message('orderNote','조회 실패'); return; }
+    if(result.error){ message('cafeStatus','주문 조회에 실패했어요.'); message('orderNote','조회 실패'); viewState.cafe={error:true};showOverview();return; }
     if((result.data || []).length > 5000){
-      message('cafeStatus','오늘 주문이 5,000건을 넘어 집계를 표시할 수 없어요.'); message('orderNote','집계 한도 초과'); return;
+      message('cafeStatus','조회 기간 주문이 5,000건을 넘어 집계를 표시할 수 없어요.'); message('orderNote','집계 한도 초과');viewState.cafe={error:true};showOverview();return;
     }
-    var summary = core.summarizeOrders(result.data);
-    message('orderCount',summary.count.toLocaleString('ko-KR')+'건');
-    message('orderAmount',won(summary.amount));
-    message('orderNote','마지막 동기화 기준');
-    message('cafeStatus','오늘 들어온 주문을 표시합니다. 취소·환불·미입금은 차감하지 않았어요.');
+    function total(start,end){return core.summarizeOrders((result.data||[]).filter(function(row){return row.ordered_at >= start && row.ordered_at < end;}));}
+    var selected = total(bounds.gte,bounds.lt), monthTotal=total(monthBounds.gte,monthBounds.lt);
+    var coverage=periods.coverage(range,account.last_synced_at,account.orders_synced_from);
+    var monthCoverage=periods.coverage(month,account.last_synced_at,account.orders_synced_from);
+    viewState.cafe={connected:true,selected:selected,month:monthTotal,coverage:coverage,monthCoverage:monthCoverage,syncedAt:account.last_synced_at};
+    if(coverage==='none'||coverage==='unknown'){
+      message('cafeStatus','선택 기간의 주문 동기화 범위를 확인할 수 없어요. 주문 동기화 · 다시 조회를 눌러 주세요.');
+      message('orderNote','동기화 범위 확인 전');
+    } else {
+      message('orderCount',selected.count.toLocaleString('ko-KR')+'건');
+      message('orderAmount',won(selected.amount));
+      message('orderNote',range.label+' · 마지막 동기화 기준');
+      message('cafeStatus',range.label+' 주문입니다. 취소·환불·미입금은 차감하지 않았어요.');
+    }
+    showOverview();
   }
   async function loadMeta(account, id){
-    if(!account){ message('metaStatus','Meta 광고계정이 연결되지 않았어요.'); message('adNote','연결 전'); return; }
+    if(!account){ message('metaStatus','Meta 광고계정이 연결되지 않았어요.'); message('adNote','연결 전');viewState.meta=null;showOverview();return; }
     if(account.status !== 'connected'){
       message('metaStatus',account.external_account_id ? 'Meta 인증이 끊어졌어요. 다시 연결해 주세요.' : 'Meta 광고계정 선택을 완료해 주세요.');
-      message('adNote','연결 확인 필요'); return;
+      message('adNote','연결 확인 필요');viewState.meta=null;showOverview();return;
     }
-    var result = await sb.functions.invoke('meta-insights',{body:{connected_account_id:account.id}});
+    var body={connected_account_id:account.id};
+    if(period.kind==='yesterday'||period.kind==='date'){body.period=period.kind;if(period.date)body.date=period.date;}
+    var result = await sb.functions.invoke('meta-insights',{body:body});
     if(id !== requestId) return;
     var data = result.data;
     if(result.error || !data || data.ok !== true){
       message('metaStatus','Meta 성과를 불러오지 못했어요. 연결 상태를 확인해 주세요.');
-      message('adNote','조회 실패'); return;
+      message('adNote','조회 실패');viewState.meta={error:true};showOverview();return;
     }
-    var today = data.today || {}, currency = data.account && data.account.currency;
+    viewState.meta=data;
+    var today = period.kind==='month' ? data.month || {} : period.kind==='today' ? data.today || {} : data.selected || {};
+    var currency = data.account && data.account.currency;
     message('adSpend',metaMoney(today.spend,currency));
     message('adRoas',today.roas == null ? '—' : Math.round(today.roas * 100).toLocaleString('ko-KR')+'%');
     message('adNote','Meta 광고계정 시간대 기준');
     message('metaStatus','Meta 자체 귀속 기준의 광고 성과입니다.');
     message('metaPurchase',today.purchase_value_observed ? 'Meta 귀속 구매금액: '+metaMoney(today.purchase_value,currency) : 'Meta 구매금액은 측정되지 않았어요.');
+    showOverview();publish();
   }
   byId('authMode').addEventListener('click', function(){
     signupMode = !signupMode;
@@ -207,7 +267,33 @@
     if(userId === id && session.data && session.data.user) signedIn(session.data.user);
   });
   byId('storeSelect').addEventListener('change',function(){
-    var id = ++requestId; loadSelected(this.value,id);
+    var id = ++requestId; resetCards();publish();loadSelected(this.value,id);
+  });
+  function switchView(view){
+    var calculator = view === 'calculator';
+    byId('overviewView').hidden = calculator; byId('calculatorView').hidden = !calculator;
+    document.querySelectorAll('[data-view]').forEach(function(btn){
+      var active = btn.getAttribute('data-view') === view;
+      btn.setAttribute('aria-current',active?'page':'false');
+      if(btn.closest('.sidebar')) btn.className=active?'sidebar-current':'sidebar-link';
+    });
+  }
+  document.querySelectorAll('[data-view]').forEach(function(btn){btn.addEventListener('click',function(){switchView(btn.getAttribute('data-view'));window.scrollTo(0,0);});});
+  document.querySelectorAll('[data-period]').forEach(function(btn){btn.addEventListener('click',function(){
+    period={kind:btn.getAttribute('data-period'),date:null}; byId('periodDate').value='';
+    document.querySelectorAll('[data-period]').forEach(function(b){b.setAttribute('aria-pressed',b===btn?'true':'false');});
+    var label=periods.resolve(period.kind,null,Date.now()).label;
+    message('ordersLabel','Cafe24 '+label+' 주문');message('amountLabel','Cafe24 '+label+' 주문금액');
+    message('spendLabel','Meta '+label+' 광고비');message('roasLabel','Meta '+label+' ROAS');
+    if(dashboardReady && byId('storeSelect').value)loadSelected(byId('storeSelect').value,++requestId);
+  });});
+  byId('periodDate').max=periods.kstDate(Date.now());
+  byId('periodDate').addEventListener('change',function(){
+    if(!periods.resolve('date',this.value,Date.now())){this.value='';return;}
+    period={kind:'date',date:this.value};
+    document.querySelectorAll('[data-period]').forEach(function(b){b.setAttribute('aria-pressed','false');});
+    ['ordersLabel','amountLabel','spendLabel','roasLabel'].forEach(function(id){var original={ordersLabel:'Cafe24 주문',amountLabel:'Cafe24 주문금액',spendLabel:'Meta 광고비',roasLabel:'Meta ROAS'}[id];message(id,original+' · '+period.date);});
+    if(dashboardReady && byId('storeSelect').value)loadSelected(byId('storeSelect').value,++requestId);
   });
   byId('refresh').addEventListener('click',async function(){
     if(!userId || syncing) return;
@@ -217,10 +303,12 @@
     message('pageMessage','Cafe24 주문을 동기화하고 있어요. 완료되면 수치를 다시 조회합니다.');
     var syncError = '';
     try{
-      var accounts = await sb.from('connected_accounts').select('id,status').eq('store_id',storeId).eq('provider','cafe24').limit(1);
+      var accounts = await sb.from('connected_accounts').select('id,status,last_synced_at').eq('store_id',storeId).eq('provider','cafe24').limit(1);
       if(accounts.error) syncError = 'Cafe24 연결 상태를 확인하지 못했어요.';
       else if(accounts.data && accounts.data[0] && accounts.data[0].status === 'connected'){
-        var result = await sb.functions.invoke('cafe24-orders-sync',{body:{store_id:storeId}});
+        var range=periods.resolve(period.kind,period.date,Date.now());
+        var plan=periods.syncPlan(range,Date.now(),accounts.data[0].last_synced_at);
+        var result = await sb.functions.invoke('cafe24-orders-sync',{body:{store_id:storeId,start_date:plan.start_date,end_date:plan.end_date}});
         if(result.error || !result.data || result.data.ok !== true){
           var body = result.error && result.error.context && await result.error.context.json().catch(function(){return null;});
           syncError = body && body.code === 'RECONNECT_REQUIRED'
@@ -233,6 +321,7 @@
       syncing = false; byId('refresh').disabled = false;
       if(id === requestId && owner === userId && byId('storeSelect').value === storeId){
         await loadStores(id);
+        if(window.LaunchRoasAdlog) window.LaunchRoasAdlog.refresh();
         if(syncError) message('pageMessage',syncError);
         else message('pageMessage','주문 동기화와 다시 조회를 완료했어요.');
       }

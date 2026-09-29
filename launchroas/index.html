@@ -68,38 +68,105 @@
     <section id="dashboard" class="dashboard" hidden>
       <aside class="sidebar" aria-label="서비스 메뉴">
         <p class="sidebar-label">WORKSPACE</p>
-        <div class="sidebar-current"><span class="nav-icon" aria-hidden="true">◫</span> 운영 현황</div>
+        <button class="sidebar-current" type="button" data-view="overview"><span class="nav-icon" aria-hidden="true">◫</span> 운영 현황</button>
+        <button class="sidebar-link" type="button" data-view="calculator"><span class="nav-icon" aria-hidden="true">▦</span> 마진 계산기</button>
         <a href="https://launchdesk.co.kr/#/account" class="sidebar-link"><span class="nav-icon" aria-hidden="true">⌘</span> 연결 관리 <span class="external" aria-hidden="true">↗</span></a>
         <div class="sidebar-bottom"><span class="caption-dot"></span> LAUNCHROAS <span class="version">EARLY ACCESS</span></div>
       </aside>
       <div class="workspace">
+      <nav class="mobile-nav" aria-label="LaunchROAS 메뉴"><button type="button" data-view="overview" aria-current="page">운영 현황</button><button type="button" data-view="calculator">마진 계산기</button></nav>
+      <div id="overviewView">
       <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>운영 현황</strong></div>
       <p class="account-notice">LaunchROAS 로그인: <strong id="workspaceEmail"></strong> · 런치데스크에서는 같은 계정으로 로그인해야 이 쇼핑몰의 연결을 관리할 수 있습니다. <button id="switchAccount" type="button" class="inline-button">계정 바꾸기</button></p>
       <div class="dashboard-head">
         <div><p class="eyebrow"><span class="eyebrow-line"></span> TODAY'S OVERVIEW</p><h1>운영 현황<span class="title-period">.</span></h1><p class="intro">주문과 광고의 오늘을 살펴보세요.</p></div>
         <div class="controls"><label for="storeSelect">쇼핑몰</label><select id="storeSelect"></select><button id="refresh" type="button" class="secondary">주문 동기화 · 다시 조회 <span aria-hidden="true">↻</span></button></div>
       </div>
+      <div class="period-controls" role="group" aria-label="운영 현황 조회 기간"><button type="button" data-period="today" aria-pressed="true">오늘</button><button type="button" data-period="yesterday" aria-pressed="false">어제</button><button type="button" data-period="month" aria-pressed="false">이번 달</button><label for="periodDate">날짜 선택</label><input id="periodDate" type="date"></div>
       <p id="pageMessage" class="message page-message" role="status"></p>
       <div class="section-heading"><div><p class="section-kicker">PERFORMANCE</p><h2>오늘의 숫자</h2></div><span>각 서비스의 집계 기준</span></div>
       <div class="metric-grid">
-        <article class="metric"><span>Cafe24 오늘 주문</span><strong id="orderCount">—</strong><small id="orderNote">연결 상태 확인 전</small></article>
-        <article class="metric"><span>Cafe24 오늘 주문금액</span><strong id="orderAmount">—</strong><small>취소·환불·미입금 미차감</small></article>
-        <article class="metric"><span>Meta 오늘 광고비</span><strong id="adSpend">—</strong><small id="adNote">광고계정 상태 확인 전</small></article>
-        <article class="metric"><span>Meta ROAS</span><strong id="adRoas">—</strong><small>Meta 귀속 구매금액 ÷ 광고비</small></article>
+        <article class="metric"><span id="ordersLabel">Cafe24 오늘 주문</span><strong id="orderCount">—</strong><small id="orderNote">연결 상태 확인 전</small></article>
+        <article class="metric"><span id="amountLabel">Cafe24 오늘 주문금액</span><strong id="orderAmount">—</strong><small>취소·환불·미입금 미차감</small></article>
+        <article class="metric"><span id="spendLabel">Meta 오늘 광고비</span><strong id="adSpend">—</strong><small id="adNote">광고계정 상태 확인 전</small></article>
+        <article class="metric"><span id="roasLabel">Meta 오늘 ROAS</span><strong id="adRoas">—</strong><small>Meta 귀속 구매금액 ÷ 광고비</small></article>
       </div>
       <div class="section-heading status-heading"><div><p class="section-kicker">CONNECTIONS</p><h2>연결 상태</h2></div></div>
       <section class="detail-grid" aria-label="서비스 연결 상태">
         <article class="detail"><div class="detail-title"><span class="service-icon cafe-icon">C</span><h3>Cafe24 주문</h3></div><p id="cafeStatus">연결 상태를 확인하고 있어요.</p><p id="lastSync" class="small"></p></article>
         <article class="detail"><div class="detail-title"><span class="service-icon meta-icon">M</span><h3>Meta 광고</h3></div><p id="metaStatus">연결 상태를 확인하고 있어요.</p><p id="metaPurchase" class="small"></p></article>
       </section>
+      <div class="section-heading"><div><p class="section-kicker">OPERATIONS</p><h2>쇼핑몰 운영 현황</h2></div></div>
+      <section class="operations-panel" aria-label="쇼핑몰 운영 현황">
+        <div class="operations-columns"><div><h3>오늘의 운영 브리핑</h3><div id="briefList" class="brief-list"></div></div><div><h3>광고 상태</h3><div id="adState" class="status-list"></div></div></div>
+        <div class="month-panel"><h3>이번 달 운영 현황</h3><div id="monthSummary" class="month-summary"></div></div>
+      </section>
+      <div class="support-grid">
+        <section class="detail"><h3>세팅 대행</h3><p>기본 쇼핑몰 세팅 · 연동·추적 세팅 · 전체 초기 세팅</p><p>상담과 견적 요청은 런치데스크에서 진행해요. 두 사이트에 같은 계정으로 로그인했는지 확인해 주세요.</p><a class="manage-link" href="https://launchdesk.co.kr/#/services/setup">세팅 대행 알아보기 ↗</a></section>
+        <section class="detail"><h3>연결 상태</h3><div id="connectionSummary" class="status-list"></div><a class="manage-link" href="https://launchdesk.co.kr/#/account">연결 관리 ↗</a></section>
+      </div>
+      <section class="operations-panel adlog-panel" aria-labelledby="adlogTitle">
+        <div class="adlog-head"><div><p class="section-kicker">AD RECORDS</p><h2 id="adlogTitle">광고 기록</h2><p class="small">직접 입력한 기록과 Meta 하루 합계를 함께 볼 수 있어요. Meta 귀속 구매금액은 Cafe24 주문금액과 합산하지 않습니다.</p></div><button id="adlogAdd" type="button" class="secondary">+ 기록 추가</button></div>
+        <div class="adlog-toolbar"><label for="adlogMetaDate">Meta 기록할 날짜</label><input id="adlogMetaDate" type="date"><button id="adlogMetaSave" type="button" class="secondary">Meta 성과 기록하기 (어제)</button><span id="adlogMessage" class="small" role="status"></span></div>
+        <form id="adlogForm" class="adlog-form" hidden><label>날짜<input id="adlogDate" type="date" required></label><label>소재명<input id="adlogName" maxlength="100" required></label><label>광고비 (원)<input id="adlogSpend" type="number" min="0" required></label><label>전환 매출 (원)<input id="adlogRevenue" type="number" min="0" required></label><label>채널<select id="adlogChannel"><option>메타</option><option>네이버</option><option>카카오</option><option>인스타</option></select></label><div class="form-actions"><button type="submit" class="primary">저장하기</button><button type="button" id="adlogCancel" class="secondary">취소</button></div></form>
+        <div class="adlog-table-wrap"><table><thead><tr><th>날짜</th><th>채널</th><th>기록 내용</th><th>광고비</th><th>전환 매출</th><th>ROAS</th><th></th></tr></thead><tbody id="adlogRows"></tbody></table></div>
+        <div class="adlog-totals"><div>총 광고비 <strong id="adlogTotalSpend">—</strong></div><div>평균 ROAS <strong id="adlogAverageRoas">—</strong></div><div>최고 기록 <strong id="adlogBest">—</strong></div></div>
+      </section>
       <p class="footnote">Cafe24 주문금액과 Meta 귀속 구매금액은 집계 기준이 달라 합산하지 않습니다. 주문 데이터는 마지막 동기화 시각 이후의 주문을 포함하지 않을 수 있습니다.</p>
       <a href="https://launchdesk.co.kr/#/account" class="manage-link">쇼핑몰·광고계정 연결 관리 <span aria-hidden="true">↗</span></a>
+      </div>
+      <section id="calculatorView" hidden aria-labelledby="calculatorTitle">
+        <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>마진 계산기</strong></div>
+        <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> PRODUCT ECONOMICS</p><h1 id="calculatorTitle">마진 계산기<span class="title-period">.</span></h1><p class="intro">상품 한 주문의 예상 잔액부터 A상품 광고 전체의 손익까지 확인하세요.</p></div></div>
+        <div class="calc-mode"><button type="button" data-calc-mode="simple" aria-pressed="true">간편 입력</button><button type="button" data-calc-mode="detailed" aria-pressed="false">상세 입력</button></div>
+        <div class="calc-examples"><label for="calcExample">입력이 막힌다면 예시로 확인</label><select id="calcExample"><option value="">내 입력값 유지</option></select><button id="calcExampleExit" type="button" class="inline-button" hidden>내 계산으로 돌아가기</button><span id="calcExampleNote" class="small"></span></div>
+        <div class="calculator-grid">
+          <form id="calcForm" class="calc-card">
+            <h2>상품·판매 조건</h2>
+            <div class="calc-fields">
+              <label>상품명 <span>계산 저장 시 표시</span><input id="calcProduct" placeholder="예: A상품"></label>
+              <label>판매가 (원) <b>필수</b><input id="calcPrice" type="number" min="1" required placeholder="30000"></label>
+              <label data-detail>판매 수량 (한 주문) <input id="calcQty" type="number" min="1" step="1" value="1"></label>
+              <label>상품 원가 (개당 원) <b>필수</b><input id="calcCost" type="number" min="0" required placeholder="15000"></label>
+              <label data-detail>판매자 부담 할인 (주문당 원)<input id="calcDiscount" type="number" min="0" placeholder="0"></label>
+              <label>배송 조건<select id="calcShippingType"><option value="free">무료배송</option><option value="paid">고객 배송비 별도</option></select></label>
+              <label id="calcCustomerShipWrap" hidden>고객에게 받는 배송비 (원)<input id="calcCustomerShip" type="number" min="0" placeholder="3000"></label>
+              <label>실제 배송비 (주문당 원)<input id="calcActualShip" type="number" min="0" placeholder="3000"></label>
+              <label>포장·부자재 (주문당 원)<input id="calcPackaging" type="number" min="0" placeholder="1000"></label>
+              <label>판매 수수료율 (%) <b>필수</b><input id="calcFee" type="number" min="0" max="100" step="0.01" required placeholder="6"></label>
+              <label>판매 플랫폼 <span>안내용 · 요율 자동 입력 없음</span><select id="calcPlatform"><option value="">선택 안 함</option><option value="cafe24">카페24</option><option value="smartstore">스마트스토어</option><option value="coupang">쿠팡</option><option value="other">기타·자사몰</option></select></label>
+              <label data-detail>상품 수수료 기준<select id="calcFeeBase"><option value="after_discount">할인 후 상품금액</option><option value="before_discount">할인 전 상품금액</option></select></label>
+              <label data-detail>수수료 부가세<select id="calcFeeVat"><option value="included">포함</option><option value="excluded">별도 (10% 가산)</option></select></label>
+              <label data-detail>배송비 수수료<select id="calcShipFeeMode"><option value="none">없음</option><option value="same">상품과 동일</option><option value="separate">별도 요율</option></select></label>
+              <label id="calcShipFeeRateWrap" data-detail hidden>배송비 수수료율 (%)<input id="calcShipFeeRate" type="number" min="0" max="100" step="0.01"></label>
+              <label data-detail>별도 PG 수수료율 (%)<input id="calcPgRate" type="number" min="0" max="100" step="0.01" placeholder="0"></label>
+              <label data-detail>기타 주문당 비용 (원)<input id="calcOther" type="number" min="0" placeholder="0"></label>
+            </div>
+            <p id="calcPlatformHelp" class="small">판매자센터나 계약서에 표시된 수수료율을 직접 확인해 입력하세요.</p>
+            <h2>주문당 광고비</h2><p class="small">상품 결제금액 대비 비율 또는 주문당 금액 중 하나를 반영합니다.</p>
+            <div class="calc-pills" role="group" aria-label="광고비 설정"><button type="button" data-calc-ad="none" aria-pressed="true">사용 안 함</button><button type="button" data-calc-ad="6">6%</button><button type="button" data-calc-ad="10">10%</button><button type="button" data-calc-ad="20">20%</button><button type="button" data-calc-ad="custom">직접 입력</button></div>
+            <div id="calcAdCustom" class="calc-fields" hidden><label>입력 방식<select id="calcAdKind"><option value="rate">비율 (%)</option><option value="amount">주문당 금액 (원)</option></select></label><label id="calcAdRateWrap">비율 (%)<input id="calcAdRate" type="number" min="0" step="0.1"></label><label id="calcAdAmountWrap" hidden>주문당 광고비 (원)<input id="calcAdAmount" type="number" min="0"></label></div>
+            <label class="calc-target">주문당 목표 잔액 (선택, 원)<input id="calcTarget" type="number" min="0" placeholder="목표 광고비 여유를 확인"></label>
+            <p id="calcError" class="message" role="alert"></p>
+          </form>
+          <div class="calc-results"><div class="calc-card"><h2>한 주문의 계산 결과</h2><p id="calcEmpty" class="small">판매가 · 원가 · 판매 수수료율을 입력하면 결과가 나와요.</p><div id="calcResult" hidden><p class="calc-result-label">광고비 차감 후 예상 잔액</p><strong id="calcPostAd" class="calc-hero-value">—</strong><div id="calcFacts" class="calc-facts"></div><p class="small">부가세 납부액·소득세·미입력 고정비 전의 추정값입니다.</p><button id="calcSave" type="button" class="secondary">계산 결과 저장</button></div></div>
+            <div class="calc-card"><h2 id="campaignTitle">A상품 광고 손익</h2><p class="small">해당 상품 광고에 쓴 총액과 그 광고로 발생한 주문 수를 직접 입력하세요. 자동 귀속 추정은 하지 않습니다.</p><div class="calc-fields"><label>광고비 총액 (원)<input id="campaignSpend" type="number" min="0" placeholder="예: 100000"></label><label>광고로 발생한 이 상품 주문 수<input id="campaignOrders" type="number" min="0" step="1" placeholder="예: 10"></label></div><div id="campaignResult" class="calc-facts">두 값을 입력하면 광고 후 남는 금액을 계산해요.</div></div>
+            <div class="calc-card"><div class="history-head"><h2>최근 저장한 계산</h2><button id="calcClear" type="button" class="inline-button">전체 지우기</button></div><div id="calcHistory" class="history-list"></div></div>
+          </div>
+        </div>
+      </section>
       </div>
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
   <script src="./policy-consent-core.js"></script>
   <script src="./core.js"></script>
+  <script src="./ops-period-core.js"></script>
+  <script src="./margin-calc.js"></script>
+  <script src="./campaign-core.js"></script>
+  <script src="./adlog-meta.js"></script>
   <script src="./app.js"></script>
+  <script src="./calculator.js"></script>
+  <script src="./adlog.js"></script>
 </body>
 </html>
