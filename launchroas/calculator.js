@@ -105,12 +105,13 @@
   ['campaignSpend','campaignOrders'].forEach(function(id){byId(id).addEventListener('input',renderCampaign);});
   window.addEventListener('launchroas:ad-selection',function(event){
     var ad=event.detail,ctx=app.getContext();
-    if(!ad||!ctx.userId||String(ctx.storeId)!==String(ad.storeId)||ad.currency!=='KRW')return;
-    byId('campaignSpend').value=String(ad.spend);
+    if(!ad||!ctx.userId||String(ctx.storeId)!==String(ad.storeId))return;
+    var krw=String(ad.currency).toUpperCase()==='KRW';
+    byId('campaignSpend').value=krw?String(ad.spend):'';
     byId('campaignOrders').value='';
     var range=ad.range&&ad.range.since&&ad.range.until?ad.range.since+' ~ '+ad.range.until:'선택 기간';
     var note=byId('linkedAdNotice');note.hidden=false;
-    note.textContent='연결된 광고: '+ad.adName+' · '+range+' · Meta 광고비 '+MC.fmtWon(ad.spend)+'. 상품 판매가·원가를 확인하고 이 광고로 발생한 해당 상품 주문 수를 입력해 주세요. Meta 구매 '+(ad.purchase==null?'측정 안 됨':ad.purchase+'건')+'은 상품별 주문 수로 자동 입력하지 않습니다.';
+    note.textContent='연결된 광고: '+ad.adName+' · '+range+' · '+(krw?'광고비 '+MC.fmtWon(ad.spend)+' 자동 입력됨.':'Meta 광고비 '+Number(ad.spend).toLocaleString('ko-KR')+' '+ad.currency+'. 원화 환산 금액을 확인해 광고비 총액 칸에 직접 입력해 주세요.')+' 상품 판매가·원가와 이 광고로 발생한 해당 상품 주문 수를 확인해 입력하세요. Meta 구매 '+(ad.purchase==null?'측정 안 됨':ad.purchase+'건')+'은 상품별 주문 수로 자동 입력하지 않습니다.';
     render();
   });
   document.querySelectorAll('[data-calc-mode]').forEach(function(btn){btn.addEventListener('click',function(){mode=this.getAttribute('data-calc-mode');updateControls();render();});});

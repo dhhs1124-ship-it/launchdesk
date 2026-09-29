@@ -29,3 +29,58 @@
 .operations-panel{padding:24px 27px}.operations-columns{gap:25px}.operations-columns>div+div{padding-left:25px}.operations-panel h3{font-size:17px;color:#f0f3f1}.brief-list,.status-list,.month-summary{gap:10px}.summary-row{display:grid;gap:6px;padding:14px 15px;border:1px solid #ffffff15;border-radius:10px;background:#22282a}.summary-row>span{font-size:12px;color:#a9b3b5}.summary-row strong{font-size:clamp(17px,1.5vw,22px);letter-spacing:-.04em;line-height:1.35;color:#fff;overflow-wrap:anywhere}.summary-row small{font-size:11px;line-height:1.5;color:#a3adaf}.brief-list p,.status-list p,.month-summary p{font-size:14px;line-height:1.65;color:#d0d7d7}.brief-list p{padding:11px 13px;background:#24292a;border-radius:0 8px 8px 0}.month-panel{margin-top:20px;padding-top:20px}.support-grid{display:block;margin-top:18px}.support-grid .detail{min-height:0;padding:18px 22px}.support-grid .detail h3{margin-bottom:7px}.support-grid .detail p{font-size:13px}.support-grid .manage-link{margin-top:9px}.linked-ad-notice{padding:13px 15px;border:1px solid #ff9a6155;border-radius:9px;background:#ff9a6114;color:#f5ddcc;font-size:13px;line-height:1.7}
 @media(max-width:1100px){.ad-item{flex-wrap:wrap}.ad-item-heading{width:100%}.ad-item .ad-perf-stats{min-width:60%}}
 @media(max-width:760px){.topbar{height:auto;min-height:64px;flex-wrap:wrap;gap:9px;padding-top:10px;padding-bottom:10px}.top-actions{flex-wrap:wrap;gap:8px;justify-content:flex-end}.connection-pills{order:5;width:100%;justify-content:flex-end}.connection-pill{font-size:10px}.ad-perf-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-columns>div+div{padding:18px 0 0}.ad-item .ad-perf-stats{min-width:100%}.ad-item .secondary{width:100%}#overviewView .breadcrumb{margin-bottom:30px}.metric{min-height:145px}}
+/* 운영 화면: 고정 메뉴와 첫 화면에 필요한 정보의 밀도 */
+@media(min-width:761px){
+  .topbar{position:sticky;top:0;z-index:30}
+  .dashboard{align-items:stretch}
+  .dashboard>.sidebar{position:sticky;top:72px;align-self:start;height:calc(100vh - 72px);height:calc(100dvh - 72px);overflow-y:auto;scrollbar-width:thin}
+}
+#overviewView .breadcrumb{margin-bottom:19px}
+#overviewView .dashboard-head{padding-bottom:18px}
+#overviewView .dashboard-head h1{margin:9px 0 3px;font-size:clamp(33px,3vw,44px)}
+#overviewView .dashboard-head .intro{font-size:13px;line-height:1.45}
+#overviewView .period-controls{margin-top:12px}
+#overviewView .page-message{min-height:0;margin:6px 0}
+#overviewView .page-message:empty{display:none}
+#overviewView>.section-heading{margin:16px 0 11px}
+#overviewView .metric{min-height:126px;padding:15px 18px}
+#overviewView .metric strong{margin:8px 0;font-size:clamp(23px,2vw,31px)}
+#overviewView .metric small{font-size:11px}
+.overview-main-grid{display:grid;grid-template-columns:minmax(0,1.13fr) minmax(0,.87fr);gap:20px;align-items:start;margin-top:24px}
+.overview-main-grid .section-heading{margin:0 0 12px!important}
+.overview-main-grid .ad-performance{margin:0}
+.overview-main-grid .ad-performance>.small{line-height:1.55}
+.overview-main-grid .adset-row{padding:13px 15px}
+.overview-main-grid .adset-name strong{font-size:15px}
+.overview-main-grid .ad-perf-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin-top:11px}
+.overview-main-grid .ad-perf-metric strong{font-size:15px}
+.overview-main-grid .ad-item{align-items:flex-start;flex-wrap:wrap;gap:10px;padding:12px}
+.overview-main-grid .ad-item-heading{width:100%}
+.overview-main-grid .ad-item .ad-perf-stats{width:100%;min-width:0}
+.overview-main-grid .ad-item .secondary{width:100%}
+.overview-main-grid .operations-panel{margin:0;padding:16px}
+.overview-main-grid .operations-columns{grid-template-columns:1fr;gap:14px}
+.overview-main-grid .operations-columns>div+div{border-left:0;border-top:1px solid #ffffff18;padding:14px 0 0}
+.overview-main-grid .operations-panel h3{margin:0 0 9px;font-size:15px}
+.overview-main-grid .month-panel{margin-top:14px;padding-top:14px}
+.overview-main-grid .month-summary{grid-template-columns:1fr;gap:7px}
+.overview-main-grid .brief-list,.overview-main-grid .status-list{gap:7px}
+.overview-main-grid .summary-row{padding:9px 11px;gap:3px}
+.overview-main-grid .summary-row strong{font-size:16px}
+.overview-main-grid .summary-row small{font-size:10px}
+.overview-main-grid .status-list p{margin:0;font-size:12px}
+.ad-performance-more{width:100%;margin-top:10px;padding:10px;border:1px solid #ffffff25;border-radius:9px;background:#202628;color:#ffbb91;font-size:12px;font-weight:700}
+.ad-performance-more:hover{background:#2c3335}
+.adlog-disclosure{margin-top:17px;border:1px solid #ffffff1b;border-radius:13px;background:#191d1f}
+.adlog-disclosure>summary{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:15px 21px;cursor:pointer;list-style:none;font-size:15px;font-weight:700}
+.adlog-disclosure>summary::-webkit-details-marker{display:none}
+.adlog-disclosure>summary small{display:inline;margin-left:14px;color:#9ea9ab;font-size:11px;font-weight:400}
+.adlog-disclosure .disclosure-action{flex:none;color:#ffbb91;font-size:12px}
+.adlog-disclosure[open] .disclosure-action{font-size:0}
+.adlog-disclosure[open] .disclosure-action:after{content:'접기 ↑';font-size:12px}
+.adlog-disclosure .adlog-panel{margin:0;border:0;border-top:1px solid #ffffff1b}
+.support-grid{margin-top:17px}
+.support-grid .detail{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:13px 20px}
+.support-grid .detail h3,.support-grid .detail p,.support-grid .manage-link{margin:0}
+@media(max-width:1150px){.overview-main-grid{grid-template-columns:1fr}.overview-main-grid .operations-columns{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-main-grid .operations-columns>div+div{border-top:0;border-left:1px solid #ffffff18;padding:0 0 0 18px}.overview-main-grid .month-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.overview-main-grid{gap:23px;margin-top:22px}.overview-main-grid .operations-columns,.overview-main-grid .month-summary{grid-template-columns:1fr}.overview-main-grid .operations-columns>div+div{border-left:0;border-top:1px solid #ffffff18;padding:14px 0 0}.adlog-disclosure>summary small{display:block;margin:3px 0 0}.support-grid .detail{display:block}.support-grid .detail p{margin:5px 0}.support-grid .manage-link{margin-top:5px}}

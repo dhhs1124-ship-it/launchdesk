@@ -4,6 +4,7 @@
   if(!app)return;
   var list=document.getElementById('adPerformanceList');
   var message=document.getElementById('adPerformanceMessage');
+  var more=document.getElementById('adPerformanceMore');
   var currentKey='',generation=0,accountCurrency='KRW',activeRange=null;
   function money(value){
     try{return new Intl.NumberFormat('ko-KR',{style:'currency',currency:accountCurrency,maximumFractionDigits:2}).format(Number(value)||0);}
@@ -20,8 +21,7 @@
     heading.append(element('strong','',ad.ad_name||'이름 없는 광고'),element('span','',adset.adset_name||'광고 세트'));
     var stats=element('div','ad-perf-stats');
     stats.append(metric('광고비',money(m.spend)),metric('Meta 구매',m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'측정 안 됨'),metric('ROAS',percent(m.roas)),metric('링크 클릭',number(m.link_clicks)));
-    var button=element('button','secondary','마진 계산 연결 →');button.type='button';button.disabled=accountCurrency!=='KRW';
-    button.title=button.disabled?'원화 계정의 광고비만 계산기에 자동 입력할 수 있어요.':'';
+    var button=element('button','secondary','마진 계산 연결 →');button.type='button';
     button.addEventListener('click',function(){
       if(!valid(ctx,key))return;
       app.openCalculatorFromAd({adId:ad.ad_id,adName:ad.ad_name||'이름 없는 광고',spend:Number(m.spend)||0,
@@ -58,10 +58,16 @@
     });
     head.append(name,button);row.append(head,stats,details);return row;
   }
+  more.addEventListener('click',function(){
+    var expanded=this.getAttribute('aria-expanded')!=='true';
+    this.setAttribute('aria-expanded',expanded?'true':'false');
+    this.textContent=expanded?'광고 세트 접기 ↑':'광고 세트 전체 보기 ↓';
+    Array.from(list.children).forEach(function(row,index){row.hidden=!expanded&&index>=3;});
+  });
   app.subscribe(async function(ctx){
     var key=ctx.userId+'|'+ctx.storeId+'|'+(ctx.metaAccount&&ctx.metaAccount.id)+'|'+ctx.period.kind+'|'+(ctx.period.date||'');
     if(key===currentKey)return;
-    currentKey=key;var id=++generation;list.replaceChildren();
+    currentKey=key;var id=++generation;list.replaceChildren();more.hidden=true;more.setAttribute('aria-expanded','false');more.textContent='광고 세트 전체 보기 ↓';
     if(!ctx.userId||!ctx.storeId){message.textContent='쇼핑몰을 선택하면 광고별 성과를 볼 수 있어요.';return;}
     if(!ctx.metaAccount||ctx.metaAccount.status!=='connected'){message.textContent='Meta 광고계정을 연결하면 광고별 성과가 표시돼요.';return;}
     message.textContent='광고별 성과를 불러오는 중이에요.';
@@ -69,12 +75,13 @@
       var response=await ctx.client.functions.invoke('meta-adset-insights',{body:params(ctx,'adsets')});
       if(id!==generation||!valid(ctx,key))return;
       if(response.error||!response.data||response.data.ok!==true){message.textContent='광고별 성과를 불러오지 못했어요. Meta 연결을 확인해 주세요.';return;}
-      var data=response.data;accountCurrency=data.account&&data.account.currency||'KRW';activeRange=data.range;
+      var data=response.data;accountCurrency=String(data.account&&data.account.currency||'KRW').toUpperCase();activeRange=data.range;
       if(data.truncated){message.textContent='조회 한도를 넘어 일부 광고 세트가 누락됐어요. 이 기간의 광고별 성과를 계산에 사용하지 마세요.';return;}
       var rows=[];(data.campaigns||[]).forEach(function(campaign){(campaign.adsets||[]).forEach(function(adset){rows.push({adset:adset,campaign:campaign});});});
       rows.sort(function(a,b){return Number(b.adset.metrics&&b.adset.metrics.spend||0)-Number(a.adset.metrics&&a.adset.metrics.spend||0);});
-      rows.forEach(function(row){list.appendChild(renderAdset(row.adset,row.campaign,ctx,key));});
+      rows.forEach(function(row,index){var el=renderAdset(row.adset,row.campaign,ctx,key);el.hidden=index>=3;list.appendChild(el);});
       var count=rows.length;
+      more.hidden=count<=3;if(count>3)more.textContent='광고 세트 전체 '+count+'개 보기 ↓';
       message.textContent=count?'광고 세트 '+count+'개 · 광고 보기를 눌러 개별 광고를 확인하세요.':'선택 기간에 성과가 잡힌 광고 세트가 없어요.';
     }catch(e){if(id===generation&&valid(ctx,key))message.textContent='광고별 성과 조회 중 오류가 발생했어요.';}
   });
