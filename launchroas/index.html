@@ -4,53 +4,73 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#101214">
   <title>LaunchROAS · 쇼핑몰 운영 현황</title>
   <meta name="description" content="Cafe24 주문과 Meta 광고 성과를 각각 확인하는 LaunchROAS">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="wordmark" href="./" aria-label="LaunchROAS 홈">Launch<span>ROAS</span></a>
+    <a class="wordmark" href="./" aria-label="LaunchROAS 홈"><span class="brand-mark" aria-hidden="true">L</span>Launch<span>ROAS</span></a>
     <div class="top-actions">
-      <a href="https://launchdesk.co.kr/" class="top-link">런치데스크 가이드 ↗</a>
+      <a href="https://launchdesk.co.kr/" class="top-link">런치데스크 가이드 <span aria-hidden="true">↗</span></a>
       <span id="accountEmail" class="account-email" hidden></span>
       <button type="button" id="logout" class="text-button" hidden>로그아웃</button>
     </div>
   </header>
   <main>
     <section id="loginPanel" class="login-panel">
-      <p class="eyebrow">LAUNCHROAS / EARLY ACCESS</p>
-      <h1>운영 중인 쇼핑몰의<br>주문과 광고를 한눈에.</h1>
-      <p class="intro">런치데스크에서 사용하던 계정으로 로그인하세요. 연결된 쇼핑몰의 실제 데이터만 표시합니다.</p>
-      <form id="loginForm" class="login-form">
-        <label for="email">이메일</label>
-        <input id="email" type="email" autocomplete="email" required>
-        <label for="password">비밀번호</label>
-        <input id="password" type="password" autocomplete="current-password" required>
-        <button type="submit" id="loginSubmit" class="primary">로그인</button>
-      </form>
-      <p id="loginMessage" class="message" role="status"></p>
-      <p class="small">계정이 없다면 <a href="https://launchdesk.co.kr/#/login">런치데스크에서 가입</a>하세요. Google·Kakao 로그인은 새 사이트의 인증 주소 설정 후 제공합니다.</p>
+      <div class="login-intro">
+        <p class="eyebrow"><span class="eyebrow-line"></span> LAUNCHDESK / ROAS</p>
+        <h1>오늘의 운영을<br><em>한눈에.</em></h1>
+        <p class="intro">쇼핑몰 주문과 광고 성과를 한 공간에서 확인하세요. 연결된 계정의 실제 데이터가 표시됩니다.</p>
+        <div class="login-caption"><span class="caption-dot"></span> Cafe24 주문 · Meta 광고</div>
+      </div>
+      <div class="login-card">
+        <p class="section-kicker">WELCOME BACK</p>
+        <h2>다시 만나서 반가워요.</h2>
+        <p class="form-description">런치데스크 계정으로 계속하세요.</p>
+        <form id="loginForm" class="login-form">
+          <label for="email">이메일</label>
+          <input id="email" type="email" autocomplete="email" placeholder="name@example.com" required>
+          <label for="password">비밀번호</label>
+          <input id="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required>
+          <button type="submit" id="loginSubmit" class="primary">로그인 <span aria-hidden="true">→</span></button>
+        </form>
+        <p id="loginMessage" class="message" role="status"></p>
+        <p class="small">계정이 없다면 <a href="https://launchdesk.co.kr/#/login">런치데스크에서 가입</a>하세요.<br>Google·Kakao 로그인은 새 사이트의 인증 주소 설정 후 제공합니다.</p>
+      </div>
     </section>
 
     <section id="dashboard" class="dashboard" hidden>
+      <aside class="sidebar" aria-label="서비스 메뉴">
+        <p class="sidebar-label">WORKSPACE</p>
+        <div class="sidebar-current"><span class="nav-icon" aria-hidden="true">◫</span> 운영 현황</div>
+        <a href="https://launchdesk.co.kr/#/account" class="sidebar-link"><span class="nav-icon" aria-hidden="true">⌘</span> 연결 관리 <span class="external" aria-hidden="true">↗</span></a>
+        <div class="sidebar-bottom"><span class="caption-dot"></span> LAUNCHROAS <span class="version">EARLY ACCESS</span></div>
+      </aside>
+      <div class="workspace">
+      <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>운영 현황</strong></div>
       <div class="dashboard-head">
-        <div><p class="eyebrow">OPERATIONS / OVERVIEW</p><h1>운영 현황</h1><p class="intro">오늘 기준 · 한국 시간의 주문, 광고계정 시간의 Meta 성과</p></div>
-        <div class="controls"><label for="storeSelect">쇼핑몰</label><select id="storeSelect"></select><button id="refresh" type="button" class="secondary">다시 조회</button></div>
+        <div><p class="eyebrow"><span class="eyebrow-line"></span> TODAY'S OVERVIEW</p><h1>운영 현황<span class="title-period">.</span></h1><p class="intro">주문과 광고의 오늘을 살펴보세요.</p></div>
+        <div class="controls"><label for="storeSelect">쇼핑몰</label><select id="storeSelect"></select><button id="refresh" type="button" class="secondary">다시 조회 <span aria-hidden="true">↻</span></button></div>
       </div>
-      <p id="pageMessage" class="message" role="status"></p>
+      <p id="pageMessage" class="message page-message" role="status"></p>
+      <div class="section-heading"><div><p class="section-kicker">PERFORMANCE</p><h2>오늘의 숫자</h2></div><span>각 서비스의 집계 기준</span></div>
       <div class="metric-grid">
         <article class="metric"><span>Cafe24 오늘 주문</span><strong id="orderCount">—</strong><small id="orderNote">연결 상태 확인 전</small></article>
         <article class="metric"><span>Cafe24 오늘 주문금액</span><strong id="orderAmount">—</strong><small>취소·환불·미입금 미차감</small></article>
         <article class="metric"><span>Meta 오늘 광고비</span><strong id="adSpend">—</strong><small id="adNote">광고계정 상태 확인 전</small></article>
         <article class="metric"><span>Meta ROAS</span><strong id="adRoas">—</strong><small>Meta 귀속 구매금액 ÷ 광고비</small></article>
       </div>
-      <section class="detail-grid">
-        <article class="detail"><h2>Cafe24 주문</h2><p id="cafeStatus">연결 상태를 확인하고 있어요.</p><p id="lastSync" class="small"></p></article>
-        <article class="detail"><h2>Meta 광고</h2><p id="metaStatus">연결 상태를 확인하고 있어요.</p><p id="metaPurchase" class="small"></p></article>
+      <div class="section-heading status-heading"><div><p class="section-kicker">CONNECTIONS</p><h2>연결 상태</h2></div></div>
+      <section class="detail-grid" aria-label="서비스 연결 상태">
+        <article class="detail"><div class="detail-title"><span class="service-icon cafe-icon">C</span><h3>Cafe24 주문</h3></div><p id="cafeStatus">연결 상태를 확인하고 있어요.</p><p id="lastSync" class="small"></p></article>
+        <article class="detail"><div class="detail-title"><span class="service-icon meta-icon">M</span><h3>Meta 광고</h3></div><p id="metaStatus">연결 상태를 확인하고 있어요.</p><p id="metaPurchase" class="small"></p></article>
       </section>
       <p class="footnote">Cafe24 주문금액과 Meta 귀속 구매금액은 집계 기준이 달라 합산하지 않습니다. 주문 데이터는 마지막 동기화 시각 이후의 주문을 포함하지 않을 수 있습니다.</p>
-      <a href="https://launchdesk.co.kr/#/account" class="manage-link">쇼핑몰·광고계정 연결 관리 ↗</a>
+      <a href="https://launchdesk.co.kr/#/account" class="manage-link">쇼핑몰·광고계정 연결 관리 <span aria-hidden="true">↗</span></a>
+      </div>
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
