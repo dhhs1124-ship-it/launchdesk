@@ -8,12 +8,12 @@
     var select=byId('connectionStore');select.replaceChildren();
     (ctx.stores||[]).forEach(function(store){var option=document.createElement('option');option.value=store.id;option.textContent=store.name;select.appendChild(option);});
     select.value=ctx.storeId||'';
-    byId('connectionStatus').textContent=ctx.storeId
-      ? 'Cafe24 '+(ctx.cafeAccount&&ctx.cafeAccount.status==='connected'?'연결됨':'미연결')+' · Meta '+(ctx.metaAccount&&ctx.metaAccount.status==='connected'?'연결됨':ctx.metaAccount?'광고계정 선택 필요':'미연결')
-      : '쇼핑몰을 먼저 등록하세요.';
+    var selected=(ctx.stores||[]).find(function(store){return String(store.id)===String(ctx.storeId);});
+    byId('connectionStatus').textContent=!ctx.storeId?'쇼핑몰을 먼저 등록하세요.':!ctx.connectionsLoaded?'연결 상태 확인 중…':
+      (selected?selected.name+' · ':'')+'Cafe24 '+(ctx.cafeAccount&&ctx.cafeAccount.status==='connected'?'연결됨':'미연결')+' · Meta '+(ctx.metaAccount&&ctx.metaAccount.status==='connected'?'연결됨':ctx.metaAccount?'광고계정 선택 필요':'미연결');
     byId('connectCafe').disabled=!ctx.storeId;byId('connectMeta').disabled=!ctx.storeId;
     byId('metaAccountPicker').hidden=true;
-    if(ctx.metaAccount&&ctx.metaAccount.status!=='connected')loadAdAccounts(ctx);
+    if(ctx.connectionsLoaded&&ctx.metaAccount&&ctx.metaAccount.status!=='connected')loadAdAccounts(ctx);
   }
   async function loadAdAccounts(ctx){
     var ticket=++generation,box=byId('metaAccountPicker');say('연결할 Meta 광고계정을 불러오는 중이에요.');

@@ -5,7 +5,7 @@
   var list=document.getElementById('adPerformanceList');
   var message=document.getElementById('adPerformanceMessage');
   var more=document.getElementById('adPerformanceMore');
-  var currentKey='',generation=0,accountCurrency='KRW',activeRange=null;
+  var currentKey='',generation=0,accountCurrency='KRW',activeRange=null,marginLinks={};
   function money(value){
     try{return new Intl.NumberFormat('ko-KR',{style:'currency',currency:accountCurrency,maximumFractionDigits:2}).format(Number(value)||0);}
     catch(e){return (accountCurrency+' '+(Number(value)||0).toLocaleString('ko-KR'));}
@@ -14,6 +14,19 @@
   function percent(value){return value==null?'—':Math.round(Number(value)*100).toLocaleString('ko-KR')+'%';}
   function element(tag,className,content){var el=document.createElement(tag);if(className)el.className=className;if(content!=null)el.textContent=content;return el;}
   function metric(label,value){var el=element('div','ad-perf-metric');el.append(element('span','',label),element('strong','',value));return el;}
+  function marginSummary(adset,m){
+    var link=marginLinks[String(adset.adset_id)],box=element('div','ad-margin-summary');
+    if(!link){box.textContent='연결된 상품·마진 없음';return box;}
+    var label=element('strong','',link.product_label+' · 주문당 광고 전 '+new Intl.NumberFormat('ko-KR').format(Number(link.pre_ad))+'원');
+    var note=element('small','','저장한 마진 기준 · Meta 전환 '+(m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'측정 안 됨'));
+    box.append(label,note);
+    if(accountCurrency==='KRW'&&m.purchase&&m.purchase.observed){
+      var estimated=Number(link.pre_ad)*Number(m.purchase.value)-Number(m.spend||0);
+      box.append(element('span','', '광고 후 추정 잔액 '+new Intl.NumberFormat('ko-KR').format(Math.round(estimated))+'원'));
+      box.append(element('small','', 'Meta 전환에 다른 상품 구매가 포함될 수 있어요. 실제 상품별 이익과 다를 수 있습니다.'));
+    }
+    return box;
+  }
   function params(ctx,scope,adsetId){var body={store_id:ctx.storeId,scope:scope,period:ctx.period.kind};if(ctx.period.kind==='date')body.date=ctx.period.date;if(adsetId)body.adset_id=adsetId;return body;}
   function valid(ctx,key){var latest=app.getContext();return key===currentKey && latest.userId===ctx.userId && latest.storeId===ctx.storeId && latest.period.kind===ctx.period.kind && latest.period.date===ctx.period.date;}
   function renderAd(ad,adset,ctx,key){
@@ -63,7 +76,7 @@
         purchase:m.purchase&&m.purchase.observed?Number(m.purchase.value):null,currency:accountCurrency,
         range:activeRange,storeId:ctx.storeId});
     });
-    head.append(name,button);row.append(head,stats,connect,details);return row;
+    head.append(name,button);row.append(head,stats,marginSummary(adset,m),connect,details);return row;
   }
   more.addEventListener('click',function(){
     var expanded=this.getAttribute('aria-expanded')!=='true';
@@ -74,7 +87,7 @@
   app.subscribe(async function(ctx){
     var key=ctx.userId+'|'+ctx.storeId+'|'+(ctx.metaAccount&&ctx.metaAccount.id)+'|'+ctx.period.kind+'|'+(ctx.period.date||'');
     if(key===currentKey)return;
-    currentKey=key;var id=++generation;list.replaceChildren();more.hidden=true;more.setAttribute('aria-expanded','false');more.textContent='광고 세트 전체 보기 ↓';
+    currentKey=key;var id=++generation;list.replaceChildren();marginLinks={};more.hidden=true;more.setAttribute('aria-expanded','false');more.textContent='광고 세트 전체 보기 ↓';
     if(!ctx.userId||!ctx.storeId){message.textContent='쇼핑몰을 선택하면 광고별 성과를 볼 수 있어요.';return;}
     if(!ctx.metaAccount||ctx.metaAccount.status!=='connected'){message.textContent='Meta 광고계정을 연결하면 광고별 성과가 표시돼요.';return;}
     message.textContent='광고별 성과를 불러오는 중이에요.';
@@ -84,6 +97,10 @@
       if(response.error||!response.data||response.data.ok!==true){message.textContent='광고별 성과를 불러오지 못했어요. Meta 연결을 확인해 주세요.';return;}
       var data=response.data;accountCurrency=String(data.account&&data.account.currency||'KRW').toUpperCase();activeRange=data.range;
       if(data.truncated){message.textContent='조회 한도를 넘어 일부 광고 세트가 누락됐어요. 이 기간의 광고별 성과를 계산에 사용하지 마세요.';return;}
+      var linked=await ctx.client.from('ad_margin_links').select('meta_adset_id,product_label,pre_ad').eq('store_id',ctx.storeId);
+      if(id!==generation||!valid(ctx,key))return;
+      if(linked.error){message.textContent='저장된 광고·마진 연결을 불러오지 못했어요. 연결 상태를 확인해 주세요.';return;}
+      (linked.data||[]).forEach(function(row){marginLinks[String(row.meta_adset_id)]=row;});
       var rows=[];(data.campaigns||[]).forEach(function(campaign){(campaign.adsets||[]).forEach(function(adset){rows.push({adset:adset,campaign:campaign});});});
       rows.sort(function(a,b){return Number(b.adset.metrics&&b.adset.metrics.spend||0)-Number(a.adset.metrics&&a.adset.metrics.spend||0);});
       rows.forEach(function(row,index){var el=renderAdset(row.adset,row.campaign,ctx,key);el.hidden=index>=3;list.appendChild(el);});
@@ -91,5 +108,9 @@
       more.hidden=count<=3;if(count>3)more.textContent='광고 세트 전체 '+count+'개 보기 ↓';
       message.textContent=count?'광고 세트 '+count+'개 · 광고 보기를 눌러 개별 광고를 확인하세요.':'선택 기간에 성과가 잡힌 광고 세트가 없어요.';
     }catch(e){if(id===generation&&valid(ctx,key))message.textContent='광고별 성과 조회 중 오류가 발생했어요.';}
+  });
+  window.addEventListener('launchroas:margin-linked',function(event){
+    if(String(event.detail.storeId)!==String(app.getContext().storeId))return;
+    currentKey='';app.selectStore(app.getContext().storeId);
   });
 })();

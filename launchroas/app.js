@@ -9,9 +9,9 @@
   var sb = window.supabase && window.supabase.createClient(PROJECT_URL, PUBLISHABLE_KEY);
   var userId = null, stores = [], requestId = 0, signupMode = false, syncing = false;
   var signupPending = false;
-  var dashboardReady = false, period = {kind:'today',date:null}, selectedCafe = null, selectedMeta = null;
+  var dashboardReady = false, connectionsLoaded = false, period = {kind:'today',date:null}, selectedCafe = null, selectedMeta = null;
   var viewState = {cafe:null,meta:null}, listeners = [];
-  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),cafeAccount:selectedCafe,metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date}}; }
+  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),connectionsLoaded:connectionsLoaded,cafeAccount:selectedCafe,metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date}}; }
   function publish(){ listeners.forEach(function(fn){try{fn(context());}catch(e){console.warn('[launchroas] 구독자 오류',e);}}); }
   window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());},reloadStores:function(){return loadStores(++requestId);},selectStore:function(id){byId('storeSelect').value=id;resetCards();publish();return loadSelected(id,++requestId);}};
   function message(id, value){ byId(id).textContent = value || ''; }
@@ -29,7 +29,7 @@
     message('orderNote', '연결 상태 확인 전'); message('adNote', '광고계정 상태 확인 전');
     ['briefList','adState','monthSummary'].forEach(function(id){byId(id).replaceChildren();});
     setConnection('cafeConnection','Cafe24 확인 중','loading');setConnection('metaConnection','Meta 확인 중','loading');
-    viewState = {cafe:null,meta:null}; selectedCafe = null; selectedMeta = null;
+    viewState = {cafe:null,meta:null}; selectedCafe = null; selectedMeta = null; connectionsLoaded = false;
   }
   function setConnection(id,text,state){var pill=byId(id);pill.textContent=text;pill.dataset.state=state;}
   function signedOut(){
@@ -93,7 +93,7 @@
     if(stores.some(function(store){return String(store.id) === previousStoreId;})) select.value = previousStoreId;
     publish();
     if(!stores.length){
-      message('pageMessage', '이 계정에 연결된 Cafe24 쇼핑몰이 없어요. 런치데스크에서 위에 표시된 같은 계정으로 로그인한 뒤 등록해 주세요.');
+      message('pageMessage', '이 계정에 등록된 Cafe24 쇼핑몰이 없어요. 연결 관리에서 쇼핑몰을 등록해 주세요.');
       setConnection('cafeConnection','Cafe24 미연결','off');setConnection('metaConnection','Meta 미연결','off');
       return;
     }
@@ -117,7 +117,7 @@
     var rows = result.data || [];
     var cafe = rows.find(function(r){ return r.provider === 'cafe24'; });
     var meta = rows.find(function(r){ return r.provider === 'meta'; });
-    selectedCafe = cafe || null; selectedMeta = meta || null; publish();
+    selectedCafe = cafe || null; selectedMeta = meta || null; connectionsLoaded = true; publish();
     setConnection('cafeConnection',cafe&&cafe.status==='connected'?'Cafe24 연결됨':'Cafe24 미연결',cafe&&cafe.status==='connected'?'on':'off');
     setConnection('metaConnection',meta&&meta.status==='connected'?'Meta 연결됨':'Meta 미연결',meta&&meta.status==='connected'?'on':'off');
     await Promise.all([loadOrders(storeId, cafe, id), loadMeta(meta, id)]);
