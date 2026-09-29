@@ -140,6 +140,9 @@ export default {
         .from("stores")
         .select("id, platform")
         .eq("id", store_id)
+        // 관리자에게 다른 사용자의 쇼핑몰 SELECT 권한이 있어도 이 함수의
+        // 주문 동기화는 호출자 본인의 쇼핑몰만 허용한다.
+        .eq("user_id", ctx.userClaims?.id ?? "")
         .single();
 
       if (storeError || !store) {
