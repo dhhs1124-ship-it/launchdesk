@@ -11,7 +11,7 @@
   var signupPending = false;
   var dashboardReady = false, period = {kind:'today',date:null}, selectedCafe = null, selectedMeta = null;
   var viewState = {cafe:null,meta:null}, listeners = [];
-  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),metaAccount:selectedMeta,metaData:viewState.meta}; }
+  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date}}; }
   function publish(){ listeners.forEach(function(fn){try{fn(context());}catch(e){console.warn('[launchroas] 구독자 오류',e);}}); }
   window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());}};
   function message(id, value){ byId(id).textContent = value || ''; }
@@ -27,15 +27,16 @@
   function resetCards(){
     ['orderCount','orderAmount','adSpend','adRoas'].forEach(function(id){ message(id, '—'); });
     message('orderNote', '연결 상태 확인 전'); message('adNote', '광고계정 상태 확인 전');
-    message('cafeStatus', '연결 상태를 확인하고 있어요.'); message('metaStatus', '연결 상태를 확인하고 있어요.');
-    message('lastSync', ''); message('metaPurchase', '');
-    ['briefList','adState','monthSummary','connectionSummary'].forEach(function(id){byId(id).replaceChildren();});
+    ['briefList','adState','monthSummary'].forEach(function(id){byId(id).replaceChildren();});
+    setConnection('cafeConnection','Cafe24 확인 중','loading');setConnection('metaConnection','Meta 확인 중','loading');
     viewState = {cafe:null,meta:null}; selectedCafe = null; selectedMeta = null;
   }
+  function setConnection(id,text,state){var pill=byId(id);pill.textContent=text;pill.dataset.state=state;}
   function signedOut(){
     requestId++; userId = null; stores = []; signupPending = false; dashboardReady = false;
     byId('loginPanel').hidden = false; byId('dashboard').hidden = true; byId('consentGate').hidden = true;
-    byId('accountEmail').hidden = true; byId('logout').hidden = true;
+    byId('connectionPills').hidden = true;
+    byId('accountEmail').hidden = true; byId('switchAccount').hidden = true; byId('logout').hidden = true;
     byId('password').value = ''; byId('refresh').disabled = false; syncing = false; resetCards(); publish();
   }
   async function hasConsent(id){
@@ -54,9 +55,9 @@
     dashboardReady = false; stores = []; userId = user.id; var id = ++requestId;
     byId('storeSelect').replaceChildren(); byId('storeSelect').value=''; resetCards(); publish();
     byId('loginPanel').hidden = true; byId('dashboard').hidden = true; byId('consentGate').hidden = true;
+    byId('connectionPills').hidden = true;
     byId('accountEmail').textContent = user.email || '로그인됨';
-    byId('workspaceEmail').textContent = user.email || '로그인됨';
-    byId('accountEmail').hidden = false; byId('logout').hidden = false;
+    byId('accountEmail').hidden = false; byId('switchAccount').hidden = false; byId('logout').hidden = false;
     if(!policy){ byId('consentGate').hidden = false; message('gateMessage','동의 확인 서비스를 불러오지 못했어요. 새로고침해 주세요.'); return; }
     var consent = await hasConsent(user.id);
     if(id !== requestId) return;
@@ -72,6 +73,7 @@
     }
     dashboardReady = true;
     byId('dashboard').hidden = false;
+    byId('connectionPills').hidden = false;
     publish();
     await loadStores(id);
   }
@@ -92,7 +94,7 @@
     publish();
     if(!stores.length){
       message('pageMessage', '이 계정에 연결된 Cafe24 쇼핑몰이 없어요. 런치데스크에서 위에 표시된 같은 계정으로 로그인한 뒤 등록해 주세요.');
-      message('cafeStatus', '쇼핑몰 없음'); message('metaStatus', '쇼핑몰을 등록한 뒤 확인할 수 있어요.');
+      setConnection('cafeConnection','Cafe24 미연결','off');setConnection('metaConnection','Meta 미연결','off');
       return;
     }
     message('pageMessage', '');
@@ -101,14 +103,14 @@
   async function loadSelected(storeId, id){
     var owned = stores.some(function(s){ return String(s.id) === String(storeId); });
     if(!owned || id !== requestId) return;
-    resetCards(); message('pageMessage', '주문과 광고를 조회하고 있어요.');
+    resetCards(); publish(); message('pageMessage', '주문과 광고를 조회하고 있어요.');
     var result = await sb.from('connected_accounts')
       .select('id,store_id,provider,status,last_synced_at,orders_synced_from,external_account_id')
       .eq('store_id', storeId).in('provider',['cafe24','meta']);
     if(id !== requestId) return;
     if(result.error){
       message('pageMessage', '연결 상태를 불러오지 못했어요. 다시 조회해 주세요.');
-      message('cafeStatus', '연결 상태 조회 실패'); message('metaStatus', '연결 상태 조회 실패');
+      setConnection('cafeConnection','Cafe24 확인 실패','error');setConnection('metaConnection','Meta 확인 실패','error');
       return;
     }
     message('pageMessage', '');
@@ -116,57 +118,57 @@
     var cafe = rows.find(function(r){ return r.provider === 'cafe24'; });
     var meta = rows.find(function(r){ return r.provider === 'meta'; });
     selectedCafe = cafe || null; selectedMeta = meta || null; publish();
+    setConnection('cafeConnection',cafe&&cafe.status==='connected'?'Cafe24 연결됨':'Cafe24 미연결',cafe&&cafe.status==='connected'?'on':'off');
+    setConnection('metaConnection',meta&&meta.status==='connected'?'Meta 연결됨':'Meta 미연결',meta&&meta.status==='connected'?'on':'off');
     await Promise.all([loadOrders(storeId, cafe, id), loadMeta(meta, id)]);
   }
   function addLine(id, text){var p = document.createElement('p');p.textContent = text;byId(id).appendChild(p);}
+  function addSummary(id,label,value,note){var row=document.createElement('div');row.className='summary-row';var title=document.createElement('span');title.textContent=label;var strong=document.createElement('strong');strong.textContent=value;row.append(title,strong);if(note){var small=document.createElement('small');small.textContent=note;row.appendChild(small);}byId(id).appendChild(row);}
   function showOverview(){
-    ['briefList','adState','monthSummary','connectionSummary'].forEach(function(id){byId(id).replaceChildren();});
+    ['briefList','adState','monthSummary'].forEach(function(id){byId(id).replaceChildren();});
     var cafe = viewState.cafe, meta = viewState.meta;
     if(cafe && cafe.connected){
-      addLine('connectionSummary','Cafe24 · 연결됨' + (cafe.syncedAt ? ' · 마지막 동기화 '+time(cafe.syncedAt) : ''));
       if(cafe.selected && cafe.coverage !== 'none' && cafe.coverage !== 'unknown'){
-        addLine('briefList',periods.resolve(period.kind,period.date,Date.now()).label + ' Cafe24 주문 '+cafe.selected.count+'건 · 주문금액 '+won(cafe.selected.amount)+' (취소·환불·미입금 포함)');
+        addSummary('briefList',periods.resolve(period.kind,period.date,Date.now()).label+' Cafe24 주문',cafe.selected.count+'건 · '+won(cafe.selected.amount),'취소·환불·미입금 미차감'+(cafe.syncedAt?' · '+time(cafe.syncedAt)+' 동기화':''));
       } else addLine('briefList','선택 기간 주문은 동기화 범위를 확인할 수 없어요. 주문 동기화 · 다시 조회를 눌러 주세요.');
       if(cafe.month && cafe.monthCoverage !== 'none' && cafe.monthCoverage !== 'unknown')
-        addLine('monthSummary','Cafe24 · 이번 달 주문 '+cafe.month.count+'건 · 주문금액 '+won(cafe.month.amount));
+        addSummary('monthSummary','Cafe24 이번 달 주문',cafe.month.count+'건 · '+won(cafe.month.amount));
       else addLine('monthSummary','Cafe24 · 이번 달 주문 동기화 범위를 확인해 주세요.');
     } else {
       addLine('briefList',cafe && cafe.error ? 'Cafe24 주문 조회에 실패했어요.' : 'Cafe24 연결 후 주문을 확인할 수 있어요.');
-      addLine('connectionSummary',cafe && cafe.error ? 'Cafe24 · 조회 오류' : 'Cafe24 · 연결 안 됨');
       addLine('monthSummary','Cafe24 · 연결 후 확인 가능');
     }
-    if(meta && meta.today){
-      var t = meta.today, m = meta.month || {}, currency = meta.account && meta.account.currency;
-      addLine('connectionSummary','Meta · 연결됨' + (meta.account && meta.account.name ? ' · '+meta.account.name : ''));
-      addLine('adState','오늘 ROAS '+(t.roas == null ? '—' : Math.round(t.roas*100).toLocaleString('ko-KR')+'%'));
-      addLine('adState','이번 달 ROAS '+(m.roas == null ? '—' : Math.round(m.roas*100).toLocaleString('ko-KR')+'%'));
-      if(Number(t.spend)>0 && Number(t.purchase_count)===0) addLine('adState','광고비가 사용되고 있지만 오늘 Meta 구매가 없습니다.');
-      else if(t.roas != null && m.roas != null) addLine('adState',t.roas>m.roas?'오늘 광고 효율이 이번 달 평균보다 높습니다.':t.roas<m.roas?'오늘 광고 효율이 이번 달 평균보다 낮습니다.':'오늘 광고 효율이 이번 달 평균과 비슷합니다.');
-      addLine('briefList','Meta 오늘 광고비 '+metaMoney(t.spend,currency)+' · 귀속 구매금액 '+(t.purchase_value_observed?metaMoney(t.purchase_value,currency):'측정되지 않음'));
-      addLine('monthSummary','Meta · 이번 달 광고비 '+metaMoney(m.spend,currency)+' · 귀속 구매금액 '+(m.purchase_value_observed?metaMoney(m.purchase_value,currency):'측정되지 않음')+' · 구매 '+(Number(m.purchase_count)||0)+'건');
+    if(meta && (meta.today||meta.selected||meta.month)){
+      var t = period.kind==='month'?meta.month:period.kind==='today'?meta.today:meta.selected, m = meta.month || {}, currency = meta.account && meta.account.currency;
+      var label=periods.resolve(period.kind,period.date,Date.now()).label;
+      t=t||{};
+      addSummary('adState',label+' ROAS',t.roas == null ? '—' : Math.round(t.roas*100).toLocaleString('ko-KR')+'%','Meta 귀속 구매금액 ÷ 광고비');
+      addSummary('adState','이번 달 ROAS',m.roas == null ? '—' : Math.round(m.roas*100).toLocaleString('ko-KR')+'%');
+      if(Number(t.spend)>0 && Number(t.purchase_count)===0) addLine('adState',label+' 광고비가 사용되고 있지만 Meta 귀속 구매는 없습니다.');
+      else if(t.roas != null && m.roas != null) addLine('adState',t.roas>m.roas?label+' 광고 효율이 이번 달 평균보다 높습니다.':t.roas<m.roas?label+' 광고 효율이 이번 달 평균보다 낮습니다.':label+' 광고 효율이 이번 달 평균과 비슷합니다.');
+      addSummary('briefList',label+' Meta 광고비',metaMoney(t.spend,currency),'귀속 구매금액 '+(t.purchase_value_observed?metaMoney(t.purchase_value,currency):'측정되지 않음'));
+      addSummary('monthSummary','Meta 이번 달 광고비',metaMoney(m.spend,currency),'귀속 구매금액 '+(m.purchase_value_observed?metaMoney(m.purchase_value,currency):'측정되지 않음')+' · 구매 '+(Number(m.purchase_count)||0)+'건');
     } else {
       addLine('adState',meta && meta.error ? 'Meta 성과 조회에 실패했어요.' : 'Meta 광고계정 연결 후 확인 가능');
       addLine('monthSummary','Meta · 연결 후 확인 가능');
-      addLine('connectionSummary',selectedMeta && selectedMeta.status !== 'connected' ? 'Meta · 연결 확인 필요' : 'Meta · 연결 안 됨');
     }
   }
   async function loadOrders(storeId, account, id){
     if(!account || account.status !== 'connected'){
-      message('cafeStatus', 'Cafe24가 연결되지 않았어요.'); message('orderNote', '연결 전');
+      message('orderNote', '연결 전');
       viewState.cafe = {connected:false}; showOverview();
       return;
     }
     var now = Date.now();
     var range = periods.resolve(period.kind,period.date,now), month = periods.resolve('month',null,now);
-    message('lastSync', account.last_synced_at ? '마지막 주문 동기화: ' + time(account.last_synced_at) : '동기화 기록 없음');
     var bounds = periods.queryBounds(range), monthBounds = periods.queryBounds(month);
     var result = await sb.from('orders').select('ordered_at,payment_amount')
       .eq('store_id',storeId).gte('ordered_at',monthBounds.gte < bounds.gte ? monthBounds.gte : bounds.gte)
       .lt('ordered_at',monthBounds.lt > bounds.lt ? monthBounds.lt : bounds.lt).limit(5001);
     if(id !== requestId) return;
-    if(result.error){ message('cafeStatus','주문 조회에 실패했어요.'); message('orderNote','조회 실패'); viewState.cafe={error:true};showOverview();return; }
+    if(result.error){ message('orderNote','조회 실패'); viewState.cafe={error:true};showOverview();return; }
     if((result.data || []).length > 5000){
-      message('cafeStatus','조회 기간 주문이 5,000건을 넘어 집계를 표시할 수 없어요.'); message('orderNote','집계 한도 초과');viewState.cafe={error:true};showOverview();return;
+      message('orderNote','집계 한도 초과');viewState.cafe={error:true};showOverview();return;
     }
     function total(start,end){return core.summarizeOrders((result.data||[]).filter(function(row){return row.ordered_at >= start && row.ordered_at < end;}));}
     var selected = total(bounds.gte,bounds.lt), monthTotal=total(monthBounds.gte,monthBounds.lt);
@@ -174,20 +176,17 @@
     var monthCoverage=periods.coverage(month,account.last_synced_at,account.orders_synced_from);
     viewState.cafe={connected:true,selected:selected,month:monthTotal,coverage:coverage,monthCoverage:monthCoverage,syncedAt:account.last_synced_at};
     if(coverage==='none'||coverage==='unknown'){
-      message('cafeStatus','선택 기간의 주문 동기화 범위를 확인할 수 없어요. 주문 동기화 · 다시 조회를 눌러 주세요.');
       message('orderNote','동기화 범위 확인 전');
     } else {
       message('orderCount',selected.count.toLocaleString('ko-KR')+'건');
       message('orderAmount',won(selected.amount));
       message('orderNote',range.label+' · 마지막 동기화 기준');
-      message('cafeStatus',range.label+' 주문입니다. 취소·환불·미입금은 차감하지 않았어요.');
     }
     showOverview();
   }
   async function loadMeta(account, id){
-    if(!account){ message('metaStatus','Meta 광고계정이 연결되지 않았어요.'); message('adNote','연결 전');viewState.meta=null;showOverview();return; }
+    if(!account){ message('adNote','연결 전');viewState.meta=null;showOverview();return; }
     if(account.status !== 'connected'){
-      message('metaStatus',account.external_account_id ? 'Meta 인증이 끊어졌어요. 다시 연결해 주세요.' : 'Meta 광고계정 선택을 완료해 주세요.');
       message('adNote','연결 확인 필요');viewState.meta=null;showOverview();return;
     }
     var body={connected_account_id:account.id};
@@ -196,7 +195,6 @@
     if(id !== requestId) return;
     var data = result.data;
     if(result.error || !data || data.ok !== true){
-      message('metaStatus','Meta 성과를 불러오지 못했어요. 연결 상태를 확인해 주세요.');
       message('adNote','조회 실패');viewState.meta={error:true};showOverview();return;
     }
     viewState.meta=data;
@@ -205,8 +203,6 @@
     message('adSpend',metaMoney(today.spend,currency));
     message('adRoas',today.roas == null ? '—' : Math.round(today.roas * 100).toLocaleString('ko-KR')+'%');
     message('adNote','Meta 광고계정 시간대 기준');
-    message('metaStatus','Meta 자체 귀속 기준의 광고 성과입니다.');
-    message('metaPurchase',today.purchase_value_observed ? 'Meta 귀속 구매금액: '+metaMoney(today.purchase_value,currency) : 'Meta 구매금액은 측정되지 않았어요.');
     showOverview();publish();
   }
   byId('authMode').addEventListener('click', function(){
@@ -278,6 +274,11 @@
       if(btn.closest('.sidebar')) btn.className=active?'sidebar-current':'sidebar-link';
     });
   }
+  window.LaunchRoasApp.openCalculatorFromAd=function(ad){
+    switchView('calculator');
+    window.dispatchEvent(new CustomEvent('launchroas:ad-selection',{detail:ad}));
+    window.scrollTo(0,0);
+  };
   document.querySelectorAll('[data-view]').forEach(function(btn){btn.addEventListener('click',function(){switchView(btn.getAttribute('data-view'));window.scrollTo(0,0);});});
   document.querySelectorAll('[data-period]').forEach(function(btn){btn.addEventListener('click',function(){
     period={kind:btn.getAttribute('data-period'),date:null}; byId('periodDate').value='';

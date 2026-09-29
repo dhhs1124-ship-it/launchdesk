@@ -86,7 +86,12 @@
   function renderHistory(){var box=byId('calcHistory');box.replaceChildren();if(!history.length){box.textContent='아직 저장한 계산이 없어요.';return;}history.forEach(function(item){box.appendChild(historyRow(item));});}
   app.subscribe(async function(ctx){
     if(ctx.userId===owner)return;
-    owner=ctx.userId;history=[];renderHistory();var id=++stamp;if(!owner)return;
+    owner=ctx.userId;history=[];renderHistory();
+    byId('calcForm').reset();byId('campaignSpend').value='';byId('campaignOrders').value='';byId('linkedAdNotice').hidden=true;
+    byId('linkedAdNotice').textContent='';adChoice='none';mode='simple';selectedExample='';exampleSnapshot=null;
+    byId('calcExample').value='';byId('calcExampleExit').hidden=true;byId('calcExampleNote').textContent='';byId('calcSave').disabled=false;
+    updateControls();renderPlatformHelp();render();
+    var id=++stamp;if(!owner)return;
     var result=await ctx.client.from('tool_records').select('data,created_at').eq('user_id',owner).eq('tool_type','margin_calc').order('created_at',{ascending:false}).limit(5);
     if(id!==stamp)return;
     if(result.error){byId('calcHistory').textContent='계산 기록을 불러오지 못했어요.';return;}
@@ -98,6 +103,16 @@
   byId('calcPlatform').addEventListener('change',renderPlatformHelp);
   byId('calcShippingType').addEventListener('change',function(){if(this.value==='free')byId('calcCustomerShip').value='0';});
   ['campaignSpend','campaignOrders'].forEach(function(id){byId(id).addEventListener('input',renderCampaign);});
+  window.addEventListener('launchroas:ad-selection',function(event){
+    var ad=event.detail,ctx=app.getContext();
+    if(!ad||!ctx.userId||String(ctx.storeId)!==String(ad.storeId)||ad.currency!=='KRW')return;
+    byId('campaignSpend').value=String(ad.spend);
+    byId('campaignOrders').value='';
+    var range=ad.range&&ad.range.since&&ad.range.until?ad.range.since+' ~ '+ad.range.until:'선택 기간';
+    var note=byId('linkedAdNotice');note.hidden=false;
+    note.textContent='연결된 광고: '+ad.adName+' · '+range+' · Meta 광고비 '+MC.fmtWon(ad.spend)+'. 상품 판매가·원가를 확인하고 이 광고로 발생한 해당 상품 주문 수를 입력해 주세요. Meta 구매 '+(ad.purchase==null?'측정 안 됨':ad.purchase+'건')+'은 상품별 주문 수로 자동 입력하지 않습니다.';
+    render();
+  });
   document.querySelectorAll('[data-calc-mode]').forEach(function(btn){btn.addEventListener('click',function(){mode=this.getAttribute('data-calc-mode');updateControls();render();});});
   document.querySelectorAll('[data-calc-ad]').forEach(function(btn){btn.addEventListener('click',function(){adChoice=this.getAttribute('data-calc-ad');updateControls();render();});});
   var examples=byId('calcExample');MC.EXAMPLES.forEach(function(ex){var option=document.createElement('option');option.value=ex.key;option.textContent=ex.title;examples.appendChild(option);});
