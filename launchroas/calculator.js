@@ -4,6 +4,7 @@
   if(!app||!MC)return;
   var byId=function(id){return document.getElementById(id);}, mode='simple', adChoice='none', history=[], owner=null, stamp=0;
   var lastCalculation=null, exampleSnapshot=null, selectedExample='';
+  var linkedAd=null,linkEpoch=0,savedLink=null,userPicked=false;
   var numeric={price:'calcPrice',qty:'calcQty',unitCost:'calcCost',sellerDiscount:'calcDiscount',customerShipping:'calcCustomerShip',actualShipping:'calcActualShip',packaging:'calcPackaging',otherCost:'calcOther',feeRate:'calcFee',pgRate:'calcPgRate',shippingFeeRate:'calcShipFeeRate',adRate:'calcAdRate',adAmount:'calcAdAmount',targetProfit:'calcTarget'};
   function raw(){
     var v={};Object.keys(numeric).forEach(function(key){v[key]=byId(numeric[key]).value;});
@@ -48,10 +49,11 @@
     if(spend===null||orders===null){box.textContent='광고비 총액과 광고로 발생한 주문 수를 모두 입력해 주세요.';return;}
     if(spend<0||orders<0||!Number.isInteger(orders)){box.textContent='광고비는 0원 이상, 주문 수는 0 이상의 정수로 입력해 주세요.';return;}
     var unit=lastCalculation.result.preAd, scenario=Campaign.calculate(unit,spend,orders);
-    box.append(addFact('광고 전 주문당 예상 잔액',MC.fmtWon(unit)),addFact('광고로 발생한 주문',orders.toLocaleString('ko-KR')+'건'),
+    box.append(addFact('선택 상품 판매가',MC.fmtWon(lastCalculation.input.price)),addFact('광고 전 주문당 예상 잔액',MC.fmtWon(unit)),addFact('적용한 전환·주문 수',orders.toLocaleString('ko-KR')+'건'),
       addFact('주문당 실제 광고비 (CPA)',orders?MC.fmtWon(scenario.acquisitionCost):'주문 0건'),addFact('광고 후 전체 예상 잔액',MC.fmtWon(scenario.estimatedBalance)));
     if(unit>0)box.appendChild(addFact('손익분기 주문 수',scenario.breakevenOrders.toLocaleString('ko-KR')+'건'));
     else box.appendChild(addFact('손익분기 주문 수','상품 기본 비용부터 조정 필요'));
+    if(!byId('linkedAdNotice').hidden){var caution=document.createElement('p');caution.className='small';caution.textContent='주의: Meta 전환에는 광고를 클릭한 뒤 다른 상품을 구매한 건도 포함될 수 있어요. 해당 상품의 실제 주문 수가 다르면 위 수치를 수정하세요. 부가세·세금·미입력 고정비 전의 추정 잔액입니다.';box.appendChild(caution);}
     box.classList.toggle('deficit',scenario.estimatedBalance<0);
   }
   function renderPlatformHelp(){
@@ -83,19 +85,39 @@
     }
     return row;
   }
-  function renderHistory(){var box=byId('calcHistory');box.replaceChildren();if(!history.length){box.textContent='아직 저장한 계산이 없어요.';return;}history.forEach(function(item){box.appendChild(historyRow(item));});}
+  function savedItems(){return history.filter(function(item){return item.calc_version===2&&item.input&&item.result&&Number.isFinite(Number(item.result.preAd))&&Number.isFinite(Number(item.input.price));});}
+  function renderSavedProducts(){
+    var select=byId('savedProduct'),previous=select.value;select.replaceChildren();
+    var empty=document.createElement('option');empty.value='';empty.textContent='직접 입력하거나 저장한 상품을 선택하세요';select.appendChild(empty);
+    savedItems().forEach(function(item,index){var option=document.createElement('option');option.value=String(index);option.textContent=(item.product_name||'이름 없는 상품')+' · 판매가 '+MC.fmtWon(item.input.price)+' · 주문당 광고 전 '+MC.fmtWon(item.result.preAd);select.appendChild(option);});
+    select.value=previous;
+  }
+  function selectSavedProduct(index){
+    var item=savedItems()[index];if(!item)return;
+    byId('calcProduct').value=item.product_name||'';
+    put(Object.assign({},item.input,{platform:item.platform||''}));
+    byId('savedProductInfo').textContent='선택 상품: '+(item.product_name||'이름 없는 상품')+' · 판매가 '+MC.fmtWon(item.input.price)+' · 주문당 광고 전 예상 잔액 '+MC.fmtWon(item.result.preAd)+' (저장한 계산 기준)';
+    renderCampaign();
+  }
+  function restoreSavedLink(){
+    if(!linkedAd||!savedLink||userPicked)return;
+    var index=savedItems().findIndex(function(item){return item.saved_at===savedLink.source_saved_at&&item.product_name===savedLink.product_label;});
+    if(index<0){byId('savedProductInfo').textContent='이 광고 세트에 연결된 계산 기록을 찾지 못했어요. 저장한 상품을 다시 선택해 주세요.';return;}
+    byId('savedProduct').value=String(index);selectSavedProduct(index);
+  }
+  function renderHistory(){var box=byId('calcHistory');box.replaceChildren();renderSavedProducts();if(!history.length){box.textContent='아직 저장한 계산이 없어요.';return;}history.slice(0,5).forEach(function(item){box.appendChild(historyRow(item));});}
   app.subscribe(async function(ctx){
     if(ctx.userId===owner)return;
-    owner=ctx.userId;history=[];renderHistory();
+    owner=ctx.userId;history=[];linkedAd=null;savedLink=null;linkEpoch++;renderHistory();byId('saveProductLink').hidden=true;
     byId('calcForm').reset();byId('campaignSpend').value='';byId('campaignOrders').value='';byId('linkedAdNotice').hidden=true;
     byId('linkedAdNotice').textContent='';adChoice='none';mode='simple';selectedExample='';exampleSnapshot=null;
     byId('calcExample').value='';byId('calcExampleExit').hidden=true;byId('calcExampleNote').textContent='';byId('calcSave').disabled=false;
     updateControls();renderPlatformHelp();render();
     var id=++stamp;if(!owner)return;
-    var result=await ctx.client.from('tool_records').select('data,created_at').eq('user_id',owner).eq('tool_type','margin_calc').order('created_at',{ascending:false}).limit(5);
+    var result=await ctx.client.from('tool_records').select('data,created_at').eq('user_id',owner).eq('tool_type','margin_calc').order('created_at',{ascending:false}).limit(100);
     if(id!==stamp)return;
     if(result.error){byId('calcHistory').textContent='계산 기록을 불러오지 못했어요.';return;}
-    history=(result.data||[]).map(function(row){return row.data;}).filter(function(row){return !!row;});renderHistory();
+    history=(result.data||[]).map(function(row){return row.data;}).filter(function(row){return !!row;});renderHistory();restoreSavedLink();
   });
   byId('calcForm').addEventListener('submit',function(event){event.preventDefault();});
   byId('calcForm').addEventListener('input',render);
@@ -103,15 +125,45 @@
   byId('calcPlatform').addEventListener('change',renderPlatformHelp);
   byId('calcShippingType').addEventListener('change',function(){if(this.value==='free')byId('calcCustomerShip').value='0';});
   ['campaignSpend','campaignOrders'].forEach(function(id){byId(id).addEventListener('input',renderCampaign);});
+  byId('savedProduct').addEventListener('change',function(){
+    userPicked=true;byId('saveProductLink').hidden=!linkedAd||this.value==='';
+    if(this.value===''){byId('savedProductInfo').textContent='상품 조건을 직접 입력하세요.';return;}
+    selectSavedProduct(Number(this.value));
+  });
+  byId('saveProductLink').addEventListener('click',async function(){
+    var ctx=app.getContext(),index=Number(byId('savedProduct').value),item=savedItems()[index],ad=linkedAd;
+    if(!ad||!item||!item.saved_at||!ctx.userId||String(ctx.storeId)!==String(ad.storeId))return;
+    if(!Number.isFinite(Number(item.result.totalIncome))||!Number.isFinite(Number(item.result.preAd)))return;
+    this.disabled=true;var token=linkEpoch;
+    var payload={store_id:ctx.storeId,meta_adset_id:String(ad.adsetId),product_label:(item.product_name||'상품').trim().slice(0,40),
+      calc_version:2,currency:'KRW',total_income:item.result.totalIncome,pre_ad:item.result.preAd,source_saved_at:item.saved_at};
+    var response=await ctx.client.from('ad_margin_links').upsert(payload,{onConflict:'store_id,meta_adset_id'});
+    if(token!==linkEpoch||!ctx.userId||ctx.userId!==app.getContext().userId)return;
+    this.disabled=false;
+    byId('savedProductInfo').textContent=response.error?'연결을 저장하지 못했어요. 광고 세트 연결 기능 설정을 확인해 주세요.':'상품 연결을 저장했어요. 다음에 이 광고 세트를 열면 저장한 계산을 불러옵니다.';
+    if(!response.error)savedLink={source_saved_at:item.saved_at,product_label:payload.product_label};
+  });
   window.addEventListener('launchroas:ad-selection',function(event){
     var ad=event.detail,ctx=app.getContext();
     if(!ad||!ctx.userId||String(ctx.storeId)!==String(ad.storeId))return;
     var krw=String(ad.currency).toUpperCase()==='KRW';
+    linkedAd=ad.adsetId?ad:null;savedLink=null;userPicked=false;var token=++linkEpoch;
+    byId('saveProductLink').hidden=true;
+    byId('calcForm').reset();adChoice='none';selectedExample='';byId('calcSave').disabled=false;updateControls();
     byId('campaignSpend').value=krw?String(ad.spend):'';
-    byId('campaignOrders').value='';
+    byId('campaignOrders').value=ad.purchase==null?'':String(ad.purchase);
+    byId('savedProduct').value='';
+    byId('savedProductInfo').textContent='저장한 상품 계산을 선택하면 판매가·원가·주문당 광고 전 예상 잔액을 불러옵니다.';
     var range=ad.range&&ad.range.since&&ad.range.until?ad.range.since+' ~ '+ad.range.until:'선택 기간';
     var note=byId('linkedAdNotice');note.hidden=false;
-    note.textContent='연결된 광고: '+ad.adName+' · '+range+' · '+(krw?'광고비 '+MC.fmtWon(ad.spend)+' 자동 입력됨.':'Meta 광고비 '+Number(ad.spend).toLocaleString('ko-KR')+' '+ad.currency+'. 원화 환산 금액을 확인해 광고비 총액 칸에 직접 입력해 주세요.')+' 상품 판매가·원가와 이 광고로 발생한 해당 상품 주문 수를 확인해 입력하세요. Meta 구매 '+(ad.purchase==null?'측정 안 됨':ad.purchase+'건')+'은 상품별 주문 수로 자동 입력하지 않습니다.';
+    note.textContent='선택한 광고: '+ad.adName+' · '+range+' · '+(krw?'광고비 '+MC.fmtWon(ad.spend)+' 자동 입력됨.':'Meta 광고비 '+Number(ad.spend).toLocaleString('ko-KR')+' '+ad.currency+'. 원화 환산 금액을 확인해 광고비 총액 칸에 직접 입력해 주세요.')+' Meta 전환 '+(ad.purchase==null?'측정 안 됨':ad.purchase+'건')+(ad.purchase==null?'은 직접 입력해 주세요.':'을 기본값으로 넣었어요. 다른 상품 구매가 포함됐다면 수정하세요.');
+    if(savedItems().length===1){byId('savedProduct').value='0';selectSavedProduct(0);byId('saveProductLink').hidden=!linkedAd;}
+    if(linkedAd){
+      ctx.client.from('ad_margin_links').select('product_label,source_saved_at').eq('store_id',ctx.storeId).eq('meta_adset_id',String(ad.adsetId)).maybeSingle().then(function(response){
+        if(token!==linkEpoch||String(app.getContext().storeId)!==String(ad.storeId)||response.error)return;
+        savedLink=response.data;restoreSavedLink();
+      });
+    }
     render();
   });
   document.querySelectorAll('[data-calc-mode]').forEach(function(btn){btn.addEventListener('click',function(){mode=this.getAttribute('data-calc-mode');updateControls();render();});});

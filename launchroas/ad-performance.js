@@ -21,10 +21,10 @@
     heading.append(element('strong','',ad.ad_name||'이름 없는 광고'),element('span','',adset.adset_name||'광고 세트'));
     var stats=element('div','ad-perf-stats');
     stats.append(metric('광고비',money(m.spend)),metric('Meta 구매',m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'측정 안 됨'),metric('ROAS',percent(m.roas)),metric('링크 클릭',number(m.link_clicks)));
-    var button=element('button','secondary','마진 계산 연결 →');button.type='button';
+    var button=element('button','secondary','상품·마진 연결 →');button.type='button';
     button.addEventListener('click',function(){
       if(!valid(ctx,key))return;
-      app.openCalculatorFromAd({adId:ad.ad_id,adName:ad.ad_name||'이름 없는 광고',spend:Number(m.spend)||0,
+      app.openCalculatorFromAd({adId:ad.ad_id,adsetId:adset.adset_id,adName:ad.ad_name||'이름 없는 광고',spend:Number(m.spend)||0,
         purchase:m.purchase&&m.purchase.observed?Number(m.purchase.value):null,currency:accountCurrency,
         range:activeRange,storeId:ctx.storeId});
     });
@@ -56,7 +56,14 @@
       }catch(e){if(valid(ctx,key))details.textContent='광고 성과 조회에 실패했어요.';}
       finally{button.disabled=false;}
     });
-    head.append(name,button);row.append(head,stats,details);return row;
+    var connect=element('button','adset-connect','상품·마진 연결 →');connect.type='button';
+    connect.addEventListener('click',function(){
+      if(!valid(ctx,key))return;
+      app.openCalculatorFromAd({adId:adset.adset_id,adsetId:adset.adset_id,adName:(campaign.campaign_name||'캠페인')+' · '+(adset.adset_name||'광고 세트'),spend:Number(m.spend)||0,
+        purchase:m.purchase&&m.purchase.observed?Number(m.purchase.value):null,currency:accountCurrency,
+        range:activeRange,storeId:ctx.storeId});
+    });
+    head.append(name,button);row.append(head,stats,connect,details);return row;
   }
   more.addEventListener('click',function(){
     var expanded=this.getAttribute('aria-expanded')!=='true';

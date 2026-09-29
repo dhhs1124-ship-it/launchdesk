@@ -1,6 +1,19 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
 
+function allowedReturnOrigin(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.origin !== value || parsed.protocol !== "https:") return null;
+    const host = parsed.hostname;
+    const configured = Deno.env.get("LAUNCHROAS_RETURN_ORIGIN");
+    return /^launchroas(?:-[a-z0-9-]+-launchdesk)?\.vercel\.app$/.test(host) ||
+      host === "launchroas.co.kr" || host === "www.launchroas.co.kr" ||
+      (configured && value === configured) ? value : null;
+  } catch { return null; }
+}
+
 const REDIRECT_URI =
   "https://zzhvckikonnalqnyatgn.supabase.co/functions/v1/meta-oauth-callback";
 
@@ -8,9 +21,9 @@ const APP_URL = "https://launchdesk.co.kr";
 
 const GRAPH_API_VERSION = "v21.0";
 
-function goBack(status: string) {
+function goBack(status: string, returnOrigin: string | null) {
   return Response.redirect(
-    `${APP_URL}/?meta=${encodeURIComponent(status)}#/account`,
+    returnOrigin ? `${returnOrigin}/?meta=${encodeURIComponent(status)}` : `${APP_URL}/?meta=${encodeURIComponent(status)}#/account`,
     302
   );
 }
@@ -45,6 +58,7 @@ export default {
   // 이유로 JWT Verify를 꺼야 한다(로그인 사용자의 브라우저 세션이 아니라
   // Meta 서버가 리다이렉트로 호출).
   fetch: withSupabase({ auth: "none" }, async (req, ctx) => {
+    let returnOrigin: string | null = null;
     try {
       const url = new URL(req.url);
 
@@ -54,7 +68,11 @@ export default {
 
       // 사용자가 Meta 권한 승인을 취소한 경우
       if (oauthError) {
-        return goBack("denied");
+        if (state) {
+          const lookup = await ctx.supabaseAdmin.from("oauth_states").select("return_origin").eq("state", state).eq("provider", "meta").maybeSingle();
+          returnOrigin = allowedReturnOrigin(lookup.data?.return_origin);
+        }
+        return goBack("denied", returnOrigin);
       }
 
       if (!code || !state) {
@@ -86,12 +104,12 @@ export default {
           .eq("provider", "meta")
           .is("used_at", null)
           .gt("expires_at", nowIso)
-          .select("store_id")
+          .select("store_id,return_origin")
           .maybeSingle();
 
       if (claimError) {
         console.error("Meta OAuth state claim error:", claimError.message);
-        return goBack("server_error");
+        return goBack("server_error", returnOrigin);
       }
 
       if (!oauthState) {
@@ -106,6 +124,8 @@ export default {
         );
       }
 
+      returnOrigin = allowedReturnOrigin(oauthState.return_origin);
+
       // claim에 성공한 이 요청만 아래로 진행한다. 이후 token exchange가
       // 실패해도 state를 다시 쓸 수 있게 되돌리지 않는다 — 사용자는 [Meta
       // 광고 연결]부터 처음부터 다시 시작하면 된다(요구사항 1).
@@ -114,7 +134,7 @@ export default {
 
       if (!appId || !appSecret) {
         console.error("Meta credentials are not configured.");
-        return goBack("server_error");
+        return goBack("server_error", returnOrigin);
       }
 
       // 2. Authorization Code → 단기(short-lived) access token 교환
@@ -134,7 +154,7 @@ export default {
           "Meta short-lived token exchange failed:",
           shortLivedResponse.status
         );
-        return goBack("token_error");
+        return goBack("token_error", returnOrigin);
       }
 
       // 3. 단기 → 장기(long-lived, 보통 ~60일) user access token 교환.
@@ -159,7 +179,7 @@ export default {
           "Meta long-lived token exchange failed:",
           longLivedResponse.status
         );
-        return goBack("token_error");
+        return goBack("token_error", returnOrigin);
       }
 
       const accessToken = longLivedData.access_token as string;
@@ -260,14 +280,14 @@ export default {
       // LaunchDesk 화면에서 meta-adaccounts/meta-account-select를 통해
       // 이어서 진행된다. 토큰은 절대 브라우저로 반환하지 않음. state는 위
       // 1번 claim 시점에 이미 used 처리됐으므로 여기서 다시 건드리지 않는다.
-      return goBack("connected");
+      return goBack("connected", returnOrigin);
     } catch (error) {
       console.error(
         "Meta OAuth callback error:",
         error instanceof Error ? error.message : "Unknown error"
       );
 
-      return goBack("server_error");
+      return goBack("server_error", returnOrigin);
     }
   }),
 };

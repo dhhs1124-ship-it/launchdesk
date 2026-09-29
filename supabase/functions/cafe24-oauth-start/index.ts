@@ -1,6 +1,19 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
 
+function allowedReturnOrigin(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.origin !== value || parsed.protocol !== "https:") return null;
+    const host = parsed.hostname;
+    const configured = Deno.env.get("LAUNCHROAS_RETURN_ORIGIN");
+    return /^launchroas(?:-[a-z0-9-]+-launchdesk)?\.vercel\.app$/.test(host) ||
+      host === "launchroas.co.kr" || host === "www.launchroas.co.kr" ||
+      (configured && value === configured) ? value : null;
+  } catch { return null; }
+}
+
 const REDIRECT_URI =
   "https://zzhvckikonnalqnyatgn.supabase.co/functions/v1/cafe24-oauth-callback";
 
@@ -13,7 +26,9 @@ const SCOPES = [
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
     try {
-      const { store_id, mall_id } = await req.json();
+      const { store_id, mall_id, return_origin } = await req.json();
+      const returnOrigin = return_origin == null ? null : allowedReturnOrigin(return_origin);
+      if (return_origin != null && !returnOrigin) return Response.json({ error: "허용되지 않은 돌아갈 주소입니다." }, { status: 400 });
 
       if (!store_id || !mall_id) {
         return Response.json(
@@ -63,6 +78,7 @@ export default {
             user_id: store.user_id,
             store_id: store.id,
             provider: "cafe24",
+            return_origin: returnOrigin,
             mall_id: mallId,
           })
           .select("state")

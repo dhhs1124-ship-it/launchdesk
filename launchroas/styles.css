@@ -46,7 +46,10 @@
 #overviewView .metric{min-height:126px;padding:15px 18px}
 #overviewView .metric strong{margin:8px 0;font-size:clamp(23px,2vw,31px)}
 #overviewView .metric small{font-size:11px}
-.overview-main-grid{display:grid;grid-template-columns:minmax(0,1.13fr) minmax(0,.87fr);gap:20px;align-items:start;margin-top:24px}
+.overview-main-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch;margin-top:24px}
+.overview-ad-column,.overview-ops-column{min-width:0;display:flex;flex-direction:column;padding:16px;border:1px solid #ffffff18;border-radius:15px;background:#191d1f}
+.overview-ad-column .ad-performance{flex:1;padding:0;border:0;background:transparent}
+.overview-ops-column .operations-panel{flex:1}
 .overview-main-grid .section-heading{margin:0 0 12px!important}
 .overview-main-grid .ad-performance{margin:0}
 .overview-main-grid .ad-performance>.small{line-height:1.55}
@@ -58,7 +61,8 @@
 .overview-main-grid .ad-item-heading{width:100%}
 .overview-main-grid .ad-item .ad-perf-stats{width:100%;min-width:0}
 .overview-main-grid .ad-item .secondary{width:100%}
-.overview-main-grid .operations-panel{margin:0;padding:16px}
+.overview-main-grid .adset-connect{margin-top:12px;padding:7px 0;border:0;background:none;color:#ffbb91;font-size:12px;font-weight:700;cursor:pointer}
+.overview-main-grid .operations-panel{margin:0;padding:0;border:0;background:transparent}
 .overview-main-grid .operations-columns{grid-template-columns:1fr;gap:14px}
 .overview-main-grid .operations-columns>div+div{border-left:0;border-top:1px solid #ffffff18;padding:14px 0 0}
 .overview-main-grid .operations-panel h3{margin:0 0 9px;font-size:15px}
@@ -84,3 +88,4 @@
 .support-grid .detail h3,.support-grid .detail p,.support-grid .manage-link{margin:0}
 @media(max-width:1150px){.overview-main-grid{grid-template-columns:1fr}.overview-main-grid .operations-columns{grid-template-columns:repeat(2,minmax(0,1fr))}.overview-main-grid .operations-columns>div+div{border-top:0;border-left:1px solid #ffffff18;padding:0 0 0 18px}.overview-main-grid .month-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.overview-main-grid{gap:23px;margin-top:22px}.overview-main-grid .operations-columns,.overview-main-grid .month-summary{grid-template-columns:1fr}.overview-main-grid .operations-columns>div+div{border-left:0;border-top:1px solid #ffffff18;padding:14px 0 0}.adlog-disclosure>summary small{display:block;margin:3px 0 0}.support-grid .detail{display:block}.support-grid .detail p{margin:5px 0}.support-grid .manage-link{margin-top:5px}}
+.saved-product-label,.connection-form label{display:grid;gap:8px;color:#ccd1d1;font-size:13px}.saved-product-label select,.connection-form input{width:100%;height:42px;border:1px solid #41494d;border-radius:8px;background:#111618;color:#f5f5f3;padding:0 12px;color-scheme:dark}.connection-card{margin:0 0 16px}.connection-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:13px;margin:15px 0}.connection-form button{min-height:42px}.connection-inline,.connection-manage{border:0;background:transparent;color:#ffbb91;cursor:pointer;font:inherit;text-align:left}.connection-manage{font-size:11px}.connection-inline{padding:0}.connection-card #metaAccountPicker{margin-top:15px}.connection-card #chooseMetaAccount{margin-top:12px}@media(max-width:760px){.connection-form{grid-template-columns:1fr}.mobile-nav{flex-wrap:wrap}}

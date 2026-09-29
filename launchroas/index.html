@@ -16,7 +16,7 @@
       <div id="connectionPills" class="connection-pills" hidden aria-label="연결 상태">
         <span id="cafeConnection" class="connection-pill" data-state="loading">Cafe24 확인 중</span>
         <span id="metaConnection" class="connection-pill" data-state="loading">Meta 확인 중</span>
-        <a href="https://launchdesk.co.kr/#/account" class="connection-manage" aria-label="연결 관리">연결 관리 ↗</a>
+        <button type="button" class="connection-manage" data-view="connections" aria-label="연결 관리">연결 관리 ↗</button>
       </div>
       <a href="https://launchdesk.co.kr/" class="top-link">런치데스크 가이드 <span aria-hidden="true">↗</span></a>
       <span id="accountEmail" class="account-email" hidden></span>
@@ -76,11 +76,12 @@
         <p class="sidebar-label">WORKSPACE</p>
         <button class="sidebar-current" type="button" data-view="overview"><span class="nav-icon" aria-hidden="true">◫</span> 운영 현황</button>
         <button class="sidebar-link" type="button" data-view="calculator"><span class="nav-icon" aria-hidden="true">▦</span> 마진 계산기</button>
-        <a href="https://launchdesk.co.kr/#/account" class="sidebar-link"><span class="nav-icon" aria-hidden="true">⌘</span> 연결 관리 <span class="external" aria-hidden="true">↗</span></a>
+        <a class="sidebar-link" href="https://launchdesk.co.kr/#/services/setup"><span class="nav-icon" aria-hidden="true">◈</span> 세팅 대행 <span class="external" aria-hidden="true">↗</span></a>
+        <button class="sidebar-link" type="button" data-view="connections"><span class="nav-icon" aria-hidden="true">⌘</span> 연결 관리</button>
         <div class="sidebar-bottom"><span class="caption-dot"></span> LAUNCHROAS <span class="version">EARLY ACCESS</span></div>
       </aside>
       <div class="workspace">
-      <nav class="mobile-nav" aria-label="LaunchROAS 메뉴"><button type="button" data-view="overview" aria-current="page">운영 현황</button><button type="button" data-view="calculator">마진 계산기</button></nav>
+      <nav class="mobile-nav" aria-label="LaunchROAS 메뉴"><button type="button" data-view="overview" aria-current="page">운영 현황</button><button type="button" data-view="calculator">마진 계산기</button><button type="button" data-view="connections">연결 관리</button></nav>
       <div id="overviewView">
       <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>운영 현황</strong></div>
       <div class="dashboard-head">
@@ -103,7 +104,7 @@
         <p id="adPerformanceMessage" class="small" role="status">Meta 연결을 확인하고 있어요.</p>
         <div id="adPerformanceList" class="ad-performance-list"></div>
         <button id="adPerformanceMore" type="button" class="ad-performance-more" hidden aria-expanded="false">광고 세트 전체 보기 ↓</button>
-        <p class="small">Meta 구매 건수는 상품별 주문 수가 아닙니다. 마진 계산에는 해당 상품 주문 수를 확인해 입력하세요.</p>
+        <p class="small">Meta 전환을 주문 수 기본값으로 사용합니다. 다른 상품 구매가 포함됐다면 계산 화면에서 수정하세요.</p>
       </section>
       </div>
       <div class="overview-ops-column">
@@ -114,8 +115,7 @@
       </section>
       </div>
       </div>
-      <div class="support-grid"><section class="detail"><h3>세팅 대행</h3><p>기본 쇼핑몰 세팅 · 연동·추적 세팅 · 전체 초기 세팅</p><a class="manage-link" href="https://launchdesk.co.kr/#/services/setup">세팅 대행 알아보기 ↗</a></section></div>
-      <details class="adlog-disclosure"><summary><span>광고 기록 <small>기록 추가·Meta 성과 저장·지난 기록 보기</small></span><span class="disclosure-action">펼치기 ↓</span></summary>
+      <details class="adlog-disclosure" open><summary><span>광고 기록 <small>기록 추가·Meta 성과 저장·지난 기록 보기</small></span><span class="disclosure-action">펼치기 ↓</span></summary>
       <section class="operations-panel adlog-panel" aria-labelledby="adlogTitle">
         <div class="adlog-head"><div><p class="section-kicker">AD RECORDS</p><h2 id="adlogTitle">광고 기록</h2><p class="small">직접 입력한 기록과 Meta 하루 합계를 함께 볼 수 있어요. Meta 귀속 구매금액은 Cafe24 주문금액과 합산하지 않습니다.</p></div><button id="adlogAdd" type="button" class="secondary">+ 기록 추가</button></div>
         <div class="adlog-toolbar"><label for="adlogMetaDate">Meta 기록할 날짜</label><input id="adlogMetaDate" type="date"><button id="adlogMetaSave" type="button" class="secondary">Meta 성과 기록하기 (어제)</button><span id="adlogMessage" class="small" role="status"></span></div>
@@ -125,8 +125,14 @@
       </section>
       </details>
       <p class="footnote">Cafe24 주문금액과 Meta 귀속 구매금액은 집계 기준이 달라 합산하지 않습니다. 주문 데이터는 마지막 동기화 시각 이후의 주문을 포함하지 않을 수 있습니다.</p>
-      <a href="https://launchdesk.co.kr/#/account" class="manage-link">쇼핑몰·광고계정 연결 관리 <span aria-hidden="true">↗</span></a>
+      <button type="button" data-view="connections" class="manage-link connection-inline">쇼핑몰·광고계정 연결 관리 →</button>
       </div>
+      <section id="connectionsView" hidden aria-labelledby="connectionsTitle">
+        <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>연결 관리</strong></div>
+        <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> CONNECTIONS</p><h1 id="connectionsTitle">연결 관리<span class="title-period">.</span></h1><p class="intro">쇼핑몰과 Meta 광고계정을 이곳에서 연결하세요.</p></div></div>
+        <section class="calc-card connection-card"><h2>쇼핑몰 등록</h2><form id="storeCreateForm" class="connection-form"><label>쇼핑몰 이름<input id="newStoreName" required maxlength="80" placeholder="내 쇼핑몰"></label><label>쇼핑몰 주소<input id="newStoreUrl" type="url" required placeholder="https://myshop.cafe24.com"></label><button type="submit" class="secondary">쇼핑몰 등록</button></form></section>
+        <section class="calc-card connection-card"><h2>선택한 쇼핑몰의 연동</h2><label class="saved-product-label" for="connectionStore">쇼핑몰 선택 <select id="connectionStore"></select></label><p id="connectionStatus" class="small" role="status"></p><div class="connection-form"><label>Cafe24 쇼핑몰 ID<input id="connectionMallId" placeholder="예: myshop" pattern="[a-zA-Z0-9_-]+"></label><button id="connectCafe" type="button" class="secondary">Cafe24 연결 · 재연결</button><button id="connectMeta" type="button" class="secondary">Meta 연결 · 재연결</button></div><div id="metaAccountPicker" hidden><label class="saved-product-label" for="metaAccountChoice">광고계정 선택 <select id="metaAccountChoice"></select></label><button id="chooseMetaAccount" type="button" class="secondary">선택한 광고계정 연결</button></div><p id="connectionMessage" class="message" role="status"></p></section>
+      </section>
       <section id="calculatorView" hidden aria-labelledby="calculatorTitle">
         <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>마진 계산기</strong></div>
         <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> PRODUCT ECONOMICS</p><h1 id="calculatorTitle">마진 계산기<span class="title-period">.</span></h1><p class="intro">상품 한 주문의 예상 잔액부터 A상품 광고 전체의 손익까지 확인하세요.</p></div></div>
@@ -162,7 +168,7 @@
             <p id="calcError" class="message" role="alert"></p>
           </form>
           <div class="calc-results"><div class="calc-card"><h2>한 주문의 계산 결과</h2><p id="calcEmpty" class="small">판매가 · 원가 · 판매 수수료율을 입력하면 결과가 나와요.</p><div id="calcResult" hidden><p class="calc-result-label">광고비 차감 후 예상 잔액</p><strong id="calcPostAd" class="calc-hero-value">—</strong><div id="calcFacts" class="calc-facts"></div><p class="small">부가세 납부액·소득세·미입력 고정비 전의 추정값입니다.</p><button id="calcSave" type="button" class="secondary">계산 결과 저장</button></div></div>
-            <div class="calc-card"><h2 id="campaignTitle">A상품 광고 손익</h2><p id="linkedAdNotice" class="linked-ad-notice" hidden></p><p class="small">해당 상품 광고에 쓴 총액과 그 광고로 발생한 주문 수를 직접 입력하세요. 자동 귀속 추정은 하지 않습니다.</p><div class="calc-fields"><label>광고비 총액 (원)<input id="campaignSpend" type="number" min="0" placeholder="예: 100000"></label><label>광고로 발생한 이 상품 주문 수<input id="campaignOrders" type="number" min="0" step="1" placeholder="예: 10"></label></div><div id="campaignResult" class="calc-facts">두 값을 입력하면 광고 후 남는 금액을 계산해요.</div></div>
+            <div class="calc-card"><h2 id="campaignTitle">A상품 광고 손익</h2><p id="linkedAdNotice" class="linked-ad-notice" hidden></p><label class="saved-product-label" for="savedProduct">저장한 상품 계산 선택 <select id="savedProduct"><option value="">직접 입력하거나 저장한 상품을 선택하세요</option></select></label><p id="savedProductInfo" class="small" role="status">저장한 계산을 선택하면 상품명·판매가·원가·주문당 광고 전 예상 잔액이 적용됩니다.</p><button id="saveProductLink" type="button" class="secondary" hidden>이 광고 세트에 상품 연결 저장</button><p class="small">Meta 전환 수를 기본값으로 넣습니다. 다른 상품 구매가 포함됐다면 이 상품 주문 수에 맞게 수정하세요.</p><div class="calc-fields"><label>광고비 총액 (원)<input id="campaignSpend" type="number" min="0" placeholder="예: 100000"></label><label>적용할 이 상품 주문 수<input id="campaignOrders" type="number" min="0" step="1" placeholder="예: 10"></label></div><div id="campaignResult" class="calc-facts">상품과 주문 수를 입력하면 광고 후 남는 금액을 계산해요.</div></div>
             <div class="calc-card"><div class="history-head"><h2>최근 저장한 계산</h2><button id="calcClear" type="button" class="inline-button">전체 지우기</button></div><div id="calcHistory" class="history-list"></div></div>
           </div>
         </div>
@@ -178,6 +184,7 @@
   <script src="./campaign-core.js"></script>
   <script src="./adlog-meta.js"></script>
   <script src="./app.js"></script>
+  <script src="./connections.js"></script>
   <script src="./calculator.js"></script>
   <script src="./ad-performance.js"></script>
   <script src="./adlog.js"></script>

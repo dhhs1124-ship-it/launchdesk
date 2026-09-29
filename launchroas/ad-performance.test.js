@@ -10,7 +10,7 @@ function node(tag){
     addEventListener(key,fn){this.events[key]=fn;}};
 }
 async function settle(){await new Promise(resolve=>setImmediate(resolve));}
-test('외화 광고도 계산 화면으로 이동하고 Meta 구매 수는 참고값으로만 전달한다',async()=>{
+test('광고 세트와 광고를 계산기에 연결하며 Meta 전환 수를 전달한다',async()=>{
   const list=node('div'),message=node('p'),more=node('button'),calls=[],opened=[];
   const client={functions:{invoke:async (name,options)=>{
     calls.push({name,body:options.body});
@@ -24,18 +24,21 @@ test('외화 광고도 계산 화면으로 이동하고 Meta 구매 수는 참�
   await settle();
   assert.equal(calls[0].body.scope,'adsets');
   const row=list.children[0],toggle=row.children[0].children[1];
+  row.children[2].events.click();
+  assert.equal(opened[0].adId,'123');
+  assert.equal(opened[0].purchase,2);
   await toggle.events.click();
   assert.equal(calls[1].body.scope,'ads');
   assert.equal(calls[1].body.adset_id,'123');
-  const detail=row.children[2],button=detail.children[0].children[2];
+  const detail=row.children[3],button=detail.children[0].children[2];
   assert.notEqual(button.disabled,true);
   button.events.click();
-  assert.equal(opened[0].spend,7000);
-  assert.equal(opened[0].currency,'USD');
-  assert.equal(opened[0].purchase,1);
-  assert.equal(Object.hasOwn(opened[0],'orders'),false);
+  assert.equal(opened[1].spend,7000);
+  assert.equal(opened[1].currency,'USD');
+  assert.equal(opened[1].purchase,1);
+  assert.equal(Object.hasOwn(opened[1],'orders'),false);
   ctx={...ctx,storeId:'other',metaAccount:null};
   subscriber(ctx);
   button.events.click();
-  assert.equal(opened.length,1);
+  assert.equal(opened.length,2);
 });

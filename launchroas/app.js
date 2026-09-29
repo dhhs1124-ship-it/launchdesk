@@ -11,9 +11,9 @@
   var signupPending = false;
   var dashboardReady = false, period = {kind:'today',date:null}, selectedCafe = null, selectedMeta = null;
   var viewState = {cafe:null,meta:null}, listeners = [];
-  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date}}; }
+  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),cafeAccount:selectedCafe,metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date}}; }
   function publish(){ listeners.forEach(function(fn){try{fn(context());}catch(e){console.warn('[launchroas] 구독자 오류',e);}}); }
-  window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());}};
+  window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());},reloadStores:function(){return loadStores(++requestId);},selectStore:function(id){byId('storeSelect').value=id;resetCards();publish();return loadSelected(id,++requestId);}};
   function message(id, value){ byId(id).textContent = value || ''; }
   function won(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '원'; }
   function metaMoney(n, currency){
@@ -267,7 +267,8 @@
   });
   function switchView(view){
     var calculator = view === 'calculator';
-    byId('overviewView').hidden = calculator; byId('calculatorView').hidden = !calculator;
+    byId('overviewView').hidden = view !== 'overview'; byId('calculatorView').hidden = !calculator;
+    byId('connectionsView').hidden = view !== 'connections';
     document.querySelectorAll('[data-view]').forEach(function(btn){
       var active = btn.getAttribute('data-view') === view;
       btn.setAttribute('aria-current',active?'page':'false');
