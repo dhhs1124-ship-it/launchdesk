@@ -54,6 +54,11 @@
     var setupConsentPrivacy = document.getElementById('setupConsentPrivacy');
     var setupConsentError = document.getElementById('setupConsentError');
     var setupSubmitError = document.getElementById('setupSubmitError');
+    var setupHeroCta = document.getElementById('setupHeroCta');
+    if(setupHeroCta) setupHeroCta.addEventListener('click', function(){
+      var plans = setupView.querySelector('.setup-plans');
+      if(plans) plans.scrollIntoView({behavior: reduceMotion ? 'auto' : 'smooth', block: 'start'});
+    });
 
     function setupShowStep(n){
       setupSteps.forEach(function(s){ s.hidden = (s.getAttribute('data-step') !== String(n)); });
