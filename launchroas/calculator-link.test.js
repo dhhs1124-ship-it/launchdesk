@@ -11,10 +11,10 @@ function el(tag){
     querySelector(){return el('button');},classList:{toggle(){}}};
   return n;
 }
-function query(rows,calls,table){
+function query(rows,calls,table,link=null){
   const q={};['select','eq','order','limit','delete'].forEach(k=>{q[k]=()=>q;});
   q.upsert=(payload,opt)=>{calls.push({table,payload,opt});return q;};
-  q.maybeSingle=()=>Promise.resolve({data:null,error:null});
+  q.maybeSingle=()=>Promise.resolve({data:table==='ad_margin_links'?link:null,error:null});
   q.then=(ok,fail)=>Promise.resolve({data:rows,error:null}).then(ok,fail);
   return q;
 }
@@ -47,4 +47,27 @@ test('광고 카드에서 저장한 상품 연결은 그 광고 세트·쇼핑�
     {store:'4',adset:'100',pre:11905,label:'[TEST] 타월'});
   assert.equal(upserts[0].opt.onConflict,'store_id,meta_adset_id');
   assert.ok(dispatched.some(e=>e.type==='launchroas:margin-linked'&&e.detail.storeId==='4'),'운영 화면 광고 카드를 다시 조회한다');
+});
+
+test('저장된 광고 세트 연결은 DB 시각 형식(+00:00)이 달라도 같은 계산 기록을 다시 불러온다',async()=>{
+  const nodes={},handlers={},upserts=[];
+  const make=(name,saved_at,preAd)=>({calc_version:2,product_name:name,saved_at,platform:'',
+    input:{price:30000,qty:1,unitCost:12000,feeRate:5.5,customerShipping:0,actualShipping:3000,packaging:500,adMode:'none'},
+    result:{totalIncome:30000,preAd,adCost:0,postAd:preAd}});
+  const records=[make('[TEST] 다른 상품','2026-10-04T13:20:29.000Z',11905),make('A상품','2026-09-29T07:41:58.564Z',10100),make('A상품','2026-09-29T07:01:33.000Z',10100)];
+  const link={product_label:'A상품',source_saved_at:'2026-09-29T07:41:58.564+00:00'};
+  const client={from:(table)=>query(table==='tool_records'?records.map((data,i)=>({id:i+1,data,created_at:data.saved_at})):[],upserts,table,link)};
+  const ctx={client,userId:'u',storeId:'4',stores:[{id:4}],metaAccount:{id:9,status:'connected'},period:{kind:'month',date:null}};
+  const document={getElementById(id){return nodes[id]||(nodes[id]=el('x'));},createElement:el,querySelectorAll(){return [];}};
+  const sandbox={document,Intl,Date,Math,Number,String,JSON,Promise,Object,Array,setTimeout,console,
+    addEventListener(type,fn){handlers[type]=fn;},dispatchEvent(){},CustomEvent:function(){},confirm(){return false;}};
+  sandbox.window=sandbox;
+  sandbox.LaunchRoasApp={subscribe(fn){fn(ctx);},getContext(){return ctx;}};
+  vm.createContext(sandbox);
+  for(const f of ['margin-calc.js','campaign-core.js','calculator.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+f,'utf8'),sandbox,{filename:f});
+  await settle();
+  handlers['launchroas:ad-selection']({detail:{adId:'100',adsetId:'100',adName:'세트',spend:79.83,purchase:5,currency:'USD',range:null,storeId:'4'}});
+  await settle();
+  assert.equal(nodes.savedProduct.value,'1','두 번째 저장 기록(같은 시각의 A상품)을 선택한다');
+  assert.match(nodes.savedProductInfo.textContent,/^선택 상품: A상품 .*10,100원/);
 });

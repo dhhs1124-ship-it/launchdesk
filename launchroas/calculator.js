@@ -111,7 +111,9 @@
   }
   function restoreSavedLink(){
     if(!linkedAd||!savedLink||userPicked)return;
-    var index=savedItems().findIndex(function(item){return item.saved_at===savedLink.source_saved_at&&item.product_name===savedLink.product_label;});
+    // DB는 '+00:00', 저장 기록은 'Z' 형식이라 문자열이 아닌 시각으로 비교한다.
+    var linkedAt=Date.parse(savedLink.source_saved_at);
+    var index=savedItems().findIndex(function(item){return Date.parse(item.saved_at)===linkedAt&&String(item.product_name||'').trim().slice(0,40)===savedLink.product_label;});
     if(index<0){byId('savedProductInfo').textContent='이 광고 세트에 연결된 계산 기록을 찾지 못했어요. 저장한 상품을 다시 선택해 주세요.';return;}
     byId('savedProduct').value=String(index);selectSavedProduct(index);
   }
