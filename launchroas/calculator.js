@@ -49,11 +49,12 @@
     if(spend===null||orders===null){box.textContent='광고비 총액과 광고로 발생한 주문 수를 모두 입력해 주세요.';return;}
     if(spend<0||orders<0||!Number.isInteger(orders)){box.textContent='광고비는 0원 이상, 주문 수는 0 이상의 정수로 입력해 주세요.';return;}
     var unit=lastCalculation.result.preAd, scenario=Campaign.calculate(unit,spend,orders);
+    var balance=addFact('광고 후 전체 예상 잔액',MC.fmtWon(scenario.estimatedBalance));balance.className='is-balance';
     box.append(addFact('선택 상품 판매가',MC.fmtWon(lastCalculation.input.price)),addFact('광고 전 주문당 예상 잔액',MC.fmtWon(unit)),addFact('적용한 전환·주문 수',orders.toLocaleString('ko-KR')+'건'),
-      addFact('주문당 실제 광고비 (CPA)',orders?MC.fmtWon(scenario.acquisitionCost):'주문 0건'),addFact('광고 후 전체 예상 잔액',MC.fmtWon(scenario.estimatedBalance)));
+      addFact('주문당 실제 광고비 (CPA)',orders?MC.fmtWon(scenario.acquisitionCost):'주문 0건'),balance);
     if(unit>0)box.appendChild(addFact('손익분기 주문 수',scenario.breakevenOrders.toLocaleString('ko-KR')+'건'));
     else box.appendChild(addFact('손익분기 주문 수','상품 기본 비용부터 조정 필요'));
-    if(!byId('linkedAdNotice').hidden){var caution=document.createElement('p');caution.className='small';caution.textContent='주의: Meta 전환에는 광고를 클릭한 뒤 다른 상품을 구매한 건도 포함될 수 있어요. 해당 상품의 실제 주문 수가 다르면 위 수치를 수정하세요. 부가세·세금·미입력 고정비 전의 추정 잔액입니다.';box.appendChild(caution);}
+    if(!byId('linkedAdNotice').hidden){var caution=document.createElement('p');caution.className='small';caution.textContent='주의: 주문 수 기본값은 Meta가 집계한 구매 수예요. 광고를 클릭한 뒤 다른 상품을 구매한 건도 포함될 수 있으니, 해당 상품의 실제 주문 수가 다르면 위 수치를 수정하세요.';box.appendChild(caution);}
     box.classList.toggle('deficit',scenario.estimatedBalance<0);
   }
   function renderPlatformHelp(){
@@ -150,7 +151,10 @@
     if(token!==linkEpoch||!ctx.userId||ctx.userId!==app.getContext().userId)return;
     this.disabled=false;
     byId('savedProductInfo').textContent=response.error?'연결을 저장하지 못했어요. 광고 세트 연결 기능 설정을 확인해 주세요.':'상품 연결을 저장했어요. 다음에 이 광고 세트를 열면 저장한 계산을 불러옵니다.';
-    if(!response.error)savedLink={source_saved_at:item.saved_at,product_label:payload.product_label};
+    if(!response.error){
+      savedLink={source_saved_at:item.saved_at,product_label:payload.product_label};
+      window.dispatchEvent(new CustomEvent('launchroas:margin-linked',{detail:{storeId:ctx.storeId}}));
+    }
   });
   window.addEventListener('launchroas:ad-selection',function(event){
     var ad=event.detail,ctx=app.getContext();

@@ -10,9 +10,12 @@ function node(tag){
     addEventListener(key,fn){this.events[key]=fn;}};
 }
 async function settle(){await new Promise(resolve=>setImmediate(resolve));}
+// select().eq().order().limit() 체인을 흉내 내고, await하면 표별 데이터를 돌려준다.
+function query(data){const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,then:(ok,fail)=>Promise.resolve({data,error:null}).then(ok,fail)};return q;}
+function texts(el){return [el.textContent,...(el.children||[]).flatMap(texts)].filter(Boolean);}
 test('광고 세트와 광고를 계산기에 연결하며 Meta 전환 수를 전달한다',async()=>{
   const list=node('div'),message=node('p'),more=node('button'),calls=[],opened=[];
-  const client={from:()=>({select:()=>({eq:async()=>({data:[],error:null})})}),functions:{invoke:async (name,options)=>{
+  const client={from:()=>query([]),functions:{invoke:async (name,options)=>{
     calls.push({name,body:options.body});
     if(options.body.scope==='adsets')return {data:{ok:true,account:{currency:'usd'},range:{since:'2026-09-29',until:'2026-09-29'},campaigns:[{campaign_name:'캠페인',adsets:[{adset_id:'123',adset_name:'광고 세트',metrics:{spend:10000,purchase:{observed:true,value:2}}}]}]}};
     return {data:{ok:true,ads:[{ad_id:'456',ad_name:'광고 A',metrics:{spend:7000,purchase:{observed:true,value:1},roas:2,link_clicks:15}}]}};
@@ -41,4 +44,32 @@ test('광고 세트와 광고를 계산기에 연결하며 Meta 전환 수를 �
   subscriber(ctx);
   button.events.click();
   assert.equal(opened.length,2);
+});
+async function summaries(links,records){
+  const list=node('div'),adsets=links.map((_,i)=>({adset_id:String(100+i),adset_name:'세트'+i,metrics:{spend:30000,purchase:{observed:true,value:4}}}));
+  const client={from:(table)=>query(table==='ad_margin_links'?links:records.map(data=>({data}))),functions:{invoke:async()=>({data:{ok:true,account:{currency:'KRW'},campaigns:[{campaign_name:'캠페인',adsets}]}})}};
+  const ctx={client,userId:'user',storeId:'store',metaAccount:{id:'meta',status:'connected'},period:{kind:'today',date:null}};
+  const document={getElementById(id){return id==='adPerformanceList'?list:node('p');},createElement:node};
+  vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:{subscribe(fn){fn(ctx);},getContext(){return ctx;}},addEventListener(){}},document,Intl,Number,Date,Math,String,Promise});
+  await settle();await settle();
+  return list.children.map(row=>texts(row.children[2]).join(' | '));
+}
+test('예상 잔액 카드는 계산 근거·미반영 항목·저장 시점을 보여주고, 확인 가능할 때만 갱신 필요를 표시한다',async()=>{
+  const linkedAt='2026-09-01T00:00:00.000Z';
+  const calc=(name,saved_at,preAd)=>({calc_version:2,product_name:name,saved_at,result:{preAd}});
+  const [changed,same,olderOnly,noDate]=await summaries([
+    {meta_adset_id:'100',product_label:'타월A',pre_ad:10000,source_saved_at:linkedAt},
+    {meta_adset_id:'101',product_label:'타월B',pre_ad:10000,source_saved_at:linkedAt},
+    {meta_adset_id:'102',product_label:'타월C',pre_ad:10000,source_saved_at:linkedAt},
+    {meta_adset_id:'103',product_label:'타월D',pre_ad:10000,source_saved_at:null}
+  ],[calc('타월A','2026-09-20T00:00:00.000Z',8000),calc('타월B','2026-09-20T00:00:00.000Z',10000),calc('타월C','2026-08-01T00:00:00.000Z',5000),calc('타월D','2026-09-20T00:00:00.000Z',5000)]);
+  assert.match(changed,/광고 전환 기준 예상 잔액 \| 10,000원/); // 10,000원 × 4건 − 30,000원
+  assert.match(changed,/Meta가 집계한 구매 수로 계산/);
+  assert.match(changed,/취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님/);
+  assert.match(changed,/사용한 마진 기준: 타월A · 주문당 광고 전 잔액 10,000원 · 2026\. 9\. 1\./);
+  assert.match(changed,/마진 기준 갱신 필요.*8,000원/);
+  assert.doesNotMatch(same,/갱신 필요/);
+  assert.doesNotMatch(olderOnly,/갱신 필요/); // 연결 이전 기록과는 비교하지 않는다
+  assert.match(noDate,/저장 시점 확인 불가/);
+  assert.doesNotMatch(noDate,/갱신 필요/); // 연결 시점을 모르면 판단하지 않는다
 });

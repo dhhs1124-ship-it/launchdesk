@@ -5,7 +5,7 @@
   var list=document.getElementById('adPerformanceList');
   var message=document.getElementById('adPerformanceMessage');
   var more=document.getElementById('adPerformanceMore');
-  var currentKey='',generation=0,accountCurrency='KRW',activeRange=null,marginLinks={};
+  var currentKey='',generation=0,accountCurrency='KRW',activeRange=null,marginLinks={},marginRecords=null;
   function money(value){
     try{return new Intl.NumberFormat('ko-KR',{style:'currency',currency:accountCurrency,maximumFractionDigits:2}).format(Number(value)||0);}
     catch(e){return (accountCurrency+' '+(Number(value)||0).toLocaleString('ko-KR'));}
@@ -14,17 +14,35 @@
   function percent(value){return value==null?'—':Math.round(Number(value)*100).toLocaleString('ko-KR')+'%';}
   function element(tag,className,content){var el=document.createElement(tag);if(className)el.className=className;if(content!=null)el.textContent=content;return el;}
   function metric(label,value){var el=element('div','ad-perf-metric');el.append(element('span','',label),element('strong','',value));return el;}
+  function won(value){return new Intl.NumberFormat('ko-KR').format(Math.round(Number(value)))+'원';}
+  function savedDate(iso){
+    if(!iso||!Number.isFinite(Date.parse(iso)))return '저장 시점 확인 불가';
+    return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',dateStyle:'medium',timeStyle:'short'}).format(new Date(iso))+' 저장';
+  }
+  // 같은 상품명의 가장 최근 저장 계산이 연결 시점 이후의 것이고 주문당 광고 전 잔액이 다를 때만 갱신 필요로 본다.
+  // 기록을 못 읽었거나, 연결 시점·비교할 기록이 없으면 판단하지 않는다(경과 시간은 보지 않는다).
+  function newerMargin(link){
+    var linkedAt=Date.parse(link.source_saved_at||'');
+    if(!marginRecords||!Number.isFinite(linkedAt))return null;
+    var label=String(link.product_label||'').trim();
+    var latest=marginRecords.find(function(r){return r&&r.calc_version===2&&r.result&&Number.isFinite(Number(r.result.preAd))&&String(r.product_name||'').trim().slice(0,40)===label;});
+    if(!latest||!(Date.parse(latest.saved_at||'')>=linkedAt))return null;
+    return Math.round(Number(latest.result.preAd))!==Math.round(Number(link.pre_ad))?latest:null;
+  }
   function marginSummary(adset,m){
     var link=marginLinks[String(adset.adset_id)],box=element('div','ad-margin-summary');
     if(!link){box.textContent='연결된 상품·마진 없음';return box;}
-    var label=element('strong','',link.product_label+' · 주문당 광고 전 '+new Intl.NumberFormat('ko-KR').format(Number(link.pre_ad))+'원');
-    var note=element('small','','저장한 마진 기준 · Meta 전환 '+(m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'측정 안 됨'));
-    box.append(label,note);
-    if(accountCurrency==='KRW'&&m.purchase&&m.purchase.observed){
-      var estimated=Number(link.pre_ad)*Number(m.purchase.value)-Number(m.spend||0);
-      box.append(element('span','', '광고 후 추정 잔액 '+new Intl.NumberFormat('ko-KR').format(Math.round(estimated))+'원'));
-      box.append(element('small','', 'Meta 전환에 다른 상품 구매가 포함될 수 있어요. 실제 상품별 이익과 다를 수 있습니다.'));
-    }
+    var observed=!!(m.purchase&&m.purchase.observed),computable=accountCurrency==='KRW'&&observed;
+    var title=element('div','ad-margin-title');
+    title.append(element('span','','광고 전환 기준 예상 잔액'),element('strong','',computable?won(Number(link.pre_ad)*Number(m.purchase.value)-Number(m.spend||0)):'계산 안 함'));
+    box.append(title);
+    box.append(element('small','',computable?'Meta가 집계한 구매 수로 계산 · 구매 '+number(m.purchase.value)+'건 × 주문당 광고 전 잔액 − 광고비 '+won(m.spend||0)
+      :accountCurrency!=='KRW'?'원화 광고계정만 계산해요.':'Meta가 집계한 구매 수가 없어 계산하지 않았어요.'));
+    if(computable)box.append(element('p','estimate-caution','취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님'));
+    box.append(element('small','','사용한 마진 기준: '+link.product_label+' · 주문당 광고 전 잔액 '+won(link.pre_ad)+' · '+savedDate(link.source_saved_at)));
+    var newer=newerMargin(link);
+    if(newer)box.append(element('p','margin-stale','마진 기준 갱신 필요 · 같은 상품의 최근 저장 계산은 주문당 광고 전 잔액 '+won(newer.result.preAd)+'이에요. 상품·마진 연결에서 다시 연결해 주세요.'));
+    if(computable)box.append(element('small','','Meta 구매에는 다른 상품 구매가 포함될 수 있어요.'));
     return box;
   }
   function params(ctx,scope,adsetId){var body={store_id:ctx.storeId,scope:scope,period:ctx.period.kind};if(ctx.period.kind==='date')body.date=ctx.period.date;if(adsetId)body.adset_id=adsetId;return body;}
@@ -87,7 +105,7 @@
   app.subscribe(async function(ctx){
     var key=ctx.userId+'|'+ctx.storeId+'|'+(ctx.metaAccount&&ctx.metaAccount.id)+'|'+ctx.period.kind+'|'+(ctx.period.date||'');
     if(key===currentKey)return;
-    currentKey=key;var id=++generation;list.replaceChildren();marginLinks={};more.hidden=true;more.setAttribute('aria-expanded','false');more.textContent='광고 세트 전체 보기 ↓';
+    currentKey=key;var id=++generation;list.replaceChildren();marginLinks={};marginRecords=null;more.hidden=true;more.setAttribute('aria-expanded','false');more.textContent='광고 세트 전체 보기 ↓';
     if(!ctx.userId||!ctx.storeId){message.textContent='쇼핑몰을 선택하면 광고별 성과를 볼 수 있어요.';return;}
     if(!ctx.metaAccount||ctx.metaAccount.status!=='connected'){message.textContent='Meta 광고계정을 연결하면 광고별 성과가 표시돼요.';return;}
     message.textContent='광고별 성과를 불러오는 중이에요.';
@@ -97,10 +115,14 @@
       if(response.error||!response.data||response.data.ok!==true){message.textContent='광고별 성과를 불러오지 못했어요. Meta 연결을 확인해 주세요.';return;}
       var data=response.data;accountCurrency=String(data.account&&data.account.currency||'KRW').toUpperCase();activeRange=data.range;
       if(data.truncated){message.textContent='조회 한도를 넘어 일부 광고 세트가 누락됐어요. 이 기간의 광고별 성과를 계산에 사용하지 마세요.';return;}
-      var linked=await ctx.client.from('ad_margin_links').select('meta_adset_id,product_label,pre_ad').eq('store_id',ctx.storeId);
+      var loaded=await Promise.all([
+        ctx.client.from('ad_margin_links').select('meta_adset_id,product_label,pre_ad,source_saved_at').eq('store_id',ctx.storeId),
+        ctx.client.from('tool_records').select('data').eq('user_id',ctx.userId).eq('tool_type','margin_calc').order('created_at',{ascending:false}).limit(100)
+      ]),linked=loaded[0];
       if(id!==generation||!valid(ctx,key))return;
       if(linked.error){message.textContent='저장된 광고·마진 연결을 불러오지 못했어요. 연결 상태를 확인해 주세요.';return;}
       (linked.data||[]).forEach(function(row){marginLinks[String(row.meta_adset_id)]=row;});
+      if(!loaded[1].error)marginRecords=(loaded[1].data||[]).map(function(row){return row.data;});
       var rows=[];(data.campaigns||[]).forEach(function(campaign){(campaign.adsets||[]).forEach(function(adset){rows.push({adset:adset,campaign:campaign});});});
       rows.sort(function(a,b){return Number(b.adset.metrics&&b.adset.metrics.spend||0)-Number(a.adset.metrics&&a.adset.metrics.spend||0);});
       rows.forEach(function(row,index){var el=renderAdset(row.adset,row.campaign,ctx,key);el.hidden=index>=3;list.appendChild(el);});

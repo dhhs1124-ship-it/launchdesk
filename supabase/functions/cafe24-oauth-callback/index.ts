@@ -2,18 +2,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
 import { normalizeCafe24ExpiresAt } from "../_shared/cafe24-token.ts";
 
-function allowedReturnOrigin(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  try {
-    const parsed = new URL(value);
-    if (parsed.origin !== value || parsed.protocol !== "https:") return null;
-    const host = parsed.hostname;
-    const configured = Deno.env.get("LAUNCHROAS_RETURN_ORIGIN");
-    return /^launchroas(?:-[a-z0-9-]+-launchdesk)?\.vercel\.app$/.test(host) ||
-      host === "launchroas.co.kr" || host === "www.launchroas.co.kr" ||
-      (configured && value === configured) ? value : null;
-  } catch { return null; }
-}
+import { allowedReturnOrigin as allowListedOrigin } from "../_shared/return-origin.ts";
+
+const allowedReturnOrigin = (value: unknown) =>
+  allowListedOrigin(value, Deno.env.get("LAUNCHROAS_RETURN_ORIGIN"));
 
 const REDIRECT_URI =
   "https://zzhvckikonnalqnyatgn.supabase.co/functions/v1/cafe24-oauth-callback";

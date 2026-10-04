@@ -11,9 +11,18 @@
   var signupPending = false;
   var dashboardReady = false, connectionsLoaded = false, period = {kind:'today',date:null}, selectedCafe = null, selectedMeta = null;
   var viewState = {cafe:null,meta:null}, listeners = [];
-  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),connectionsLoaded:connectionsLoaded,cafeAccount:selectedCafe,metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date}}; }
+  // OAuth 복귀 직후 한 번만 쓰는 시작 대상({provider,status,target})과 그 판정 결과({provider,status,storeId|null}).
+  var returnTarget = null, returnResult = null, RETURN_TTL = 15 * 60 * 1000;
+  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),connectionsLoaded:connectionsLoaded,cafeAccount:selectedCafe,metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date},returnResult:returnResult}; }
   function publish(){ listeners.forEach(function(fn){try{fn(context());}catch(e){console.warn('[launchroas] 구독자 오류',e);}}); }
-  window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());},reloadStores:function(){return loadStores(++requestId);},selectStore:function(id){byId('storeSelect').value=id;resetCards();publish();return loadSelected(id,++requestId);}};
+  window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());},reloadStores:function(){return loadStores(++requestId);},selectStore:function(id){byId('storeSelect').value=id;resetCards();publish();return loadSelected(id,++requestId);},expectReturn:function(info){returnTarget=info;}};
+  // 시작 기록이 같은 사용자·제공자·유효 시간이고 현재 사용자의 쇼핑몰일 때만 복원한다.
+  function returnStoreId(r){
+    var t = r.target || {}, age = Date.now() - Number(t.at);
+    var ok = t.userId === userId && t.provider === r.provider && age >= 0 && age < RETURN_TTL &&
+      stores.some(function(store){ return String(store.id) === String(t.storeId); });
+    return ok ? String(t.storeId) : null;
+  }
   function message(id, value){ byId(id).textContent = value || ''; }
   function won(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '원'; }
   function metaMoney(n, currency){
@@ -33,7 +42,7 @@
   }
   function setConnection(id,text,state){var pill=byId(id);pill.textContent=text;pill.dataset.state=state;}
   function signedOut(){
-    requestId++; userId = null; stores = []; signupPending = false; dashboardReady = false;
+    requestId++; userId = null; stores = []; signupPending = false; dashboardReady = false; returnResult = null;
     byId('loginPanel').hidden = false; byId('dashboard').hidden = true; byId('consentGate').hidden = true;
     byId('connectionPills').hidden = true;
     byId('accountEmail').hidden = true; byId('switchAccount').hidden = true; byId('logout').hidden = true;
@@ -93,9 +102,23 @@
     if(stores.some(function(store){return String(store.id) === previousStoreId;})) select.value = previousStoreId;
     publish();
     if(!stores.length){
+      if(returnTarget){ returnResult = {provider:returnTarget.provider,status:returnTarget.status,storeId:null}; returnTarget = null; publish(); }
       message('pageMessage', '이 계정에 등록된 Cafe24 쇼핑몰이 없어요. 연결 관리에서 쇼핑몰을 등록해 주세요.');
       setConnection('cafeConnection','Cafe24 미연결','off');setConnection('metaConnection','Meta 미연결','off');
       return;
+    }
+    if(returnTarget){
+      var pending = returnTarget; returnTarget = null;
+      returnResult = {provider:pending.provider,status:pending.status,storeId:returnStoreId(pending)};
+      // 시작 대상을 확인하지 못하면 첫 쇼핑몰로 바꾸지 않고 선택을 비운 채 다시 고르게 한다.
+      select.value = returnResult.storeId || '';
+      if(!returnResult.storeId){
+        publish();
+        message('pageMessage', '인증을 시작한 쇼핑몰을 확인할 수 없어요. 쇼핑몰을 다시 선택해 주세요.');
+        setConnection('cafeConnection','Cafe24 확인 전','off');setConnection('metaConnection','Meta 확인 전','off');
+        return;
+      }
+      publish();
     }
     message('pageMessage', '');
     await loadSelected(select.value, id);
@@ -314,7 +337,7 @@
         if(result.error || !result.data || result.data.ok !== true){
           var body = result.error && result.error.context && await result.error.context.json().catch(function(){return null;});
           syncError = body && body.code === 'RECONNECT_REQUIRED'
-            ? 'Cafe24 인증이 만료됐어요. 런치데스크에서 같은 계정으로 다시 연결해 주세요.'
+            ? 'Cafe24 인증이 만료됐어요. 연결 관리에서 Cafe24를 다시 연결해 주세요.'
             : '주문 동기화에 실패했어요. 연결 상태를 확인해 주세요.';
         }
       } else syncError = 'Cafe24가 연결되지 않아 저장된 데이터만 다시 조회했어요.';

@@ -1,15 +1,26 @@
 (function(){
   'use strict';
   var app=window.LaunchRoasApp;if(!app)return;
-  var byId=function(id){return document.getElementById(id);},generation=0;
+  var byId=function(id){return document.getElementById(id);},generation=0,RETURN_KEY='launchroas.oauthTarget';
+  var LABEL={cafe24:'Cafe24',meta:'Meta'};
   function say(value){byId('connectionMessage').textContent=value||'';}
+  // 복귀 안내는 판정된 쇼핑몰이 선택돼 있을 때만(대상 없음이면 아무것도 선택되지 않았을 때만) 보인다.
+  function showReturn(ctx){
+    var r=ctx.returnResult,box=byId('connectionReturn');
+    box.hidden=!r||(r.storeId?String(ctx.storeId)!==r.storeId:!!ctx.storeId);
+    if(box.hidden)return;
+    if(!r.storeId){box.textContent=LABEL[r.provider]+' 인증 후 돌아왔지만 인증을 시작한 쇼핑몰을 확인할 수 없어요. 연결할 쇼핑몰을 다시 선택한 뒤 연결 상태를 확인해 주세요.';return;}
+    var store=(ctx.stores||[]).find(function(s){return String(s.id)===r.storeId;}),name=store?store.name:'선택한 쇼핑몰';
+    box.textContent=name+' · '+(r.status!=='connected'?LABEL[r.provider]+' 인증을 마치지 못했어요. 연결을 다시 시도해 주세요.':r.provider==='meta'?'Meta 인증을 마쳤어요. 아래에서 이 쇼핑몰의 광고계정을 선택해 주세요.':'Cafe24가 연결됐어요.');
+  }
   function same(ctx){var now=app.getContext();return now.userId===ctx.userId&&String(now.storeId)===String(ctx.storeId);}
   function refresh(ctx){
     var select=byId('connectionStore');select.replaceChildren();
     (ctx.stores||[]).forEach(function(store){var option=document.createElement('option');option.value=store.id;option.textContent=store.name;select.appendChild(option);});
     select.value=ctx.storeId||'';
     var selected=(ctx.stores||[]).find(function(store){return String(store.id)===String(ctx.storeId);});
-    byId('connectionStatus').textContent=!ctx.storeId?'쇼핑몰을 먼저 등록하세요.':!ctx.connectionsLoaded?'연결 상태 확인 중…':
+    showReturn(ctx);
+    byId('connectionStatus').textContent=!ctx.storeId?((ctx.stores||[]).length?'연결할 쇼핑몰을 선택하세요.':'쇼핑몰을 먼저 등록하세요.'):!ctx.connectionsLoaded?'연결 상태 확인 중…':
       (selected?selected.name+' · ':'')+'Cafe24 '+(ctx.cafeAccount&&ctx.cafeAccount.status==='connected'?'연결됨':'미연결')+' · Meta '+(ctx.metaAccount&&ctx.metaAccount.status==='connected'?'연결됨':ctx.metaAccount?'광고계정 선택 필요':'미연결');
     byId('connectCafe').disabled=!ctx.storeId;byId('connectMeta').disabled=!ctx.storeId;
     byId('metaAccountPicker').hidden=true;
@@ -55,6 +66,8 @@
       var target=new URL(result.data.authorization_url);
       if(provider==='cafe24'? !/^[a-z0-9_-]+\.cafe24api\.com$/i.test(target.hostname): !['www.facebook.com','facebook.com'].includes(target.hostname))throw Error('잘못된 인증 주소');
       if(target.protocol!=='https:')throw Error('잘못된 인증 주소');
+      // 복귀 후 같은 쇼핑몰을 다시 고르기 위한 시작 기록. 새로 시작할 때마다 덮어쓴다.
+      try{sessionStorage.setItem(RETURN_KEY,JSON.stringify({provider:provider,storeId:String(ctx.storeId),userId:ctx.userId,at:Date.now()}));}catch(e){}
       window.location.assign(target.href);
     }catch(e){say('연결을 시작하지 못했어요. 다시 시도해 주세요.');}
     finally{button.disabled=false;}
@@ -71,9 +84,12 @@
       say('Meta 광고계정을 연결했어요.');await app.selectStore(ctx.storeId);
     }finally{this.disabled=false;}
   });
-  var params=new URLSearchParams(window.location.search),cafe=params.get('cafe24'),meta=params.get('meta');
-  if(cafe||meta){
-    history.replaceState(null,'',window.location.pathname+window.location.hash);
-    window.addEventListener('load',function(){document.querySelector('[data-view="connections"]').click();say((cafe||meta)==='connected'?(meta?'Meta 인증을 마쳤어요. 광고계정을 선택해 주세요.':'Cafe24가 연결됐어요.'): '인증을 마치지 못했어요. 연결을 다시 시도해 주세요.');});
+  var params=new URLSearchParams(window.location.search),returned=params.get('meta')?'meta':params.get('cafe24')?'cafe24':null;
+  if(returned){
+    // 시작 기록은 복귀 때 한 번만 읽고 지운다. 예전 시도의 값이 다음 복귀에 쓰이지 않게 한다.
+    var target=null;try{target=JSON.parse(sessionStorage.getItem(RETURN_KEY)||'null');sessionStorage.removeItem(RETURN_KEY);}catch(e){}
+    app.expectReturn({provider:returned,status:params.get(returned),target:target});
+    history.replaceState(null,'',window.location.pathname+(window.location.hash==='#_=_'?'':window.location.hash));
+    window.addEventListener('load',function(){document.querySelector('[data-view="connections"]').click();});
   }
 })();
