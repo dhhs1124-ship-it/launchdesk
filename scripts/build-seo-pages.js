@@ -22,7 +22,7 @@ const PAGES = [
     slug: 'marketplace-vs-own',
     title: '스마트스토어와 자사몰, 무엇부터 시작할까? | 런치데스크',
     heading: '스마트스토어와 자사몰, 무엇부터 시작할까?',
-    description: '온라인 쇼핑몰을 시작할 때 오픈마켓과 자사몰 중 어디부터 시작할지 고민된다면, 초기 유입·비용·브랜드 운영 기준으로 선택해보세요.',
+    description: '의류 쇼핑몰을 시작할 때 오픈마켓과 자사몰 중 어디부터 시작할지 고민된다면, 초기 유입·비용·브랜드 운영 기준으로 선택해보세요.',
     appRoute: '/resources/marketplace-vs-own'
   },
   {
@@ -30,7 +30,7 @@ const PAGES = [
     slug: 'supplier-check-checklist',
     title: '도매처·공급처 계약 전 확인할 7가지 | 런치데스크',
     heading: '도매처를 정하기 전, 이 7가지는 확인하세요',
-    description: '공급가부터 MOQ, 배송 조건, 반품·교환, 품절 대응과 세금계산서까지. 초보 쇼핑몰 운영자를 위한 공급처 비교 체크리스트입니다.',
+    description: '공급가부터 MOQ, 배송 조건, 반품·교환, 품절 대응과 세금계산서까지. 초보 의류 쇼핑몰 운영자를 위한 도매처 비교 체크리스트입니다.',
     appRoute: '/resources/supplier-check-checklist'
   }
 ];
@@ -70,14 +70,14 @@ function renderPage(page){
   // base를 루트로 둬서 기존 상대 경로 스크립트/이미지와 #/ 내부 링크가
   // /guides/.../ 아래가 아닌 / 아래에서 작동한다.
   html = replaceOnce(html, '<head>', '<head>\n<base href="/">');
-  html = replaceOnce(html, '<title>런치데스크 | 온라인 쇼핑몰 시작 가이드 · 운영 도구</title>', `<title>${escapeHtml(page.title)}</title>`);
+  html = replaceOnce(html, '<title>런치데스크 | 의류 쇼핑몰 시작 가이드 · 운영 도구</title>', `<title>${escapeHtml(page.title)}</title>`);
   html = replaceOnce(html,
-    '<meta name="description" content="초보 판매자를 위한 쇼핑몰 준비 가이드와 운영 도구. 로드맵, 마진 계산기, 도매처 찾기를 런치데스크에서 시작하세요.">',
+    '<meta name="description" content="\'의류 쇼핑몰 해 볼까\' 고민 중이라면. 초보 의류 셀러를 위한 준비 로드맵, 마진 계산기, 동대문 도매처 찾기를 런치데스크에서 순서대로 시작하세요.">',
     `<meta name="description" content="${escapeHtml(page.description)}">`);
   html = replaceOnce(html, '<link rel="canonical" href="https://launchdesk.co.kr/">', `<link rel="canonical" href="${url}">`);
   html = replaceOnce(html, '<meta property="og:url" content="https://launchdesk.co.kr/">', `<meta property="og:url" content="${url}">`);
-  html = replaceOnce(html, '<meta property="og:title" content="런치데스크 | 온라인 쇼핑몰 시작 가이드 · 운영 도구">', `<meta property="og:title" content="${escapeHtml(page.title)}">`);
-  html = replaceOnce(html, '<meta property="og:description" content="초보 판매자를 위한 쇼핑몰 준비 가이드와 운영 도구. 로드맵, 마진 계산기, 도매처 찾기를 런치데스크에서 시작하세요.">', `<meta property="og:description" content="${escapeHtml(page.description)}">`);
+  html = replaceOnce(html, '<meta property="og:title" content="런치데스크 | 의류 쇼핑몰 시작 가이드 · 운영 도구">', `<meta property="og:title" content="${escapeHtml(page.title)}">`);
+  html = replaceOnce(html, '<meta property="og:description" content="\'의류 쇼핑몰 해 볼까\' 고민 중이라면. 초보 의류 셀러를 위한 준비 로드맵, 마진 계산기, 동대문 도매처 찾기를 런치데스크에서 순서대로 시작하세요.">', `<meta property="og:description" content="${escapeHtml(page.description)}">`);
   html = replaceOnce(html, '<body>', `<body class="${page.appRoute === '/tools' ? 'tools-view' : 'resources-view'}" data-route="${page.appRoute}">`);
   if(page.appRoute === '/tools'){
     html = replaceOnce(html, '<section class="view" id="view-tools" hidden>', '<section class="view" id="view-tools">');
