@@ -105,3 +105,59 @@
 .pm-group{margin:18px 0 10px;font-size:14px;color:#f1f3f2}.pm-group span{margin-left:6px;color:#a3adae;font-size:11.5px;font-weight:500}.pm-group:first-of-type{margin-top:6px}.calc-fields label>span{display:block;margin-top:2px}.pm-note{margin:0 0 8px}.pm-next{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 @media(max-width:530px){.setup-step{grid-template-columns:26px 1fr}.setup-btn{grid-column:1/-1;width:100%}.status-summary{font-size:14px}.status-summary strong{font-size:18px}}
 .setup-items{display:grid;gap:2px;margin:6px 0 0;padding:0;list-style:none}.setup-items .inline-button{padding:0;text-align:left;font-size:12.5px;word-break:keep-all}
+
+/* ---- 모션 · 연출 (일반 조작 150~250ms · 주요 등장 300~500ms, 같은 이징) ---- */
+:root{--fx-ease:cubic-bezier(.22,1,.36,1);--fx-fast:200ms;--fx-main:420ms}
+button,.sales-chip,.pm-item,.setup-btn{transition:transform var(--fx-fast) var(--fx-ease),background-color var(--fx-fast) var(--fx-ease),border-color var(--fx-fast) var(--fx-ease),color var(--fx-fast) var(--fx-ease)}
+button:active:not(:disabled){transform:scale(.97)}
+details[open]>:not(summary){animation:fx-fade var(--fx-fast) var(--fx-ease)}
+#overviewView,#calculatorView,#connectionsView{animation:fx-fade var(--fx-fast) var(--fx-ease)}
+@keyframes fx-fade{from{opacity:0}to{opacity:1}}
+/* 키네틱: 금액 · 부호 · 단위 · '일부 상품 기준'이 한 덩어리로 함께 등장 */
+.fx-kinetic{animation:fx-kinetic var(--fx-main) var(--fx-ease)}
+@keyframes fx-kinetic{from{opacity:.15;transform:translateY(10px);letter-spacing:.04em}to{opacity:1;transform:none;letter-spacing:normal}}
+/* 스태거: 금액 → 계산식 → 상태 → 개선 점검 */
+.fx-rise{animation:fx-rise var(--fx-main) var(--fx-ease) both;animation-delay:calc(var(--fx-i,0) * 90ms)}
+@keyframes fx-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+/* 펀치 인: 레이아웃을 밀지 않는 transform만 */
+.fx-punch{animation:fx-punch 260ms var(--fx-ease)}
+@keyframes fx-punch{0%{transform:scale(1)}45%{transform:scale(1.035)}100%{transform:scale(1)}}
+/* 로어 서드 안내 */
+.fx-toast{position:fixed;left:24px;bottom:24px;z-index:60;max-width:min(420px,calc(100vw - 32px));padding:12px 16px 12px 14px;border-left:3px solid #ff9a61;border-radius:8px;background:#121618f2;color:#f1f3f2;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px #0008;pointer-events:none}
+.fx-toast-in{animation:fx-lower 360ms var(--fx-ease)}
+@keyframes fx-lower{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
+
+/* ---- 개선 점검 ---- */
+.insights{margin-top:18px}.insights-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}.insights-head h2{margin:0;font-size:17px}
+.insight-badge{padding:3px 9px;border:1px solid #ffffff2a;border-radius:999px;color:#b3bcbc;font-size:11.5px}
+.insights-note{margin:6px 0 12px}
+.insight-status{display:grid;gap:4px;margin:0 0 12px;padding:0;list-style:none;color:#dfe4e2;font-size:13.5px}.insight-status li::before{content:'· ';color:#ff9a61}
+.insight-list{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.insight-item{display:grid;gap:4px;padding:12px 14px;border:1px solid #ffffff14;border-radius:10px;background:#1b2023;animation:fx-rise var(--fx-main) var(--fx-ease) both;animation-delay:calc(var(--i,0) * 90ms)}
+.insight-action{font-size:14.5px;color:#f4f5f4;word-break:keep-all}.insight-adset{color:#9aa4a5;font-size:12px}
+.insight-facts{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:6px 0 0;font-size:12.5px}.insight-facts dt{color:#ffbd92;font-weight:700;white-space:nowrap}.insight-facts dd{margin:0;color:#c9cfcf;word-break:keep-all}
+.insight-gaps{margin-top:12px;padding-top:10px}.insight-gaps ul{margin:0;padding-left:18px;font-size:12.5px}
+
+/* ---- 처음 사용 가이드 ---- */
+.tour-layer{position:fixed;inset:0;z-index:70;pointer-events:none}
+.tour-spot{position:fixed;left:0;top:0;border-radius:12px;box-shadow:0 0 0 9999px #05080acc,0 0 0 2px #ff9a61;transition:transform 320ms var(--fx-ease),width 320ms var(--fx-ease),height 320ms var(--fx-ease)}
+.tour-card{position:fixed;left:50%;bottom:20px;width:min(460px,calc(100vw - 24px));transform:translateX(-50%);padding:16px 18px 14px;border-left:3px solid #ff9a61;border-radius:12px;background:#151a1c;color:#eef1f0;box-shadow:0 18px 50px #000a;pointer-events:auto}
+.tour-card.top{bottom:auto;top:20px}
+.tour-head{display:flex;justify-content:space-between;align-items:center}.tour-count{color:#9aa4a5;font-size:12px}
+.tour-skip{border:0;background:none;color:#b3bcbc;font-size:12.5px;cursor:pointer;padding:4px}
+.tour-title{margin:6px 0 4px;font-size:18px}.tour-word{display:inline-block;animation:fx-rise 360ms var(--fx-ease) both;animation-delay:calc(var(--w,0) * 60ms)}
+.tour-text{margin:0;color:#cdd3d2;font-size:13.5px;line-height:1.55;word-break:keep-all}
+.tour-state{margin:8px 0 0;color:#ffbd92;font-size:12.5px}.tour-state.done{color:#9fe0bb}
+.tour-nav{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:12px}.tour-nav button{width:auto;height:38px;margin:0;padding:0 14px;font-size:13px}
+
+.fx-whip{animation:fx-whip 380ms var(--fx-ease)}
+@keyframes fx-whip{from{opacity:0;transform:translateX(calc(-50% - 60px));filter:blur(6px)}to{opacity:1;transform:translateX(-50%);filter:none}}
+.fx-swap{animation:fx-swap 220ms var(--fx-ease)}
+@keyframes fx-swap{from{opacity:.4}to{opacity:1}}
+@media(max-width:530px){.fx-toast{left:12px;right:12px;bottom:auto;top:12px}.tour-card{bottom:12px}.tour-card.top{top:12px}.tour-title{font-size:16.5px}}
+
+/* 움직임 줄이기: 이동 · 확대 · 블러 없이 투명도만 짧게 */
+@media (prefers-reduced-motion: reduce){
+  .fx-kinetic,.fx-rise,.fx-punch,.fx-whip,.fx-toast-in,.tour-word,.insight-item{animation:fx-fade 150ms linear both!important;animation-delay:0s!important}
+  .tour-spot{transition:none}button:active:not(:disabled){transform:none}
+}

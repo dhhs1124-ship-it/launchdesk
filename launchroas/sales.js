@@ -59,7 +59,8 @@
     var range=state.range;
     byId('salesPeriod').textContent=range?('Cafe24 주문일 '+range.since+(range.until!==range.since?' ~ '+range.until:'')+' (한국 시간)'):'';
     if(!ctx.userId||!ctx.storeId){msg.textContent='쇼핑몰을 선택하면 볼 수 있어요.';fxBox.hidden=true;renderHero(null,null,null,false,[]);
-      renderGuide(setupSteps(ctx,null,null,null,metaState(ctx),null),!!ctx.userId&&!(ctx.stores||[]).length);byId('statusSummary').hidden=true;return;}
+      renderGuide(setupSteps(ctx,null,null,null,metaState(ctx),null),!!ctx.userId&&!(ctx.stores||[]).length);byId('statusSummary').hidden=true;
+      window.dispatchEvent(new CustomEvent('launchroas:sales-state',{detail:{ready:!!ctx.userId&&!!ctx.connectionsLoaded,loading:false,error:'',summary:null,profit:null,partial:false,spendKrw:null,meta:null,metaIssue:'',steps:setupSteps(ctx,null,null,null,metaState(ctx),null).map(function(x){return {title:x.title,done:x.done,text:x.text};})}}));return;}
     msg.textContent=state.orders||state.error?'':'불러오는 중…';
 
     // 예전에 저장한 연결에 계산 입력값이 없으면 같은 저장 시각의 계산 기록에서 찾아 실제 결제 기준에 쓴다.
@@ -93,7 +94,7 @@
     var partial=!!(s&&s.partial),scope=partial?'일부 상품 기준 ':'';
     var rule=s&&s.ordersWithLinked?'배송·포장·기타: 실제 택배 지출액을 알 수 없어 저장한 설정값으로 추정 — 추정 규칙: 주문 1건에 한 번, 담긴 상품 중 가장 큰 설정값'+(s.margin.multiCodeOrders?' · Cafe24 배송코드가 나뉜 주문 '+count(s.margin.multiCodeOrders,'건')+'도 실제 분할 발송을 확인할 수 없어 한 번으로 계산':''):'';
     var cpn=s&&s.ordersWithLinked?s.margin.coupon:null;
-    var couponNote=cpn&&(cpn.shipping||cpn.product||cpn.unknown)?'쿠폰: 주문 쿠폰 이름으로 구분 — 무료배송 쿠폰 '+count(cpn.shipping||0,'건')+'(고객 배송비에서 뺌) · 상품 쿠폰 '+count(cpn.product||0,'건')+(cpn.unknown?' · 구분 불가 '+count(cpn.unknown,'건')+'(상품 할인으로 봄 — 상품 · 배송비 수수료율이 다르면 수수료가 쿠폰 금액 × 요율 차이만큼 달라질 수 있음)':''):'';
+    var couponNote=cpn&&(cpn.shipping||cpn.product||cpn.unknown||cpn.ambiguous)?'쿠폰 종류는 쿠폰 이름 기준 추정(Cafe24가 종류를 주지 않음) — 무료배송 쿠폰 '+count(cpn.shipping||0,'건')+'(고객 배송비에서 뺌) · 상품 쿠폰 '+count(cpn.product||0,'건')+((cpn.ambiguous||cpn.unknown)?' · 이름이 모호하거나 조회 못 함 '+count((cpn.ambiguous||0)+(cpn.unknown||0),'건')+'(분류하지 않고 상품 할인으로 계산 — 상품 · 배송비 수수료율이 다르면 쿠폰 금액 × 요율 차이만큼 수수료가 달라질 수 있음)':''):'';
     var payNote=s&&s.ordersWithLinked?'적립금 사용 '+count(s.margin.pointsOrders,'건')+'은 쇼핑몰이 지급한 혜택이라 판매자 부담으로 따로 뺌 · 예치금 '+count(s.margin.creditsOrders,'건')+' · 네이버페이(포인트 포함)는 정산되는 결제라 빼지 않음':'';
     var ship=s&&s.ordersWithLinked?s.margin.ship:null;
     var shipNote=ship?'고객 배송비: 주문에 실제 부과된 금액(현재 무료배송 조건으로 다시 계산하지 않음) — 부과 '+count(ship.charged,'건')+' · 0원 '+count(ship.free,'건')+(ship.unknown?' · 확인 불가 '+count(ship.unknown,'건')+'(0원으로 계산)':''):'';
@@ -155,6 +156,8 @@
     renderHero(profit,base,spendKrw,partial,chips,s);
     var ready=!!ctx.connectionsLoaded;
     renderGuide(setupSteps(ctx,s,profit,spendKrw,ms,mp),ready);
+    // 개선 점검 패널 · 사용법 안내가 같은 상태를 쓰도록 알린다(조회 중이면 loading — 0원으로 보지 않게).
+    window.dispatchEvent(new CustomEvent('launchroas:sales-state',{detail:{ready:ready,loading:!s&&!state.error,error:state.error||'',summary:s,profit:profit,partial:partial,spendKrw:spendKrw,meta:mp||null,metaIssue:ms?ms.text:'',steps:setupSteps(ctx,s,profit,spendKrw,ms,mp).map(function(x){return {title:x.title,done:x.done,text:x.text};}),range:state.range}}));
     renderStatus(ctx,s,profit,spendKrw,ms,mp,partial,ready&&!!(s||state.error));
   }
 
@@ -217,11 +220,19 @@
     if(parts.length)box.appendChild(el('small','',' '+parts.join(' · ')));
   }
 
+  var revealKey='';
   function renderHero(profit,base,spendKrw,partial,chips,s){
-    var amount=byId('salesAmount');
-    amount.textContent=profit==null?'—':won(profit);
+    var amount=byId('salesAmount'),text=profit==null?'—':won(profit),M=window.LaunchRoasMotion;
+    var changed=amount.textContent!==text||byId('salesScope').hidden!==!(partial&&profit!=null);
+    amount.textContent=text;
     amount.classList.toggle('deficit',profit!=null&&profit<0);
     byId('salesScope').hidden=!(partial&&profit!=null);
+    // 금액(부호 · 단위)과 '일부 상품 기준' 표시는 한 덩어리(.sales-hero-amount)로 함께 움직인다. 조회 중('—')에는 연출하지 않는다.
+    if(M&&profit!=null){
+      var key=app.getContext().storeId+'|'+(state.range?state.range.since+'~'+state.range.until:'');
+      if(key!==revealKey){revealKey=key;M.stagger([document.querySelector('.sales-hero-amount'),byId('salesFormula'),byId('statusSummary'),byId('insights')]);}
+      else if(changed)M.play(document.querySelector('.sales-hero-amount'),'fx-kinetic');
+    }
     // 일부 상품만 계산됐으면 마진이 판매 몇 개분인지, 광고비는 전체인지를 계산식 줄에 바로 붙인다.
     byId('salesFormula').textContent='상품 마진 '+(base==null?'?':won(base))+(partial&&s?' (판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')':'')+' − 실제 광고비 '+(spendKrw==null?'?':won(spendKrw))+(partial?' (전체)':'');
     var box=byId('salesChips');box.replaceChildren();
@@ -243,7 +254,7 @@
     var computed=m.revenue+m.customerShipping-m.points-m.unitCost-m.fees-m.orderCosts,lines=[
       ['상품 금액 (실제 결제 '+count(m.actualOrders,'건')+(m.estimatedOrders?' · 추정 '+count(m.estimatedOrders,'건'):'')+')',m.revenue,'+'],
       ['고객에게 받은 배송비',m.customerShipping,'+'],['적립금 사용 (판매자 부담)',m.points,'−'],['상품 원가',m.unitCost,'−'],
-      ['판매·PG·배송비 수수료',m.fees,'−'],['배송·포장·기타 (설정값 추정)',m.orderCosts,'−']];
+      ['판매 수수료 (상품금액 · 적립금 포함 × 판매 수수료율)',m.feeSales,'−'],['PG 수수료 (적립금 · 예치금 뺀 결제분 × PG 수수료율)',m.feePg,'−'],['배송비 수수료',m.feeShip,'−'],['배송·포장·기타 (설정값 추정)',m.orderCosts,'−']];
     if(m.savedOnlyOrders)lines.push(['저장한 1개당 마진으로만 계산한 주문 '+count(m.savedOnlyOrders,'건'),m.total-computed,'+']);
     lines.push(['상품 마진',m.total,'=']);
     if(spendKrw!=null){lines.push(['원화 광고비 (전체)',spendKrw,'−']);lines.push([s.partial?'일부 상품 기준 남은 금액':'남은 금액',profit,'=']);}

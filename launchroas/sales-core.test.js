@@ -264,3 +264,23 @@ test('실제 0원 판매(사은품)는 매출 0원 · 원가 반영, 판매가 �
   const missing=S.summarize([paidOrder([item({quantity:1,product_price:null})],0,{})],[linkFor(1,calcInput({}))]);
   assert.deepEqual(missing.margin.estimated,{savedPrice:1});assert.equal(missing.margin.revenue,30000);
 });
+
+test('쿠폰 이름이 모호하면(배송 · 상품 신호가 함께 있거나 둘 다 없음) 확정하지 않고 상품 할인으로 계산한다',()=>{
+  const link=linkFor(1,calcInput({}));
+  const mk=(name)=>Object.assign(paidOrder([item({quantity:1,product_price:30000})],30000,{shipping_fee:3000,coupon_discount_price:3000}),{coupons:[{coupon_name:name}]});
+  const kind=(name)=>Object.keys(S.summarize([mk(name)],[link]).margin.coupon)[0];
+  assert.equal(kind('무료배송쿠폰'),'shipping');assert.equal(kind('5% 할인 쿠폰'),'product');
+  assert.equal(kind('가을 이벤트 쿠폰'),'ambiguous');assert.equal(kind('무료배송+10% 할인'),'ambiguous');
+  const amb=S.summarize([mk('가을 이벤트 쿠폰')],[link]);
+  assert.equal(amb.margin.customerShipping,3000,'모호하면 배송비 쿠폰으로 보지 않음');
+});
+
+test('수수료 내역: 판매 수수료는 적립금 포함 상품금액 기준, PG는 적립금을 뺀 결제분 기준',()=>{
+  const sales=linkFor(1,calcInput({unitCost:25000,actualShipping:3000,packaging:200,feeRate:6,pgRate:0}));
+  const pts=paidOrder([item({quantity:2,product_price:54750})],111500,{shipping_fee:3000,points_spent_amount:1000});
+  const a=S.summarize([pts],[sales]).margin;
+  assert.deepEqual({s:a.feeSales,p:a.feePg,sh:a.feeShip},{s:6570,p:0,sh:0},'109,500 × 6% = 6,570, PG 0%');
+  const pg=linkFor(1,calcInput({unitCost:25000,feeRate:0,pgRate:6,shippingFeeMode:'none'}));
+  const b=S.summarize([pts],[pg]).margin;
+  assert.equal(b.feePg,Math.round(109500*111500/112500*0.06)+Math.round(3000*111500/112500*0.06),'PG는 (결제 111,500 ÷ 적립금 포함 112,500) 비율만');
+});

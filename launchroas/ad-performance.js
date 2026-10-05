@@ -89,6 +89,7 @@
     });
     box.append(pick,save);return box;
   }
+  function publish(detail){if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('launchroas:adsets-state',{detail:detail}));}
   function renderAdset(adset,campaign,ctx,key){
     var row=element('article','adset-row'),head=element('div','adset-head'),name=element('div','adset-name');
     name.append(element('small','',campaign.campaign_name||'캠페인'),element('strong','',adset.adset_name||'이름 없는 광고 세트'));
@@ -139,12 +140,12 @@
     if(key===currentKey)return;
     currentKey=key;currentFx=ctx.fx||null;var id=++generation;list.replaceChildren();marginLinks={};marginRecords=null;productLinks=[];more.hidden=true;more.setAttribute('aria-expanded','false');more.textContent='광고 세트 전체 보기 ↓';
     if(!ctx.userId||!ctx.storeId){message.textContent='쇼핑몰을 선택하면 광고별 성과를 볼 수 있어요.';return;}
-    if(!ctx.metaAccount||ctx.metaAccount.status!=='connected'){message.textContent='Meta 광고계정을 연결하면 광고별 성과가 표시돼요.';return;}
-    message.textContent='광고별 성과를 불러오는 중이에요.';
+    if(!ctx.metaAccount||ctx.metaAccount.status!=='connected'){message.textContent='Meta 광고계정을 연결하면 광고별 성과가 표시돼요.';publish({key:key,error:'Meta 광고계정 미연결'});return;}
+    message.textContent='광고별 성과를 불러오는 중이에요.';publish({key:key,loading:true});
     try{
       var response=await ctx.client.functions.invoke('meta-adset-insights',{body:params(ctx,'adsets')});
       if(id!==generation||!valid(ctx,key))return;
-      if(response.error||!response.data||response.data.ok!==true){message.textContent='광고별 성과를 불러오지 못했어요. Meta 연결을 확인해 주세요.';return;}
+      if(response.error||!response.data||response.data.ok!==true){message.textContent='광고별 성과를 불러오지 못했어요. Meta 연결을 확인해 주세요.';publish({key:key,error:'광고 세트 성과를 불러오지 못함'});return;}
       var data=response.data;accountCurrency=String(data.account&&data.account.currency||'KRW').toUpperCase();
       if(data.truncated){message.textContent='조회 한도를 넘어 일부 광고 세트가 누락됐어요. 이 기간의 광고별 성과를 계산에 사용하지 마세요.';return;}
       var loaded=await Promise.all([
@@ -164,6 +165,8 @@
       var rows=[];(data.campaigns||[]).forEach(function(campaign){(campaign.adsets||[]).forEach(function(adset){rows.push({adset:adset,campaign:campaign});});});
       rows.sort(function(a,b){return Number(b.adset.metrics&&b.adset.metrics.spend||0)-Number(a.adset.metrics&&a.adset.metrics.spend||0);});
       rows.forEach(function(row,index){var el=renderAdset(row.adset,row.campaign,ctx,key);el.hidden=index>=3;list.appendChild(el);});
+      // 개선 점검 패널에 같은 데이터(실제로 받은 지표만)를 넘긴다.
+      publish({key:key,currency:accountCurrency,rows:rows.map(function(r){var link=marginLinks[String(r.adset.adset_id)];return {name:r.adset.adset_name||'이름 없는 광고 세트',metrics:r.adset.metrics||{},linked:!!link,verdict:verdictOf(link,r.adset.metrics||{})};})});
       var count=rows.length;
       more.hidden=count<=3;if(count>3)more.textContent='광고 세트 전체 '+count+'개 보기 ↓';
       message.textContent=count?'광고 세트 '+count+'개':'선택 기간에 성과가 잡힌 광고 세트가 없어요.';
