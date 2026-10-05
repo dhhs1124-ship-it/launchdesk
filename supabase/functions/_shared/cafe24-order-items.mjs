@@ -10,6 +10,16 @@ function str(value) {
   return typeof value === "string" ? value : value == null ? null : String(value);
 }
 
+const ORDER_AMOUNT_FIELDS = ["order_price_amount", "shipping_fee", "points_spent_amount", "credits_spent_amount",
+  "coupon_discount_price", "coupon_shipping_fee_amount", "membership_discount_amount", "shipping_fee_discount_amount",
+  "set_product_discount_amount", "app_discount_amount", "total_amount_due", "payment_amount"];
+function pickAmounts(amounts) {
+  if (!amounts || typeof amounts !== "object") return null;
+  const out = {};
+  for (const k of ORDER_AMOUNT_FIELDS) out[k] = num(amounts[k]);
+  return out;
+}
+
 export function slimOrders(orders) {
   return (Array.isArray(orders) ? orders : [])
     .filter((order) => order && order.order_id)
@@ -18,6 +28,9 @@ export function slimOrders(orders) {
       order_date: str(order.order_date),
       paid: str(order.paid),
       canceled: str(order.canceled),
+      // 주문 단위 금액(공식 문서 actual_order_amount: 최종 결제 내역). 고객 부담 배송비와 주문 단위 할인을 여기서 본다.
+      payment_amount: num(order.payment_amount),
+      actual_order_amount: pickAmounts(order.actual_order_amount),
       items: (Array.isArray(order.items) ? order.items : []).map((item) => ({
         order_item_code: str(item.order_item_code),
         product_no: num(item.product_no),
@@ -30,6 +43,11 @@ export function slimOrders(orders) {
         status_code: str(item.status_code),
         status_text: str(item.status_text),
         product_bundle: str(item.product_bundle),
+        product_price: num(item.product_price),
+        option_price: num(item.option_price),
+        additional_discount_price: num(item.additional_discount_price),
+        coupon_discount_price: num(item.coupon_discount_price),
+        app_item_discount_amount: num(item.app_item_discount_amount),
         payment_amount: num(item.payment_amount),
       })),
     }));

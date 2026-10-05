@@ -18,12 +18,11 @@
 //   로직은 여기서 건드리지 않는다 — 이미 발급된 토큰을 "유효하게 유지"하는
 //   것까지만 이 모듈의 역할이다.
 //
-// 알려진 한계: 같은 connected_account_id에 대해 거의 동시에 요청 두 개가
-// 들어와 access_token이 동시에 만료 상태로 판정되면, refresh 요청이 두 번
-// 나갈 수 있다. Cafe24는 refresh 시 이전 refresh_token을 폐기하므로 이
-// 경우 먼저 끝난 쪽이 저장한 토큰을 나중 응답이 덮어써도 최종 상태 자체는
-// 여전히 유효한 최신 토큰이라 서비스에는 영향이 없지만, 완벽한 동시성
-// 제어(행 잠금 등)는 이번 단계 범위 밖이라 다루지 않았다.
+// 동시 갱신: Cafe24는 새 토큰을 발급하면 이전 refresh_token을 폐기한다. 그래서 같은
+// 계정에 대해 갱신 요청이 두 번 나가면 한쪽은 실패하고, 저장 순서가 엇갈리면 폐기된
+// 토큰이 DB에 남아 연결이 끊길 수 있다. 이를 막으려고 Cafe24에 갱신을 요청하기 전에
+// integration_credentials.updated_at을 읽은 값과 비교·교체(CAS)해 한 요청만 갱신 권한을
+// 갖는다. 나머지 요청은 갱신된 토큰이 저장될 때까지 기다렸다가 그 토큰을 쓴다.
 
 // supabaseAdmin의 정확한 타입은 "jsr:@supabase/server" 내부 타입이라 여기서
 // 다시 끌어오지 않고, 이 모듈이 실제로 쓰는 모양(.from(...).select/update)만
@@ -41,7 +40,16 @@ interface IntegrationCredentialRow {
   refresh_token: string | null;
   access_token_expires_at: string | null;
   refresh_token_expires_at: string | null;
+  updated_at: string | null;
 }
+
+const CREDENTIAL_COLUMNS =
+  "access_token, refresh_token, access_token_expires_at, refresh_token_expires_at, updated_at";
+// 다른 요청이 갱신 권한을 가져갔을 때 새 토큰을 기다리는 시간. 갱신 권한을 가진 요청이
+// 중간에 죽었으면(이 시간 동안 토큰이 바뀌지 않으면) 한 번 더 권한을 얻어 직접 갱신한다.
+const REFRESH_WAIT_MS = 12000;
+const REFRESH_POLL_MS = 400;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface Cafe24TokenRefreshResponse {
   access_token: string;
@@ -206,15 +214,17 @@ export async function getValidCafe24AccessToken(
   connectedAccountId: number,
   mallId: string
 ): Promise<Cafe24TokenResult> {
-  const { data: credential, error } = await supabaseAdmin
-    .from("integration_credentials")
-    .select(
-      "access_token, refresh_token, access_token_expires_at, refresh_token_expires_at"
-    )
-    .eq("connected_account_id", connectedAccountId)
-    .single();
+  const readRow = async (): Promise<IntegrationCredentialRow | null> => {
+    const { data, error } = await supabaseAdmin
+      .from("integration_credentials")
+      .select(CREDENTIAL_COLUMNS)
+      .eq("connected_account_id", connectedAccountId)
+      .single();
+    return error || !data ? null : (data as IntegrationCredentialRow);
+  };
 
-  if (error || !credential) {
+  let row = await readRow();
+  if (!row) {
     return {
       ok: false,
       code: "CREDENTIAL_NOT_FOUND",
@@ -222,14 +232,48 @@ export async function getValidCafe24AccessToken(
     };
   }
 
-  const row = credential as IntegrationCredentialRow;
-
   // 1. Access Token이 아직(만료 5분 전보다 더) 유효하면 그대로 반환.
   if (isStillValid(row.access_token_expires_at)) {
     return { ok: true, accessToken: row.access_token };
   }
 
-  // 2. Access Token은 만료/임박했다 — refresh 전에 Refresh Token 자체의
+  // 2. 갱신 권한 선점 — 읽은 updated_at이 그대로일 때만 바꿀 수 있으므로 한 요청만 성공한다.
+  //    실패했으면 다른 요청이 갱신 중이거나 이미 갱신했으니 저장될 새 토큰을 기다린다.
+  let claimed = false;
+  for (let attempt = 0; attempt < 2 && !claimed; attempt++) {
+    let claim = supabaseAdmin
+      .from("integration_credentials")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("connected_account_id", connectedAccountId);
+    claim = row.updated_at ? claim.eq("updated_at", row.updated_at) : claim.is("updated_at", null);
+    const { data: won } = await claim.select(CREDENTIAL_COLUMNS).maybeSingle();
+    if (won) {
+      row = won as IntegrationCredentialRow;
+      claimed = true;
+      break;
+    }
+    for (let waited = 0; waited < REFRESH_WAIT_MS; waited += REFRESH_POLL_MS) {
+      await sleep(REFRESH_POLL_MS);
+      const latest = await readRow();
+      if (latest && isStillValid(latest.access_token_expires_at)) {
+        return { ok: true, accessToken: latest.access_token };
+      }
+      if (latest) row = latest;
+    }
+  }
+  if (!claimed) {
+    return {
+      ok: false,
+      code: "REFRESH_FAILED",
+      message: "다른 요청의 Cafe24 토큰 갱신을 기다리지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    };
+  }
+  // 권한을 얻은 사이 다른 요청이 이미 갱신을 끝냈으면 그 토큰을 쓴다.
+  if (isStillValid(row.access_token_expires_at)) {
+    return { ok: true, accessToken: row.access_token };
+  }
+
+  // 3. Access Token은 만료/임박했다 — refresh 전에 Refresh Token 자체의
   //    만료부터 확인한다. 만료됐으면 자동 갱신을 시도하지 않는다.
   if (!row.refresh_token || isDefinitelyExpired(row.refresh_token_expires_at)) {
     return {
@@ -239,7 +283,7 @@ export async function getValidCafe24AccessToken(
     };
   }
 
-  // 3. Cafe24 공식 refresh_token 플로우로 갱신.
+  // 4. Cafe24 공식 refresh_token 플로우로 갱신.
   const refreshed = await requestCafe24TokenRefresh(mallId, row.refresh_token);
   if (!refreshed.ok) {
     return refreshed;

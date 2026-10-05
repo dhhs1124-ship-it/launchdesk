@@ -61,7 +61,13 @@
     if(!ctx.userId||!ctx.storeId){msg.textContent='쇼핑몰을 선택하면 실제 판매 기준 이익을 볼 수 있어요.';fxBox.hidden=true;return;}
     msg.textContent=state.error||(state.orders?'':'주문 상품을 불러오는 중이에요.');
 
-    var s=state.orders?S.summarize(state.orders,state.links):null;
+    // 예전에 저장한 연결에 계산 입력값이 없으면 같은 저장 시각의 계산 기록에서 찾아 실제 결제 기준에 쓴다.
+    var links=state.links.map(function(l){
+      if(l.input)return l;
+      var at=Date.parse(l.source_saved_at),c=state.calcs.find(function(c){return Date.parse(c.saved_at)===at;});
+      return c?Object.assign({},l,{input:c.input}):l;
+    });
+    var s=state.orders?S.summarize(state.orders,links):null;
     var mp=metaPeriod(ctx),ms=metaState(ctx),currency=ctx.metaData&&ctx.metaData.account&&String(ctx.metaData.account.currency||'').toUpperCase();
     var tz=ctx.metaData&&ctx.metaData.account&&ctx.metaData.account.timezone_name;
 
@@ -70,6 +76,7 @@
       var ex=Object.keys(s.excluded).map(function(k){return EXCLUDED_LABEL[k]+' '+count(s.excluded[k]);});
       figures.appendChild(row('판매 수량 (취소·반품 반영)',count(s.soldQty),[
         '유효 주문 '+count(s.validOrders,'건')+' / 전체 주문 '+count(s.orders,'건'),
+        '마진 반영 '+count(s.linkedQty)+' · 마진 미등록 '+count(s.unlinkedQty),
         ex.length?'제외: '+ex.join(' · '):'제외된 수량 없음',
         Object.keys(s.unknownCodes).length?'상태 확인 필요 코드: '+Object.keys(s.unknownCodes).join(', '):''
       ]));
@@ -80,14 +87,22 @@
       ms?ms.note:'Meta가 광고에 귀속한 구매 수예요. 실제 판매 수량과 다른 숫자이며 계산에 쓰지 않아요.'
     ]));
 
-    // 3. 광고 전 상품 마진 합계
-    var margin=s?s.marginTotal:null;
-    figures.appendChild(row('광고 전 상품 마진 합계',margin==null?'—':won(margin),s?[
-      s.linkedQty?'마진 연결 상품 '+count(s.linkedQty)+' 기준 · 주문당 배송·포장 등은 주문 '+count(s.ordersWithLinked,'건')+'에 한 번씩':'',
-      s.unlinkedQty?'마진 미등록 '+count(s.unlinkedQty)+'는 계산에서 제외했어요. 아래 상품별 연결에서 등록하세요.':'',
-      s.ordersMixed?'미등록 상품이 섞인 주문 '+count(s.ordersMixed,'건')+'은 연결 상품 마진과 주문당 비용만 반영했어요.':'',
+    // 3. 광고 전 상품 마진 — 등록 판매가 기준과 실제 결제 기준을 나눠 보여 준다.
+    //    일부 상품만 연결됐으면 "일부 상품 기준"으로 표시하고, 미등록 상품을 0원 마진으로 더하지 않는다.
+    var partial=!!(s&&s.partial),scope=partial?'일부 상품 기준 ':'';
+    var coverage=s?(partial?'전체 판매 '+count(s.soldQty)+' 중 마진 반영 '+count(s.linkedQty)+'만 계산 · 미등록 '+count(s.unlinkedQty)+'는 0원으로 보지 않고 제외':'판매 '+count(s.soldQty)+' 전부 마진 반영'):'';
+    var rule=s&&s.ordersWithLinked?'주문당 비용(배송·포장·기타)은 주문마다 한 번 — 마진 상품이 2종 이상 담긴 주문 '+count(s.ordersMultiLinked,'건')+'은 그중 비용이 가장 큰 상품 기준으로 한 번만 뺐어요.':'';
+    var margin=s?s.marginTotal:null,actual=s?s.actual:null,actualMargin=actual?actual.margin:null;
+    var ACTUAL_EXCLUDED={partialStatus:'취소·클레임이 섞인 주문',zeroPayment:'결제금액 0원 주문',noAmount:'결제 내역 없음',noInput:'계산 입력값을 찾지 못한 연결'};
+    figures.appendChild(row(scope+'마진 (등록 판매가 기준)',margin==null?'—':won(margin),s?[
+      coverage,rule,'저장한 판매가·판매자 할인·고객 배송비로 계산 — Cafe24 실제 결제 할인·쿠폰은 반영 안 함',
       margin==null&&s.soldQty?'판매된 상품에 마진을 연결하면 계산돼요.':''
-    ]:[]));
+    ]:[],partial?'partial':''));
+    figures.appendChild(row(scope+'마진 (실제 결제 기준)',actualMargin==null?'—':won(actualMargin),s&&s.linkedQty?[
+      'Cafe24 결제금액 기준 주문 '+count(actual.orders,'건')+' · 상품 '+count(actual.linkedQty),
+      '주문 결제금액 − 고객 배송비를 등록가(판매가+옵션가)×수량 비율로 상품에 나눴어요(쿠폰·적립금 등 주문 단위 할인 포함).',
+      Object.keys(actual.excluded).length?'실제 결제 기준 제외: '+Object.keys(actual.excluded).map(function(k){return ACTUAL_EXCLUDED[k]+' '+count(actual.excluded[k],'건');}).join(' · '):''
+    ]:[s?'마진이 연결된 상품이 있어야 계산돼요.':''],partial?'partial':''));
 
     // 4. 원화 광고비
     var spendKrw=null,spendNotes=[];
@@ -106,19 +121,36 @@
     figures.appendChild(row('원화 광고비',ms?ms.text:spendKrw==null?'환율 입력 필요':won(spendKrw),spendNotes));
 
     // 5. 광고비 차감 후 예상 이익 — 필요한 값이 없으면 0원으로 표시하지 않는다
+    //    실제 결제 기준 마진이 있으면 그것을, 없으면 등록 판매가 기준을 쓴다.
+    var base=actualMargin!=null?actualMargin:margin,baseLabel=actualMargin!=null?'실제 결제 기준':'등록 판매가 기준';
     var profitNotes=[],profit=null;
-    if(margin==null)profitNotes.push('광고 전 상품 마진 합계가 필요해요.');
+    if(base==null)profitNotes.push('마진이 연결된 판매 상품이 필요해요.');
     if(ms)profitNotes.push('광고비를 확인할 수 없어 계산하지 않았어요.');
     else if(mp&&spendKrw==null)profitNotes.push('광고비 환율이 필요해요.');
-    if(margin!=null&&spendKrw!=null)profit=margin-spendKrw;
-    var p=row('광고비 차감 후 예상 이익',profit==null?'계산 불가':won(profit),profitNotes,profit!=null&&profit<0?'deficit':'');
+    if(base!=null&&spendKrw!=null)profit=base-spendKrw;
+    var p=row(partial?'일부 상품 기준 예상 잔액':'광고비 차감 후 예상 이익',profit==null?'계산 불가':won(profit),profitNotes,(profit!=null&&profit<0?'deficit ':'')+(partial?'partial':''));
     if(profit!=null){
-      p.appendChild(el('p','estimate-caution','쇼핑몰 전체 추정 · 부가세·세금·고정비·반품 배송비 미반영 · 확정 순이익 아님'));
-      p.appendChild(el('small','','상품 마진은 저장한 판매가·원가 기준이에요. 실제 결제 할인·쿠폰은 반영되지 않고, 과거 주문에도 현재 저장한 원가를 적용해요.'));
+      p.appendChild(el('small','',baseLabel+' 마진 '+won(base)+' − 원화 광고비 '+won(spendKrw)+(actualMargin!=null&&margin!=null?' (등록 판매가 기준이면 '+won(margin-spendKrw)+')':'')));
+      if(partial)p.appendChild(el('small','sales-partial-note','마진 미등록 '+count(s.unlinkedQty)+'의 이익은 빠져 있고, 광고비는 전체 금액을 그대로 뺐어요. 쇼핑몰 전체 이익이 아닙니다.'));
+      p.appendChild(el('p','estimate-caution',(partial?'일부 상품 기준':'쇼핑몰 전체')+' 추정 · 부가세·세금·고정비·반품 배송비 미반영 · 확정 순이익 아님'));
+      p.appendChild(el('small','','원가·수수료율은 지금 저장한 계산값을 과거 주문에도 적용해요.'));
     }
     figures.appendChild(p);
+    renderBreakdown(s,spendKrw,margin,profit,actualMargin);
 
     if(s)renderProducts(products,s,ctx);
+  }
+
+  // 실제 결제금액 → 원가·비용 → 광고비 → 예상 잔액 순서의 계산 내역(대조용).
+  function renderBreakdown(s,spendKrw,margin,profit,actualMargin){
+    var box=byId('salesBreakdown');box.replaceChildren();box.parentElement.hidden=!(s&&s.actual&&s.actual.orders);
+    if(box.parentElement.hidden)return;
+    var a=s.actual,lines=[
+      ['상품 결제액 (배분)',a.revenue,'+'],['고객 부담 배송비',a.customerShipping,'+'],['상품 원가',a.unitCost,'−'],
+      ['판매·PG·배송비 수수료',a.fees,'−'],['주문당 비용 (배송·포장·기타)',a.orderCosts,'−'],['광고 전 마진 (실제 결제 기준)',a.margin,'=']];
+    if(spendKrw!=null){lines.push(['원화 광고비 (전체)',spendKrw,'−']);lines.push([s.partial?'일부 상품 기준 예상 잔액':'예상 이익',actualMargin-spendKrw,'=']);}
+    lines.forEach(function(l){var r=el('div','breakdown-row'+(l[2]==='='?' total':''));r.append(el('span','',l[2]+' '+l[0]),el('strong','',won(l[1])));box.appendChild(r);});
+    box.appendChild(el('small','','대상: 실제 결제 기준으로 계산한 주문 '+count(a.orders,'건')+' · 마진 연결 상품 '+count(a.linkedQty)+(margin!=null?' · 같은 주문의 등록 판매가 기준 마진은 위 카드 참고':'')));
   }
 
   function calcLabel(c){return (c.product_name||'이름 없는 상품')+' · 판매가 '+MC.fmtWon(c.input.price);}
@@ -148,7 +180,8 @@
     var split=S.splitMargin(calc.input,MC);
     if(!split){byId('salesMessage').textContent='이 계산은 다시 계산할 수 없어 연결하지 않았어요.';return;}
     var data={store_id:String(ctx.storeId),product_no:product.product_no,variant_code:variant||'',cafe24_product_name:product.product_name,
-      product_label:String(calc.product_name||'상품').trim().slice(0,40),source_saved_at:calc.saved_at,unit_margin:split.unitMargin,order_adjust:split.orderAdjust,linked_at:new Date().toISOString()};
+      product_label:String(calc.product_name||'상품').trim().slice(0,40),source_saved_at:calc.saved_at,unit_margin:split.unitMargin,order_adjust:split.orderAdjust,
+      input:calc.input,linked_at:new Date().toISOString()};
     var existing=state.links.find(function(l){return String(l.product_no)===String(product.product_no)&&(l.variant_code||'')===data.variant_code;});
     button.disabled=true;
     var res=existing
