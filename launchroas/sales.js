@@ -98,8 +98,8 @@
       coverage,rule,'저장한 판매가·판매자 할인·고객 배송비로 계산 — Cafe24 실제 결제 할인·쿠폰은 반영 안 함',
       margin==null&&s.soldQty?'판매된 상품에 마진을 연결하면 계산돼요.':''
     ]:[],partial?'partial':''));
-    figures.appendChild(row(scope+'마진 (실제 결제 기준)',actualMargin==null?'—':won(actualMargin),s&&s.linkedQty?[
-      'Cafe24 결제금액 기준 주문 '+count(actual.orders,'건')+' · 상품 '+count(actual.linkedQty),
+    figures.appendChild(row(scope+'마진 (실제 결제 기준'+(actual&&actual.orders&&!actual.complete?' · 계산 가능 주문만':'')+')',actualMargin==null?'—':won(actualMargin),s&&s.linkedQty?[
+      'Cafe24 결제금액 기준 주문 '+count(actual.orders,'건')+' · 상품 '+count(actual.linkedQty)+(actual.orders?' — 같은 주문을 등록 판매가로 계산하면 '+won(actual.registeredMargin):''),
       '주문 결제금액 − 고객 배송비를 등록가(판매가+옵션가)×수량 비율로 상품에 나눴어요(쿠폰·적립금 등 주문 단위 할인 포함).',
       Object.keys(actual.excluded).length?'실제 결제 기준 제외: '+Object.keys(actual.excluded).map(function(k){return ACTUAL_EXCLUDED[k]+' '+count(actual.excluded[k],'건');}).join(' · '):''
     ]:[s?'마진이 연결된 상품이 있어야 계산돼요.':''],partial?'partial':''));
@@ -122,7 +122,8 @@
 
     // 5. 광고비 차감 후 예상 이익 — 필요한 값이 없으면 0원으로 표시하지 않는다
     //    실제 결제 기준 마진이 있으면 그것을, 없으면 등록 판매가 기준을 쓴다.
-    var base=actualMargin!=null?actualMargin:margin,baseLabel=actualMargin!=null?'실제 결제 기준':'등록 판매가 기준';
+    // 실제 결제 기준이 마진 연결 주문을 모두 계산했을 때만 그것을 쓰고, 일부 주문이 빠졌으면 전체를 덮는 등록 판매가 기준을 쓴다.
+    var useActual=actualMargin!=null&&actual.complete,base=useActual?actualMargin:margin,baseLabel=useActual?'실제 결제 기준':'등록 판매가 기준';
     var profitNotes=[],profit=null;
     if(base==null)profitNotes.push('마진이 연결된 판매 상품이 필요해요.');
     if(ms)profitNotes.push('광고비를 확인할 수 없어 계산하지 않았어요.');
@@ -130,7 +131,8 @@
     if(base!=null&&spendKrw!=null)profit=base-spendKrw;
     var p=row(partial?'일부 상품 기준 예상 잔액':'광고비 차감 후 예상 이익',profit==null?'계산 불가':won(profit),profitNotes,(profit!=null&&profit<0?'deficit ':'')+(partial?'partial':''));
     if(profit!=null){
-      p.appendChild(el('small','',baseLabel+' 마진 '+won(base)+' − 원화 광고비 '+won(spendKrw)+(actualMargin!=null&&margin!=null?' (등록 판매가 기준이면 '+won(margin-spendKrw)+')':'')));
+      p.appendChild(el('small','',baseLabel+' 마진 '+won(base)+' − 원화 광고비 '+won(spendKrw)+(useActual?' (같은 주문 등록 판매가 기준이면 '+won(actual.registeredMargin-spendKrw)+')':'')));
+      if(!useActual&&actualMargin!=null)p.appendChild(el('small','','실제 결제 기준은 마진 연결 주문 '+count(s.ordersWithLinked,'건')+' 중 '+count(actual.orders,'건')+'만 계산돼서 등록 판매가 기준으로 계산했어요.'));
       if(partial)p.appendChild(el('small','sales-partial-note','마진 미등록 '+count(s.unlinkedQty)+'의 이익은 빠져 있고, 광고비는 전체 금액을 그대로 뺐어요. 쇼핑몰 전체 이익이 아닙니다.'));
       p.appendChild(el('p','estimate-caution',(partial?'일부 상품 기준':'쇼핑몰 전체')+' 추정 · 부가세·세금·고정비·반품 배송비 미반영 · 확정 순이익 아님'));
       p.appendChild(el('small','','원가·수수료율은 지금 저장한 계산값을 과거 주문에도 적용해요.'));
@@ -148,7 +150,9 @@
     var a=s.actual,lines=[
       ['상품 결제액 (배분)',a.revenue,'+'],['고객 부담 배송비',a.customerShipping,'+'],['상품 원가',a.unitCost,'−'],
       ['판매·PG·배송비 수수료',a.fees,'−'],['주문당 비용 (배송·포장·기타)',a.orderCosts,'−'],['광고 전 마진 (실제 결제 기준)',a.margin,'=']];
-    if(spendKrw!=null){lines.push(['원화 광고비 (전체)',spendKrw,'−']);lines.push([s.partial?'일부 상품 기준 예상 잔액':'예상 이익',actualMargin-spendKrw,'=']);}
+    lines.push(['참고: 같은 주문 등록 판매가 기준 마진',a.registeredMargin,'·']);
+    if(spendKrw!=null&&a.complete){lines.push(['원화 광고비 (전체)',spendKrw,'−']);lines.push([s.partial?'일부 상품 기준 예상 잔액':'예상 이익',actualMargin-spendKrw,'=']);}
+    else if(spendKrw!=null)lines.push(['광고비는 계산 가능 주문이 일부라 여기서 빼지 않음',spendKrw,'·']);
     lines.forEach(function(l){var r=el('div','breakdown-row'+(l[2]==='='?' total':''));r.append(el('span','',l[2]+' '+l[0]),el('strong','',won(l[1])));box.appendChild(r);});
     box.appendChild(el('small','','대상: 실제 결제 기준으로 계산한 주문 '+count(a.orders,'건')+' · 마진 연결 상품 '+count(a.linkedQty)+(margin!=null?' · 같은 주문의 등록 판매가 기준 마진은 위 카드 참고':'')));
   }

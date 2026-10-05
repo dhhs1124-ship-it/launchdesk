@@ -76,7 +76,7 @@
   function summarize(orders,links){
     var s={orders:0,validOrders:0,soldQty:0,excluded:{},linkedQty:0,unlinkedQty:0,unitMarginTotal:0,orderAdjustTotal:0,
       ordersWithLinked:0,ordersMixed:0,ordersMultiLinked:0,products:{},unknownCodes:{},
-      actual:{orders:0,linkedQty:0,revenue:0,customerShipping:0,unitCost:0,fees:0,orderCosts:0,margin:0,excluded:{}}};
+      actual:{orders:0,linkedQty:0,revenue:0,customerShipping:0,unitCost:0,fees:0,orderCosts:0,margin:0,registeredMargin:0,excluded:{}}};
     (orders||[]).forEach(function(order){
       s.orders++;
       var sold=0,costLink=null,hasUnlinked=false,hasExcluded=false,lines=[],distinct={};
@@ -109,13 +109,17 @@
       if(reason){s.actual.excluded[reason]=(s.actual.excluded[reason]||0)+1;return;}
       var r=actualOrder(order,lines,costLink);
       s.actual.orders++;
-      lines.forEach(function(l){if(l.link)s.actual.linkedQty+=l.sold;});
+      // 같은 주문을 등록 판매가 기준으로 계산한 값 — 두 기준을 같은 주문끼리 비교하기 위함.
+      s.actual.registeredMargin+=Number(costLink.order_adjust)||0;
+      lines.forEach(function(l){if(l.link){s.actual.linkedQty+=l.sold;s.actual.registeredMargin+=Number(l.link.unit_margin)*l.sold;}});
       ['revenue','customerShipping','unitCost','fees','orderCosts','margin'].forEach(function(k){s.actual[k]+=r[k];});
     });
     s.marginTotal=s.linkedQty?Math.round(s.unitMarginTotal+s.orderAdjustTotal):null;
     s.partial=s.unlinkedQty>0;
     ['revenue','customerShipping','unitCost','fees','orderCosts','margin'].forEach(function(k){s.actual[k]=Math.round(s.actual[k]);});
-    if(!s.actual.orders)s.actual.margin=null;
+    s.actual.registeredMargin=Math.round(s.actual.registeredMargin);
+    s.actual.complete=s.actual.orders===s.ordersWithLinked;
+    if(!s.actual.orders){s.actual.margin=null;s.actual.registeredMargin=null;}
     s.products=Object.keys(s.products).map(function(k){return s.products[k];}).sort(function(a,b){return b.soldQty-a.soldQty;});
     return s;
   }

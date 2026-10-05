@@ -128,3 +128,15 @@ test('일부 상품만 마진이 연결되면 부분 계산으로 표시한다',
   assert.equal(s.partial,true);assert.equal(s.linkedQty,1);assert.equal(s.unlinkedQty,2);
   assert.equal(S.summarize([paidOrder([item({quantity:1})],1,{})],[linkFor(1,calcInput({}))]).partial,false);
 });
+
+test('두 기준은 같은 주문끼리만 비교하고, 실제 결제 기준이 일부 주문만 계산하면 완전하지 않다고 표시한다',()=>{
+  const input=calcInput({}),link=linkFor(1,input);
+  const s=S.summarize([
+    paidOrder([item({quantity:1,product_price:30000})],27000,{coupon_discount_price:3000}), // 계산 가능
+    paidOrder([item({quantity:7,product_price:30000})],0,{})                                 // 결제금액 0원 → 실제 결제 기준 제외
+  ],[link]);
+  assert.equal(s.actual.orders,1);assert.equal(s.actual.complete,false);
+  assert.equal(s.actual.registeredMargin,link.unit_margin*1+link.order_adjust,'같은 주문(1개짜리)만의 등록가 기준');
+  assert.equal(s.marginTotal,link.unit_margin*8+link.order_adjust*2,'등록 판매가 기준은 두 주문 모두');
+  assert.ok(s.actual.margin<s.actual.registeredMargin,'쿠폰 3,000원만큼 실제 결제 기준이 낮다');
+});
