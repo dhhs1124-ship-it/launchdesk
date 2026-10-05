@@ -59,3 +59,38 @@
 ## 알려진 테스트 실패 (기능 영향 없음)
 (2026-10-04 테스트가 파일을 읽을 때 CRLF를 LF로 맞추도록 수정해 해결. SQL 파일은 바꾸지 않았다. CRLF·LF 모두 30/30 통과.)
 `tests/cafe24-disconnect.test.js`의 12번·14번은 HEAD에서도 실패했다. migration 파일 `20260922120000_cafe24_disconnect.sql`이 CRLF 줄바꿈으로 커밋되어 있는데, 테스트 정규식이 `\n`을 바로 기대해서 생기는 문제다. 줄바꿈을 LF로 맞추면 두 검사 모두 통과한다. 원격 함수 `disconnect_cafe24_integration`에도 provider='cafe24' 조건 4개와 stores의 external_store_id만 NULL로 비우는 동작이 그대로 있다.
+
+## 2026-10-05 실제 판매 기준 손익 (미리보기 브랜치)
+
+### 원격 변경 (추가만, 기존 함수·표는 그대로)
+- 새 Edge Function `cafe24-order-items` 배포(verify_jwt=true). 선택 기간(한국 시간, 최대 31일)의 Cafe24 `GET /api/v2/admin/orders?embed=items` 응답에서 상품·수량·상태만 돌려준다. DB에는 저장하지 않는다. 구매자·수령인·계좌 등 개인정보는 응답에서 뺀다(`_shared/cafe24-order-items.mjs`). LaunchDesk가 쓰는 `cafe24-orders-sync`는 바꾸지 않았다.
+- 새 DB 표는 없다. 상품↔마진 연결(`tool_type='product_margin_link'`)과 광고비 환율(`tool_type='ad_fx_rate'`)은 사용자 본인 RLS가 걸린 `tool_records`에 저장한다.
+
+### 근거로 삼은 공식 문서·실제 응답
+- 공식 문서(apidocs.cafe24.com, API 2026-09-01 번들): `embed`는 items·receivers·buyer·return·cancellation·exchange 중에서 고른다. `limit`는 최대 1000이다. item에는 `quantity`, `claim_quantity`, `order_status`(N00~N50·C00~C49·R00~R43·E00~), `status_code`(N1 정상·N2 교환상품·C1 입금전취소·C2 배송전취소·C3 반품·E1 교환)가 있다.
+- 실제 응답(운영 쇼핑몰, 2026-07-04~10-04): N1|N20·N40·N50, N2|N40, C2|C40, C1|C47·C48, E1|E40을 확인했다. 반품(C3/R*)과 `claim_quantity`>0인 부분 클레임은 이 기간에 없어 실제 응답으로는 확인하지 못했다(코드는 반품·부분 클레임을 판매에서 뺀다).
+- 교환은 원 상품(E1)과 교환 상품(N2)이 따로 오므로, N2만 세어 중복을 막는다.
+- 공식 OAuth 가이드: "Previous Refresh Token is automatically revoked when a new token is issued." 같은 몰을 테스트 쇼핑몰에 다시 연결하면 운영 쇼핑몰의 Cafe24 토큰이 폐기될 수 있다. 그래서 Cafe24 연결 복귀 실연동 시험은 운영 몰로 하지 않는다(별도 Cafe24 테스트 몰 필요).
+
+### 계산 규칙 (`launchroas/sales-core.js`)
+- 판매 수량은 status_code N1·N2의 수량에서 진행 중 클레임 수량을 뺀 값이다. order_status N00(입금 전)과 C1·C2·C3·E1, 모르는 코드는 제외 사유별로 따로 표시한다.
+- 저장한 마진 계산(주문 1건 · 수량 qty 기준)을 "상품 1개당 마진"과 "주문당 조정액"(배송·포장·기타·고객배송비·판매자 할인)으로 나눈다. 주문당 조정액은 주문마다 한 번만 반영한다(연결 상품이 여럿이면 비용이 가장 큰 것 하나).
+- 마진 미등록 상품은 계산에서 빼고 수량만 표시한다. 저장한 판매가·원가 기준이라 실제 할인·쿠폰은 반영하지 않고, 과거 주문에도 현재 값을 적용한다.
+- 외화 광고비는 사용자가 저장한 환율로만 원화로 바꾼다. 환율·마진·광고비 중 하나라도 없으면 이익을 0원이 아닌 "계산 불가"로 표시한다.
+- Meta 구매 전환수는 별도 숫자로만 표시하고 판매 수량 대신 쓰지 않는다. 광고 카드의 값은 "광고별 추정"으로 쇼핑몰 전체 이익과 구분한다.
+
+### 운영 도메인 복귀 허용 준비 (아직 적용하지 않음)
+1. Vercel에 운영 도메인(예: launchroas.co.kr)을 연결하고 소유를 확인한다. www는 apex로 리디렉션해 Origin을 하나로 둔다.
+2. 재배포 없이: `npx supabase@2.119.0 secrets set LAUNCHROAS_RETURN_ORIGIN=https://launchroas.co.kr --project-ref zzhvckikonnalqnyatgn` (정확히 일치하는 1개 Origin만 허용된다).
+   - 또는 `_shared/return-origin.ts` 목록에 추가한 뒤 OAuth 함수 4개를 다시 배포한다(콜백 2개는 `--no-verify-jwt` 필수).
+3. 이메일·비밀번호 로그인은 Auth Redirect URL이 필요 없다. 이메일 인증 링크는 Supabase Site URL(현재 런치데스크)로 열린다.
+
+### 테스트 데이터 정리 (2026-10-05)
+의존성을 확인한 뒤 한 문장(조건부 삭제)으로 지웠다.
+- 쇼핑몰 5 `[TEST] 복귀 시험 – 삭제 예정`: CASCADE로 Meta pending 연결 1, 자격증명 1, OAuth 기록 1이 함께 삭제됐다.
+- 운영 계정의 `[TEST] 검수용 상품` 계산 기록, 검수용 상품 연결 1건, 검수용 환율(1,400원) 1건
+- 미인증 테스트 계정 1개(로그인 기록 없음, 자동 생성 profile 1행만 있었음)
+- 운영 쇼핑몰 4의 연결 해시(`c84a4f2f…`), A상품 계산 2건, 광고 세트 연결 1건은 그대로다.
+
+### 알려진 테스트 실패 해결
+`tests/privacy-version-consistency.test.js` 1건도 CRLF 문제였다(v1.2 migration의 CR 160개 때문에 여러 줄 비교가 실패). 읽을 때 LF로 맞추도록 바꿔 45/45 통과한다. SQL은 바꾸지 않았다.

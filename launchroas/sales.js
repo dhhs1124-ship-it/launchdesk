@@ -176,6 +176,8 @@
 
   function refresh(ctx){
     var key=[ctx.userId,ctx.storeId,ctx.period.kind,ctx.period.date||'',ctx.cafeAccount&&ctx.cafeAccount.status].join('|');
+    // 앱이 연결 상태를 다시 읽는 중이면(기간 변경 · 주문 동기화 · 쇼핑몰 전환) 다 읽은 뒤 주문 상품도 다시 불러온다.
+    if(!ctx.connectionsLoaded)dataKey='';
     if(ctx.userId&&ctx.storeId&&ctx.connectionsLoaded&&key!==dataKey){dataKey=key;load(ctx,key);return;}
     if(!ctx.userId||!ctx.storeId){dataKey='';ticket++;state.orders=null;state.error='';}
     render(ctx);

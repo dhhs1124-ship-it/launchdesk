@@ -184,7 +184,7 @@ test('새 v1.2 마이그레이션의 업무 검증 로직(플랜 가격·필드 
   // v1.2는 버전 불일치 차단을 위해 시그니처에 인자를 하나 추가했으므로(아래
   // 별도 테스트) 더 이상 "주석 제거 후 문자열 완전 일치"로 비교할 수 없다
   // — 대신 실제 업무 로직 조각들이 문자 그대로 남아있는지 개별 확인한다.
-  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8');
+  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8').replace(/\r\n/g, '\n'); // CRLF 체크아웃도 같은 내용으로 비교
   const sharedFragments = [
     "v_plan_name := '기본 쇼핑몰 세팅';",
     'v_plan_price := 79000;',
@@ -209,7 +209,7 @@ test('새 v1.2 마이그레이션의 업무 검증 로직(플랜 가격·필드 
 });
 
 test('v1.2 마이그레이션은 옛 6인자 시그니처를 명시적으로 DROP한다(오버로드로 남아 버전 검사를 우회하지 못하도록)', () => {
-  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8');
+  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8').replace(/\r\n/g, '\n'); // CRLF 체크아웃도 같은 내용으로 비교
   assert.match(v12, /drop function if exists public\.submit_setup_inquiry\(text, text, text, text, text, boolean\);/, '옛 6인자 시그니처 DROP 구문이 없다 — 구버전 클라이언트가 여전히 가드 없는 함수를 호출할 수 있다');
   // DROP이 CREATE보다 먼저 나와야 한다(같은 트랜잭션 내 순서 — 마이그레이션은
   // 파일 전체가 한 트랜잭션으로 적용되므로 텍스트 순서가 곧 실행 순서다).
@@ -219,12 +219,12 @@ test('v1.2 마이그레이션은 옛 6인자 시그니처를 명시적으로 DRO
 });
 
 test('v1.2 마이그레이션은 새 인자 p_expected_privacy_version(기본값 null)을 시그니처 마지막에 추가한다', () => {
-  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8');
+  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8').replace(/\r\n/g, '\n'); // CRLF 체크아웃도 같은 내용으로 비교
   assert.match(v12, /p_privacy_consent boolean default false,\s*\r?\n\s*p_expected_privacy_version text default null\s*\r?\n\)/, '새 인자가 시그니처 마지막에 기본값 null로 추가돼야 한다');
 });
 
 test('v1.2 RPC는 p_expected_privacy_version이 서버 상수와 다르면(구버전 클라이언트의 null 포함) 접수 자체를 거부하고, 이 값을 저장에 쓰지 않는다', () => {
-  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8');
+  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8').replace(/\r\n/g, '\n'); // CRLF 체크아웃도 같은 내용으로 비교
   assert.match(v12, /if p_expected_privacy_version is distinct from v_consent_version then\s*\r?\n\s*raise exception 'PRIVACY_VERSION_MISMATCH';/, '버전 불일치 차단 가드가 없거나 문구가 다르다');
   // insert 문의 값 목록에 p_expected_privacy_version이 등장하지 않아야 한다
   // — 저장에는 여전히 v_consent_version 서버 상수만 쓰여야 한다(2026-09-18
@@ -235,7 +235,7 @@ test('v1.2 RPC는 p_expected_privacy_version이 서버 상수와 다르면(구�
 });
 
 test('v1.2 GRANT/REVOKE는 새 7인자 시그니처를 대상으로 하고, anon·authenticated 실행 권한은 v1.1과 동일하게 유지한다', () => {
-  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8');
+  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8').replace(/\r\n/g, '\n'); // CRLF 체크아웃도 같은 내용으로 비교
   const newSig = '(text, text, text, text, text, boolean, text)';
   assert.ok(v12.includes(`revoke all on function public.submit_setup_inquiry${newSig} from public;`), '새 시그니처 대상 REVOKE 문이 없다');
   assert.ok(v12.includes(`grant execute on function public.submit_setup_inquiry${newSig} to anon, authenticated;`), '새 시그니처 대상 GRANT 문이 없거나 anon/authenticated 권한이 달라졌다');
@@ -266,7 +266,7 @@ test('Meta 광고 성과: 조회한 성과 자체는 저장하지 않고, 이용
 });
 
 test('v1.3 마이그레이션: 같은 7인자 시그니처를 CREATE OR REPLACE로 교체하고 서버 상수만 v1.3으로 바꾼다(검증 로직 · 가격 · INSERT · 권한은 v1.2와 동일)', () => {
-  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8');
+  const v12 = fs.readFileSync(V1_2_MIGRATION_PATH, 'utf8').replace(/\r\n/g, '\n'); // CRLF 체크아웃도 같은 내용으로 비교
   const v13 = fs.readFileSync(V1_3_MIGRATION_PATH, 'utf8');
   assert.match(v13, /create or replace function public\.submit_setup_inquiry\(\s*p_plan_id text,[\s\S]*?p_privacy_consent boolean default false,\s*p_expected_privacy_version text default null\s*\)/);
   assert.match(v13, /v_consent_version constant text := 'v1\.3';/);
