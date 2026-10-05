@@ -120,10 +120,11 @@ test('저장한 판매가를 고쳐도 결과는 같다 — 판매가는 Cafe24 
   assert.equal(oldPrice,newPrice);
 });
 
-test('Cafe24 상품가가 없거나 계산 입력값이 없으면 저장한 1개당 마진으로만 계산한다',()=>{
-  const link=linkFor(1,calcInput({}));
-  const noPrice=S.summarize([paidOrder([item({quantity:2})],1,{})],[link]);
-  assert.equal(noPrice.margin.savedOnlyOrders,1);assert.equal(noPrice.marginTotal,link.unit_margin*2+link.order_adjust);
+test('Cafe24 상품가가 0원이면 저장한 판매가로 추정하고, 계산 입력값이 없을 때만 저장한 1개당 마진을 쓴다',()=>{
+  const link=linkFor(1,calcInput({customerShipping:3000}));
+  const noPrice=S.summarize([paidOrder([item({quantity:2})],0,{})],[link]);
+  assert.equal(noPrice.margin.savedOnlyOrders,0);assert.deepEqual(noPrice.margin.estimated,{savedPrice:1});
+  assert.equal(noPrice.margin.revenue,60000);assert.equal(noPrice.margin.customerShipping,0,'저장 설정의 고객 배송비 3,000원을 더하지 않는다');
   const noInput=S.summarize([paidOrder([item({quantity:1,product_price:30000})],30000,{})],[Object.assign({},link,{input:undefined})]);
   assert.equal(noInput.margin.savedOnlyOrders,1);
 });
@@ -183,4 +184,53 @@ test('미등록은 판매 수량(개)과 상품 종류(옵션은 같은 상품)�
 test('남은 상품 이름을 상품 단위로 판매 많은 순으로 준다',()=>{
   const s=S.summarize([{order_id:'A',items:[item({product_no:1,variant_code:'M',quantity:1,product_name:'티'}),item({product_no:2,variant_code:'X',quantity:3,product_name:'후드'}),item({product_no:2,variant_code:'Y',quantity:1,product_name:'후드'})]}],[]);
   assert.deepEqual(s.unlinkedList.map(p=>[p.product_name,p.soldQty]),[['후드',4],['티',1]]);
+});
+
+
+// ---- 주문 사례 — 실제 운영 쇼핑몰 31일 응답에서 확인한 형태(유료배송 · 조건부 무료배송 · 옵션 추가금 · 합배송 · 추가 비용 상품의 별도 배송코드) ----
+test('유료배송 주문은 부과된 3,000원, 조건부 무료배송 주문은 0원 — 현재 설정(고객 배송비 3,000원)으로 다시 계산하지 않는다',()=>{
+  const link=linkFor(1,calcInput({customerShipping:3000,unitCost:10000}));
+  const paid=S.summarize([paidOrder([item({quantity:1,product_price:21900})],24900,{shipping_fee:3000})],[link]);
+  assert.equal(paid.margin.customerShipping,3000);assert.deepEqual(paid.margin.ship,{charged:1,free:0,unknown:0});
+  const free=S.summarize([paidOrder([item({quantity:7,product_price:21900})],153300,{shipping_fee:0})],[link]);
+  assert.equal(free.margin.customerShipping,0);assert.deepEqual(free.margin.ship,{charged:0,free:1,unknown:0});
+  assert.equal(free.margin.orderCosts,3500,'무료배송이어도 판매자 택배 · 포장비(설정값)는 뺀다');
+});
+
+test('배송비 쿠폰으로 0원이 된 주문은 고객 배송비 0원, 주문 금액 정보가 없으면 0원이 아니라 확인 불가로 센다',()=>{
+  const link=linkFor(1,calcInput({}));
+  const waived=S.summarize([paidOrder([item({quantity:1,product_price:30000})],30000,{shipping_fee:3000,coupon_shipping_fee_amount:3000})],[link]);
+  assert.equal(waived.margin.customerShipping,0);assert.equal(waived.margin.actualOrders,1);
+  const unknown=S.summarize([{order_id:'U',payment_amount:0,actual_order_amount:null,items:[item({quantity:1,product_price:30000})]}],[link]);
+  assert.deepEqual(unknown.margin.ship,{charged:0,free:0,unknown:1});assert.deepEqual(unknown.margin.estimated,{noAmount:1});
+});
+
+test('옵션 추가금은 1개 기준으로 수량만큼, 결제금액에 이미 들어 있어 다시 더하지 않는다 · 옵션 원가는 옵션 값 우선, 없으면 상품 기본',()=>{
+  const base=linkFor(1,calcInput({unitCost:15000})),xl=linkFor(1,calcInput({unitCost:18000}),'XL');
+  const order=paidOrder([item({variant_code:'M',quantity:2,product_price:38900,option_price:0}),item({variant_code:'XL',quantity:1,product_price:38900,option_price:9000})],
+    38900*2+47900+3000,{shipping_fee:3000});
+  const s=S.summarize([order],[base,xl]);
+  assert.equal(s.margin.actualOrders,1);
+  assert.equal(s.margin.revenue,38900*2+47900,'옵션가 9,000원은 1번만(× 수량 1)');
+  assert.equal(s.margin.unitCost,15000*2+18000,'M은 상품 기본 원가, XL은 옵션 원가');
+  assert.equal(s.unlinkedQty,0,'원가가 같은 옵션(M)은 따로 입력하지 않아도 된다');
+});
+
+test('합배송: 같은 배송코드의 여러 상품은 배송 · 포장비 한 번, 실제로 배송코드가 나뉘면 배송 단위마다',()=>{
+  const tee=linkFor(1,calcInput({unitCost:10000,actualShipping:3000,packaging:500})),hood=linkFor(2,calcInput({unitCost:20000,actualShipping:3500,packaging:500}));
+  const together=paidOrder([item({product_no:1,quantity:1,product_price:30000,shipping_code:'D1'}),item({product_no:2,variant_code:'H',quantity:1,product_price:30000,shipping_code:'D1'})],63000,{shipping_fee:3000});
+  const s1=S.summarize([together],[tee,hood]);
+  assert.equal(s1.margin.orderCosts,4000,'더 큰 비용(3,500+500) 한 번');assert.equal(s1.margin.multiShipmentOrders,0);
+  const split=Object.assign({},together,{items:[item({product_no:1,quantity:1,product_price:30000,shipping_code:'D1'}),item({product_no:2,variant_code:'H',quantity:1,product_price:30000,shipping_code:'D2'})]});
+  const s2=S.summarize([split],[tee,hood]);
+  assert.equal(s2.margin.orderCosts,3500+4000);assert.equal(s2.margin.multiShipmentOrders,1);
+});
+
+test('추가 비용 상품(배송비 무료 · 배송·포장 0원으로 저장)이 다른 배송코드여도 배송비가 두 번 빠지지 않는다',()=>{
+  const tee=linkFor(1,calcInput({unitCost:10000})),press=linkFor(9,calcInput({price:5000,unitCost:1000,actualShipping:0,packaging:0}));
+  const order=paidOrder([item({quantity:3,product_price:24900,option_price:9000,shipping_code:'D1'}),item({product_no:9,variant_code:'',quantity:3,product_price:5000,shipping_code:'D2'})],
+    33900*3+15000+3000,{shipping_fee:3000});
+  const s=S.summarize([order],[tee,press]);
+  assert.equal(s.margin.orderCosts,3500);
+  assert.equal(s.marginTotal,(33900*3+15000)+3000-(10000*3+1000*3)-(Math.round(33900*3*0.05)+Math.round(15000*0.05))-3500);
 });

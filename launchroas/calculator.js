@@ -47,8 +47,8 @@
     byId('calcPostAd').textContent=MC.fmtWon(r.preAd);byId('calcPostAd').classList.toggle('deficit',r.preAd<0);
     facts.replaceChildren(
       fact('총 수입',MC.fmtWon(r.totalIncome)),fact('원가',MC.fmtWon(r.productCostTotal)),fact('수수료',MC.fmtWon(r.feeTotal)),
-      fact('배송·포장·기타 (주문당)',MC.fmtWon(r.actualShipping+r.packaging+r.otherCost)),
-      fact('상품 1개당 마진',split?MC.fmtWon(split.unitMargin):'—'),fact('주문당 비용·조정 (주문마다 한 번)',split?MC.fmtWon(split.orderAdjust):'—'),
+      fact('배송·포장·기타 (발송 1번)',MC.fmtWon(r.actualShipping+r.packaging+r.otherCost)),
+      fact('상품 1개당 마진',split?MC.fmtWon(split.unitMargin):'—'),fact('발송당 비용·조정 (한 번만)',split?MC.fmtWon(split.orderAdjust):'—'),
       fact('손익분기 ROAS',r.breakevenRoas==null?'계산 불가':MC.fmtPct(r.breakevenRoas)));
     return {calc:calc,split:split};
   }

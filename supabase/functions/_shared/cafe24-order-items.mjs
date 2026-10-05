@@ -54,6 +54,11 @@ export function slimOrders(orders) {
         coupon_discount_price: num(item.coupon_discount_price),
         app_item_discount_amount: num(item.app_item_discount_amount),
         payment_amount: num(item.payment_amount),
+        // 배송 단위 확인용 — 같은 주문이라도 shipping_code가 다르면 따로 발송된 것이다.
+        // shipping_fee_type(T 무료 · M 조건부 등)과 개별 배송비는 상품별 배송비 설정 여부를 본다.
+        shipping_code: str(item.shipping_code),
+        shipping_fee_type: str(item.shipping_fee_type),
+        individual_shipping_fee: num(item.individual_shipping_fee),
       })),
     }));
 }

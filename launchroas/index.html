@@ -172,7 +172,7 @@
             <div class="calc-fields">
               <label class="pm-wide">상품<input id="calcProduct" readonly></label>
             </div>
-            <h3 class="pm-group">상품 1개당 <span>팔린 개수만큼 곱해져요</span></h3>
+            <h3 class="pm-group">상품 1개당 원가 · 수수료 <span>팔린 개수만큼 곱해져요</span></h3>
             <div class="calc-fields">
               <label>상품 원가 (원) <b>필수</b><span>1개 매입·제작 비용</span><input id="calcCost" type="number" min="0" required inputmode="numeric" placeholder="15000"></label>
               <label>판매 수수료율 (%) <b>필수</b><span>판매금액에 붙는 수수료</span><input id="calcFee" type="number" min="0" max="100" step="0.01" required inputmode="decimal" placeholder="3"></label>
@@ -182,11 +182,11 @@
               <label data-detail>별도 PG 수수료율 (%)<span>결제 금액에 붙는 수수료</span><input id="calcPgRate" type="number" min="0" max="100" step="0.01" placeholder="0"></label>
               <label data-detail>판매 플랫폼 <span>안내용</span><select id="calcPlatform"><option value="">선택 안 함</option><option value="cafe24">카페24</option><option value="smartstore">스마트스토어</option><option value="coupang">쿠팡</option><option value="other">기타·자사몰</option></select></label>
             </div>
-            <h3 class="pm-group">주문 1건당 <span>여러 개를 함께 사도 한 번만 빠져요</span></h3>
+            <h3 class="pm-group">발송 1번에 드는 배송 · 포장 비용 <span>함께 보내면 한 번만 빠져요</span></h3>
             <div class="calc-fields">
-              <label>실제 배송비 (원)<span>택배사에 내는 금액</span><input id="calcActualShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
+              <label>택배비 (원)<span>판매자가 택배사에 내는 금액 · 따로 보내지 않는 추가 상품은 0</span><input id="calcActualShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
               <label>포장·부자재 (원)<span>박스·봉투 등</span><input id="calcPackaging" type="number" min="0" inputmode="numeric" placeholder="1000"></label>
-              <label>배송 조건<select id="calcShippingType"><option value="free">무료배송</option><option value="paid">고객 배송비 별도</option></select></label>
+              <label>배송 조건 <span>미리보기용 · 운영 현황은 주문에 실제 부과된 배송비 사용</span><select id="calcShippingType"><option value="free">무료배송</option><option value="paid">고객 배송비 별도</option></select></label>
               <label id="calcCustomerShipWrap" hidden>고객에게 받는 배송비 (원)<input id="calcCustomerShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
               <label data-detail>판매자 부담 할인 (원)<input id="calcDiscount" type="number" min="0" placeholder="0"></label>
               <label data-detail>배송비 수수료<select id="calcShipFeeMode"><option value="none">없음</option><option value="same">상품과 동일</option><option value="separate">별도 요율</option></select></label>
