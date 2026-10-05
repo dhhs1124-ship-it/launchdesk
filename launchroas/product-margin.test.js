@@ -94,3 +94,11 @@ test('옵션별 설정은 필요할 때만, 옵션 저장은 상품 기본을 �
   assert.deepEqual({v:state.rows[1].data.variant_code,cost:state.rows[1].data.input.unitCost},{v:'V-XL',cost:11000});
   assert.ok(xl);
 });
+
+test('index.html은 계산 모듈을 쓰는 화면 스크립트보다 먼저 불러온다(순서가 틀리면 화면이 조용히 동작하지 않음)',()=>{
+  const html=fs.readFileSync(__dirname+'/index.html','utf8');
+  const order=[...html.matchAll(/<script src="\.\/([^"]+)"/g)].map(m=>m[1]);
+  const before=(dep,user)=>assert.ok(order.indexOf(dep)>=0&&order.indexOf(dep)<order.indexOf(user),dep+' → '+user);
+  for(const user of ['calculator.js','sales.js','ad-performance.js']){before('app.js',user);before('margin-calc.js',user);before('sales-core.js',user);}
+  before('ops-period-core.js','calculator.js');before('ops-period-core.js','sales.js');
+});
