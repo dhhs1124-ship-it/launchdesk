@@ -133,5 +133,22 @@
     return Math.round(amount*Number(fx.krw_per_unit));
   }
 
-  return {classifyItem:classifyItem,splitMargin:splitMargin,findLink:findLink,summarize:summarize,adSpendKrw:adSpendKrw};
+  // 광고 세트 판단 — 연결한 상품 마진의 손익분기 ROAS(총 수입 ÷ 광고 전 잔액)와 Meta ROAS를 비교만 한다.
+  // 근거가 부족하면 "판단 보류". 중단·증액 같은 권고는 하지 않는다.
+  var MIN_PURCHASES=3;
+  function adVerdict(link,metrics){
+    var m=metrics||{},purchases=m.purchase&&m.purchase.observed?Number(m.purchase.value)||0:0,roas=m.roas==null?null:Number(m.roas);
+    var hold=function(reason){return {label:'판단 보류',tone:'hold',reason:reason};};
+    if(!link)return hold('상품 마진 미연결');
+    var pre=Number(link.pre_ad),income=Number(link.total_income);
+    if(!(pre>0)||!(income>0))return hold('연결한 마진이 0원 이하라 손익분기를 계산할 수 없음');
+    if(!(Number(m.spend)>0)||roas==null)return hold('광고비 · ROAS 없음');
+    if(purchases<MIN_PURCHASES)return hold('Meta 구매 '+purchases+'건 — '+MIN_PURCHASES+'건 미만');
+    var breakeven=income/pre;
+    return roas<breakeven
+      ?{label:'손익분기 미달',tone:'below',reason:'',breakeven:breakeven}
+      :{label:'손익분기 이상',tone:'above',reason:'',breakeven:breakeven};
+  }
+
+  return {classifyItem:classifyItem,splitMargin:splitMargin,findLink:findLink,summarize:summarize,adSpendKrw:adSpendKrw,adVerdict:adVerdict,MIN_PURCHASES:MIN_PURCHASES};
 });

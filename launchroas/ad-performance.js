@@ -49,11 +49,17 @@
   }
   function params(ctx,scope,adsetId){var body={store_id:ctx.storeId,scope:scope,period:ctx.period.kind};if(ctx.period.kind==='date')body.date=ctx.period.date;if(adsetId)body.adset_id=adsetId;return body;}
   function valid(ctx,key){var latest=app.getContext();return key===currentKey && latest.userId===ctx.userId && latest.storeId===ctx.storeId && latest.period.kind===ctx.period.kind && latest.period.date===ctx.period.date;}
+  function purchases(m){return m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'0건';}
+  function verdictOf(link,m){return window.LaunchRoasSales?window.LaunchRoasSales.adVerdict(link,m):{label:'판단 보류',tone:'hold',reason:''};}
+  function verdictBadge(v){
+    var box=element('div','ad-verdict-box');box.appendChild(element('span','ad-verdict '+v.tone,v.label));
+    if(v.reason)box.appendChild(element('small','',v.reason));return box;
+  }
   function renderAd(ad,adset,ctx,key){
     var m=ad.metrics||{},card=element('div','ad-item'),heading=element('div','ad-item-heading');
-    heading.append(element('strong','',ad.ad_name||'이름 없는 광고'),element('span','',adset.adset_name||'광고 세트'));
+    heading.append(element('strong','',ad.ad_name||'이름 없는 광고'),element('span','','Meta 구매 '+purchases(m)+' · 링크 클릭 '+number(m.link_clicks)));
     var stats=element('div','ad-perf-stats');
-    stats.append(metric('광고비',money(m.spend)),metric('Meta 구매',m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'0건 (집계 없음)'),metric('ROAS',percent(m.roas)),metric('링크 클릭',number(m.link_clicks)));
+    stats.append(metric('광고비',money(m.spend)),metric('ROAS',percent(m.roas)),verdictBadge(verdictOf(marginLinks[String(adset.adset_id)],m)));
     var button=element('button','secondary','상품·마진 연결 →');button.type='button';
     button.addEventListener('click',function(){
       if(!valid(ctx,key))return;
@@ -66,8 +72,16 @@
   function renderAdset(adset,campaign,ctx,key){
     var row=element('article','adset-row'),head=element('div','adset-head'),name=element('div','adset-name');
     name.append(element('small','',campaign.campaign_name||'캠페인'),element('strong','',adset.adset_name||'이름 없는 광고 세트'));
-    var stats=element('div','ad-perf-stats'),m=adset.metrics||{};
-    stats.append(metric('광고비',money(m.spend)),metric('Meta 구매',m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'0건 (집계 없음)'),metric('ROAS',percent(m.roas)),metric('링크 클릭',number(m.link_clicks)));
+    var m=adset.metrics||{},link=marginLinks[String(adset.adset_id)],verdict=verdictOf(link,m);
+    // 먼저 보이는 줄: 광고비 · ROAS · 판단. 나머지는 "자세히"를 눌렀을 때.
+    var stats=element('div','ad-perf-stats adset-summary');
+    stats.append(metric('광고비',money(m.spend)),metric('ROAS',percent(m.roas)),verdictBadge(verdict));
+    var more=element('button','adset-more','자세히 ↓');more.type='button';more.setAttribute('aria-expanded','false');
+    var extra=element('div','adset-extra');extra.hidden=true;
+    more.addEventListener('click',function(){extra.hidden=!extra.hidden;more.textContent=extra.hidden?'자세히 ↓':'접기 ↑';more.setAttribute('aria-expanded',extra.hidden?'false':'true');});
+    var facts=element('div','ad-perf-stats');
+    facts.append(metric('Meta 구매',purchases(m)),metric('링크 클릭',number(m.link_clicks)),
+      metric('손익분기 ROAS',verdict.breakeven?percent(verdict.breakeven):link&&Number(link.pre_ad)>0&&Number(link.total_income)>0?percent(Number(link.total_income)/Number(link.pre_ad)):'—'));
     var button=element('button','adset-toggle','광고 보기 ↓');button.type='button';button.setAttribute('aria-expanded','false');
     var details=element('div','adset-details');details.hidden=true;
     button.addEventListener('click',async function(){
@@ -96,7 +110,10 @@
         purchase:m.purchase&&m.purchase.observed?Number(m.purchase.value):null,currency:accountCurrency,
         range:activeRange,storeId:ctx.storeId});
     });
-    head.append(name,button);row.append(head,stats,marginSummary(adset,m),connect,details);return row;
+    var actions=element('div','adset-actions');actions.append(connect,button);
+    extra.append(facts,element('small','adset-basis','판단 기준: Meta ROAS와 연결한 상품 마진의 손익분기 ROAS(총 수입 ÷ 광고 전 잔액) 비교 · Meta 구매 '+(window.LaunchRoasSales?window.LaunchRoasSales.MIN_PURCHASES:3)+'건 이상일 때만'),
+      marginSummary(adset,m),actions,details);
+    head.append(name,more);row.append(head,stats,extra);return row;
   }
   more.addEventListener('click',function(){
     var expanded=this.getAttribute('aria-expanded')!=='true';
@@ -118,7 +135,7 @@
       var data=response.data;accountCurrency=String(data.account&&data.account.currency||'KRW').toUpperCase();activeRange=data.range;
       if(data.truncated){message.textContent='조회 한도를 넘어 일부 광고 세트가 누락됐어요. 이 기간의 광고별 성과를 계산에 사용하지 마세요.';return;}
       var loaded=await Promise.all([
-        ctx.client.from('ad_margin_links').select('meta_adset_id,product_label,pre_ad,source_saved_at').eq('store_id',ctx.storeId),
+        ctx.client.from('ad_margin_links').select('meta_adset_id,product_label,pre_ad,total_income,source_saved_at').eq('store_id',ctx.storeId),
         ctx.client.from('tool_records').select('data').eq('user_id',ctx.userId).eq('tool_type','margin_calc').order('created_at',{ascending:false}).limit(100)
       ]),linked=loaded[0];
       if(id!==generation||!valid(ctx,key))return;

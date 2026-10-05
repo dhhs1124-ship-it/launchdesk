@@ -141,3 +141,17 @@ test('두 기준은 같은 주문끼리만 비교하고, 실제 결제 기준이
   assert.equal(s.marginTotal,link.unit_margin*8+link.order_adjust*2,'등록 판매가 기준은 두 주문 모두');
   assert.ok(s.actual.margin<s.actual.registeredMargin,'쿠폰 3,000원만큼 실제 결제 기준이 낮다');
 });
+
+test('광고 판단: 근거가 충분할 때만 손익분기 미달·이상, 아니면 판단 보류(권고 없음)',()=>{
+  const link={pre_ad:10000,total_income:30000}; // 손익분기 ROAS 300%
+  const m=(roas,purchases,spend=100)=>({roas,spend,purchase:{observed:purchases!=null,value:purchases||0}});
+  assert.equal(S.adVerdict(link,m(2.5,5)).label,'손익분기 미달');
+  assert.equal(S.adVerdict(link,m(3.0,5)).label,'손익분기 이상');
+  assert.deepEqual(S.adVerdict(null,m(9,9)),{label:'판단 보류',tone:'hold',reason:'상품 마진 미연결'});
+  assert.equal(S.adVerdict(link,m(9,2)).label,'판단 보류','구매 3건 미만');
+  assert.equal(S.adVerdict(link,m(null,null)).label,'판단 보류','구매 집계 없음');
+  assert.equal(S.adVerdict({pre_ad:-500,total_income:30000},m(9,9)).label,'판단 보류','광고 전 잔액이 0원 이하');
+  assert.equal(S.adVerdict(link,m(5,9,0)).label,'판단 보류','광고비 없음');
+  for(const v of [S.adVerdict(link,m(2.5,5)),S.adVerdict(link,m(3,5)),S.adVerdict(null,m(1,1))])
+    assert.doesNotMatch(JSON.stringify(v),/중단|증액|늘리|줄이|끄세요/,'권고 문구 없음');
+});

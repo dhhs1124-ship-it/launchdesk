@@ -12,6 +12,7 @@ function node(tag){
 async function settle(){await new Promise(resolve=>setImmediate(resolve));}
 // select().eq().order().limit() 체인을 흉내 내고, await하면 표별 데이터를 돌려준다.
 function query(data){const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,then:(ok,fail)=>Promise.resolve({data,error:null}).then(ok,fail)};return q;}
+const find=(n,cls)=>String(n.className||'').split(' ').includes(cls)?n:(n.children||[]).map(c=>find(c,cls)).find(Boolean);
 function texts(el){return [el.textContent,...(el.children||[]).flatMap(texts)].filter(Boolean);}
 test('광고 세트와 광고를 계산기에 연결하며 Meta 전환 수를 전달한다',async()=>{
   const list=node('div'),message=node('p'),more=node('button'),calls=[],opened=[];
@@ -26,14 +27,14 @@ test('광고 세트와 광고를 계산기에 연결하며 Meta 전환 수를 �
   vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:app,addEventListener(){}},document,Intl,Number});
   await settle();
   assert.equal(calls[0].body.scope,'adsets');
-  const row=list.children[0],toggle=row.children[0].children[1];
-  row.children[3].events.click();
+  const row=list.children[0],toggle=find(row,'adset-toggle');
+  find(row,'adset-connect').events.click();
   assert.equal(opened[0].adId,'123');
   assert.equal(opened[0].purchase,2);
   await toggle.events.click();
   assert.equal(calls[1].body.scope,'ads');
   assert.equal(calls[1].body.adset_id,'123');
-  const detail=row.children[4],button=detail.children[0].children[2];
+  const detail=find(row,'adset-details'),button=detail.children[0].children[2];
   assert.notEqual(button.disabled,true);
   button.events.click();
   assert.equal(opened[1].spend,7000);
@@ -52,7 +53,7 @@ async function summaries(links,records,{currency='KRW',spend=30000,fx=null}={}){
   const document={getElementById(id){return id==='adPerformanceList'?list:node('p');},createElement:node};
   vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:{subscribe(fn){fn(ctx);},getContext(){return ctx;}},addEventListener(){},LaunchRoasSales:require('./sales-core.js')},document,Intl,Number,Date,Math,String,Promise});
   await settle();await settle();
-  return list.children.map(row=>texts(row.children[2]).join(' | '));
+  return list.children.map(row=>texts(find(row,'ad-margin-summary')).join(' | '));
 }
 test('예상 잔액 카드는 계산 근거·미반영 항목·저장 시점을 보여주고, 확인 가능할 때만 갱신 필요를 표시한다',async()=>{
   const linkedAt='2026-09-01T00:00:00.000Z';
@@ -82,4 +83,23 @@ test('USD 광고계정은 저장한 환율이 있을 때만 광고별 추정을 
   const [withFx]=await summaries(link,[],{currency:'USD',spend:20,fx:{currency:'USD',krw_per_unit:1400}});
   assert.match(withFx,/\| 12,000원 \|/); // 10,000원 × 4건 − 20달러 × 1,400원
   assert.match(withFx,/광고비 28,000원 \(저장한 환율 적용\)/);
+});
+
+test('광고 세트 첫 줄은 광고비 · ROAS · 판단만 보이고, 자세한 지표는 자세히를 눌러야 보인다',async()=>{
+  const list=node('div');
+  const adsets=[{adset_id:'100',adset_name:'세트',metrics:{spend:50000,roas:2.5,link_clicks:10,purchase:{observed:true,value:5}}},
+    {adset_id:'101',adset_name:'세트2',metrics:{spend:50000,roas:9,link_clicks:10,purchase:{observed:true,value:1}}}];
+  const links=[{meta_adset_id:'100',product_label:'A',pre_ad:10000,total_income:30000,source_saved_at:null},{meta_adset_id:'101',product_label:'A',pre_ad:10000,total_income:30000,source_saved_at:null}];
+  const client={from:(table)=>query(table==='ad_margin_links'?links:[]),functions:{invoke:async()=>({data:{ok:true,account:{currency:'KRW'},campaigns:[{campaign_name:'캠페인',adsets}]}})}};
+  const ctx={client,userId:'user',storeId:'store',metaAccount:{id:'meta',status:'connected'},period:{kind:'today',date:null}};
+  const document={getElementById(id){return id==='adPerformanceList'?list:node('p');},createElement:node};
+  vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:{subscribe(fn){fn(ctx);},getContext(){return ctx;}},addEventListener(){},LaunchRoasSales:require('./sales-core.js')},document,Intl,Number,Date,Math,String,Promise});
+  await settle();await settle();
+  const [below,few]=list.children;
+  assert.deepEqual(texts(find(below,'adset-summary')).filter(x=>/광고비|ROAS|손익|보류/.test(x)),['광고비','ROAS','손익분기 미달']);
+  assert.equal(find(below,'adset-extra').hidden,true,'자세한 지표는 접혀 있다');
+  assert.match(texts(find(few,'adset-summary')).join(' '),/판단 보류 Meta 구매 1건 — 3건 미만/);
+  find(below,'adset-more').events.click();
+  assert.equal(find(below,'adset-extra').hidden,false);
+  assert.match(texts(find(below,'adset-extra')).join(' '),/손익분기 ROAS 300%/);
 });

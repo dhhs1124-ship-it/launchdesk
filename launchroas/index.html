@@ -102,12 +102,19 @@
         <article class="metric"><span id="roasLabel">Meta 오늘 ROAS</span><strong id="adRoas">—</strong><small>Meta 귀속 구매금액 ÷ 광고비</small></article>
       </div>
       <section class="operations-panel sales-profit" aria-labelledby="salesProfitTitle">
-        <div class="sales-head"><div><p class="section-kicker">ACTUAL SALES</p><h2 id="salesProfitTitle">실제 판매 기준 예상 이익</h2><p id="salesPeriod" class="small"></p></div></div>
-        <p id="salesMessage" class="small" role="status"></p>
-        <div id="salesFigures" class="sales-figures"></div>
+        <div class="sales-hero">
+          <div class="sales-hero-head"><h2 id="salesProfitTitle">광고비 빼고 남은 금액</h2><span class="sales-estimate">예상</span><span id="salesPeriod" class="sales-period"></span></div>
+          <div class="sales-hero-amount"><strong id="salesAmount">—</strong><span id="salesScope" class="sales-scope" hidden>일부 상품 기준</span></div>
+          <p id="salesFormula" class="sales-formula"></p>
+          <div id="salesChips" class="sales-chips"></div>
+          <p id="salesMessage" class="small" role="status"></p>
+        </div>
         <div id="salesFx" class="sales-fx" hidden><label for="salesFxRate"><span>광고비 환율 · 1 <b id="salesFxCurrency">USD</b>당 원화</span><input id="salesFxRate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="예: 1390"></label><button id="salesFxSave" type="button" class="secondary">환율 저장</button><small id="salesFxNote" role="status"></small></div>
-        <details class="sales-breakdown" hidden><summary>실제 결제 기준 계산 내역</summary><div id="salesBreakdown"></div></details>
-        <details class="sales-products"><summary>상품별 판매 수량 · 마진 연결</summary><div id="salesProducts"></div></details>
+        <details id="salesBasis" class="sales-basis"><summary>계산 기준 보기</summary>
+          <div id="salesFigures" class="sales-figures"></div>
+          <details class="sales-breakdown" hidden><summary>실제 결제 기준 계산 내역</summary><div id="salesBreakdown"></div></details>
+        </details>
+        <details id="salesProductsBox" class="sales-products"><summary>상품 마진 연결 <span id="salesProductsCount"></span></summary><div id="salesProducts"></div></details>
       </section>
       <div class="overview-main-grid">
       <div class="overview-ad-column">
