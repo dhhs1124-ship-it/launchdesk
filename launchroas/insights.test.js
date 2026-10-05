@@ -31,3 +31,21 @@ test('일부 상품 기준 음수는 광고 전체 적자로 판단하지 않는
 test('조회 중이면 아무 판단도 하지 않는다(0원으로 보지 않음)',()=>{
   assert.deepEqual(I.build({loading:true},null),{loading:true});
 });
+
+test('AI로 보내는 데이터: 일부 상품 기준 표시 · 실제 받은 지표만 · 정의와 데이터 공백 포함',()=>{
+  const summary={soldQty:25,linkedQty:19,unlinkedQty:6,unlinkedKinds:2,marginTotal:151400,partial:true,
+    margin:{revenue:395100,customerShipping:9000,points:336,unitCost:211000,feeSales:19764,feePg:0,feeShip:0,orderCosts:21600,actualOrders:6,estimatedOrders:0}};
+  const sales={ready:true,summary,profit:19622,partial:true,meta:{roas:5.44,purchase_count:5},spendKrw:131778,range:{label:'이번 달',since:'2026-10-01',until:'2026-10-05'}};
+  const ads={rows:[{name:'전환 캠페인',metrics:metrics({spend:90,roas:5.45,purchase:{observed:true,value:5}}),linked:true,verdict:{tone:'below',label:'손익분기 미달',breakeven:9.76}}],currency:'USD'};
+  const p=I.buildPayload(sales,ads,null);
+  assert.equal(p.current.sales.partial,true);assert.equal(p.current.sales.profit_krw,19622);
+  assert.equal(p.current.adsets[0].purchases,5);assert.equal(p.current.adsets[0].breakeven_roas,9.76);
+  assert.equal(p.previous,null);assert.match(p.definitions.landing_page_view,/클릭보다 많을 수 있음/);
+  assert.ok(p.rules.length>=1);
+  assert.ok(!JSON.stringify(p).includes('픽셀 오류'));
+});
+
+test('직전 같은 길이 기간',()=>{
+  assert.deepEqual(I.previousRange('2026-10-01','2026-10-05'),{since:'2026-09-26',until:'2026-09-30',days:5});
+  assert.deepEqual(I.previousRange('2026-10-05','2026-10-05'),{since:'2026-10-04',until:'2026-10-04',days:1});
+});

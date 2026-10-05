@@ -30,7 +30,7 @@
       {target:'.sales-hero',view:'overview',title:'3. 광고비 빼고 남은 금액',
        text:'판매 마진에서 실제 광고비를 뺀 금액이에요. 일부 상품만 저장했으면 \'일부 상품 기준\'으로 표시돼요.',state:status(2),done:st[2]&&st[2].done},
       {target:'#insights',view:'overview',title:'4. 개선 점검',
-       text:'확인한 지표와 추정 원인을 나눠 다음에 해볼 일을 알려줘요. 규칙 기반 점검이에요(AI 분석 아님).',state:'',done:false}
+       text:'AI 분석 요청을 누르면 실제 지표로 우선 테스트할 행동 1개를 골라줘요. 아래 규칙 기반 점검은 데이터 확인용이에요.',state:'',done:false}
     ];
   }
 

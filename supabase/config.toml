@@ -456,3 +456,7 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# ai-insights — LaunchROAS AI 개선 분석(버튼을 눌렀을 때만 Claude API 호출). 로그인 사용자만. 키: 시크릿 ANTHROPIC_API_KEY
+[functions.ai-insights]
+verify_jwt = true

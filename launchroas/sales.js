@@ -157,7 +157,7 @@
     var ready=!!ctx.connectionsLoaded;
     renderGuide(setupSteps(ctx,s,profit,spendKrw,ms,mp),ready);
     // 개선 점검 패널 · 사용법 안내가 같은 상태를 쓰도록 알린다(조회 중이면 loading — 0원으로 보지 않게).
-    window.dispatchEvent(new CustomEvent('launchroas:sales-state',{detail:{ready:ready,loading:!s&&!state.error,error:state.error||'',summary:s,profit:profit,partial:partial,spendKrw:spendKrw,meta:mp||null,metaIssue:ms?ms.text:'',steps:setupSteps(ctx,s,profit,spendKrw,ms,mp).map(function(x){return {title:x.title,done:x.done,text:x.text};}),range:state.range}}));
+    window.dispatchEvent(new CustomEvent('launchroas:sales-state',{detail:{ready:ready,loading:!s&&!state.error,error:state.error||'',summary:s,links:links,profit:profit,partial:partial,spendKrw:spendKrw,meta:mp||null,metaIssue:ms?ms.text:'',steps:setupSteps(ctx,s,profit,spendKrw,ms,mp).map(function(x){return {title:x.title,done:x.done,text:x.text};}),range:state.range}}));
     renderStatus(ctx,s,profit,spendKrw,ms,mp,partial,ready&&!!(s||state.error));
   }
 

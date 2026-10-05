@@ -161,3 +161,22 @@ details[open]>:not(summary){animation:fx-fade var(--fx-fast) var(--fx-ease)}
   .fx-kinetic,.fx-rise,.fx-punch,.fx-whip,.fx-toast-in,.tour-word,.insight-item{animation:fx-fade 150ms linear both!important;animation-delay:0s!important}
   .tour-spot{transition:none}button:active:not(:disabled){transform:none}
 }
+
+/* ---- AI 분석 카드 ---- */
+.ai-card{display:grid;gap:10px;margin:0 0 14px;padding:14px 16px;border:1px solid #ff9a6140;border-radius:12px;background:#ff9a610a}
+.ai-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.insight-sub{margin:0;font-size:14.5px;color:#f1f3f2}
+.ai-badge{padding:3px 9px;border-radius:999px;font-size:11.5px;border:1px solid #ffffff2a;color:#b3bcbc}
+.ai-badge.ok{border-color:#7fd6a466;color:#b9efcf}.ai-badge.failed{border-color:#ff9b8f66;color:#ffb3aa}.ai-badge.not_configured{border-color:#ffd27a55;color:#ffe0a3}
+.ai-badge.loading{border-color:#ff9a6166;color:#ffbd92;animation:fx-fade 900ms ease-in-out infinite alternate}
+.ai-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}.ai-run{width:auto;height:38px;margin:0;padding:0 14px;font-size:13px}
+.ai-note{color:#9aa4a5;font-size:11.5px;line-height:1.5}
+.ai-error{color:#ffb3aa}
+.ai-result{display:grid;gap:8px;animation:fx-rise var(--fx-main) var(--fx-ease) both}
+.ai-action{font-size:15px}
+.ai-ev-wrap,.ai-compare{display:grid;gap:4px}.ai-ev-title{color:#ffbd92;font-size:12px;font-weight:700}
+.ai-evidence,.ai-compare ul,.ai-cautions{margin:0;padding-left:18px;font-size:12.5px;color:#c9cfcf}
+.ai-evidence code{font-size:11.5px;color:#e8ecea;background:#ffffff10;padding:1px 5px;border-radius:4px;word-break:break-all}
+.ai-cautions{color:#ffe0a3}
+.insight-rules{display:grid;gap:8px}
+@media (prefers-reduced-motion: reduce){.ai-badge.loading,.ai-result{animation:none!important}}
