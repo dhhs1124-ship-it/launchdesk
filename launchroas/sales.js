@@ -159,16 +159,19 @@
   function setupSteps(ctx,s,profit,spendKrw,ms,mp){
     var cafeOk=!!(ctx.cafeAccount&&ctx.cafeAccount.status==='connected'),metaOk=!!(ctx.metaAccount&&ctx.metaAccount.status==='connected');
     var conn={title:'쇼핑몰 · 광고 계정 연결',done:cafeOk&&metaOk,
-      text:'Cafe24 '+(cafeOk?'연결됨':'미연결')+' · Meta '+(metaOk?'연결됨':ctx.metaAccount?'광고계정 선택 필요':'미연결'),
+      text:!(ctx.stores||[]).length?'쇼핑몰을 등록하고 Cafe24 · Meta를 연결하세요':'Cafe24 '+(cafeOk?'연결됨':'미연결')+' · Meta '+(metaOk?'연결됨':ctx.metaAccount?'광고계정 선택 필요':'미연결'),
       button:cafeOk&&metaOk?null:{label:'연결 관리로 이동',run:function(){app.showView('connections');}}};
     var cost={title:'상품 비용 입력',done:false,button:{label:'상품 비용 입력하기',run:openProducts}};
-    if(!cafeOk)cost.text='Cafe24를 연결하면 판매 상품이 보여요.';
+    // 앞 단계가 필요한 단계에는 버튼을 두지 않는다(누를 수 있는 곳을 하나로).
+    if(!cafeOk){cost.text='Cafe24를 연결하면 판매 상품이 보여요.';cost.button=null;}
     else if(!s)cost.text=state.error?'판매 상품을 불러오지 못했어요.':'판매 상품을 확인하는 중이에요.';
     else if(!s.soldQty)cost.text='이 기간 판매가 없어 확인할 상품이 없어요.';
     else if(!s.unlinkedQty){cost.done=true;cost.text='판매 상품 '+count(s.productKinds,'종')+' 모두 비용 저장됨';cost.button=null;}
     else cost.text='판매 상품 '+count(s.productKinds,'종')+' 중 '+count(s.productKinds-s.unlinkedKinds,'종')+' 저장 · 남은 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+')';
-    var result={title:'광고비 빼고 남은 금액 확인',done:profit!=null,button:profit!=null?{label:'결과 보기',run:goResult}:null};
-    result.text=profit!=null?(s&&s.partial?'일부 상품 기준으로 확인할 수 있어요':'확인할 수 있어요')
+    // 일부 상품만 계산되면 결과는 볼 수 있어도 완료로 표시하지 않는다(전체 손익으로 오해 방지).
+    var partialResult=profit!=null&&!!(s&&s.partial);
+    var result={title:'광고비 빼고 남은 금액 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};
+    result.text=profit!=null?(partialResult?'지금은 일부 상품 기준(판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')이에요':'전체 판매 상품 기준으로 확인할 수 있어요')
       :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
     if(profit==null&&mp&&spendKrw==null&&!ms)result.button={label:'환율 입력',run:function(){goResult();byId('salesFxRate').focus();}};
     return [conn,cost,result];
