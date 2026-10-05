@@ -167,7 +167,7 @@
     else if(!s)cost.text=state.error?'판매 상품을 불러오지 못했어요.':'판매 상품을 확인하는 중이에요.';
     else if(!s.soldQty)cost.text='이 기간 판매가 없어 확인할 상품이 없어요.';
     else if(!s.unlinkedQty){cost.done=true;cost.text='판매 상품 '+count(s.productKinds,'종')+' 모두 비용 저장됨';cost.button=null;}
-    else cost.text='판매 상품 '+count(s.productKinds,'종')+' 중 '+count(s.productKinds-s.unlinkedKinds,'종')+' 저장 · 남은 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+')';
+    else cost.text=(state.range?state.range.label+' ':'')+'판매 상품 '+count(s.productKinds,'종')+' 중 '+count(s.productKinds-s.unlinkedKinds,'종')+' 저장 · 남은 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+')';
     // 일부 상품만 계산되면 결과는 볼 수 있어도 완료로 표시하지 않는다(전체 손익으로 오해 방지).
     var partialResult=profit!=null&&!!(s&&s.partial);
     var result={title:'광고비 빼고 남은 금액 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};

@@ -71,7 +71,7 @@ test('상품 선택 → 비용 입력 → 이 상품에 저장 → 다시 열면
   assert.equal(saved.unit_margin,21900-9000-657);assert.equal(saved.order_adjust,-3500);
   assert.ok(state.dispatched.includes('launchroas:product-margin-saved'));
   assert.equal(r.nodes.pmNext.hidden,false,'저장 뒤 다음 단계 버튼');
-  assert.equal(r.nodes.pmNextProduct.textContent,'다음 미입력 상품 (1종 남음)','상품 하나 저장했다고 끝난 것이 아니다');
+  assert.equal(r.nodes.pmNextProduct.textContent,'다음 미입력 상품 (최근 31일 1종 남음)','상품 하나 저장했다고 끝난 것이 아니다');
   // 다른 상품을 열었다가 다시 열면 저장값이 그대로 보인다
   await pick(r,'후드티');assert.equal(r.nodes.calcCost.value,'');
   await pick(r,'가족티');

@@ -172,7 +172,7 @@
     byId('pmSelected').textContent='저장된 값을 불러왔어요';
     renderVariants();renderList();
     var left=(st.products||[]).filter(needsSetup).length;
-    byId('pmNextProduct').hidden=!left;byId('pmNextProduct').textContent='다음 미입력 상품 ('+left+'종 남음)';byId('pmNext').hidden=false;
+    byId('pmNextProduct').hidden=!left;byId('pmNextProduct').textContent='다음 미입력 상품 (최근 31일 '+left+'종 남음)';byId('pmNext').hidden=false;
     window.dispatchEvent(new CustomEvent('launchroas:product-margin-saved',{detail:{storeId:ctx.storeId}}));
   }
 
