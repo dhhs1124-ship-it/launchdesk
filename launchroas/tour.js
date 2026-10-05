@@ -29,7 +29,7 @@
        action:{label:'상품 비용 입력하기',run:openProducts}},
       {target:'.sales-hero',view:'overview',title:'3. 광고비 빼고 남은 금액',
        text:'판매 마진에서 실제 광고비를 뺀 금액이에요. 일부 상품만 저장했으면 \'일부 상품 기준\'으로 표시돼요.',state:status(2),done:st[2]&&st[2].done},
-      {target:'#insights',view:'overview',title:'4. 개선 점검',
+      {target:'#insights .ai-card, #insights',view:'overview',title:'4. 개선 점검',
        text:'AI 분석 요청을 누르면 실제 지표로 우선 테스트할 행동 1개를 골라줘요. 아래 규칙 기반 점검은 데이터 확인용이에요.',state:'',done:false}
     ];
   }
@@ -82,7 +82,7 @@
     render();
     if(M)M.play(card,first?'fx-whip':'fx-swap'); // 첫 장면만 휩팬, 이후는 짧은 전환
     if(target){target.classList.add('tour-target');if(M)M.play(target,'fx-punch');scrollTo(target);}
-    place();setTimeout(place,260);
+    place();setTimeout(place,260);setTimeout(place,750); // 부드러운 스크롤이 끝난 뒤 위치를 한 번 더 맞춘다
     card.querySelector('.primary').focus({preventScroll:true});
   }
   function open(){

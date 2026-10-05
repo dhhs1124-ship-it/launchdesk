@@ -171,7 +171,7 @@
     st.linkIds=[{id:saved._id,key:key}].concat((st.linkIds||[]).filter(function(x){return x.key!==key;}));
     say((t.variant_code?t.option+' 옵션':'상품')+' 비용을 저장했어요. 운영 현황에 바로 반영돼요.');
     // 저장 응답을 받은 뒤에만 완료 연출(펀치 인 + 로어 서드 안내)
-    if(window.LaunchRoasMotion){window.LaunchRoasMotion.play(byId('pmSelected'),'fx-punch');window.LaunchRoasMotion.toast((t.option?t.option+' 옵션':t.product.name.slice(0,18))+' 비용 저장 완료');}
+    if(window.LaunchRoasMotion){window.LaunchRoasMotion.play(byId('pmSelected'),'fx-punch');var nm=t.product.name.length>16?t.product.name.slice(0,16)+'…':t.product.name;window.LaunchRoasMotion.toast(nm+(t.option?' · '+t.option:'')+' 비용 저장 완료');}
     byId('pmSelected').textContent='저장된 값을 불러왔어요';
     renderVariants();renderList();
     var left=(st.products||[]).filter(needsSetup).length;
