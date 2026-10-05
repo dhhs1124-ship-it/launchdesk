@@ -284,3 +284,8 @@ test('수수료 내역: 판매 수수료는 적립금 포함 상품금액 기준
   const b=S.summarize([pts],[pg]).margin;
   assert.equal(b.feePg,Math.round(109500*111500/112500*0.06)+Math.round(3000*111500/112500*0.06),'PG는 (결제 111,500 ÷ 적립금 포함 112,500) 비율만');
 });
+
+test('쇼핑몰 전체 상품 판매금액: 비용 미입력 상품 포함 · 취소 제외 · 주문 당시 판매가 × 수량',()=>{
+  const s=S.summarize([{order_id:'A',items:[item({quantity:2,product_price:10000,option_price:2000}),item({product_no:9,variant_code:'',quantity:1,product_price:5000}),item({status_code:'C2',order_status:'C40',quantity:3,product_price:10000})]}],[]);
+  assert.equal(s.grossSales,24000+5000);
+});

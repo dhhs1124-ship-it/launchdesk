@@ -130,7 +130,7 @@
   function linkCost(l){return l.input?shipCost(l.input):-Number(l.order_adjust)||0;}
   var SUMS=['revenue','customerShipping','points','unitCost','fees','feeSales','feePg','feeShip','orderCosts','total'];
   function summarize(orders,links){
-    var s={orders:0,validOrders:0,soldQty:0,excluded:{},linkedQty:0,unlinkedQty:0,
+    var s={orders:0,validOrders:0,soldQty:0,grossSales:0,excluded:{},linkedQty:0,unlinkedQty:0,
       ordersWithLinked:0,ordersMixed:0,ordersMultiLinked:0,products:{},unknownCodes:{},
       margin:{actualOrders:0,estimatedOrders:0,savedOnlyOrders:0,estimated:{},estimatedTotal:0,
         revenue:0,customerShipping:0,unitCost:0,fees:0,orderCosts:0,total:0,points:0,feeSales:0,feePg:0,feeShip:0,ship:{charged:0,free:0,unknown:0},multiCodeOrders:0,coupon:{},pointsOrders:0,creditsOrders:0}};
@@ -151,6 +151,8 @@
         var g=(n(item.product_price)+n(item.option_price))*c.sold,savedPrice=false;
         if(item.product_price==null&&link&&link.input&&n(link.input.price)>0){g=n(link.input.price)*c.sold;savedPrice=true;}
         lines.push({sold:c.sold,link:link||null,gross:g,savedPrice:savedPrice,shipping_code:item.shipping_code||''});
+        // 쇼핑몰 전체 상품 판매금액(주문 당시 판매가 × 판매 수량, 취소 · 반품 제외 · 비용 미입력 상품 포함, 할인 전)
+        if(!savedPrice)s.grossSales+=g;
         if(link){
           s.linkedQty+=c.sold;
           distinct[(link.product_no)+'|'+(link.variant_code||'')]=true;

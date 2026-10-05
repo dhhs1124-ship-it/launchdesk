@@ -142,20 +142,20 @@
 
 (function(){
   if(typeof document==='undefined'||!window.LaunchRoasApp)return;
-  var I=window.LaunchRoasInsights,app=window.LaunchRoasApp,S=window.LaunchRoasSales,sales=null,ads=null,lastSig='',ai={state:'idle'},aiKey='';
+  var I=window.LaunchRoasInsights,app=window.LaunchRoasApp,S=window.LaunchRoasSales,sales=null,ads=null,lastSig='';
+  var wk={state:'idle',data:null,message:'',storeId:null,busy:false};
   function byId(id){return document.getElementById(id);}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
   function won(v){return v==null?'—':(v<0?'−':'')+Math.abs(Math.round(v)).toLocaleString('ko-KR')+'원';}
-  // 공식 요금(platform.claude.com/docs/en/about-claude/pricing, 2026-10-05 확인): USD / 100만 토큰
-  var PRICE={'claude-sonnet-5-5':[2,10],'claude-haiku-4-5':[1,5],'claude-haiku-4-5-20251001':[1,5]},USD_KRW=1400;
-  function costKrw(model,u){var p=PRICE[model];if(!p||!u||u.input_tokens==null)return null;return (u.input_tokens*p[0]+u.output_tokens*p[1])/1e6*USD_KRW;}
+  function n(v,u){return v==null?'—':Number(v).toLocaleString('ko-KR',{maximumFractionDigits:2})+(u||'');}
+  function money(v,cur){return v==null?'—':cur==='KRW'?won(v):Number(v).toLocaleString('en-US',{maximumFractionDigits:2})+' '+(cur||'');}
+  function delta(a,b){if(a==null||b==null)return '';if(!b)return ' (전주 '+n(b)+')';var p=Math.round((a-b)/Math.abs(b)*1000)/10;return ' (전주 대비 '+(p>0?'+':'')+p+'%)';}
 
   function render(){
     var box=byId('insightsBody');if(!box)return;
-    var r=I.build(sales,ads),sig=JSON.stringify(r)+'|'+JSON.stringify(ai);
+    var r=I.build(sales,ads),sig=JSON.stringify(r)+'|'+JSON.stringify(wk);
     if(sig===lastSig)return;lastSig=sig; // 같은 내용이면 다시 그리지 않음(다시 등장하는 효과 방지)
-    box.replaceChildren();
-    box.appendChild(renderAi());
+    box.replaceChildren(renderWeekly());
     var rules=el('section','insight-rules');rules.appendChild(el('h3','insight-sub','규칙 기반 점검 · 데이터 확인'));box.appendChild(rules);
     if(r.loading){rules.appendChild(el('p','small','판매 · 광고 데이터를 확인하는 중이에요.'));return;}
     if(r.status.length){var st=el('ul','insight-status');r.status.forEach(function(t){st.appendChild(el('li','',t));});rules.appendChild(st);}
@@ -174,93 +174,138 @@
     if(r.gaps.length){var g=el('details','insight-gaps');g.appendChild(el('summary','','부족한 데이터 '+r.gaps.length+'개'));var ul=el('ul');r.gaps.forEach(function(t){ul.appendChild(el('li','',t));});g.appendChild(ul);rules.appendChild(g);}
   }
 
-  // ---- AI 분석 카드: 실제 호출 결과만 'AI 분석 완료'로 표시. 실패 · 미연결이면 그렇게 표시하고 규칙 점검만 보여준다. ----
-  function renderAi(){
-    var card=el('section','ai-card'),head=el('div','ai-head');
-    var badge={idle:'대기',loading:'분석 중',ok:'AI 분석 완료',not_configured:'AI 미연결',failed:'AI 분석 실패'}[ai.state];
-    head.append(el('h3','insight-sub','AI 분석'),el('span','ai-badge '+ai.state,badge));card.appendChild(head);
-    var ready=!!(sales&&!sales.loading&&sales.summary&&ads&&!ads.loading&&!ads.error);
-    if(ai.state==='ok')card.appendChild(renderResult(ai));
-    else if(ai.state==='not_configured')card.appendChild(el('p','small','AI API 키가 아직 설정되지 않아 AI를 호출하지 않았어요. 아래 규칙 기반 점검만 보여줘요.'));
-    else if(ai.state==='failed')card.appendChild(el('p','small ai-error',(ai.message||'AI 호출에 실패했어요.')+' AI 결과는 없고, 아래 규칙 기반 점검만 보여줘요.'));
-    if(ai.compare)card.appendChild(renderCompare(ai.compare));
-    var btn=el('button','secondary ai-run',ai.state==='loading'?'분석 중…':ai.state==='ok'?'다시 분석':'AI 분석 요청');btn.type='button';
-    btn.disabled=!ready||ai.state==='loading';btn.addEventListener('click',run);
-    var row=el('div','ai-actions');row.append(btn,el('small','ai-note','누를 때만 호출 · 1회 약 20원(Claude Sonnet 5.5 기준) · 실제 지표와 계산 기준만 보냄'));card.appendChild(row);
-    if(!ready&&ai.state!=='loading')card.appendChild(el('small','ai-note',sales&&sales.summary?'광고 세트 지표를 불러오면 분석할 수 있어요.':'판매 데이터를 불러오면 분석할 수 있어요.'));
+  // ---- 주간 AI 점검 ----
+  var STATUS_TEXT={completed:'점검 완료',partial:'부분 완료',failed:'분석 실패',no_data:'데이터 부족',running:'진행 중'};
+  function renderWeekly(){
+    var card=el('section','ai-card weekly'),head=el('div','ai-head'),d=wk.data,q=d&&d.quota;
+    var badge=wk.busy?'분석 중':wk.state==='unavailable'?'준비 중':wk.state==='off'?'AI 미연결':d&&d.status?STATUS_TEXT[d.status]||d.status:'대기';
+    head.append(el('h3','insight-sub','주간 AI 광고 점검'),el('span','ai-badge '+(d&&d.status||wk.state),badge));card.appendChild(head);
+    var resetTxt=q?'다음 갱신 '+new Date(q.resets_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',weekday:'short',hour:'2-digit',minute:'2-digit'}):'';
+    card.appendChild(el('small','ai-note','지난주(월~일)를 그 전주와 비교해요 · 계정당 주 1회 무료 · 한국 시간 월요일 00시 갱신(이월 없음)'+(resetTxt?' · '+resetTxt:'')));
+    if(wk.message)card.appendChild(el('p','small '+(wk.state==='error'?'ai-error':''),wk.message));
+    if(d&&d.result)card.appendChild(renderResult(d.result,d.status));
+    else if(d&&d.error)card.appendChild(el('p','small ai-error',d.error));
+    var canRun=!wk.busy&&wk.state!=='unavailable'&&(!q||q.can_run);
+    var label=d&&d.status==='partial'?'남은 광고 이어서 점검':'주간 AI 점검';
+    var btn=el('button','secondary ai-run',wk.busy?'점검 중…':label);btn.type='button';btn.disabled=!canRun||!(sales&&sales.links);
+    btn.addEventListener('click',run);
+    var row=el('div','ai-actions');row.appendChild(btn);
+    if(q&&q.used&&!q.can_run)row.appendChild(el('small','ai-note','이번 주 점검을 사용했어요.'));
+    card.appendChild(row);
     return card;
   }
-  function renderResult(a){
-    var r=a.result,box=el('div','ai-result'),dl=el('dl','insight-facts ai-facts');
-    function add(k,v){if(v)dl.append(el('dt','',k),el('dd','',v));}
-    box.appendChild(el('strong','insight-action ai-action','우선 테스트: '+r.action));
-    add('현재 상태',r.status);
-    add('점검 가설',r.hypothesis);
-    add('테스트 방법',[r.test.method,r.test.duration].filter(Boolean).join(' · '));
-    add('이후 비교할 지표',r.test.compare_metrics.join(', '));
-    add('직전 기간 비교',r.comparison);
-    box.appendChild(dl);
-    var ev=el('ul','ai-evidence');
-    r.evidence.forEach(function(e){var li=el('li');li.append(el('code','',e.metric+' = '+e.actual),el('span','',' '+(e.meaning||'')));ev.appendChild(li);});
-    var evWrap=el('div','ai-ev-wrap');evWrap.append(el('span','ai-ev-title','판단 근거(보낸 데이터의 실제 값)'),ev);box.appendChild(evWrap);
-    if(r.cautions.length){var c=el('ul','ai-cautions');r.cautions.forEach(function(t){c.appendChild(el('li','',t));});box.appendChild(c);}
-    var cost=costKrw(a.model,a.usage);
-    box.appendChild(el('small','ai-note','모델 '+a.model+' · 입력 '+(a.usage.input_tokens||0).toLocaleString()+' / 출력 '+(a.usage.output_tokens||0).toLocaleString()+' 토큰'+(cost!=null?' · 약 '+Math.round(cost)+'원':'')+(r.dropped.length?' · 근거로 확인되지 않은 지표 '+r.dropped.length+'개 제외':'')));
-    return box;
+  function renderResult(r,status){
+    var wrap=el('div','ai-result');
+    var cov=r.coverage||{},p=r.snapshot&&r.snapshot.period||(r.summary&&r.summary.period);
+    // 분석 범위
+    var scope=el('p','weekly-scope','광고 '+n(cov.total,'개')+' 중 '+n(cov.analyzed,'개')+' 분석'+((cov.skipped&&cov.skipped.length)||(cov.failed_ads&&cov.failed_ads.length)?' · 누락 '+((cov.skipped||[]).length+(cov.failed_ads||[]).length)+'개':'')+(status==='partial'?' · 일부만 분석된 결과예요':''));
+    wrap.appendChild(scope);
+    // 전체 요약
+    var s=r.summary||{},c=s.cafe24||{},m=s.meta||{},ep=s.expected_profit||{};
+    var sum=el('dl','insight-facts weekly-summary');
+    function add(k,v){sum.append(el('dt','',k),el('dd','',v));}
+    add('Cafe24 상품 판매금액',won(c.current&&c.current.gross_sales_krw)+delta(c.current&&c.current.gross_sales_krw,c.previous&&c.previous.gross_sales_krw));
+    add('Meta 광고비',money(m.current&&m.current.spend,m.currency)+delta(m.current&&m.current.spend,m.previous&&m.previous.spend));
+    add('예상 이익'+(ep.partial?' (일부 상품 기준)':''),won(ep.current)+delta(ep.current,ep.previous));
+    add('Meta 귀속 구매값',money(m.current&&m.current.purchase_value,m.currency)+' · Cafe24 매출과 다른 값');
+    wrap.appendChild(sum);
+    // 이번 주 우선순위
+    if(r.priorities&&r.priorities.length){
+      var pr=el('ol','weekly-priorities');wrap.appendChild(el('span','ai-ev-title','이번 주 우선순위'));
+      r.priorities.forEach(function(x){var li=el('li');li.append(el('strong','',x.ad_name),el('span','',' — '+x.action));pr.appendChild(li);});
+      wrap.appendChild(pr);
+    }
+    // 광고별 목록
+    var list=el('ul','weekly-ads');
+    (r.ads||[]).forEach(function(a){
+      var an=a.analysis,li=el('li','weekly-ad');
+      var top=el('div','weekly-ad-head');top.append(el('strong','',a.ad_name||a.ad_id),el('span','weekly-scope-tag',a.scope?a.scope.label:'지표 확인'));
+      if(a.new_ad)top.appendChild(el('span','weekly-new','신규'));
+      li.appendChild(top);
+      var cm=a.current||{};
+      li.appendChild(el('small','weekly-metrics','광고비 '+money(cm.spend,m.currency)+' · CTR '+n(cm.link_ctr_pct,'%')+' · 구매 '+(cm.purchases==null?'미측정':n(cm.purchases,'건'))+' · ROAS '+(cm.roas==null?'—':Math.round(cm.roas*100)+'%')));
+      if(an){
+        li.appendChild(el('p','weekly-verdict',an.verdict+' · '+an.headline));
+        if(an.next_action)li.appendChild(el('p','weekly-next','다음 행동: '+an.next_action));
+        li.appendChild(detail(a,an));
+      }else li.appendChild(el('p','small','AI 분석 결과 없음(누락)'));
+      list.appendChild(li);
+    });
+    wrap.appendChild(list);
+    var skipped=(cov.skipped||[]).map(function(x){return (x.ad_name||x.ad_id)+' — '+x.reason;}).concat((cov.failed_ads||[]).map(function(id){return id+' — AI 응답 없음(재시도 대상)';}));
+    var notes=(r.notes||[]).concat(skipped);
+    if(notes.length){var g=el('details','insight-gaps');g.appendChild(el('summary','','기간 · 집계 기준과 누락 '+notes.length+'개'));var ul=el('ul');notes.forEach(function(t){ul.appendChild(el('li','',t));});g.appendChild(ul);wrap.appendChild(g);}
+    return wrap;
   }
-  function renderCompare(c){
-    var wrap=el('div','ai-compare');wrap.appendChild(el('span','ai-ev-title','직전 같은 길이 기간 '+c.range.since+' ~ '+c.range.until+' (계산값)'));
-    var ul=el('ul');c.lines.forEach(function(t){ul.appendChild(el('li','',t));});wrap.appendChild(ul);return wrap;
+  function detail(a,an){
+    var d=el('details','weekly-detail');d.appendChild(el('summary','','상세 분석 보기'));
+    var dl=el('dl','insight-facts');
+    function add(k,v){if(v){dl.append(el('dt','',k),el('dd','',v));}}
+    add('전주 대비',an.changes);
+    add('의심 구간',an.funnel&&(an.funnel.stage+(an.funnel.evidence?' — '+an.funnel.evidence:'')));
+    add('비교 광고',an.peers);
+    add('실제 근거',(an.evidence||[]).map(function(e){return e.metric+' = '+e.value+(e.note?' ('+e.note+')':'');}).join(' / '));
+    (an.hypotheses||[]).forEach(function(h,i){add('가설 '+(i+1),h.text+(h.basis?' · 근거: '+h.basis:'')+(h.check?' · 확인: '+h.check:''));});
+    var rec=an.recommendation;
+    if(rec){
+      add('현재안',rec.current);add('변경안 (검증할 가설)',rec.proposed);
+      add(rec.example_is_provisional?'수정 예시 (추가 정보 확인 전 예시)':'수정 예시',rec.example);
+      if(rec.needs_info&&rec.needs_info.length)add('필요한 정보',rec.needs_info.join(', '));
+      add('테스트 방법',[rec.test.method,rec.test.compare_metrics.length?'비교 지표: '+rec.test.compare_metrics.join(', '):'',rec.test.decision_rule?'판단 조건: '+rec.test.decision_rule:'',rec.test.sample_note].filter(Boolean).join(' · '));
+    }
+    add('예산 판단',an.budget_note);
+    add('판단 한계',(an.limits||[]).join(' / '));
+    add('소재',(a.creative&&a.creative.notes||[]).join(' / '));
+    d.appendChild(dl);return d;
   }
 
-  // 직전 동일 길이 기간: Cafe24는 같은 날짜 범위로 다시 조회 · Meta 광고 세트는 하루 단위 기간일 때만(현재 함수가 날짜 하나만 받음)
-  async function previous(ctx){
-    var range=sales.range;if(!range)return {data:null,lines:['기간 정보 없음 — 비교하지 않음'],range:{since:'—',until:'—'}};
-    var pr=I.previousRange(range.since,range.until),out={range:pr,sales:null,adsets:null,notes:[]},lines=[];
-    try{
-      var res=await ctx.client.functions.invoke('cafe24-order-items',{body:{store_id:ctx.storeId,start_date:pr.since,end_date:pr.until}});
-      if(res.data&&res.data.ok&&!res.data.truncated){
-        var s=S.summarize(res.data.orders||[],sales.links||[]);out.sales=I.salesBlock(s,null,s.partial);
-        out.notes.push('직전 기간 남은 금액은 그 기간 원화 광고비를 함께 확인하지 못해 계산하지 않음');
-        lines.push('판매 '+s.soldQty+'개 → 지금 '+sales.summary.soldQty+'개');
-        lines.push('상품 마진(같은 비용 설정) '+won(s.marginTotal)+' → 지금 '+won(sales.summary.marginTotal));
-      }else{out.notes.push('직전 기간 Cafe24 주문을 불러오지 못함');lines.push('Cafe24 직전 기간: 불러오지 못함(비교하지 않음)');}
-    }catch(e){out.notes.push('직전 기간 Cafe24 조회 오류');lines.push('Cafe24 직전 기간: 조회 오류');}
-    if(pr.days===1){
-      try{
-        var m=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'adsets',period:'date',date:pr.since}});
-        if(m.data&&m.data.ok&&!m.data.truncated){
-          var rows=[];(m.data.campaigns||[]).forEach(function(c){(c.adsets||[]).forEach(function(a){rows.push({name:a.adset_name||'이름 없는 광고 세트',metrics:a.metrics||{},linked:false,verdict:null});});});
-          out.adsets=I.topAdsets(rows);
-          var sp=rows.reduce(function(t,r){return t+(Number(r.metrics.spend)||0);},0);
-          lines.push('Meta 광고 세트 광고비 합계 '+sp.toLocaleString('en-US',{maximumFractionDigits:2})+' '+(m.data.account&&m.data.account.currency||''));
-        }else{out.notes.push('직전 기간 Meta 광고 세트를 불러오지 못함');lines.push('Meta 직전 기간: 불러오지 못함(비교하지 않음)');}
-      }catch(e){out.notes.push('직전 기간 Meta 조회 오류');lines.push('Meta 직전 기간: 조회 오류');}
-    }else{out.notes.push('Meta 광고 세트는 하루 단위 기간만 직전 기간을 조회할 수 있음 — 이번 기간은 Meta 비교 없음');lines.push('Meta 직전 기간: 여러 날 기간은 아직 조회 미지원(비교하지 않음)');}
-    return {data:out,lines:lines,range:pr};
+  // 지난주 · 그 전주 Cafe24 집계(개인정보 없이 합계만)를 계산해 함께 보낸다
+  async function weekSales(ctx,range){
+    var res=await ctx.client.functions.invoke('cafe24-order-items',{body:{store_id:ctx.storeId,start_date:range.since,end_date:range.until}});
+    if(!res.data||!res.data.ok||res.data.truncated)return null;
+    var s=S.summarize(res.data.orders||[],sales.links||[]);
+    return {gross_sales_krw:Math.round(s.grossSales),sold_qty:s.soldQty,linked_qty:s.linkedQty,margin_total_krw:s.marginTotal,partial:s.partial,estimated_orders:s.margin.estimatedOrders};
   }
-
-  async function run(){
-    var ctx=app.getContext(),key=ctx.storeId+'|'+(sales.range?sales.range.since+'~'+sales.range.until:'');
-    aiKey=key;ai={state:'loading'};render();
-    var prev=await previous(ctx);
-    if(aiKey!==key)return;
-    var payload=I.buildPayload(sales,ads,prev.data);
-    try{
-      var res=await ctx.client.functions.invoke('ai-insights',{body:{payload:payload}});
-      if(aiKey!==key)return;
-      var d=res.data;
-      if(d&&d.ok&&d.result)ai={state:'ok',result:d.result,model:d.model,usage:d.usage||{},compare:prev};
-      else if(d&&d.code==='AI_NOT_CONFIGURED')ai={state:'not_configured',compare:prev};
-      else ai={state:'failed',message:(d&&d.message)||'AI 호출에 실패했어요.',compare:prev};
-    }catch(e){ai={state:'failed',message:'AI 호출에 실패했어요.',compare:prev};}
+  function lastWeeks(){
+    var now=new Date(Date.now()+9*3600e3),dow=(now.getUTCDay()+6)%7,mon=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate())-dow*864e5,f=function(ms){return new Date(ms).toISOString().slice(0,10);};
+    return {current:{since:f(mon-7*864e5),until:f(mon-864e5)},previous:{since:f(mon-14*864e5),until:f(mon-8*864e5)}};
+  }
+  async function call(ctx,body){
+    var res=await ctx.client.functions.invoke('ai-weekly-review',{body:body});
+    if(res.error&&!res.data){
+      // 함수가 아직 배포되지 않았거나 응답 실패 — 성공으로 보이지 않게
+      var ctxErr=res.error&&res.error.context;var st=ctxErr&&ctxErr.status;
+      return {unavailable:st===404,error:true,body:ctxErr&&ctxErr.json?await ctxErr.json().catch(function(){return null;}):null};
+    }
+    return {data:res.data};
+  }
+  async function loadStatus(){
+    var ctx=app.getContext();if(!ctx.storeId||wk.storeId===ctx.storeId)return;
+    wk={state:'idle',data:null,message:'',storeId:ctx.storeId,busy:false};render();
+    var r=await call(ctx,{store_id:ctx.storeId,action:'status'});
+    if(app.getContext().storeId!==ctx.storeId)return;
+    if(r.unavailable||r.error)wk.state='unavailable',wk.message='주간 AI 점검은 아직 준비 중이에요(서버 미적용).';
+    else{wk.data=r.data;wk.state=r.data.enabled?'ready':'off';if(!r.data.enabled)wk.message='AI 연결 전이라 아직 실행할 수 없어요.';}
     render();
   }
+  async function run(){
+    if(wk.busy)return; // 연속 클릭 방지(서버도 동시 요청을 막는다)
+    var ctx=app.getContext();wk.busy=true;wk.message='지난주 · 그 전주 판매를 집계하는 중이에요.';render();
+    try{
+      var w=lastWeeks(),cur=await weekSales(ctx,w.current),prev=await weekSales(ctx,w.previous);
+      wk.message='광고와 소재를 확인하고 분석하는 중이에요. 광고가 많으면 1~2분 걸릴 수 있어요.';render();
+      var r=await call(ctx,{store_id:ctx.storeId,action:'run',sales:{current:cur,previous:prev},fx_krw_per_unit:ctx.fx&&ctx.fx.krw_per_unit||null});
+      var d=r.data||r.body||{};
+      if(r.unavailable){wk.state='unavailable';wk.message='주간 AI 점검은 아직 준비 중이에요(서버 미적용).';}
+      else{
+        if(d.quota)wk.data=d;
+        if(d.ok){wk.state='ready';wk.message='';if(window.LaunchRoasMotion)window.LaunchRoasMotion.toast(d.status==='partial'?'일부 광고만 분석했어요':'주간 점검 완료');}
+        else{wk.state=d.code==='AI_NOT_CONFIGURED'?'off':'error';wk.message=d.message||(d.error)||'점검에 실패했어요. 이용 횟수는 차감되지 않았어요.';}
+      }
+    }catch(e){wk.state='error';wk.message='점검 요청에 실패했어요. 이용 횟수는 차감되지 않았어요.';}
+    wk.busy=false;render();
+  }
 
-  window.addEventListener('launchroas:sales-state',function(e){
-    var k=e.detail&&e.detail.range?app.getContext().storeId+'|'+e.detail.range.since+'~'+e.detail.range.until:'';
-    if(aiKey&&k!==aiKey){aiKey='';ai={state:'idle'};} // 기간 · 쇼핑몰이 바뀌면 이전 AI 결과를 지운다
-    sales=e.detail;render();
-  });
+  window.addEventListener('launchroas:sales-state',function(e){sales=e.detail;render();loadStatus();});
   window.addEventListener('launchroas:adsets-state',function(e){ads=e.detail;render();});
 })();

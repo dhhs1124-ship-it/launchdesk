@@ -180,3 +180,16 @@ details[open]>:not(summary){animation:fx-fade var(--fx-fast) var(--fx-ease)}
 .ai-cautions{color:#ffe0a3}
 .insight-rules{display:grid;gap:8px}
 @media (prefers-reduced-motion: reduce){.ai-badge.loading,.ai-result{animation:none!important}}
+
+/* ---- 주간 AI 점검 ---- */
+.weekly-scope{margin:0;color:#ffbd92;font-size:12.5px;font-weight:700}
+.weekly-summary dd{font-variant-numeric:tabular-nums}
+.weekly-priorities{margin:0;padding-left:20px;font-size:13px;color:#e8ecea;display:grid;gap:4px}
+.weekly-ads{display:grid;gap:8px;margin:4px 0 0;padding:0;list-style:none}
+.weekly-ad{display:grid;gap:4px;padding:11px 12px;border:1px solid #ffffff14;border-radius:10px;background:#1b2023}
+.weekly-ad-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}.weekly-ad-head strong{font-size:13.5px;word-break:keep-all}
+.weekly-scope-tag,.weekly-new{padding:2px 7px;border-radius:999px;font-size:11px;border:1px solid #ffffff26;color:#b3bcbc}.weekly-new{border-color:#7fd6a466;color:#b9efcf}
+.weekly-metrics{color:#9aa4a5;font-size:12px}
+.weekly-verdict{margin:0;font-size:13px;color:#f1f3f2;word-break:keep-all}.weekly-next{margin:0;font-size:12.5px;color:#ffbd92}
+.weekly-detail{margin-top:4px;padding-top:6px}.weekly-detail summary{cursor:pointer;font-size:12.5px;color:#cdd3d2}
+.ai-badge.completed{border-color:#7fd6a466;color:#b9efcf}.ai-badge.partial,.ai-badge.off,.ai-badge.unavailable{border-color:#ffd27a55;color:#ffe0a3}.ai-badge.error,.ai-badge.failed{border-color:#ff9b8f66;color:#ffb3aa}

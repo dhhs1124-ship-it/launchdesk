@@ -460,3 +460,8 @@ enabled = true
 # ai-insights — LaunchROAS AI 개선 분석(버튼을 눌렀을 때만 Claude API 호출). 로그인 사용자만. 키: 시크릿 ANTHROPIC_API_KEY
 [functions.ai-insights]
 verify_jwt = true
+
+# ai-weekly-review — LaunchROAS 주간 AI 광고 점검(버튼 클릭 때만, 계정당 주 1회). 로그인 사용자만.
+# 시크릿: LAUNCHROAS_ANTHROPIC_API_KEY, AI_WEEKLY_ENABLED=true (+선택: AI_MAX_ADS, AI_ADS_PER_BATCH, AI_MAX_IMAGES, AI_IMAGES_PER_AD, AI_MAX_OUTPUT_TOKENS, AI_MAX_RETRIES, AI_MONTHLY_BUDGET_USD, AI_TIME_BUDGET_MS, AI_MODEL)
+[functions.ai-weekly-review]
+verify_jwt = true

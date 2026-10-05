@@ -1,0 +1,277 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { withSupabase } from "jsr:@supabase/server@^1";
+import { getValidMetaAccessToken } from "../_shared/meta-token.ts";
+import { GRAPH_API_VERSION, buildInsightsUrl, fetchAllInsightsRows } from "../_shared/meta-adset-normalize.mjs";
+import {
+  config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
+  batchContent, parseBatch, priorities, costUsd, scopeOf, SYSTEM_PROMPT,
+} from "../_shared/ai-weekly-core.mjs";
+
+// LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
+// 계정당 주 1회(한국 시간 월요일 00시 갱신) · 여러 광고를 묶어 전체 점검 1회로 계산.
+// 키: 시크릿 LAUNCHROAS_ANTHROPIC_API_KEY (예전 ai-insights 함수가 쓰던 ANTHROPIC_API_KEY와 일부러 분리)
+// 켜기: 시크릿 AI_WEEKLY_ENABLED=true — 꺼져 있으면 AI를 부르지 않고 이용 횟수도 쓰지 않는다.
+// 사용자에게는 결과만 돌려주고 토큰 · 비용(usage, cost_usd)은 DB에만 남긴다(운영자 확인용).
+
+type Admin = any;
+const env = (k: string) => Deno.env.get(k) ?? "";
+const json = (body: unknown, status = 200) => Response.json(body, { status });
+
+async function meta(url: string, token: string) {
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => null);
+    return res.ok && data ? { ok: true as const, data } : { ok: false as const, status: res.status, data };
+  } catch {
+    return { ok: false as const, status: 0, data: null };
+  }
+}
+
+// 광고 단위 성과(지정 기간, 귀속은 광고 세트 설정과 같게) — 페이지네이션 끝까지(상한 시 truncated)
+async function adInsights(accountId: string, token: string, range: { since: string; until: string }) {
+  return await fetchAllInsightsRows(async (after?: string) => {
+    const url = new URL(buildInsightsUrl({ accountId, level: "ad", since: range.since, until: range.until, after, preset: null, filteringAdsetId: null, apiVersion: null }));
+    url.searchParams.set("use_unified_attribution_setting", "true");
+    url.searchParams.set("fields", url.searchParams.get("fields") + ",optimization_goal");
+    const r = await meta(url.toString(), token);
+    if (!r.ok) return { ok: false, status: r.status };
+    return { ok: true, rows: r.data.data || [], nextAfter: r.data.paging?.next ? r.data.paging?.cursors?.after : null };
+  }, { maxPages: 30, maxRows: 2000 });
+}
+
+// ids로 여러 객체를 한 번에(50개씩)
+async function byIds(ids: string[], fields: string, token: string) {
+  const out: Record<string, any> = {}, failed: string[] = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/`);
+    url.searchParams.set("ids", chunk.join(","));
+    url.searchParams.set("fields", fields);
+    const r = await meta(url.toString(), token);
+    if (r.ok) Object.assign(out, r.data); else failed.push(...chunk);
+  }
+  return { out, failed };
+}
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+async function downloadImage(url: string) {
+  try {
+    const res = await fetch(url);
+    const type = (res.headers.get("content-type") || "").split(";")[0].trim();
+    if (!res.ok || !IMAGE_TYPES.includes(type)) return null;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.byteLength > 4_500_000) return null;
+    let bin = "";
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+    return { media_type: type, data: btoa(bin) };
+  } catch {
+    return null;
+  }
+}
+
+async function claude(key: string, model: string, maxTokens: number, content: unknown[]) {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model, max_tokens: maxTokens, system: SYSTEM_PROMPT, messages: [{ role: "user", content }] }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data) return { ok: false as const, status: res.status, usage: data?.usage };
+    const text = (data.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
+    return { ok: true as const, text, usage: data.usage || {} };
+  } catch {
+    return { ok: false as const, status: 0 };
+  }
+}
+
+// 사용자에게 돌려줄 값 — 운영자용 usage · cost는 빼고
+function publicView(row: any, weeks: ReturnType<typeof weekRanges>) {
+  return {
+    quota: { week: weeks.quotaWeek, resets_at: weeks.resetsAt, used: !!row && ["completed", "partial"].includes(row.status),
+      status: row?.status ?? null, can_run: !row || ["failed", "no_data", "partial"].includes(row.status) },
+    status: row?.status ?? null, error: row?.error ?? null,
+    // 이어서 하기용 스냅샷(이미지 주소 · 원본 지표)과 내부 결과 맵은 내려주지 않는다
+    result: row?.result ? { ...row.result, snapshot: undefined, ads_by_id: undefined } : null,
+  };
+}
+
+function num(v: unknown) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+function salesBlock(s: any) {
+  if (!s || typeof s !== "object") return null;
+  return { gross_sales_krw: num(s.gross_sales_krw), sold_qty: num(s.sold_qty), linked_qty: num(s.linked_qty),
+    margin_total_krw: num(s.margin_total_krw), partial: !!s.partial, estimated_orders: num(s.estimated_orders) };
+}
+
+export default {
+  fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
+    const started = Date.now();
+    const cfg = config(env);
+    const userId = ctx.userClaims?.id;
+    if (!userId) return json({ ok: false, code: "UNAUTHORIZED" }, 401);
+    const body = await req.json().catch(() => null);
+    const storeId = body?.store_id, action = body?.action;
+    if (!storeId || !["status", "run"].includes(action)) return json({ ok: false, code: "BAD_REQUEST" }, 400);
+    const { data: store } = await ctx.supabase.from("stores").select("id").eq("id", storeId).eq("user_id", userId).single();
+    if (!store) return json({ ok: false, code: "STORE_NOT_FOUND" }, 404);
+
+    const admin: Admin = ctx.supabaseAdmin;
+    const weeks = weekRanges(new Date());
+    const { data: row } = await admin.from("ai_weekly_reviews").select("*").eq("user_id", userId).eq("quota_week", weeks.quotaWeek).maybeSingle();
+    if (action === "status") return json({ ok: true, enabled: cfg.enabled, ...publicView(row, weeks) });
+
+    // ---- 실행 ----
+    const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");
+    if (!cfg.enabled || !key) return json({ ok: false, code: "AI_NOT_CONFIGURED", message: "주간 AI 점검이 아직 켜지지 않았어요.", ...publicView(row, weeks) });
+    if (row && String(row.store_id) !== String(storeId) && !["failed", "no_data"].includes(row.status)) {
+      return json({ ok: false, code: "USED_FOR_OTHER_STORE", message: "이번 주 점검은 다른 쇼핑몰에 사용했어요.", ...publicView(row, weeks) });
+    }
+    const decision = decideRun(row, new Date(), cfg.maxRetries);
+    if (decision.kind === "done") return json({ ok: false, code: "WEEKLY_LIMIT", message: "이번 주 점검을 이미 사용했어요.", ...publicView(row, weeks) });
+    if (decision.kind === "busy") return json({ ok: false, code: "IN_PROGRESS", message: "점검이 진행 중이에요.", ...publicView(row, weeks) });
+    if (decision.kind === "retries_exhausted") return json({ ok: false, code: "RETRIES_EXHAUSTED", message: "이번 주 재시도 횟수를 모두 썼어요.", ...publicView(row, weeks) });
+
+    // 서비스 전체 월 예산
+    const monthStart = new Date().toISOString().slice(0, 8) + "01";
+    const { data: spentRows } = await admin.from("ai_weekly_reviews").select("cost_usd").gte("updated_at", monthStart);
+    const spent = (spentRows || []).reduce((t: number, r: any) => t + Number(r.cost_usd || 0), 0);
+    if (spent >= cfg.monthlyBudgetUsd) return json({ ok: false, code: "BUDGET_EXCEEDED", message: "이번 달 AI 점검 운영 한도에 도달했어요.", ...publicView(row, weeks) });
+
+    // 실행 권한 잡기 — 새 행 삽입(고유 제약) 또는 같은 updated_at일 때만 갱신(동시 클릭 · 동시 요청 방지)
+    const nowIso = new Date().toISOString();
+    let claimed: any = null;
+    if (decision.kind === "new") {
+      const ins = await admin.from("ai_weekly_reviews").insert({ user_id: userId, quota_week: weeks.quotaWeek, store_id: storeId, status: "running", updated_at: nowIso }).select("*").single();
+      claimed = ins.data;
+    } else {
+      const upd = await admin.from("ai_weekly_reviews").update({ status: "running", updated_at: nowIso, store_id: decision.kind === "continue" ? row.store_id : storeId })
+        .eq("id", row.id).eq("updated_at", row.updated_at).select("*").maybeSingle();
+      claimed = upd.data;
+    }
+    if (!claimed) return json({ ok: false, code: "IN_PROGRESS", message: "점검이 진행 중이에요." });
+
+    const finish = async (patch: Record<string, unknown>) => {
+      const { data } = await admin.from("ai_weekly_reviews").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", claimed.id).select("*").single();
+      return json({ ok: patch.status === "completed" || patch.status === "partial", ...publicView(data, weeks) });
+    };
+
+    try {
+      // ---- 데이터: 이어서 하기면 저장한 스냅샷, 아니면 새로 조회 ----
+      let snap = decision.kind === "continue" ? row.result?.snapshot : null;
+      let batches = decision.kind === "continue" ? row.batches : null;
+      if (!snap) {
+        const { data: account }: { data: any } = await ctx.supabase.from("connected_accounts").select("id, status, external_account_id").eq("provider", "meta").eq("store_id", storeId).maybeSingle();
+        if (!account || account.status !== "connected" || !account.external_account_id) return await finish({ status: "failed", error: "Meta 광고계정이 연결되어 있지 않아요." });
+        const tok = await getValidMetaAccessToken(admin, account.id);
+        if (!tok.ok) return await finish({ status: "failed", error: "Meta 연결을 다시 확인해 주세요." });
+        const accountId = account.external_account_id, token = tok.accessToken;
+        const accMeta = await meta(`https://graph.facebook.com/${GRAPH_API_VERSION}/${accountId}?fields=currency,timezone_name`, token);
+        const timezone = accMeta.ok ? accMeta.data.timezone_name : null, currency = accMeta.ok ? accMeta.data.currency : null;
+
+        const [cur, prev] = await Promise.all([adInsights(accountId, token, weeks.current), adInsights(accountId, token, weeks.previous)]);
+        if (!cur.ok) return await finish({ status: "failed", error: "Meta 광고 성과를 불러오지 못했어요." });
+        const prevById: Record<string, any> = {};
+        if (prev.ok) for (const r of prev.rows || []) prevById[String(r.ad_id)] = adMetrics(r);
+        const rows = (cur.rows || []).filter((r: any) => Number(r.spend) > 0);
+        if (!rows.length) return await finish({ status: "no_data", error: "지난주 광고비가 집행된 광고가 없어요." });
+
+        const adsetIds = [...new Set(rows.map((r: any) => String(r.adset_id)))];
+        const adsets = await byIds(adsetIds, "optimization_goal,attribution_spec", token);
+        const ads = rows.map((r: any) => {
+          const set = adsets.out[String(r.adset_id)] || {};
+          return { ad_id: String(r.ad_id), ad_name: r.ad_name, campaign_name: r.campaign_name, adset_name: r.adset_name, objective: r.objective || null,
+            optimization_goal: set.optimization_goal || r.optimization_goal || null,
+            attribution: Array.isArray(set.attribution_spec) ? set.attribution_spec.map((a: any) => `${a.event_type} ${a.window_days}일`).join(", ") : null,
+            current: adMetrics(r), previous: prevById[String(r.ad_id)] || null };
+        });
+        const plan = planBatches(ads, cfg);
+        const creativeFields = "creative.thumbnail_width(800).thumbnail_height(800){title,body,call_to_action_type,object_type,image_url,thumbnail_url,video_id,link_url,object_story_spec,asset_feed_spec}";
+        let cr = await byIds(plan.analyzed.map((a: any) => a.ad_id), creativeFields, token);
+        if (cr.failed.length === plan.analyzed.length) cr = await byIds(plan.analyzed.map((a: any) => a.ad_id), creativeFields.replace(".thumbnail_width(800).thumbnail_height(800)", ""), token);
+        for (const a of plan.analyzed) a.creative = extractCreative(cr.out[a.ad_id]?.creative);
+        const replanned = planBatches(plan.analyzed, cfg); // 소재 이미지 수를 반영해 이미지 예산 다시 배분
+
+        const notes: string[] = [];
+        if (timezone && timezone !== "Asia/Seoul") notes.push(`Meta 광고계정 시간대 ${timezone} — Cafe24(한국 시간)와 하루 경계가 달라요`);
+        if (!timezone) notes.push("Meta 광고계정 시간대를 확인하지 못했어요");
+        if (cur.truncated) notes.push("Meta 광고 행이 조회 상한을 넘어 일부가 빠졌어요 — 전체 분석이 아니에요");
+        if (!prev.ok) notes.push("그 전주 Meta 성과를 불러오지 못해 전주 비교가 없어요");
+        if (cr.failed.length) notes.push(`소재를 불러오지 못한 광고 ${cr.failed.length}개 — 지표만 분석`);
+        notes.push("귀속: 광고 세트 귀속 설정 기준(use_unified_attribution_setting). 최근 날짜의 구매는 귀속 지연으로 늘어날 수 있어요");
+        notes.push("상세페이지 내용은 가져오지 않았어요 — 페이지 수정안은 제공하지 않아요");
+
+        const sales = { current: salesBlock(body?.sales?.current), previous: salesBlock(body?.sales?.previous) };
+        const fx = num(body?.fx_krw_per_unit);
+        snap = {
+          period: { current: weeks.current, previous: weeks.previous, timezone_meta: timezone, timezone_cafe24: "Asia/Seoul", currency },
+          ads: replanned.analyzed, skipped: replanned.skipped.concat(plan.skipped), notes, sales, fx,
+          counts: { total: rows.length, analyzed: replanned.analyzed.length, skipped: plan.skipped.length },
+        };
+        batches = replanned.batches;
+      }
+
+      // ---- AI 묶음 처리(시간 예산 안에서) — 이어서 하기는 실패 · 남은 묶음만 ----
+      const adsById: Record<string, any> = {};
+      for (const a of snap.ads) adsById[a.ad_id] = a;
+      const peers = peerGroups(snap.ads);
+      const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency };
+      const results: Record<string, any> = { ...(row?.result?.ads_by_id || {}) };
+      const usage = { ...(row?.usage || {}) } as any;
+      usage.calls = usage.calls || 0; usage.input_tokens = usage.input_tokens || 0; usage.output_tokens = usage.output_tokens || 0; usage.images = usage.images || 0;
+      let cost = Number(row?.cost_usd || 0), retried = false;
+      for (const b of batches) {
+        if (b.status === "done") continue;
+        if (b.status === "failed") retried = true;
+        if (Date.now() - started > cfg.timeBudgetMs - 45000) { b.status = "pending"; continue; }
+        const images: Record<string, any[]> = {};
+        for (const id of b.ad_ids) {
+          images[id] = [];
+          for (const im of adsById[id].imagePlan || []) {
+            const got = await downloadImage(im.url);
+            im.sent = !!got;
+            if (got) images[id].push({ ...got, label: im.label });
+          }
+        }
+        const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images));
+        usage.calls++;
+        if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
+        usage.images += Object.values(images).reduce((t, l) => t + l.length, 0);
+        const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, b, adsById, peers) : null;
+        const missing = b.ad_ids.filter((id: string) => !parsed || !parsed[id]);
+        if (parsed) Object.assign(results, parsed);
+        b.status = !parsed || missing.length === b.ad_ids.length ? "failed" : "done";
+        b.missing = missing;
+      }
+
+      const done = batches.filter((b: any) => b.status === "done").length;
+      const status = done === batches.length ? "completed" : done ? "partial" : "failed";
+      for (const a of snap.ads) a.scope = scopeOf(a);
+      const cur = totals(snap.ads, "current"), prv = totals(snap.ads.filter((a: any) => a.previous), "previous");
+      const spendKrw = (v: number | null) => (v == null || !snap.fx ? (snap.period.currency === "KRW" ? v : null) : Math.round(v * snap.fx));
+      const profit = (s: any, spend: number | null) => (s && s.margin_total_krw != null && spendKrw(spend) != null ? s.margin_total_krw - (spendKrw(spend) as number) : null);
+      const result = {
+        snapshot: snap, ads_by_id: results,
+        summary: {
+          cafe24: snap.sales, meta: { current: cur, previous: prv, currency: snap.period.currency, fx_krw_per_unit: snap.fx },
+          expected_profit: { current: profit(snap.sales.current, cur.spend), previous: profit(snap.sales.previous, prv.spend),
+            partial: !!(snap.sales.current?.partial || snap.sales.previous?.partial) },
+          note: "Meta 귀속 구매값은 Cafe24 실제 매출과 다른 값이에요. 예상 이익은 입력한 상품 비용 기준이에요.",
+        },
+        priorities: priorities(results, adsById),
+        ads: snap.ads.map((a: any) => ({ ad_id: a.ad_id, ad_name: a.ad_name, campaign_name: a.campaign_name, scope: a.scope,
+          current: a.current, previous: a.previous, new_ad: !a.previous, analysis: results[a.ad_id] || null,
+          creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, notes: a.creative?.notes } })),
+        coverage: { total: snap.counts.total, analyzed: Object.keys(results).length, requested: snap.counts.analyzed,
+          skipped: snap.skipped, failed_ads: batches.flatMap((b: any) => b.status === "done" ? b.missing || [] : b.ad_ids) },
+        notes: snap.notes, model: cfg.model,
+      };
+      return await finish({ status, batches, result, usage, cost_usd: Math.round(cost * 10000) / 10000,
+        retry_count: (row?.retry_count || 0) + (retried ? 1 : 0), period: snap.period,
+        error: status === "failed" ? "AI 분석에 실패했어요. 이용 횟수는 차감되지 않았어요." : null });
+    } catch (e) {
+      console.error("ai-weekly-review error:", e instanceof Error ? e.message : e);
+      return await finish({ status: row?.status === "partial" ? "partial" : "failed", error: "점검 중 오류가 발생했어요. 이용 횟수는 차감되지 않았어요." });
+    }
+  }),
+};
+
