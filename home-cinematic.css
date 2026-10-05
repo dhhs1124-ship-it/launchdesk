@@ -194,3 +194,36 @@ body.home-view .menu-btn span { background:#f5f5f5; }
   #view-home .desk-status-list { grid-template-columns:1fr; }
   #view-home .desk-status { padding:18px; }
 }
+
+/* 2026-10 역할 정리 — 홈 간소화. 아이콘 카드·운영 현황 카드를 뺀 뒤의 배치:
+   지금 할 일 → 소개(히어로) → 진행 상황 → 함께 쓰는 곳·도움 → (접힌) 상황 선택. */
+#view-home .desk-aside { order:4; }
+#view-home .desk-tool { min-height:96px; }
+#view-home .desk-situation { order:5; padding:0; }
+#view-home .desk-sit-summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:18px 20px; cursor:pointer; list-style:none; }
+#view-home .desk-sit-summary::-webkit-details-marker { display:none; }
+#view-home .desk-sit-summary::after { content:"펼치기"; flex:none; font-size:12px; font-weight:700; color:#ffb888; }
+#view-home .desk-situation[open] .desk-sit-summary::after { content:"접기"; }
+#view-home .desk-sit-summary b { display:block; color:#f8f8f8; font-size:16px; }
+#view-home .desk-sit-summary small { display:block; margin-top:2px; color:#c0c2c2; font-size:12px; }
+#view-home .desk-sit-summary:focus-visible { outline:2px solid #ff8a4b; outline-offset:-2px; border-radius:12px; }
+#view-home .desk-situation > :not(summary) { margin-left:20px; margin-right:20px; }
+#view-home .desk-situation .desk-sit-grid { margin-top:0; }
+#view-home .desk-situation .desk-rec { margin-top:14px; margin-bottom:18px; }
+#view-home .desk-situation .desk-decide { grid-column:auto; margin-bottom:20px; }
+#view-home .desk-decide:not(:has(.desk-decide-row)) { display:none; }
+@media (min-width:1600px) {
+  #view-home .desk-aside { grid-row:3; }
+  #view-home .desk-situation { grid-row:4; }
+}
+@media (max-width:640px) {
+  #view-home .desk-sit-summary { padding:16px 18px; }
+  #view-home .desk-situation > :not(summary) { margin-left:16px; margin-right:16px; }
+}
+/* 처음 방문(저장된 진행 기록 없음)일 때만 보이는 STEP 00 안내 링크 */
+#view-home .desk-today-intro { display:inline-block; margin-top:12px; color:#ffb888; font-size:12px; font-weight:700; text-decoration:underline; text-underline-offset:3px; }
+#view-home .desk-today-intro[hidden] { display:none; }
+@media (max-width:1599px) and (min-width:801px) {
+  #view-home .desk-today { grid-template-areas:"heading action" "description action" "intro action"; }
+  #view-home .desk-today-intro { grid-area:intro; justify-self:start; margin-top:6px; }
+}

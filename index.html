@@ -521,14 +521,17 @@
                피그마 Make 시안의 홈을 정적 마크업으로 옮긴 것. 상황 선택(A~D)은
                진짜 radio + label이고, 선택 결과는 desk.js가 #deskRec/#deskDecideList에
                createElement로 그린다(저장 없음). 링크는 전부 app.js BUILT에 이미 있는
-               해시 라우트만 쓴다. 이 블록 아래에는 운영 현황 안내 카드가 이어진다. -->
+               해시 라우트만 쓴다. -->
           <div class="desk" id="deskRoot">
             <div class="desk-rail">
               <a class="desk-brand" href="#/" aria-label="LaunchDesk 홈"><b>Launch<span>Desk</span></b><small>처음 시작하는<br>의류 쇼핑몰 가이드</small></a>
               <section class="desk-today" aria-labelledby="deskTodayTitle">
                 <div class="desk-today-head"><h2 id="deskTodayTitle">지금 할 일</h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8M8 2v4m8-4v4M5 5h14v16H5zM8 11l2 2 4-4M8 17h8"/></svg></div>
-                <p>쇼핑몰의 다음 단계를 진행해보세요.</p>
+                <!-- 문구·버튼은 app.js recomputeProgress()가 저장된 진행 기록으로만 바꾼다.
+                     기록이 없으면 "처음 방문" 문구와 STEP 00 안내 링크, 있으면 다음 STEP으로 이어가기. -->
+                <p id="deskTodayDesc">처음이라면 STEP 01부터 시작하면 돼요.</p>
                 <a class="desk-hero-cta" id="deskNextLink" href="#/start/prepare"><span id="deskNextText">STEP 01 시작하기</span><span aria-hidden="true">→</span></a>
+                <a class="desk-today-intro" id="deskIntroLink" href="#/start/intro">전체 흐름 먼저 보기 (STEP 00)</a>
               </section>
               <section class="desk-status" aria-labelledby="deskStatusTitle">
                 <div class="desk-status-head"><span>진행 상황</span><a href="#/start">전체 단계 보기 →</a></div>
@@ -559,57 +562,21 @@
                 <div class="desk-hero-text">
                   <p class="desk-eyebrow">처음 시작하는 의류 쇼핑몰</p>
                   <h1 id="deskHeroTitle">내 의류 쇼핑몰,<br>어디까지 왔나요?</h1>
-                  <p class="desk-hero-lead">방향 정하기부터 동대문 사입, 촬영, 첫 판매까지. 의류 쇼핑몰 준비를 순서대로 따라가세요.</p>
-                  <a class="desk-hero-cta" href="#/start">쇼핑몰 준비 살펴보기 <span aria-hidden="true">→</span></a>
+                  <p class="desk-hero-lead">처음 의류 쇼핑몰을 여는 분께 무엇부터 할지 7단계로 안내해요. 단계마다 할 일을 체크하며 첫 판매까지 준비하세요.</p>
+                  <a class="desk-hero-cta" href="#/start">전체 준비 순서 보기 <span aria-hidden="true">→</span></a>
                   <a class="desk-hero-signup" href="#/login" data-auth-mode="signup">무료 계정 만들고 진행 상황 저장하기 →</a>
                 </div>
                 <div class="desk-hero-visual" aria-hidden="true"></div>
               </section>
 
-            <!-- 실제 STEP 01~04의 빠른 진입점. STEP 05~08 및 저장된 진행 상태는
-                 전체 로드맵 링크와 상단의 실제 다음 단계 버튼으로 이어진다. -->
-            <section class="desk-panel desk-roadmap" aria-labelledby="deskRoadmapTitle">
-              <div class="desk-panel-head">
-                <div>
-                  <h2 id="deskRoadmapTitle">쇼핑몰 준비 순서</h2>
-                  <p class="desk-sub">처음 네 단계를 빠르게 살펴보세요. 나머지는 전체 로드맵에서 이어집니다.</p>
-                </div>
-                <a class="desk-link" href="#/start">전체 로드맵 보기 <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a>
-              </div>
-              <div class="desk-steps">
-                <a class="desk-step" href="#/start/prepare">
-                  <span class="desk-step-num">01</span>
-                  <span class="desk-step-icon desk-custom-icon desk-icon-product" aria-hidden="true"></span>
-                  <span class="desk-step-text"><b>방향 정하기</b><small>상품 · 고객 · 예산</small></span>
-                  <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
-                </a>
-                <a class="desk-step" href="#/start/setup">
-                  <span class="desk-step-num">02</span>
-                  <span class="desk-step-icon desk-custom-icon desk-icon-store" aria-hidden="true"></span>
-                  <span class="desk-step-text"><b>사업자·쇼핑몰 설정</b><small>사업자 등록 · 플랫폼 · 결제 환경</small></span>
-                  <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
-                </a>
-                <a class="desk-step" href="#/start/sourcing">
-                  <span class="desk-step-num">03</span>
-                  <span class="desk-step-icon desk-custom-icon desk-icon-parcel" aria-hidden="true"></span>
-                  <span class="desk-step-text"><b>상품과 가격 준비</b><small>공급처 · 원가 · 판매가</small></span>
-                  <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
-                </a>
-                <a class="desk-step" href="#/start/content">
-                  <span class="desk-step-num">04</span>
-                  <span class="desk-step-icon desk-custom-icon desk-icon-detail" aria-hidden="true"></span>
-                  <span class="desk-step-text"><b>상세페이지 만들기</b><small>이미지 · 설명 · 상품 등록</small></span>
-                  <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
-                </a>
-              </div>
-              <p class="desk-note"><svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/><line x1="7" y1="5" x2="7" y2="9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="7" cy="3.5" r="0.6" fill="currentColor"/></svg>이 카드는 시작 지점만 보여줘요. 실제 진행 상태는 로그인 후 STEP 01~07에서 저장됩니다.</p>
-            </section>
-
-            <!-- 실제 도구 연결과 선택 상황별 확인 항목. 데스크톱에서는 카드 행,
-                 좁은 화면에서는 세로로 배치하며 DOM은 한 벌만 둔다. -->
+            <!-- 2026-10 역할 정리: 홈은 "무엇을 돕는지 + 시작/이어서 하기"만 앞에 둔다.
+                 STEP 01~04 아이콘 카드(위 진행 목록과 중복)는 뺐다. 마진 계산기 카드와
+                 아래 운영 현황 안내 카드는 LaunchROAS 공개 전까지 유지한다. 상황 선택은 필요한 사람만 펼치도록 <details>로
+                 접었고, desk.js가 쓰는 #deskSituation/#deskRec/#deskDecideList/#deskDecideTag
+                 id는 그대로다. -->
             <aside class="desk-aside">
               <section class="desk-panel desk-tools" aria-labelledby="deskToolsTitle">
-                <h3 id="deskToolsTitle">준비에 필요한 도구</h3>
+                <h3 id="deskToolsTitle">준비하면서 함께 쓰는 곳</h3>
                 <div class="desk-tool-list">
                   <a class="desk-tool" href="#/tools" data-tools-target="calc">
                     <span class="desk-tool-icon desk-custom-icon desk-icon-calculator" aria-hidden="true"></span>
@@ -628,25 +595,14 @@
                   </a>
                 </div>
               </section>
-              <section class="desk-panel desk-decide" aria-labelledby="deskDecideTitle">
-                <div class="desk-panel-head">
-                  <h3 id="deskDecideTitle">이번 단계에서 정할 것</h3>
-                  <span class="desk-tag" id="deskDecideTag" hidden></span>
-                </div>
-                <div class="desk-decide-list" id="deskDecideList" aria-live="polite">
-                  <p class="desk-rec-hint">상황을 선택하면 확인할 항목이 보여요.</p>
-                </div>
-              </section>
               <section class="desk-help" aria-labelledby="deskHelpTitle">
                 <h3 id="deskHelpTitle">혼자 하다 막혔나요?</h3>
                 <p>필요한 설정만 도움받을 수 있어요.</p>
                 <a class="desk-help-btn" href="#/services/setup">세팅 도움받기 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a>
-                <p class="desk-help-foot">막막할 때,<br>함께 고민해요.</p>
               </section>
             </aside>
-            <section class="desk-panel desk-situation" aria-labelledby="deskSitTitle">
-              <h2 id="deskSitTitle">지금 어디까지 준비하셨나요?</h2>
-              <p class="desk-sub">가장 가까운 상황을 고르면 시작할 곳을 알려드려요.</p>
+            <details class="desk-panel desk-situation">
+              <summary class="desk-sit-summary"><span><b id="deskSitTitle">어디서 시작할지 모르겠다면</b><small>지금 상황을 고르면 시작할 STEP을 알려드려요.</small></span></summary>
               <fieldset class="desk-sit-grid" id="deskSituation">
                 <legend class="sr-only">현재 준비 상황</legend>
                 <input type="radio" class="sr-only desk-sit-input" name="deskSituation" id="deskSitA" value="A">
@@ -661,7 +617,14 @@
               <div class="desk-rec" id="deskRec" aria-live="polite">
                 <p class="desk-rec-hint">상황을 선택하면 시작할 곳을 안내해드려요.</p>
               </div>
-            </section>
+              <div class="desk-decide" aria-labelledby="deskDecideTitle">
+                <div class="desk-panel-head">
+                  <h3 id="deskDecideTitle">이번 단계에서 정할 것</h3>
+                  <span class="desk-tag" id="deskDecideTag" hidden></span>
+                </div>
+                <div class="desk-decide-list" id="deskDecideList" aria-live="polite"></div>
+              </div>
+            </details>
             </div><!-- desk-stage -->
           </div>
 
@@ -986,7 +949,6 @@
           <!-- 완료 집계는 기존 STEP 01~07만 사용한다. 체크 항목과 다음 단계는
                app.js가 저장된 진행 상태와 아래 기존 카드 내용에서 채운다. -->
           <div class="start-status" id="startStatus">
-            <div class="start-status-art"><img src="assets/start-checklist.png" alt="" loading="lazy"></div>
             <div class="start-status-text">
               <p class="start-status-label">지금 할 일</p>
               <h2 class="start-status-next" id="startStatusNext">STEP 01 · 무엇을, 누구에게 팔지 정하기</h2>
@@ -1004,11 +966,11 @@
             </div>
           </div>
 
-          <div class="start-grid-head"><div><span>STEP BY STEP</span><h2>쇼핑몰 준비, 이렇게 진행해요</h2><p>00은 사용법 안내, 01~07은 실제 준비 단계, 08은 운영 시작 안내예요.</p></div></div>
+          <div class="start-grid-head"><div><span>STEP BY STEP</span><h2>전체 단계</h2><p>00은 사용법 안내, 01~07은 실제 준비 단계, 08은 운영 시작 안내예요. 단계를 누르면 할 일이 펼쳐져요.</p></div></div>
           <div class="card-grid" id="chapterGrid">
             <div class="guide-card" data-chapter="/start/intro" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">00</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">00</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>오픈 로드맵 확인하기</h2><p>상품 · 사업자등록 · 쇼핑몰 중 무엇부터 시작할지 순서를 먼저 정합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1019,7 +981,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/prepare" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">01</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">01</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>방향 정하기</h2><p>상품과 타겟 고객의 방향을 먼저 정하면 이후 판단이 훨씬 쉬워집니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1030,7 +992,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/setup" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">02</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">02</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>사업자·쇼핑몰 설정</h2><p>사업자 · 쇼핑몰 · 결제 환경을 실제 거래 가능한 상태로 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1041,7 +1003,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/sourcing" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">03</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">03</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>상품과 가격 준비</h2><p>어디서 공급받고 얼마에 들여와 얼마에 팔지 계산해 판매를 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1052,7 +1014,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/content" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">04</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">04</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>상세페이지 만들기</h2><p>이미지와 설명만으로 상품의 특징과 차이를 이해할 수 있게 만듭니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1063,7 +1025,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/orders" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">05</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">05</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>배송·오픈 준비</h2><p>주문을 실제로 처리할 수 있는 배송 · CS 체계를 갖춰 오픈을 마무리합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1074,7 +1036,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/marketing-setup" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">06</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">06</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>마케팅 준비</h2><p>광고를 시작하기 전에 유입과 구매를 추적할 수 있는 환경부터 준비합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1085,7 +1047,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/marketing" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">07</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">07</div><div class="cc-badges"><span class="cc-status" hidden></span><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>첫 유입 만들기</h2><p>최소 하나의 방법으로 실제 방문자를 만들어보고 반응을 확인합니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1096,7 +1058,7 @@
             </div>
             <div class="guide-card" data-chapter="/start/wrapup" data-tier="free">
               <button class="gc-head" type="button">
-                <div class="cc-top"><div class="cc-num">08</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><span class="cc-badge free">무료</span></div></div>
+                <div class="cc-top"><div class="cc-num">08</div><div class="cc-badges"><span class="cc-check" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div></div>
                 <h2>운영 시작하기</h2><p>오픈은 끝이 아니라 운영의 시작입니다. 상품 · 주문 · 광고 · 고객 반응을 확인하며 개선해갑니다.</p>
                 <svg class="gc-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </button>
@@ -1114,7 +1076,7 @@
           </div>
 
           <div class="sub-banner" id="subBanner">
-            <div><div class="sb-title">이 가이드는 처음부터 끝까지 무료로 따라할 수 있어요</div><div class="sb-desc">직접 따라하면 되고, 기술 설정이 막히면 세팅대행을 이용할 수 있어요.</div></div>
+            <div><div class="sb-title">이 가이드는 처음부터 끝까지 무료로 따라할 수 있어요</div><div class="sb-desc">가이드 · 로드맵 · 자료실은 무료예요. 기술 설정이 막히면 별도 유료인 세팅 대행을 이용할 수 있어요.</div></div>
             <a class="btn btn-primary" href="#/services/setup">세팅 대행 알아보기 →</a>
           </div>
 
@@ -1152,11 +1114,15 @@
             <div class="s0-main">
               <section class="s0-card s0-about" aria-labelledby="s0AboutTitle">
                 <h2 id="s0AboutTitle" class="s0-section-title">이 로드맵에 대하여</h2>
+                <p class="s0-section-lead">실제 의류 쇼핑몰 운영 경험을 바탕으로 정리한 참고용 순서예요. 제도·정책은 바뀔 수 있고, 매출이나 기간을 보장하지 않아요.</p>
+                <details class="ld-more">
+                <summary>자세히 보기</summary>
                 <ul class="s0-about-list">
                   <li><b>실제 경험을 바탕으로 정리했어요.</b> 의류 쇼핑몰을 직접 준비하고 운영하며 겪은 시행착오와 순서를 바탕으로 만든 가이드예요. 특정 플랫폼·광고 채널·운영 방식이 모든 쇼핑몰에 똑같이 맞는 정답은 아니에요.</li>
                   <li><b>제도와 정책은 계속 바뀔 수 있어요.</b> 사업자등록·세금·통신판매업 신고·표시광고, 플랫폼 정책 같은 내용은 시점과 상황에 따라 달라질 수 있으니, 실제로 진행할 때는 관련 기관이나 전문가를 통해 한 번 더 확인하세요.</li>
                   <li><b>비용·성과·기간을 보장하지 않아요.</b> 이 순서를 따른다고 특정 매출이나 기간이 보장되지는 않아요. 안내에 담긴 개인적인 경험이나 사례는 참고용이며, 공식 정책과는 구분해서 봐주세요.</li>
                 </ul>
+                </details>
               </section>
 
               <section class="s0-card s0-think" aria-labelledby="s0ThinkTitle">
@@ -1294,7 +1260,7 @@
               <div class="tab-panel s1-panel s1-panel-guide active" data-tab="guide">
                 <div class="s1-guide-intro">
                   <h2>먼저 방향을 정하는 기준을 살펴보세요.</h2>
-                  <p><strong>사업자 등록이나 공급처를 정하기보다 먼저, 내가 가진 예산과 목표에 맞는 방향을 정합니다.</strong> 방향이 흔들리면 상품도, 가격도, 마케팅도 함께 흔들립니다. 의류 쇼핑몰은 누구에게 팔지가 정해져야 어떤 옷을 고를지, 어떤 분위기로 찍을지, 어떤 말투로 알릴지가 함께 정해집니다.</p>
+                  <p><strong>사업자 등록이나 공급처를 정하기보다 먼저, 내가 가진 예산과 목표에 맞는 방향을 정합니다.</strong> 누구에게 팔지가 정해져야 어떤 옷을 고를지, 어떤 분위기로 찍을지, 어떤 말투로 알릴지가 정해집니다.</p>
                 </div>
 
                 <ol class="s1-sections">
@@ -1329,7 +1295,18 @@
                     <span class="s1-num">03</span>
                     <div class="s1-section-body">
                       <h3>초기 예산 — 얼마가 필요한가</h3>
-                      <p class="s1-summary">완전한 무자본 창업은 현실적으로 어렵습니다. 처음부터 브랜드처럼 시작할지(사무실 · 모델 · 스튜디오 · 광고), 직접 촬영하는 생존형으로 시작할지에 따라 필요한 금액이 크게 달라집니다. 특정 금액을 정답으로 두기보다 아래 항목별로 가늠해보세요. 초기 비용은 결국 시간이나 돈 중 하나로 반드시 치르게 됩니다.</p>
+                      <p class="s1-summary">완전한 무자본 창업은 현실적으로 어렵습니다. 어떻게 시작하느냐에 따라 필요한 금액이 크게 달라져요.</p>
+                      <div class="ld-table-wrap">
+                        <table class="ld-table ld-table-stack">
+                          <caption class="sr-only">시작 방식별 초기 비용 비교</caption>
+                          <thead><tr><th scope="col">시작 방식</th><th scope="col">주로 드는 비용</th><th scope="col">특징</th></tr></thead>
+                          <tbody>
+                            <tr><th scope="row">브랜드형</th><td data-label="주로 드는 비용">사무실 · 모델 · 스튜디오 · 광고</td><td data-label="특징">처음부터 브랜드처럼 보이지만 초기 금액이 커요</td></tr>
+                            <tr><th scope="row">생존형</th><td data-label="주로 드는 비용">직접 촬영 · 최소 구성</td><td data-label="특징">비용을 줄이는 대신 직접 들이는 시간이 늘어요</td></tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <p class="ld-label">항목별로 가늠할 예산</p>
                       <dl class="s1-budget">
                         <div><dt>상품 · 샘플</dt><dd>샘플 사입(첫 거래는 대부분 직접 구매), 초도 물량</dd></div>
                         <div><dt>쇼핑몰 · 도메인</dt><dd>플랫폼 이용료, 도메인, 테마 비용</dd></div>
@@ -1338,6 +1315,7 @@
                         <div><dt>광고 · 고정비</dt><dd>초기 테스트 광고비, 보정 프로그램 · 리뷰 연동 같은 매달 나가는 비용</dd></div>
                         <div><dt>예비비</dt><dd>예상하지 못한 지출 대비</dd></div>
                       </dl>
+                      <p class="s1-note">특정 금액을 정답으로 두기보다 항목별로 가늠해보세요. 초기 비용은 결국 시간이나 돈 중 하나로 치르게 됩니다.</p>
                     </div>
                   </li>
                   <li class="s1-section">
@@ -1574,7 +1552,7 @@
               <div class="tab-panel s2-panel s2-panel-guide active" data-tab="guide">
                 <div class="s2-guide-intro">
                   <h2>먼저 판매 가능한 환경을 준비해요.</h2>
-                  <p><strong>대부분 한 번은 거쳐야 하는 절차지만, 순서를 미리 알아두면 실수 없이 빠르게 끝낼 수 있습니다.</strong> 사업자 등록, 통신판매업 신고(필요한 경우), 쇼핑몰 플랫폼 개설 — 이 세 가지가 가장 먼저입니다.</p>
+                  <p>사업자 등록 → 통신판매업 신고(필요한 경우) → 쇼핑몰 플랫폼 개설 순서로 먼저 끝내요.</p>
                 </div>
 
                 <ol class="s2-sections">
@@ -1582,19 +1560,35 @@
                     <span class="s2-num">01</span>
                     <div class="s2-section-body">
                       <h3>사업자등록과 통신판매업 신고</h3>
-                      <div class="s2-cards">
-                        <div class="s2-card-item">
-                          <p class="s2-card-title">개인사업자 등록 <span class="s2-tag">홈택스</span></p>
-                          <p>민원 신청 → 사업자등록 신청. 취급하는 상품과 실제 사업 형태에 맞는 업종 · 업태를 확인하고, 대표자 정보 · 사업장 주소를 입력해 등록증을 PDF로 저장해 둡니다.</p>
+                      <p class="ld-label">준비물</p>
+                      <ul class="s2-checks">
+                        <li>대표자 정보와 사업장 주소</li>
+                        <li>취급할 상품에 맞는 업종 · 업태</li>
+                        <li>통신판매업 신고용: 사업자등록증 · 사업장 주소 확인서류</li>
+                      </ul>
+                      <p class="ld-label">진행 순서</p>
+                      <ol class="ld-flow">
+                        <li><b>홈택스에서 사업자등록 신청</b><span>민원 신청 → 사업자등록 신청</span></li>
+                        <li><b>사업자등록증 PDF 저장</b><span>통신판매업 신고와 쇼핑몰 기본정보에 다시 써요</span></li>
+                        <li><b>통신판매업 신고 대상인지 확인</b><span>정부24 · 관할 구청</span></li>
+                        <li><b>정부24에서 통신판매업 신고</b><span>필요한 경우만 · 신고번호는 쇼핑몰 기본정보에 입력</span></li>
+                      </ol>
+                      <details class="ld-more">
+                        <summary>자세히 보기</summary>
+                        <div class="s2-cards">
+                          <div class="s2-card-item">
+                            <p class="s2-card-title">개인사업자 등록 <span class="s2-tag">홈택스</span></p>
+                            <p>민원 신청 → 사업자등록 신청. 취급하는 상품과 실제 사업 형태에 맞는 업종 · 업태를 확인하고, 대표자 정보 · 사업장 주소를 입력해 등록증을 PDF로 저장해 둡니다.</p>
+                          </div>
+                          <div class="s2-card-item">
+                            <p class="s2-card-title">통신판매업 신고 <span class="s2-tag">정부24</span></p>
+                            <p>온라인으로 상품을 판매하면 신고 대상이 되는 경우가 많습니다. 필요서류는 사업자등록증 · 사업장 주소 확인서류이며, 신고 대상인지 · 면제 요건에 해당하는지는 정부24 · 관할 구청에서 확인하세요.</p>
+                          </div>
                         </div>
-                        <div class="s2-card-item">
-                          <p class="s2-card-title">통신판매업 신고 <span class="s2-tag">정부24</span></p>
-                          <p>온라인으로 상품을 판매하면 신고 대상이 되는 경우가 많습니다. 필요서류는 사업자등록증 · 사업장 주소 확인서류이며, 신고 대상인지 · 면제 요건에 해당하는지는 정부24 · 관할 구청에서 확인하세요.</p>
-                        </div>
-                      </div>
+                      </details>
                       <div class="s2-warn">
                         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
-                        <p>업종코드 · 신고 대상 여부는 사업 형태에 따라 달라질 수 있습니다. 정확한 판단은 국세청 · 정부24 · 관할 기관이나 세무사 등 전문가 확인을 거치는 걸 권장합니다.</p>
+                        <p>업종코드 · 신고 대상 여부는 사업 형태에 따라 달라요. 국세청 · 정부24 · 관할 기관이나 세무사에게 확인하세요.</p>
                       </div>
                     </div>
                   </li>
@@ -1603,31 +1597,26 @@
                     <span class="s2-num">02</span>
                     <div class="s2-section-body">
                       <h3>쇼핑몰 플랫폼 선택</h3>
-                      <p class="s2-summary">쇼핑몰 플랫폼은 크게 <strong>오픈마켓 입점형</strong>(스마트스토어 · 쿠팡 등)과 <strong>자사몰 구축형</strong>(카페24 · 고도몰 · 식스샵 등)으로 나뉩니다. 두 방식의 차이를 살펴보고 STEP 01에서 정한 방향에 맞는 쪽을 고르면 됩니다 — 정답은 없습니다.</p>
-                      <div class="s2-compare">
-                        <div class="s2-compare-card">
-                          <small>진입 장벽 낮음 · 예시</small>
-                          <h4>오픈마켓형</h4>
-                          <p class="s2-compare-ex">예: 스마트스토어 · 쿠팡</p>
-                          <ul>
-                            <li class="good">진입장벽이 낮고 플랫폼의 기존 트래픽을 바로 활용할 수 있음</li>
-                            <li class="limit">가격 경쟁 · 노출 알고리즘에 좌우되기 쉬움</li>
-                            <li class="limit">픽셀 설치 · 행동 추적 · 자동화가 제한적인 경우가 많음</li>
-                          </ul>
-                        </div>
-                        <div class="s2-compare-card">
-                          <small>브랜드 구축형 · 예시</small>
-                          <h4>자사몰형</h4>
-                          <p class="s2-compare-ex">예: 카페24 · 고도몰 · 식스샵</p>
-                          <ul>
-                            <li class="good">디자인 · 기능 · 구조를 자유롭게 커스터마이징할 수 있음</li>
-                            <li class="good">GA · 메타 픽셀 등 분석 툴을 자유롭게 삽입할 수 있음</li>
-                            <li class="good">도메인 직접 연결로 브랜드 정체성을 강조할 수 있음</li>
-                            <li class="limit">초기 트래픽은 직접 만들어야 함</li>
-                          </ul>
-                        </div>
+                      <p class="s2-summary">STEP 01에서 정한 방향에 맞는 쪽을 고르세요. 정답은 없어요.</p>
+                      <div class="ld-table-wrap">
+                        <table class="ld-table">
+                          <caption class="sr-only">오픈마켓형과 자사몰형 비교(예시)</caption>
+                          <thead><tr><th scope="col">비교</th><th scope="col">오픈마켓형</th><th scope="col">자사몰형</th></tr></thead>
+                          <tbody>
+                            <tr><th scope="row">예시</th><td>스마트스토어 · 쿠팡</td><td>카페24 · 고도몰 · 식스샵</td></tr>
+                            <tr><th scope="row">시작</th><td class="good">진입장벽이 낮음</td><td>쇼핑몰을 직접 구축</td></tr>
+                            <tr><th scope="row">첫 방문자</th><td class="good">플랫폼 트래픽 활용</td><td class="limit">직접 만들어야 함</td></tr>
+                            <tr><th scope="row">디자인 · 기능</th><td>플랫폼이 정한 틀 안에서</td><td class="good">자유롭게 꾸밀 수 있음</td></tr>
+                            <tr><th scope="row">분석 도구</th><td class="limit">픽셀 · 행동 추적이 제한적인 경우가 많음</td><td class="good">GA · 메타 픽셀 자유롭게 설치</td></tr>
+                            <tr><th scope="row">결제(PG)</th><td>플랫폼 결제 그대로 사용</td><td>PG 별도 신청 · 연동</td></tr>
+                            <tr><th scope="row">주의할 점</th><td class="limit">가격 경쟁 · 노출 알고리즘 영향</td><td>도메인 연결로 브랜드 강조 가능</td></tr>
+                          </tbody>
+                        </table>
                       </div>
-                      <p class="s2-note s2-center">위 비교는 한 예시입니다. 판매 방식과 목표에 따라 선택이 달라지며, 어떤 플랫폼을 고르든 이후 STEP은 동일하게 진행됩니다.</p>
+                      <details class="ld-more">
+                        <summary>자세히 보기</summary>
+                        <p class="s2-summary">쇼핑몰 플랫폼은 크게 <strong>오픈마켓 입점형</strong>(스마트스토어 · 쿠팡 등)과 <strong>자사몰 구축형</strong>(카페24 · 고도몰 · 식스샵 등)으로 나뉩니다. 위 비교는 한 예시입니다. 판매 방식과 목표에 따라 선택이 달라지며, 어떤 플랫폼을 고르든 이후 STEP은 동일하게 진행됩니다.</p>
+                      </details>
                     </div>
                   </li>
 
@@ -1654,7 +1643,10 @@
                         <div class="s2-row"><span class="s2-pill">자사몰형</span><p>대부분 별도로 PG를 신청 · 연동해야 합니다. 사용하는 플랫폼에서 지원하는 PG사 · 결제수단 목록을 확인하고 신청하세요.</p></div>
                         <div class="s2-row"><span class="s2-pill">오픈마켓형</span><p>플랫폼 자체 결제 시스템을 그대로 씁니다. 플랫폼에서 제공하는 결제 시스템의 설정 상태를 확인하세요.</p></div>
                       </div>
-                      <p class="s2-note">지원 결제수단 · 심사 기간 · 비용은 플랫폼과 PG사에 따라 달라지므로 현재 안내를 직접 확인해 비교하세요. 특정 PG사가 모든 사용자에게 정답은 아닙니다.</p>
+                      <details class="ld-more">
+                        <summary>자세히 보기</summary>
+                        <p class="s2-note">지원 결제수단 · 심사 기간 · 비용은 플랫폼과 PG사에 따라 달라지므로 현재 안내를 직접 확인해 비교하세요. 특정 PG사가 모든 사용자에게 정답은 아닙니다.</p>
+                      </details>
                     </div>
                   </li>
 
@@ -1662,17 +1654,21 @@
                     <span class="s2-num">05</span>
                     <div class="s2-section-body">
                       <h3>플랫폼 부가 기능</h3>
-                      <span class="s2-badge">카페24를 사용하는 경우의 참고 예시</span>
-                      <div class="s2-features">
-                        <div class="s2-feature"><div class="s2-feature-head"><b>리뷰 수집 · 관리</b><span>알파리뷰</span></div><p>리뷰 자동 수집 + 스태프 리뷰 기능. 1초 회원가입(네이버 · 카카오) 연동도 됩니다.</p></div>
-                        <div class="s2-feature"><div class="s2-feature-head"><b>회원가입과 로그인 편의</b><span>킵그로우</span></div><p>가입 전환율 최적화에 특화. "구매보다 회원가입을 먼저 올리고 싶다"면 적합합니다.</p></div>
-                        <div class="s2-feature"><div class="s2-feature-head"><b>실시간 상담과 자동응답</b><span>채널톡</span></div><p>실시간 상담 · 자동응답. 톤을 운영자 감도로 맞추면 전환율에 도움이 됩니다.</p></div>
-                      </div>
-                      <div class="s2-tip">
-                        <b>공통 팁</b>
-                        <p>전부 설치하기보다, 가장 필요한 1~2개부터 빠르게 테스트하고 데이터로 판단하세요. 다른 플랫폼을 쓴다면 비슷한 기능(리뷰 자동화 · 가입전환 최적화 · 실시간 상담)을 제공하는 자체 앱스토어 · 부가서비스를 찾아보세요.</p>
-                      </div>
-                      <p class="s2-note">앱의 제공 여부 · 가격 · 기능은 바뀔 수 있어요. 설치 전에 사용하는 플랫폼의 앱스토어에서 현재 정보를 다시 확인하세요.</p>
+                      <p class="s2-summary">선택 사항이에요. 필요한 1~2개만 나중에 추가해도 돼요.</p>
+                      <details class="ld-more">
+                        <summary>카페24 사용 시 참고 예시 보기</summary>
+                        <span class="s2-badge">카페24를 사용하는 경우의 참고 예시</span>
+                        <div class="s2-features">
+                          <div class="s2-feature"><div class="s2-feature-head"><b>리뷰 수집 · 관리</b><span>알파리뷰</span></div><p>리뷰 자동 수집 + 스태프 리뷰 기능. 1초 회원가입(네이버 · 카카오) 연동도 됩니다.</p></div>
+                          <div class="s2-feature"><div class="s2-feature-head"><b>회원가입과 로그인 편의</b><span>킵그로우</span></div><p>가입 전환율 최적화에 특화. "구매보다 회원가입을 먼저 올리고 싶다"면 적합합니다.</p></div>
+                          <div class="s2-feature"><div class="s2-feature-head"><b>실시간 상담과 자동응답</b><span>채널톡</span></div><p>실시간 상담 · 자동응답. 톤을 운영자 감도로 맞추면 전환율에 도움이 됩니다.</p></div>
+                        </div>
+                        <div class="s2-tip">
+                          <b>공통 팁</b>
+                          <p>전부 설치하기보다, 가장 필요한 1~2개부터 빠르게 테스트하고 데이터로 판단하세요. 다른 플랫폼을 쓴다면 비슷한 기능(리뷰 자동화 · 가입전환 최적화 · 실시간 상담)을 제공하는 자체 앱스토어 · 부가서비스를 찾아보세요.</p>
+                        </div>
+                        <p class="s2-note">앱의 제공 여부 · 가격 · 기능은 바뀔 수 있어요. 설치 전에 사용하는 플랫폼의 앱스토어에서 현재 정보를 다시 확인하세요.</p>
+                        </details>
                     </div>
                   </li>
 
@@ -1779,15 +1775,6 @@
                 <p class="s2-progress-foot s2-progress-member">로그인 상태 · 체크한 내용은 계정에 저장돼요.</p>
               </section>
 
-              <section class="s2-card s2-resources" aria-labelledby="s2ResTitle">
-                <h3 id="s2ResTitle">관련 자료</h3>
-                <ul class="s2-res-list">
-                  <li><a href="#/resources/domain-ssl-seo"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>도메인 · SEO 설정</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
-                  <li><a href="#/resources/business-pg-checklist"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>PG 신청</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
-                  <li><a href="#/resources" data-resource-cat="business"><span class="s2-link-icon"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-5-5Z"/><path d="M10 2v5h5"/><line x1="6" y1="10" x2="12" y2="10"/><line x1="6" y1="13" x2="10" y2="13"/></svg></span><span>사업자 · 플랫폼 자료</span><svg class="s2-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg></a></li>
-                </ul>
-              </section>
-
               <section class="desk-help s2-help" aria-labelledby="s2HelpTitle">
                 <h3 id="s2HelpTitle">도메인 · SSL · 기본 설정이 막혔나요?</h3>
                 <p>기본 쇼핑몰 세팅으로 필요한 설정만 도움받을 수 있어요.</p>
@@ -1856,13 +1843,13 @@
                     <div class="s6-section-body">
                       <h3>측정할 행동 먼저 정하기</h3>
                       <p class="s6-summary">아래 다섯 가지는 대표적으로 확인하는 행동입니다. 전부 수집해야 하는 것은 아니며, 지금 쇼핑몰에 필요한 항목부터 확인하세요.</p>
-                      <div class="s6-cards">
-                        <div class="s6-card-item"><p class="s6-card-title">상품 조회</p><p>고객이 상품 상세페이지를 확인했는지</p></div>
-                        <div class="s6-card-item"><p class="s6-card-title">장바구니</p><p>상품을 장바구니에 담았는지</p></div>
-                        <div class="s6-card-item"><p class="s6-card-title">결제 시작</p><p>결제 단계로 진입했는지</p></div>
-                        <div class="s6-card-item"><p class="s6-card-title">구매 완료</p><p>실제로 결제가 완료됐는지</p></div>
-                        <div class="s6-card-item"><p class="s6-card-title">문의</p><p>구매 전 질문 · 상담이 있었는지</p></div>
-                      </div>
+                      <ul class="s6-checks">
+                        <li><b>상품 조회</b> — 상품 상세페이지를 확인했는지</li>
+                        <li><b>장바구니</b> — 상품을 장바구니에 담았는지</li>
+                        <li><b>결제 시작</b> — 결제 단계로 진입했는지</li>
+                        <li><b>구매 완료</b> — 실제로 결제가 완료됐는지</li>
+                        <li><b>문의</b> — 구매 전 질문 · 상담이 있었는지</li>
+                      </ul>
                       <p class="s6-note">처음에는 "방문이 얼마나 있었는지"와 "구매까지 이어졌는지" 두 가지만 확인해도 충분합니다.</p>
                     </div>
                   </li>
@@ -1872,11 +1859,17 @@
                     <div class="s6-section-body">
                       <h3>기본 분석 도구 확인 <span class="s6-tag s6-tag-required">필수</span></h3>
                       <p class="s6-summary">모든 쇼핑몰에 공통으로 필요한 건 방문과 주요 행동을 확인할 수 있는 도구 최소 1개입니다. 아래 중 이미 쓰고 있는 게 있다면 그것으로 충분합니다.</p>
-                      <div class="s6-cards">
-                        <div class="s6-card-item"><p class="s6-card-title">GA4</p><p>방문 · 페이지 이동 · 주요 행동을 확인할 수 있습니다. 유일한 정답은 아닙니다.</p></div>
-                        <div class="s6-card-item"><p class="s6-card-title">쇼핑몰 플랫폼 기본 통계</p><p>카페24 등 플랫폼 자체 통계만으로도 충분히 시작할 수 있습니다.</p></div>
-                        <div class="s6-card-item"><p class="s6-card-title">주문 · 유입 분석 기능</p><p>판매 채널 · 오픈마켓이 기본 제공하는 유입 · 주문 통계도 해당합니다.</p></div>
-                        <div class="s6-card-item"><p class="s6-card-title">기타 분석 도구</p><p>이미 쓰고 있는 다른 분석 도구가 있다면 그것으로도 충분합니다.</p></div>
+                      <div class="ld-table-wrap">
+                        <table class="ld-table">
+                          <caption class="sr-only">기본 분석 도구 비교</caption>
+                          <thead><tr><th scope="col">도구</th><th scope="col">확인할 수 있는 것 · 참고</th></tr></thead>
+                          <tbody>
+                            <tr><th scope="row">GA4</th><td>방문 · 페이지 이동 · 주요 행동. 유일한 정답은 아니에요</td></tr>
+                            <tr><th scope="row">쇼핑몰 플랫폼 기본 통계</th><td>카페24 등 플랫폼 자체 통계만으로도 시작할 수 있어요</td></tr>
+                            <tr><th scope="row">주문 · 유입 분석 기능</th><td>판매 채널 · 오픈마켓이 기본 제공하는 유입 · 주문 통계</td></tr>
+                            <tr><th scope="row">기타 분석 도구</th><td>이미 쓰고 있다면 그것으로도 충분해요</td></tr>
+                          </tbody>
+                        </table>
                       </div>
                       <div class="s6-warn">
                         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5 1.5 14h13L8 1.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="12" r="0.65" fill="currentColor"/></svg>
@@ -1940,13 +1933,13 @@
                     <span class="s6-num">06</span>
                     <div class="s6-section-body">
                       <h3>테스트하기</h3>
-                      <p class="s6-summary">도구를 연결했다면 실제로 확인해보세요.</p>
-                      <ul class="s6-checks">
-                        <li>직접 사이트에 방문하기</li>
-                        <li>상품을 조회해보기</li>
-                        <li>장바구니에 담거나 테스트 구매해보기</li>
-                        <li>분석 도구에서 방금 한 행동이 이벤트로 잡히는지 확인하기</li>
-                      </ul>
+                      <p class="s6-summary">도구를 연결했다면 아래 순서로 직접 확인해보세요.</p>
+                      <ol class="ld-flow">
+                        <li><b>직접 사이트에 방문하기</b></li>
+                        <li><b>상품을 조회해보기</b></li>
+                        <li><b>장바구니에 담거나 테스트 구매해보기</b></li>
+                        <li><b>방금 한 행동이 분석 도구에 이벤트로 잡히는지 확인하기</b></li>
+                      </ol>
                       <p class="s6-note">광고 관리자에 표시되는 구매 수와 쇼핑몰 주문 데이터가 완전히 같은 숫자로 일치하지 않을 수 있습니다. 집계 방식과 시점 차이 때문이며, 정상적인 범위의 오차입니다.</p>
                       <p class="s6-note"><a href="#/resources" data-resource-cat="analytics">분석 · 연동 관련 자료 보기 →</a></p>
                     </div>
@@ -2133,14 +2126,15 @@
                     <span class="s4-num">01</span>
                     <div class="s4-section-body">
                       <h3>필요한 이미지 목록 정하기</h3>
-                      <p class="s4-summary">촬영을 시작하기 전에 아래 다섯 가지 유형을 기준으로 무엇을 찍을지 먼저 정하세요. 의류는 여기에 착용컷이 꼭 필요합니다. 도매처가 제공하는 컷이 있다면 사용 범위를 확인해 먼저 활용하고, 없는 항목만 직접 촬영하면 됩니다.</p>
-                      <div class="s4-cards">
-                        <div class="s4-card-item"><p class="s4-card-title">대표 썸네일</p><p>상품을 한눈에 보여주는 이미지. 상세페이지 최상단에서 첫인상을 결정합니다.</p></div>
-                        <div class="s4-card-item"><p class="s4-card-title">정면 · 후면</p><p>상품 전체 모습을 앞뒤로 보여줘 형태를 정확히 전달합니다.</p></div>
-                        <div class="s4-card-item"><p class="s4-card-title">원단 · 마감 · 디테일</p><p>원단 조직감 · 단추 · 봉제선 · 안감을 확대해서 보여줘 신뢰를 높입니다.</p></div>
-                        <div class="s4-card-item"><p class="s4-card-title">실측 사이즈 · 모델 정보</p><p>어깨 · 가슴 · 기장 실측과 모델 키 · 착용 사이즈를 함께 보여주면 사이즈 때문에 생기는 반품을 줄일 수 있습니다.</p></div>
-                        <div class="s4-card-item"><p class="s4-card-title">착용컷</p><p>전신 · 상반신 · 뒷모습 · 걷거나 앉는 컷으로 핏과 입체감을 보여줘 입었을 때를 상상하게 합니다.</p></div>
-                      </div>
+                      <p class="s4-summary">촬영 전에 무엇을 찍을지 먼저 정하세요. 도매처가 제공하는 컷은 사용 범위를 확인해 먼저 활용하고, 없는 항목만 직접 촬영하면 됩니다.</p>
+                      <p class="ld-label">준비할 이미지</p>
+                      <ul class="s4-checks">
+                        <li><b>대표 썸네일</b> — 상세페이지 첫인상을 결정해요</li>
+                        <li><b>정면 · 후면</b> — 형태를 앞뒤로 정확히 보여줘요</li>
+                        <li><b>원단 · 마감 · 디테일</b> — 조직감 · 단추 · 봉제선 · 안감 확대</li>
+                        <li><b>실측 사이즈 · 모델 정보</b> — 어깨 · 가슴 · 기장 실측과 모델 키 · 착용 사이즈(사이즈 반품을 줄여요)</li>
+                        <li><b>착용컷</b> — 전신 · 상반신 · 뒷모습 · 걷거나 앉는 컷으로 핏을 보여줘요</li>
+                      </ul>
                       <p class="s4-note">공급처가 제공한 이미지도 사용 가능 범위를 먼저 확인하세요. 사용 허가 없이 복사한 이미지나 실제 상품과 다른 AI 이미지는 저작권 · 오인 표시 문제가 생길 수 있습니다.</p>
 
                       <div class="accordion s4-industry">
@@ -2177,13 +2171,22 @@
                     <div class="s4-section-body">
                       <h3>촬영 방식 정하기</h3>
                       <p class="s4-summary">누가, 어떻게 촬영할지 정하면 준비할 게 명확해집니다. 아래 세 가지 방식의 차이를 보고 내 상품 · 예산에 맞는 방식을 고르세요.</p>
-                      <div class="s4-methods">
-                        <div class="s4-method"><p class="s4-method-name">직접 촬영</p><p class="s4-m-good">비용 부담이 적고 바로 시작 가능</p><p class="s4-m-limit">결과물 퀄리티가 촬영자 역량에 좌우됨</p></div>
-                        <div class="s4-method"><p class="s4-method-name">모델 촬영</p><p class="s4-m-good">착용 · 사용 모습을 자연스럽게 전달</p><p class="s4-m-limit">섭외 비용이 들고 일정을 미리 잡아야 함(프리랜서 모델은 보통 한 주 전 예약)</p></div>
-                        <div class="s4-method"><p class="s4-method-name">촬영 대행</p><p class="s4-m-good">전문 장비 · 편집까지 한 번에 해결</p><p class="s4-m-limit">외주 비용이 들고 일정 조율이 필요</p></div>
+                      <div class="ld-table-wrap">
+                        <table class="ld-table ld-table-stack">
+                          <caption class="sr-only">촬영 방식 비교</caption>
+                          <thead><tr><th scope="col">촬영 방식</th><th scope="col">좋은 점</th><th scope="col">주의할 점</th></tr></thead>
+                          <tbody>
+                            <tr><th scope="row">직접 촬영</th><td data-label="좋은 점">비용 부담이 적고 바로 시작 가능</td><td data-label="주의할 점">결과물 퀄리티가 촬영자 역량에 좌우됨</td></tr>
+                            <tr><th scope="row">모델 촬영</th><td data-label="좋은 점">착용 · 사용 모습을 자연스럽게 전달</td><td data-label="주의할 점">섭외 비용이 들고 일정을 미리 잡아야 함(프리랜서 모델은 보통 한 주 전 예약)</td></tr>
+                            <tr><th scope="row">촬영 대행</th><td data-label="좋은 점">전문 장비 · 편집까지 한 번에 해결</td><td data-label="주의할 점">외주 비용이 들고 일정 조율이 필요</td></tr>
+                          </tbody>
+                        </table>
                       </div>
-                      <p class="s4-note">모델 · 촬영 대행 비용은 지역 · 경력 · 촬영 규모에 따라 차이가 커서 여기서는 특정 금액을 기준으로 안내하지 않습니다. 실제 진행 전 여러 곳의 견적을 비교하고, 짧은 테스트 촬영으로 결과물을 먼저 확인하세요. 촬영 장소도 컨셉에 맞게 고르세요 — 흰 배경 스튜디오(상품 강조), 카페 · 인테리어 스튜디오(무드), 셀카존 · 집(예산 절약, 자연광 확인), 야외(자연스러움, 날씨 변수).</p>
-                      <p class="s4-note">사진만으로 부족하다고 느껴진다면 5~10초 정도의 짧은 사용 장면 영상을 함께 준비하는 것도 방법입니다 — 모든 상품에 꼭 필요한 것은 아닙니다.</p>
+                      <details class="ld-more">
+                        <summary>비용 · 촬영 장소 · 영상 참고</summary>
+                        <p class="s4-note">모델 · 촬영 대행 비용은 지역 · 경력 · 촬영 규모에 따라 차이가 커서 여기서는 특정 금액을 기준으로 안내하지 않습니다. 실제 진행 전 여러 곳의 견적을 비교하고, 짧은 테스트 촬영으로 결과물을 먼저 확인하세요. 촬영 장소도 컨셉에 맞게 고르세요 — 흰 배경 스튜디오(상품 강조), 카페 · 인테리어 스튜디오(무드), 셀카존 · 집(예산 절약, 자연광 확인), 야외(자연스러움, 날씨 변수).</p>
+                        <p class="s4-note">사진만으로 부족하다고 느껴진다면 5~10초 정도의 짧은 사용 장면 영상을 함께 준비하는 것도 방법입니다 — 모든 상품에 꼭 필요한 것은 아닙니다.</p>
+                      </details>
                       <a class="s4-service" href="#/resources/photo-outsourcing-checklist">
                         <span class="s4-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5h2l1-2h5l1 2h2A1.5 1.5 0 0 1 16 6.5v7A1.5 1.5 0 0 1 14.5 15h-11A1.5 1.5 0 0 1 2 13.5z"/><circle cx="9" cy="10" r="2.6"/></svg></span>
                         <span class="s4-service-text"><b>촬영 대행을 찾고 있다면</b><small>자료실에서 촬영 방식과 대행 전 확인할 항목을 살펴보세요</small></span>
@@ -2196,14 +2199,14 @@
                     <span class="s4-num">03</span>
                     <div class="s4-section-body">
                       <h3>상세페이지 순서 정하기</h3>
-                      <p class="s4-summary">의류 상세페이지는 고객이 아래 순서로 정보를 확인할 수 있으면 이해하고 구매를 결정하기 쉬워집니다.</p>
-                      <ul class="s4-checks">
-                        <li>고객 문제 · 핵심 장점 — 이 상품이 무엇이고 누구에게 필요한지</li>
-                        <li>실제 상품 이미지 — 01에서 준비한 이미지</li>
-                        <li>상세 스펙 — 실측 사이즈 · 소재 · 두께 · 신축성 · 비침 · 안감</li>
-                        <li>옵션 · 사이즈 — 선택 가능한 구성</li>
-                        <li>배송 · 교환 · 반품 안내</li>
-                      </ul>
+                      <p class="s4-summary">고객이 아래 순서로 정보를 확인할 수 있으면 이해하고 구매를 결정하기 쉬워집니다.</p>
+                      <ol class="ld-flow">
+                        <li><b>고객 문제 · 핵심 장점</b><span>이 상품이 무엇이고 누구에게 필요한지</span></li>
+                        <li><b>실제 상품 이미지</b><span>01에서 준비한 이미지</span></li>
+                        <li><b>상세 스펙</b><span>실측 사이즈 · 소재 · 두께 · 신축성 · 비침 · 안감</span></li>
+                        <li><b>옵션 · 사이즈</b><span>선택 가능한 구성</span></li>
+                        <li><b>배송 · 교환 · 반품 안내</b></li>
+                      </ol>
                       <div class="callout s4-callout">
                         <p>과장광고 문구나 근거 없는 효능 표현은 피하세요.</p>
                       </div>
@@ -2407,10 +2410,7 @@
            관련 경험담처럼 검증되지 않은 주장은 본문에 사실처럼 적지 않는다(자료실 콘텐츠 제작은
            이번 작업 범위 밖이라 의도적으로 옮기지 않고 생략했다 — 완료 보고에 기록). "관련 자료"
            링크는 STEP04~06과 동일하게 #/resources의 기존 카테고리(marketing·analytics)만 쓰고
-           새 카테고리를 만들지 않는다. "운영 현황" 카드는 #/dashboard로 연결한다 — 재설계 이전
-           마크업은 "광고 기록"을 #/tools로 링크했는데, 그 기능은 이후 리팩터에서 #/dashboard로
-           옮겨져 있었다(app.js/index.html 주석 확인, 이 STEP07 작업 중 발견해 같은 화면 안에서
-           바로잡음). 스타일은 전부 #view-start-marketing 스코프(--ld-* 토큰), 다른 STEP은 그대로다. -->
+           새 카테고리를 만들지 않는다. "운영 현황" 카드는 #/dashboard로 연결한다(LaunchROAS 공개 전까지 유지). 스타일은 전부 #view-start-marketing 스코프(--ld-* 토큰), 다른 STEP은 그대로다. -->
       <section class="view" id="view-start-marketing" hidden>
         <div class="content">
           <div class="s7" id="step07Root" data-tab="guide">
@@ -2455,13 +2455,19 @@
                     <div class="s7-section-body">
                       <h3>첫 유입 채널 정하기 <span class="s7-tag">선택 조합</span></h3>
                       <p class="s7-summary">검색 · 블로그 · 인스타그램 · 숏폼 · 커뮤니티 · Meta 광고 등 채널은 다양합니다. 처음부터 전부 운영할 필요는 없습니다.</p>
-                      <div class="s7-cards">
-                        <div class="s7-card-item"><p class="s7-card-title">검색 유입</p><p>상품명 · 키워드로 찾아오는 방문자</p></div>
-                        <div class="s7-card-item"><p class="s7-card-title">블로그</p><p>후기 · 정보성 글로 신뢰를 보완</p></div>
-                        <div class="s7-card-item"><p class="s7-card-title">인스타그램</p><p>이미지 · 영상으로 브랜드를 보여줌</p></div>
-                        <div class="s7-card-item"><p class="s7-card-title">숏폼</p><p>짧은 영상으로 새로운 사람에게 도달</p></div>
-                        <div class="s7-card-item"><p class="s7-card-title">커뮤니티</p><p>관심사가 맞는 사람들에게 자연스럽게 노출</p></div>
-                        <div class="s7-card-item"><p class="s7-card-title">Meta 광고</p><p>타겟을 정해 소액으로 반응을 테스트</p></div>
+                      <div class="ld-table-wrap">
+                        <table class="ld-table">
+                          <caption class="sr-only">첫 유입 채널 비교</caption>
+                          <thead><tr><th scope="col">채널</th><th scope="col">이런 역할을 해요</th></tr></thead>
+                          <tbody>
+                            <tr><th scope="row">검색 유입</th><td>상품명 · 키워드로 찾아오는 방문자</td></tr>
+                            <tr><th scope="row">블로그</th><td>후기 · 정보성 글로 신뢰를 보완</td></tr>
+                            <tr><th scope="row">인스타그램</th><td>이미지 · 영상으로 브랜드를 보여줌</td></tr>
+                            <tr><th scope="row">숏폼</th><td>짧은 영상으로 새로운 사람에게 도달</td></tr>
+                            <tr><th scope="row">커뮤니티</th><td>관심사가 맞는 사람들에게 자연스럽게 노출</td></tr>
+                            <tr><th scope="row">Meta 광고</th><td>타겟을 정해 소액으로 반응을 테스트(유료)</td></tr>
+                          </tbody>
+                        </table>
                       </div>
                       <p class="s7-note">무료 채널 1개로 먼저 시작하고, 필요하면 유료 채널 1개를 더해보는 방향을 권장합니다. 채널을 몇 개 고르는지가 이 STEP의 완료 조건은 아닙니다.</p>
                     </div>
@@ -2744,7 +2750,10 @@
                         <li class="s5-flow-item"><span class="s5-flow-num">5</span><div class="s5-flow-body"><h4>배송 완료</h4><p>고객에게 상품이 도착합니다.</p></div></li>
                         <li class="s5-flow-item"><span class="s5-flow-num">6</span><div class="s5-flow-body"><h4>교환 · 반품 대응</h4><p>문의가 오면 정해둔 기준대로 응대합니다.</p></div></li>
                       </ol>
-                      <p class="s5-note">예: 주문 · 배송 건이 늘어나 직접 처리가 버거워지면, 이지어드민 같은 멀티채널 주문관리 도구로 주문 수집 · 송장 발행 · 재고 동기화를 자동화하는 것도 방법입니다. 그 전까지는 직접 처리하는 편이 오히려 효율적인 경우가 많습니다.</p>
+                      <details class="ld-more">
+                        <summary>주문이 많아지면</summary>
+                        <p class="s5-note">예: 주문 · 배송 건이 늘어나 직접 처리가 버거워지면, 이지어드민 같은 멀티채널 주문관리 도구로 주문 수집 · 송장 발행 · 재고 동기화를 자동화하는 것도 방법입니다. 그 전까지는 직접 처리하는 편이 오히려 효율적인 경우가 많습니다.</p>
+                      </details>
                     </div>
                   </li>
 
@@ -2753,24 +2762,16 @@
                     <div class="s5-section-body">
                       <h3>배송 정책 정하기</h3>
                       <p class="s5-summary">무료배송이 무조건 유리하거나 유료배송이 무조건 유리한 것은 아닙니다. 내 상품 · 객단가에 맞는 기준을 정하세요.</p>
-                      <div class="s5-compare">
-                        <div class="s5-compare-card">
-                          <small>구매 장벽 낮음</small>
-                          <h4>무료배송</h4>
-                          <ul>
-                            <li class="good">저가 상품일수록 전환율에 유리할 수 있음</li>
-                            <li class="limit">한 개만 구매하는 비율이 늘어 객단가가 낮아질 수 있음</li>
-                          </ul>
-                        </div>
-                        <div class="s5-compare-card">
-                          <small>객단가 우선</small>
-                          <h4>조건부 무료배송</h4>
-                          <ul>
-                            <li class="good">기준 금액을 채우려 상품을 추가해 객단가가 오를 수 있음</li>
-                            <li class="good">배송비를 채우는 저관여 상품을 함께 구성할 수 있음</li>
-                            <li class="limit">기준 금액을 어떻게 정하느냐에 따라 결과가 달라질 수 있음</li>
-                          </ul>
-                        </div>
+                      <div class="ld-table-wrap">
+                        <table class="ld-table">
+                          <caption class="sr-only">배송비 정책 비교</caption>
+                          <thead><tr><th scope="col">기준</th><th scope="col">무료배송</th><th scope="col">조건부 무료배송</th></tr></thead>
+                          <tbody>
+                            <tr><th scope="row">유리한 경우</th><td>저가 상품일수록 전환율에 유리할 수 있음</td><td>기준 금액을 채우려 상품을 추가해 객단가가 오를 수 있음</td></tr>
+                            <tr><th scope="row">함께 쓰는 방법</th><td>—</td><td>배송비를 채우는 저관여 상품을 함께 구성</td></tr>
+                            <tr><th scope="row">주의할 점</th><td>한 개만 구매하는 비율이 늘어 객단가가 낮아질 수 있음</td><td>기준 금액을 어떻게 정하느냐에 따라 결과가 달라질 수 있음</td></tr>
+                          </tbody>
+                        </table>
                       </div>
                       <p class="s5-note s5-center">특정 금액이 정답은 아니며, 아래 항목을 내 상품 구조에 맞게 직접 정하면 됩니다.</p>
                       <ul class="s5-checks">
@@ -2789,10 +2790,16 @@
                     <div class="s5-section-body">
                       <h3>택배 발송 방식 준비하기</h3>
                       <p class="s5-summary">초기 물량이 적다면 처음부터 정식 계약택배를 이용하지 않아도 됩니다. 물량에 맞는 발송 방식을 먼저 살펴보세요.</p>
-                      <div class="s5-methods">
-                        <div class="s5-method"><p class="s5-method-name">편의점 택배</p><p class="s5-m-good">별도 계약 없이 바로 이용 가능</p><p class="s5-m-limit">건당 단가가 상대적으로 높고 방문 접수가 필요</p></div>
-                        <div class="s5-method"><p class="s5-method-name">우체국 소포</p><p class="s5-m-good">전국 어디서나 접수 가능</p><p class="s5-m-limit">물량이 많아지면 처리에 시간이 걸릴 수 있음</p></div>
-                        <div class="s5-method"><p class="s5-method-name">택배사 정식 계약</p><p class="s5-m-good">수거 대행 · 단가 협상이 가능</p><p class="s5-m-limit">최소 물량 등 계약 조건이 있을 수 있음</p></div>
+                      <div class="ld-table-wrap">
+                        <table class="ld-table ld-table-stack">
+                          <caption class="sr-only">택배 발송 방식 비교</caption>
+                          <thead><tr><th scope="col">발송 방식</th><th scope="col">좋은 점</th><th scope="col">주의할 점</th></tr></thead>
+                          <tbody>
+                            <tr><th scope="row">편의점 택배</th><td data-label="좋은 점">별도 계약 없이 바로 이용 가능</td><td data-label="주의할 점">건당 단가가 상대적으로 높고 방문 접수가 필요</td></tr>
+                            <tr><th scope="row">우체국 소포</th><td data-label="좋은 점">전국 어디서나 접수 가능</td><td data-label="주의할 점">물량이 많아지면 처리에 시간이 걸릴 수 있음</td></tr>
+                            <tr><th scope="row">택배사 정식 계약</th><td data-label="좋은 점">수거 대행 · 단가 협상이 가능</td><td data-label="주의할 점">최소 물량 등 계약 조건이 있을 수 있음</td></tr>
+                          </tbody>
+                        </table>
                       </div>
                       <p class="s5-note">물량이 늘어나면 정식 계약택배로 전환하는 경우가 많습니다. 어떤 방식이 맞는지는 지금 물량과 예산에 따라 다릅니다.</p>
                       <p class="s5-subhead">계약 시 확인할 항목</p>
@@ -3015,9 +3022,8 @@
            근처 diff 참고). 저장 로직이 없어 부가 JS 파일도 두지 않는다 —
            라우팅에 따른 GA4 page_view · chapter_start, 진입 시 스크롤
            최상단은 app.js 라우터가 기존 방식 그대로 처리한다(CHAPTER_PATHS에
-           '/start/wrapup' 포함, 변경 없음). #/tools 링크의
-           data-tools-target="calc"는 tools.js의 기존 전역 리스너가 그대로
-           처리한다. 스타일은 전부 #view-start-wrapup 스코프(--ld-* 올리브
+           '/start/wrapup' 포함, 변경 없음). 마진 계산기 · 운영 현황 링크는
+           LaunchROAS 공개 전까지 그대로 둔다. 스타일은 전부 #view-start-wrapup 스코프(--ld-* 올리브
            토큰) — 다른 STEP은 그대로다. -->
       <section class="view" id="view-start-wrapup" hidden>
         <div class="content">
@@ -3040,13 +3046,13 @@
                     <span class="s8-num">01</span>
                     <div class="s8-section-body">
                       <h3>첫 주문 흐름 확인</h3>
-                      <ul class="s8-checks">
-                        <li>실제 주문이 들어왔을 때 결제 확인</li>
-                        <li>상품 준비</li>
-                        <li>송장 등록</li>
-                        <li>출고</li>
-                        <li>배송 완료까지 흐름 확인</li>
-                      </ul>
+                      <ol class="ld-flow">
+                        <li><b>결제 확인</b><span>실제 주문이 들어왔을 때</span></li>
+                        <li><b>상품 준비</b></li>
+                        <li><b>송장 등록</b></li>
+                        <li><b>출고</b></li>
+                        <li><b>배송 완료까지 확인</b></li>
+                      </ol>
                     </div>
                   </li>
                   <li class="s8-section">
@@ -3476,8 +3482,8 @@
              1100px 미만에서는 CSS display:contents + order로 한 열 순서(제목 → 탭 → 탭 콘텐츠 →
              진행 → 게스트 안내 → 체크리스트 → 도구 → 도움 → 이전/다음)를 만든다 — 같은 패널을
              DOM에 두 번 두지 않는다. 이 STEP은 상세 계산 도구가 아니라 다음 단계로 넘어가기 위한
-             방향 확인 화면이므로, 원가/판매가를 직접 계산하는 입력창은 두지 않고 정밀 계산은
-             마진 계산기(#/tools, data-tools-target="calc")로 안내한다. 스타일은 전부
+             방향 확인 화면이므로, 원가/판매가를 직접 계산하는 입력창은 두지 않는다(마진 계산기는
+             LaunchROAS 공개 전까지 #/tools 계산기로 안내한다). 스타일은 전부
              #view-start-sourcing 스코프(--ld-* 올리브 토큰), 다른 STEP은 그대로다. -->
         <div class="content">
           <div class="s3" id="step03Root" data-tab="guide">
@@ -3523,13 +3529,19 @@
                     <div class="s3-section-body">
                       <h3>공급처 후보 찾기</h3>
                       <p class="s3-summary">공급 방식부터 정하면 후보를 좁히기 쉽습니다. 한 가지 방식이 정답은 아니니, 아래 기준으로 내 상품에 맞는 방식을 먼저 살펴보세요.</p>
-                      <div class="s3-methods">
-                        <div class="s3-method"><p class="s3-method-name">동대문 사입</p><p class="s3-m-good">실물을 보고 빠르게 시작 가능, 신상이 계속 나옴</p><p class="s3-m-limit">같은 상품을 파는 쇼핑몰이 많아 촬영 · 컨셉으로 차별화해야 함</p></div>
-                        <div class="s3-method"><p class="s3-method-name">자체제작</p><p class="s3-m-good">브랜드 차별화, 잘 팔리는 상품은 원가를 낮출 수 있음</p><p class="s3-m-limit">최소 생산 수량 · 원단비 · 패턴비 부담, 실패하면 재고로 남음</p></div>
-                        <div class="s3-method"><p class="s3-method-name">중국 도매 직거래</p><p class="s3-m-good">중간 유통을 줄여 도매가를 낮출 수 있음</p><p class="s3-m-limit">최소 수량 · 배송 기간 · 품질 편차 · 통관을 확인해야 함</p></div>
-                        <div class="s3-method"><p class="s3-method-name">위탁판매</p><p class="s3-m-good">재고 부담 없이 진입장벽이 낮음</p><p class="s3-m-limit">마진이 낮고 배송 · 품질 통제가 어려움</p></div>
-                        <div class="s3-method"><p class="s3-method-name">사입 대행(사입삼촌)</p><p class="s3-m-good">동대문에 직접 가지 않아도 사입 · 합포장 가능</p><p class="s3-m-limit">도매처마다 대행비가 들고, 처음엔 믿을 만한 대행을 찾아야 함</p></div>
-                        <div class="s3-method"><p class="s3-method-name">기타 <span class="s3-tag">협업 · 구독형 등</span></p><p class="s3-m-good">상황에 맞게 유연하게 조합 가능</p><p class="s3-m-limit">케이스마다 조건이 크게 다름</p></div>
+                      <div class="ld-table-wrap">
+                        <table class="ld-table ld-table-stack">
+                          <caption class="sr-only">의류 공급 방식 비교</caption>
+                          <thead><tr><th scope="col">공급 방식</th><th scope="col">좋은 점</th><th scope="col">주의할 점</th></tr></thead>
+                          <tbody>
+                            <tr><th scope="row">동대문 사입</th><td data-label="좋은 점">실물을 보고 빠르게 시작 가능, 신상이 계속 나옴</td><td data-label="주의할 점">같은 상품을 파는 쇼핑몰이 많아 촬영 · 컨셉으로 차별화해야 함</td></tr>
+                            <tr><th scope="row">자체제작</th><td data-label="좋은 점">브랜드 차별화, 잘 팔리는 상품은 원가를 낮출 수 있음</td><td data-label="주의할 점">최소 생산 수량 · 원단비 · 패턴비 부담, 실패하면 재고로 남음</td></tr>
+                            <tr><th scope="row">중국 도매 직거래</th><td data-label="좋은 점">중간 유통을 줄여 도매가를 낮출 수 있음</td><td data-label="주의할 점">최소 수량 · 배송 기간 · 품질 편차 · 통관을 확인해야 함</td></tr>
+                            <tr><th scope="row">위탁판매</th><td data-label="좋은 점">재고 부담 없이 진입장벽이 낮음</td><td data-label="주의할 점">마진이 낮고 배송 · 품질 통제가 어려움</td></tr>
+                            <tr><th scope="row">사입 대행(사입삼촌)</th><td data-label="좋은 점">동대문에 직접 가지 않아도 사입 · 합포장 가능</td><td data-label="주의할 점">도매처마다 대행비가 들고, 믿을 만한 대행을 찾아야 함</td></tr>
+                            <tr><th scope="row">기타(협업 · 구독형 등)</th><td data-label="좋은 점">상황에 맞게 유연하게 조합 가능</td><td data-label="주의할 점">케이스마다 조건이 크게 다름</td></tr>
+                          </tbody>
+                        </table>
                       </div>
                       <p class="s3-note">공급처 후보는 한 곳만 보지 말고 <strong>최소 2~3곳을 비교</strong>하세요. 단가 · 조건이 비슷해 보여도 배송 · 대응 속도에서 차이가 큰 경우가 많습니다.</p>
 
@@ -3590,17 +3602,31 @@
                     <span class="s3-num">04</span>
                     <div class="s3-section-body">
                       <h3>판매 가격 기준 정하기</h3>
-                      <p class="s3-summary">원가의 2배로 팔아도 실제로 남는 돈은 그보다 훨씬 적을 수 있습니다. 플랫폼 수수료 · 결제 수수료 · 배송비 · 포장비 · 할인 · 반품 비용 · 광고비를 빼고 나면 이익이 거의 없거나 적자가 되는 경우도 많습니다. 판매가는 경쟁사 가격만 보고 따라 정하지 말고, 이 비용을 모두 반영해 마진 계산기에서 실제로 남는 금액을 확인한 뒤 정하세요.</p>
+                      <p class="s3-summary">원가의 2배로 팔아도 실제로 남는 돈은 훨씬 적을 수 있어요. 경쟁사 가격만 따라 정하지 말고, 아래 비용을 모두 뺀 뒤 남는 금액을 확인하고 정하세요.</p>
+                      <p class="ld-label">판매가에서 빠지는 비용</p>
                       <ul class="s3-checks">
-                        <li>비슷한 상품의 판매가 범위를 먼저 확인하세요.</li>
-                        <li>리뷰에서 반복되는 불만(배송 지연 · 사이즈 오차 · 포장 파손 등)을 확인하고, 내 공급 조건에서 피할 수 있는지 점검하세요.</li>
+                        <li>플랫폼 수수료 · 결제 수수료</li>
+                        <li>배송비 · 포장비</li>
+                        <li>할인 · 쿠폰</li>
+                        <li>반품 · 교환 처리 비용</li>
+                        <li>광고비</li>
                       </ul>
+                      <p class="ld-label">판매가 정하는 순서</p>
+                      <ol class="ld-flow">
+                        <li><b>비슷한 상품의 판매가 범위 확인</b><span>경쟁 쇼핑몰 가격은 기준이 아니라 참고용이에요</span></li>
+                        <li><b>리뷰에서 반복되는 불만 확인</b><span>배송 지연 · 사이즈 오차 · 포장 파손을 내 공급 조건에서 피할 수 있는지 점검</span></li>
+                        <li><b>위 비용을 모두 빼고 남는 금액 확인</b><span>이익이 거의 없거나 적자라면 가격 · 공급 조건 · 구성을 다시 봐요</span></li>
+                        <li><b>판매가 확정</b></li>
+                      </ol>
+                      <details class="ld-more">
+                        <summary>남는 금액이 적을 때 조정하는 방법</summary>
+                        <p class="s3-note">가격을 올리는 것만이 답은 아닙니다. 공급가 재협상 · 묶음(번들) 구성 · 배송 조건 · 객단가(부가 상품)를 함께 조정하는 방법도 있습니다. 어떤 조합이 실제로 남는지는 마진 계산기로 확인하세요.</p>
+                      </details>
                       <a class="s3-service s3-service-accent" href="#/tools" data-tools-target="calc">
                         <span class="s3-service-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="12" height="14" rx="2"/><rect x="5.5" y="4" width="7" height="3" rx="0.5"/><circle cx="5.5" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="12.5" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="5.5" cy="13" r="0.7" fill="currentColor" stroke="none"/><circle cx="9" cy="13" r="0.7" fill="currentColor" stroke="none"/><circle cx="12.5" cy="13" r="0.7" fill="currentColor" stroke="none"/></svg></span>
                         <span class="s3-service-text"><b>가격은 경쟁사만 따라 정하지 마세요</b><small>수수료 · 배송비 · 포장비 · 광고비까지 반영한 실제 순이익은 마진 계산기에서 확인하세요</small></span>
                         <svg class="s3-link-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9,4 13,8 9,12"/></svg>
                       </a>
-                      <p class="s3-note">가격을 올리는 것만이 답은 아닙니다. 공급가 재협상 · 묶음(번들) 구성 · 배송 조건 · 객단가(부가 상품)를 함께 조정하는 방법도 있습니다. 어떤 조합이 실제로 남는지는 마진 계산기로 확인하세요.</p>
                     </div>
                   </li>
 
@@ -4384,7 +4410,7 @@
       <header class="support-head">
         <span class="eyebrow">처음 오셨나요?</span>
         <h1>런치데스크 이용 안내</h1>
-        <p>쇼핑몰 준비부터 운영 숫자 확인까지, 필요한 곳부터 시작하세요.</p>
+        <p>쇼핑몰 준비부터 운영 숫자 확인까지, 필요한 곳부터 시작하세요. 가이드 · 로드맵 · 자료실 등 사이트 이용은 무료이고, 세팅 대행만 별도 유료예요.</p>
       </header>
       <div class="support-grid">
         <section class="support-card">

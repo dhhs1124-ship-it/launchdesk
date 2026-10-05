@@ -916,11 +916,24 @@
     var homeNext = document.getElementById('deskNextLink');
     if(homeNext){
       var nextStep = prog.next;
+      // 진행 기록 = 완료한 STEP 또는 실제 입력(체크·작성)이 저장된 STEP. 추정값은 쓰지 않는다.
+      var hasRecord = prog.done > 0 || GATED_STEPS.some(function(s){
+        return stepEntryHasContent({ data: launchdeskStore.getStepData(s.route), isCompleted: false });
+      });
+      var nextStarted = !!nextStep && stepEntryHasContent({ data: launchdeskStore.getStepData(nextStep.route), isCompleted: false });
       homeNext.href = '#' + (nextStep ? nextStep.route : '/start/wrapup');
       var homeNextText = document.getElementById('deskNextText');
       if(homeNextText) homeNextText.textContent = nextStep
-        ? (prog.done === 0 ? 'STEP ' + nextStep.num + ' 시작하기' : 'STEP ' + nextStep.num + ' 이어서 준비하기')
+        ? 'STEP ' + nextStep.num + (nextStarted ? ' 이어서 하기' : ' 시작하기')
         : '오픈 완료 확인하기';
+      var homeDesc = document.getElementById('deskTodayDesc');
+      if(homeDesc) homeDesc.textContent = !hasRecord
+        ? '처음이라면 STEP 01부터 시작하면 돼요.'
+        : (nextStep
+          ? '진행 기록 기준 다음 할 일이에요 · ' + nextStep.label
+          : 'STEP 01~07을 모두 완료했어요. 운영 시작 안내를 확인하세요.');
+      var homeIntro = document.getElementById('deskIntroLink');
+      if(homeIntro) homeIntro.hidden = hasRecord;
     }
     // (사이드바 "창업 준비 N%" 미니 진행 바(#progressPct/#progressFillSide)는 2026-09
     //  UI 재설계 2차에서 제거 — 진행 정보는 /start와 홈 카드에서만 보여준다.)

@@ -138,3 +138,31 @@ body.start-overview-view footer .footer-meta { color:#a9adae; }
   #view-start .guide-card[data-chapter="/start/intro"] { grid-column:auto; }
   #view-start .guide-card[data-chapter="/start/wrapup"] .gc-head { min-height:188px; }
 }
+
+/* 2026-10 역할 정리 — 로드맵을 "단계 흐름 → 지금 위치·다음 할 일 → 단계 목록" 순으로.
+   카드 그리드(장식 아이콘·고정 높이)를 한 줄짜리 단계 목록으로 바꾼다. 상태(완료·진행 중·
+   시작 전)와 할 일 목록은 app.js recomputeProgress()가 저장된 진행 기록으로만 채운다. */
+#view-start .start-status { grid-template-columns:minmax(0,1fr) minmax(220px,280px); min-height:0; }
+#view-start .card-grid { grid-template-columns:minmax(0,1fr); gap:8px; max-width:960px; }
+#view-start .card-grid .guide-card { grid-column:auto; }
+#view-start .card-grid .guide-card .gc-head { min-height:0; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"num title badge" "num desc badge"; align-items:center; column-gap:14px; row-gap:2px; padding:14px 44px 14px 16px; text-align:left; }
+#view-start .card-grid .guide-card .gc-head::after { display:none; }
+#view-start .card-grid .cc-top { display:contents; }
+#view-start .card-grid .cc-num { grid-area:num; width:36px; height:36px; border-radius:50%; }
+#view-start .card-grid .cc-badges { grid-area:badge; }
+#view-start .card-grid .gc-head h2 { grid-area:title; margin:0; font-size:15px; }
+#view-start .card-grid .gc-head p { grid-area:desc; margin:0; }
+#view-start .card-grid .guide-card .gc-chev { position:absolute; left:auto; right:16px; top:50%; bottom:auto; margin-top:-9px; transition:transform .15s; }
+#view-start .card-grid .guide-card.open .gc-chev { transform:rotate(180deg); }
+#view-start .card-grid .guide-card.is-next .cc-num { background:#ff8a4b; color:#28170f; }
+#view-start .card-grid .gc-body-inner { padding:0 16px 16px 66px; }
+@media (max-width:1180px) {
+  #view-start .start-status-progress { grid-column:auto; border-left:1px solid #353b3e; border-top:0; padding:0 0 0 25px; }
+}
+@media (max-width:620px) {
+  #view-start .start-status-progress { border-left:0; border-top:1px solid #353b3e; padding:18px 0 0; }
+  #view-start .card-grid .guide-card .gc-head { grid-template-areas:"num title" "num desc" "num badge"; grid-template-columns:auto minmax(0,1fr); padding-right:40px; }
+  #view-start .card-grid .cc-badges { justify-self:start; margin-top:4px; }
+  #view-start .card-grid .cc-badges:not(:has(:not([hidden]))) { display:none; }
+  #view-start .card-grid .gc-body-inner { padding-left:16px; }
+}

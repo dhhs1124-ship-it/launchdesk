@@ -1514,7 +1514,9 @@
   .ask-block{margin:0 0 24px;}
   #view-resources .ask-block{margin:24px 0 0;}
   #view-start-intro .s0-nav, #view-start-wrapup .s8-nav{flex-wrap:wrap;}
-  #view-start-intro .s0-nav .ask-inline, #view-start-wrapup .s8-nav .ask-inline{margin:0;}
+  /* 모바일에서는 nav가 세로(flex-direction:column)라 flex-basis:100%가 높이로 해석돼 문장이
+     옆 열로 밀려났다(390px 가로 넘침) — 너비 100%로 한 줄을 차지하게 한다. */
+  #view-start-intro .s0-nav .ask-inline, #view-start-wrapup .s8-nav .ask-inline{margin:0; flex-basis:auto; width:100%;}
   .desk-ops-card h2{margin:0 0 4px; font-size:15px; font-weight:700; letter-spacing:-.01em; color:var(--ld-text); line-height:1.4;}
   .desk-ops-card p{margin:0; max-width:none; font-size:13px; color:var(--ld-muted); line-height:1.6;}
   .desk-ops-card-btn{display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:9px 16px; border-radius:2px; border:1px solid var(--ld-border-strong); background:var(--ld-panel); color:var(--ld-accent); font-size:13px; font-weight:600; white-space:nowrap; flex:0 0 auto; transition:background .15s, border-color .15s;}
@@ -3802,4 +3804,48 @@
     .support-form-grid{grid-template-columns:1fr;}
     .support-card{padding:20px;}
     .support-card .btn{width:100%; justify-content:center;}
+  }
+
+  /* =========================================================================
+     2026-10 가이드 공통 형식(STEP 00~08) — 준비물은 각 STEP의 체크 목록, 선택 기준은
+     .ld-table 비교표, 절차는 .ld-flow 단계 흐름, 긴 보충 설명은 .ld-more 펼쳐보기.
+     STEP 화면은 모두 어두운 챕터 테마라 각 #view-start-* 의 --ld-* 토큰을 그대로 쓴다.
+     ========================================================================= */
+  .ld-label{margin:14px 0 8px; color:var(--ld-accent-dark,#ffb98d); font-size:12px; font-weight:800;}
+  .ld-flow{list-style:none; margin:10px 0 12px; padding:0; counter-reset:ldflow;}
+  .ld-flow li{position:relative; counter-increment:ldflow; padding:0 0 14px 40px; min-height:30px;}
+  .ld-flow li::before{content:counter(ldflow); position:absolute; left:0; top:0; display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--ld-accent-light,#39291f); border:1px solid var(--ld-accent,#ff8a4b); color:var(--ld-accent-dark,#ffb98d); font-size:12px; font-weight:800;}
+  .ld-flow li:not(:last-child)::after{content:""; position:absolute; left:13px; top:28px; bottom:2px; border-left:1px solid #4a5356;}
+  .ld-flow b{display:block; color:var(--ld-text,#f8f8f8); font-size:14px; line-height:1.45;}
+  .ld-flow span{display:block; color:var(--ld-muted,#bbc6c7); font-size:12px; line-height:1.5;}
+  .ld-more{margin:10px 0 12px; border:1px solid #353c3f; border-radius:9px; background:#1a1f21;}
+  .ld-more > summary{cursor:pointer; padding:10px 14px; color:var(--ld-accent-dark,#ffb98d); font-size:13px; font-weight:700;}
+  .ld-more > summary:focus-visible{outline:2px solid var(--ld-accent,#ff8a4b); outline-offset:-2px; border-radius:9px;}
+  .ld-more[open] > summary{border-bottom:1px solid #353c3f;}
+  .ld-more > :not(summary){margin:12px 14px;}
+  .ld-table-wrap{margin:10px 0 6px; border:1px solid #414a4d; border-radius:10px; overflow:hidden;}
+  .ld-table{width:100%; min-width:0; table-layout:fixed; border-collapse:collapse; font-size:13px; line-height:1.45;} /* 전역 table{min-width:460px} 무효화 */
+  .ld-table th, .ld-table td{padding:10px 12px; border-bottom:1px solid #353c3f; text-align:left; vertical-align:top; word-break:keep-all; overflow-wrap:anywhere;}
+  .ld-table tr:last-child th, .ld-table tr:last-child td{border-bottom:0;}
+  .ld-table thead th{background:#242a2c; color:var(--ld-text,#f8f8f8); font-weight:800;}
+  .ld-table tbody th{width:24%; color:var(--ld-muted,#bbc6c7); font-weight:600;}
+  .ld-table td{color:#e0e5e5;}
+  .ld-table td.good{color:#a5d6ae;}
+  .ld-table td.limit{color:#f1c9a3;}
+  .ld-roas-note{margin:10px 0; padding:10px 12px; border-left:3px solid var(--ld-accent,#ff8a4b); background:#1a1f21; color:var(--ld-muted,#bbc6c7); font-size:12.5px; line-height:1.6;}
+  @media (max-width:640px){
+    .ld-table{font-size:12px;}
+    .ld-table th, .ld-table td{padding:8px 6px;}
+    .ld-table tbody th, .ld-table thead th:first-child{width:25%;}
+  }
+  /* 방식(행)별로 장단점을 보는 비교표는 좁은 화면에서 행마다 세로로 세운다(칸이 좁아 글자가 꺾이는 것 방지).
+     두 선택지를 나란히 보는 표(.ld-table만)는 그대로 둔다. 열 이름은 각 칸의 data-label에서 가져온다. */
+  @media (max-width:640px){
+    .ld-table-stack thead{display:none;}
+    .ld-table-stack, .ld-table-stack tbody, .ld-table-stack tr, .ld-table-stack th, .ld-table-stack td{display:block; width:auto;}
+    .ld-table-stack tr{padding:10px 12px; border-bottom:1px solid #353c3f;}
+    .ld-table-stack tr:last-child{border-bottom:0;}
+    .ld-table-stack tbody th, .ld-table-stack td{padding:2px 0; border:0; width:auto;}
+    .ld-table-stack tbody th{color:var(--ld-text,#f8f8f8); font-size:14px; font-weight:800; margin-bottom:4px;}
+    .ld-table-stack td::before{content:attr(data-label); margin-right:6px; color:var(--ld-accent-dark,#ffb98d); font-size:12px; font-weight:800;}
   }
