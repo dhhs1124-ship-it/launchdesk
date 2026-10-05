@@ -11,44 +11,45 @@ function node(tag){
 }
 async function settle(){await new Promise(resolve=>setImmediate(resolve));}
 // select().eq().order().limit() 체인을 흉내 내고, await하면 표별 데이터를 돌려준다.
-function query(data){const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>q,then:(ok,fail)=>Promise.resolve({data,error:null}).then(ok,fail)};return q;}
+function query(data,upserts){const q={select:()=>q,eq:()=>q,in:()=>q,order:()=>q,limit:()=>q,upsert:(p,o)=>{(upserts||[]).push({p,o});return q;},then:(ok,fail)=>Promise.resolve({data,error:null}).then(ok,fail)};return q;}
 const find=(n,cls)=>String(n.className||'').split(' ').includes(cls)?n:(n.children||[]).map(c=>find(c,cls)).find(Boolean);
 function texts(el){return [el.textContent,...(el.children||[]).flatMap(texts)].filter(Boolean);}
-test('광고 세트와 광고를 계산기에 연결하며 Meta 전환 수를 전달한다',async()=>{
-  const list=node('div'),message=node('p'),more=node('button'),calls=[],opened=[];
-  const client={from:()=>query([]),functions:{invoke:async (name,options)=>{
+test('광고 세트 자세히: 광고 보기는 개별 광고를 불러오고, 상품 연결은 저장한 상품 마진에서 골라 광고 화면에서 저장한다',async()=>{
+  const list=node('div'),message=node('p'),more=node('button'),calls=[],upserts=[],events={};
+  const productLink={store_id:'store',product_no:152,variant_code:'',product_label:'가족티',linked_at:'2026-10-05T08:00:00.000Z',
+    input:{price:21900,qty:1,unitCost:9000,feeRate:3,actualShipping:3000,packaging:500,customerShipping:0,sellerDiscount:0,otherCost:0,pgRate:0,feeBase:'after_discount',feeVat:'included',shippingFeeMode:'none',adMode:'none'}};
+  const client={from:(table)=>query(table==='tool_records'?[{tool_type:'product_margin_link',data:productLink}]:[],upserts),functions:{invoke:async (name,options)=>{
     calls.push({name,body:options.body});
-    if(options.body.scope==='adsets')return {data:{ok:true,account:{currency:'usd'},range:{since:'2026-09-29',until:'2026-09-29'},campaigns:[{campaign_name:'캠페인',adsets:[{adset_id:'123',adset_name:'광고 세트',metrics:{spend:10000,purchase:{observed:true,value:2}}}]}]}};
+    if(options.body.scope==='adsets')return {data:{ok:true,account:{currency:'usd'},campaigns:[{campaign_name:'캠페인',adsets:[{adset_id:'123',adset_name:'광고 세트',metrics:{spend:10000,purchase:{observed:true,value:2}}}]}]}};
     return {data:{ok:true,ads:[{ad_id:'456',ad_name:'광고 A',metrics:{spend:7000,purchase:{observed:true,value:1},roas:2,link_clicks:15}}]}};
   }}};
-  let subscriber,ctx={client,userId:'user',storeId:'store',metaAccount:{id:'meta',status:'connected'},period:{kind:'today',date:null}};
-  const app={subscribe(fn){subscriber=fn;fn(ctx);},getContext(){return ctx;},openCalculatorFromAd(data){opened.push(data);}};
+  const ctx={client,userId:'user',storeId:'store',metaAccount:{id:'meta',status:'connected'},period:{kind:'today',date:null}};
+  const app={subscribe(fn){fn(ctx);},getContext(){return ctx;}};
   const document={getElementById(id){return id==='adPerformanceList'?list:id==='adPerformanceMore'?more:message;},createElement:node};
-  vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:app,addEventListener(){}},document,Intl,Number});
+  const dispatched=[];
+  vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:app,addEventListener(t,fn){events[t]=fn;},dispatchEvent(e){dispatched.push(e.type);},
+    launchdeskMarginCalc:require('./margin-calc.js'),LaunchRoasSales:require('./sales-core.js')},
+    document,Intl,Number,CustomEvent:function(t){this.type=t;},Option:function(text,value){return Object.assign(node('option'),{textContent:text,value});}});
   await settle();
   assert.equal(calls[0].body.scope,'adsets');
-  const row=list.children[0],toggle=find(row,'adset-toggle');
-  find(row,'adset-connect').events.click();
-  assert.equal(opened[0].adId,'123');
-  assert.equal(opened[0].purchase,2);
-  await toggle.events.click();
-  assert.equal(calls[1].body.scope,'ads');
-  assert.equal(calls[1].body.adset_id,'123');
-  const detail=find(row,'adset-details'),button=detail.children[0].children[2];
-  assert.notEqual(button.disabled,true);
-  button.events.click();
-  assert.equal(opened[1].spend,7000);
-  assert.equal(opened[1].currency,'USD');
-  assert.equal(opened[1].purchase,1);
-  assert.equal(Object.hasOwn(opened[1],'orders'),false);
-  ctx={...ctx,storeId:'other',metaAccount:null};
-  subscriber(ctx);
-  button.events.click();
-  assert.equal(opened.length,2);
+  const row=list.children[0];
+  await find(row,'adset-toggle').events.click();
+  assert.equal(calls[1].body.scope,'ads');assert.equal(calls[1].body.adset_id,'123');
+  const card=find(row,'adset-details').children[0];
+  assert.equal(find(card,'secondary'),undefined,'개별 광고 카드에는 계산기로 가는 버튼이 없다');
+  const linker=find(row,'adset-linker'),[pick,save]=linker.children;
+  assert.deepEqual(pick.children.map(o=>o.textContent),['연결할 상품 선택','가족티']);
+  pick.value='0';await save.events.click();await settle();
+  assert.equal(upserts.length,1);
+  const p=upserts[0].p;
+  assert.deepEqual({adset:p.meta_adset_id,label:p.product_label,income:p.total_income,pre:p.pre_ad,currency:p.currency},{adset:'123',label:'가족티',income:21900,pre:21900-9000-657-3500,currency:'KRW'});
+  assert.equal(upserts[0].o.onConflict,'store_id,meta_adset_id');
+  assert.ok(dispatched.includes('launchroas:margin-linked'),'저장 후 광고 목록을 다시 불러온다');
 });
+
 async function summaries(links,records,{currency='KRW',spend=30000,fx=null}={}){
   const list=node('div'),adsets=links.map((_,i)=>({adset_id:String(100+i),adset_name:'세트'+i,metrics:{spend,purchase:{observed:true,value:4}}}));
-  const client={from:(table)=>query(table==='ad_margin_links'?links:records.map(data=>({data}))),functions:{invoke:async()=>({data:{ok:true,account:{currency},campaigns:[{campaign_name:'캠페인',adsets}]}})}};
+  const client={from:(table)=>query(table==='ad_margin_links'?links:records.map(data=>({tool_type:'margin_calc',data}))),functions:{invoke:async()=>({data:{ok:true,account:{currency},campaigns:[{campaign_name:'캠페인',adsets}]}})}};
   const ctx={client,userId:'user',storeId:'store',metaAccount:{id:'meta',status:'connected'},period:{kind:'today',date:null},fx};
   const document={getElementById(id){return id==='adPerformanceList'?list:node('p');},createElement:node};
   vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:{subscribe(fn){fn(ctx);},getContext(){return ctx;}},addEventListener(){},LaunchRoasSales:require('./sales-core.js')},document,Intl,Number,Date,Math,String,Promise});

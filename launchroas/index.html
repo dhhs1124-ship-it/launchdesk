@@ -114,7 +114,6 @@
           <div id="salesFigures" class="sales-figures"></div>
           <details class="sales-breakdown" hidden><summary>실제 결제 기준 계산 내역</summary><div id="salesBreakdown"></div></details>
         </details>
-        <details id="salesProductsBox" class="sales-products"><summary>상품 마진 연결 <span id="salesProductsCount"></span></summary><div id="salesProducts"></div></details>
       </section>
       <div class="overview-main-grid">
       <div class="overview-ad-column">
@@ -153,24 +152,28 @@
       </section>
       <section id="calculatorView" hidden aria-labelledby="calculatorTitle">
         <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>마진 계산기</strong></div>
-        <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> PRODUCT ECONOMICS</p><h1 id="calculatorTitle">마진 계산기<span class="title-period">.</span></h1><p class="intro">상품 한 주문의 예상 잔액부터 A상품 광고 전체의 손익까지 확인하세요.</p></div></div>
+        <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> PRODUCT MARGIN</p><h1 id="calculatorTitle">마진 계산기<span class="title-period">.</span></h1><p class="intro">상품을 골라 원가·수수료·배송·포장 비용을 저장하세요. 광고비는 운영 현황에서 실제 금액으로 뺍니다.</p></div></div>
+        <div class="pm-bar"><button id="pmPick" type="button" class="primary pm-pick">상품 선택하기</button><span id="pmSelected" class="small" role="status"></span></div>
+        <div id="pmPicker" class="calc-card pm-picker" hidden>
+          <div class="pm-picker-head"><input id="pmSearch" type="search" placeholder="상품 이름 검색" aria-label="상품 이름 검색"><button id="pmClose" type="button" class="inline-button">닫기</button></div>
+          <div id="pmList" class="pm-list"></div>
+        </div>
+        <div id="pmEditor" hidden>
         <div class="calc-mode"><button type="button" data-calc-mode="simple" aria-pressed="true">간편 입력</button><button type="button" data-calc-mode="detailed" aria-pressed="false">상세 입력</button></div>
-        <div class="calc-examples"><label for="calcExample">입력이 막힌다면 예시로 확인</label><select id="calcExample"><option value="">내 입력값 유지</option></select><button id="calcExampleExit" type="button" class="inline-button" hidden>내 계산으로 돌아가기</button><span id="calcExampleNote" class="small"></span></div>
         <div class="calculator-grid">
           <form id="calcForm" class="calc-card">
-            <h2>상품·판매 조건</h2>
+            <h2 id="pmFormTitle">상품 비용</h2>
             <div class="calc-fields">
-              <label>상품명 <span>계산 저장 시 표시</span><input id="calcProduct" placeholder="예: A상품"></label>
-              <label>판매가 (원) <b>필수</b><input id="calcPrice" type="number" min="1" required placeholder="30000"></label>
-              <label data-detail>판매 수량 (한 주문) <input id="calcQty" type="number" min="1" step="1" value="1"></label>
-              <label>상품 원가 (개당 원) <b>필수</b><input id="calcCost" type="number" min="0" required placeholder="15000"></label>
-              <label data-detail>판매자 부담 할인 (주문당 원)<input id="calcDiscount" type="number" min="0" placeholder="0"></label>
+              <label class="pm-wide">상품<input id="calcProduct" readonly></label>
+              <label>판매가 (원) <span>미리보기 · 실제 계산은 Cafe24 주문 금액</span><input id="calcPrice" type="number" min="1" required inputmode="numeric"></label>
+              <label>상품 원가 (개당 원) <b>필수</b><input id="calcCost" type="number" min="0" required inputmode="numeric" placeholder="15000"></label>
+              <label>판매 수수료율 (%) <b>필수</b><input id="calcFee" type="number" min="0" max="100" step="0.01" required inputmode="decimal" placeholder="3"></label>
+              <label>실제 배송비 (주문당 원)<input id="calcActualShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
+              <label>포장·부자재 (주문당 원)<input id="calcPackaging" type="number" min="0" inputmode="numeric" placeholder="1000"></label>
               <label>배송 조건<select id="calcShippingType"><option value="free">무료배송</option><option value="paid">고객 배송비 별도</option></select></label>
-              <label id="calcCustomerShipWrap" hidden>고객에게 받는 배송비 (원)<input id="calcCustomerShip" type="number" min="0" placeholder="3000"></label>
-              <label>실제 배송비 (주문당 원)<input id="calcActualShip" type="number" min="0" placeholder="3000"></label>
-              <label>포장·부자재 (주문당 원)<input id="calcPackaging" type="number" min="0" placeholder="1000"></label>
-              <label>판매 수수료율 (%) <b>필수</b><input id="calcFee" type="number" min="0" max="100" step="0.01" required placeholder="6"></label>
-              <label>판매 플랫폼 <span>안내용 · 요율 자동 입력 없음</span><select id="calcPlatform"><option value="">선택 안 함</option><option value="cafe24">카페24</option><option value="smartstore">스마트스토어</option><option value="coupang">쿠팡</option><option value="other">기타·자사몰</option></select></label>
+              <label id="calcCustomerShipWrap" hidden>고객에게 받는 배송비 (원)<input id="calcCustomerShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
+              <label data-detail>판매자 부담 할인 (주문당 원)<input id="calcDiscount" type="number" min="0" placeholder="0"></label>
+              <label data-detail>판매 플랫폼 <span>안내용</span><select id="calcPlatform"><option value="">선택 안 함</option><option value="cafe24">카페24</option><option value="smartstore">스마트스토어</option><option value="coupang">쿠팡</option><option value="other">기타·자사몰</option></select></label>
               <label data-detail>상품 수수료 기준<select id="calcFeeBase"><option value="after_discount">할인 후 상품금액</option><option value="before_discount">할인 전 상품금액</option></select></label>
               <label data-detail>수수료 부가세<select id="calcFeeVat"><option value="included">포함</option><option value="excluded">별도 (10% 가산)</option></select></label>
               <label data-detail>배송비 수수료<select id="calcShipFeeMode"><option value="none">없음</option><option value="same">상품과 동일</option><option value="separate">별도 요율</option></select></label>
@@ -178,19 +181,19 @@
               <label data-detail>별도 PG 수수료율 (%)<input id="calcPgRate" type="number" min="0" max="100" step="0.01" placeholder="0"></label>
               <label data-detail>기타 주문당 비용 (원)<input id="calcOther" type="number" min="0" placeholder="0"></label>
             </div>
-            <p id="calcPlatformHelp" class="small">판매자센터나 계약서에 표시된 수수료율을 직접 확인해 입력하세요.</p>
-            <h2>주문당 광고비</h2><p class="small">상품 결제금액 대비 비율 또는 주문당 금액 중 하나를 반영합니다.</p>
-            <div class="calc-pills" role="group" aria-label="광고비 설정"><button type="button" data-calc-ad="none" aria-pressed="true">사용 안 함</button><button type="button" data-calc-ad="6">6%</button><button type="button" data-calc-ad="10">10%</button><button type="button" data-calc-ad="20">20%</button><button type="button" data-calc-ad="custom">직접 입력</button></div>
-            <div id="calcAdCustom" class="calc-fields" hidden><label>입력 방식<select id="calcAdKind"><option value="rate">비율 (%)</option><option value="amount">주문당 금액 (원)</option></select></label><label id="calcAdRateWrap">비율 (%)<input id="calcAdRate" type="number" min="0" step="0.1"></label><label id="calcAdAmountWrap" hidden>주문당 광고비 (원)<input id="calcAdAmount" type="number" min="0"></label></div>
-            <label class="calc-target">주문당 목표 잔액 (선택, 원)<input id="calcTarget" type="number" min="0" placeholder="목표 광고비 여유를 확인"></label>
             <p id="calcError" class="message" role="alert"></p>
           </form>
-          <div class="calc-results"><div class="calc-card"><h2>한 주문의 계산 결과</h2><p id="calcEmpty" class="small">판매가 · 원가 · 판매 수수료율을 입력하면 결과가 나와요.</p><div id="calcResult" hidden><p class="calc-result-label">광고 전 주문당 예상 잔액</p><strong id="calcPostAd" class="calc-hero-value">—</strong><div id="calcFacts" class="calc-facts"></div><p class="estimate-caution">취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님</p><div class="calc-actions"><button id="calcSave" type="button" class="secondary">저장하기</button><button id="calcLoadSaved" type="button" class="secondary">불러오기</button><button id="calcLinkAd" type="button" class="secondary">광고 연결</button><button id="calcDeleteSaved" type="button" class="inline-button">지우기</button></div><label class="saved-product-label" for="calcSavedChoice">저장한 상품 <select id="calcSavedChoice"><option value="">저장한 상품을 선택하세요</option></select></label><p id="calcActionMessage" class="small" role="status">마진을 저장한 뒤 광고 연결을 누르세요.</p><div id="calcAdPicker" class="ad-picker" hidden><label class="saved-product-label" for="calcAdChoice">어떤 광고 세트와 연결하시겠어요?<select id="calcAdChoice"></select></label><button id="calcConfirmAd" type="button" class="secondary">선택한 광고에 연결</button><button id="calcCancelAd" type="button" class="inline-button">닫기</button></div></div></div>
-            <div class="calc-card"><h2 id="campaignTitle">A상품 광고 손익</h2><p id="linkedAdNotice" class="linked-ad-notice" hidden></p><label class="saved-product-label" for="savedProduct">저장한 상품 계산 선택 <select id="savedProduct"><option value="">직접 입력하거나 저장한 상품을 선택하세요</option></select></label><p id="savedProductInfo" class="small" role="status">저장한 계산을 선택하면 상품명·판매가·원가·주문당 광고 전 예상 잔액이 적용됩니다.</p><button id="saveProductLink" type="button" class="secondary" hidden>이 광고 세트에 상품 연결 저장</button><p class="small">Meta 전환 수를 기본값으로 넣습니다. 다른 상품 구매가 포함됐다면 이 상품 주문 수에 맞게 수정하세요.</p><div class="calc-fields"><label>광고비 총액 (원)<input id="campaignSpend" type="number" min="0" placeholder="예: 100000"></label><label>적용할 이 상품 주문 수<input id="campaignOrders" type="number" min="0" step="1" placeholder="예: 10"></label></div><div id="campaignResult" class="calc-facts">상품과 주문 수를 입력하면 광고 후 남는 금액을 계산해요.</div><p class="estimate-caution">취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님</p></div>
-            <div class="calc-card"><div class="history-head"><h2>최근 저장한 계산</h2><button id="calcClear" type="button" class="inline-button">전체 지우기</button></div><div id="calcHistory" class="history-list"></div></div>
-          </div>
+          <div class="calc-results"><div class="calc-card">
+            <h2>광고비 차감 전 마진</h2>
+            <p id="calcEmpty" class="small">원가와 판매 수수료율을 입력하면 결과가 나와요.</p>
+            <div id="calcResult" hidden><p class="calc-result-label">1개 판매 주문의 상품 마진</p><strong id="calcPostAd" class="calc-hero-value">—</strong><div id="calcFacts" class="calc-facts"></div></div>
+            <button id="pmSave" type="button" class="primary pm-save" disabled>이 상품에 저장</button>
+            <p id="pmMessage" class="small" role="status"></p>
+            <details id="pmVariantsBox" class="pm-variants-box" hidden><summary>옵션별 설정 <span id="pmVariantsCount"></span></summary><p class="small">사이즈·색상마다 원가가 다를 때만 설정하세요. 옵션별 값이 상품 기본보다 우선합니다.</p><div id="pmVariants" class="pm-variants"></div></details>
+          </div></div>
         </div>
-      </section>
+        </div>
+</section>
       </div>
     </section>
   </main>
@@ -199,7 +202,6 @@
   <script src="./core.js"></script>
   <script src="./ops-period-core.js"></script>
   <script src="./margin-calc.js"></script>
-  <script src="./campaign-core.js"></script>
   <script src="./adlog-meta.js"></script>
   <script src="./app.js"></script>
   <script src="./connections.js"></script>

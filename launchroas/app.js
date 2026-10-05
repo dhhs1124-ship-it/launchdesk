@@ -300,11 +300,7 @@
       if(btn.closest('.sidebar')) btn.className=active?'sidebar-current':'sidebar-link';
     });
   }
-  window.LaunchRoasApp.openCalculatorFromAd=function(ad){
-    switchView('calculator');
-    window.dispatchEvent(new CustomEvent('launchroas:ad-selection',{detail:ad}));
-    window.scrollTo(0,0);
-  };
+  window.LaunchRoasApp.showView=function(view){switchView(view);window.scrollTo(0,0);};
   document.querySelectorAll('[data-view]').forEach(function(btn){btn.addEventListener('click',function(){switchView(btn.getAttribute('data-view'));window.scrollTo(0,0);});});
   document.querySelectorAll('[data-period]').forEach(function(btn){btn.addEventListener('click',function(){
     period={kind:btn.getAttribute('data-period'),date:null}; byId('periodDate').value='';

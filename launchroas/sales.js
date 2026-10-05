@@ -54,8 +54,8 @@
   }
 
   function render(ctx){
-    var figures=byId('salesFigures'),msg=byId('salesMessage'),fxBox=byId('salesFx'),products=byId('salesProducts');
-    figures.replaceChildren();products.replaceChildren();
+    var figures=byId('salesFigures'),msg=byId('salesMessage'),fxBox=byId('salesFx');
+    figures.replaceChildren();
     var range=state.range;
     byId('salesPeriod').textContent=range?('Cafe24 주문일 '+range.since+(range.until!==range.since?' ~ '+range.until:'')+' (한국 시간)'):'';
     if(!ctx.userId||!ctx.storeId){msg.textContent='쇼핑몰을 선택하면 볼 수 있어요.';fxBox.hidden=true;renderHero(null,null,null,false,[]);return;}
@@ -140,12 +140,12 @@
     var chips=[];
     if(state.error)chips.push({text:ctx.cafeAccount&&ctx.cafeAccount.status==='connected'?'Cafe24 조회 실패':'Cafe24 미연결',tone:'warn'});
     if(ms)chips.push({text:'Meta '+ms.text,tone:ms.text==='조회 중'?'':'warn'});
-    if(s&&s.unlinkedQty)chips.push({text:'마진 미등록 '+count(s.unlinkedQty),tone:'warn',action:'products'});
+    if(s&&s.unlinkedQty)chips.push({text:'마진 미등록 '+count(s.unlinkedQty)+' → 입력하기',tone:'warn',action:'products'});
+    if(s&&s.margin.estimatedOrders)chips.push({text:'판매가 추정 '+count(s.margin.estimatedOrders,'건'),tone:''});
+    if(s&&s.margin.savedOnlyOrders)chips.push({text:'저장 판매가 기준 '+count(s.margin.savedOnlyOrders,'건'),tone:''});
     if(!ms&&mp&&spendKrw==null)chips.push({text:'환율 입력 필요',tone:'warn',action:'fx'});
     if(s&&!s.soldQty)chips.push({text:'판매 없음',tone:''});
     renderHero(profit,base,spendKrw,partial,chips,s);
-    byId('salesProductsCount').textContent=s?(s.unlinkedQty?'· 미등록 '+count(s.unlinkedQty):s.soldQty?'· 전부 연결됨':''):'';
-    if(s)renderProducts(products,s);
   }
 
   function renderHero(profit,base,spendKrw,partial,chips,s){
@@ -154,12 +154,12 @@
     amount.classList.toggle('deficit',profit!=null&&profit<0);
     byId('salesScope').hidden=!(partial&&profit!=null);
     // 일부 상품만 계산됐으면 마진이 판매 몇 개분인지, 광고비는 전체인지를 계산식 줄에 바로 붙인다.
-    byId('salesFormula').textContent='상품 마진 '+(base==null?'?':won(base))+(partial&&s?' (판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')':'')+' − 광고비 '+(spendKrw==null?'?':won(spendKrw))+(partial?' (전체)':'');
+    byId('salesFormula').textContent='상품 마진 '+(base==null?'?':won(base))+(partial&&s?' (판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')':'')+' − 실제 광고비 '+(spendKrw==null?'?':won(spendKrw))+(partial?' (전체)':'');
     var box=byId('salesChips');box.replaceChildren();
     chips.forEach(function(c){
       var chip=el(c.action?'button':'span','sales-chip'+(c.tone?' '+c.tone:''),c.text);
       if(c.action){chip.type='button';chip.addEventListener('click',function(){
-        if(c.action==='products'){byId('salesProductsBox').open=true;byId('salesProductsBox').scrollIntoView({block:'start',behavior:'smooth'});}
+        if(c.action==='products'){app.showView('calculator');window.dispatchEvent(new CustomEvent('launchroas:open-product-picker'));}
         else byId('salesFxRate').focus();
       });}
       box.appendChild(chip);
@@ -179,68 +179,6 @@
     lines.push(['상품 마진',m.total,'=']);
     if(spendKrw!=null){lines.push(['원화 광고비 (전체)',spendKrw,'−']);lines.push([s.partial?'일부 상품 기준 남은 금액':'남은 금액',profit,'=']);}
     lines.forEach(function(l){var r=el('div','breakdown-row'+(l[2]==='='?' total':''));r.append(el('span','',l[2]+' '+l[0]),el('strong','',won(l[1])));box.appendChild(r);});
-  }
-
-  function calcLabel(c){return (c.product_name||'이름 없는 상품')+' · 판매가 '+MC.fmtWon(c.input.price);}
-  function linkText(l){return l.product_label+' · 1개당 '+won(l.unit_margin);}
-  function linkTools(target,variant){
-    var tools=el('div','sales-product-tools');
-    if(!state.calcs.length)return tools;
-    var pick=el('select');pick.appendChild(new Option('저장한 계산 선택',''));
-    state.calcs.forEach(function(c,i){pick.appendChild(new Option(calcLabel(c),String(i)));});
-    var save=el('button','secondary','저장');save.type='button';
-    save.addEventListener('click',function(){if(pick.value!=='')saveLink(target,state.calcs[Number(pick.value)],variant,save);});
-    tools.append(pick,save);return tools;
-  }
-  // 상품별 한 줄이 기본. 상품 기본 마진(variant '')은 모든 옵션에 적용되고, 옵션별 설정이 있으면 그 옵션에는 그것이 우선한다.
-  function renderProducts(box,s){
-    if(!s.products.length){box.textContent='이 기간에 판매된 상품이 없어요.';return;}
-    if(!state.calcs.length)box.appendChild(el('p','small','마진 계산기에서 상품 계산을 먼저 저장하세요.'));
-    var groups={},order=[];
-    s.products.forEach(function(p){
-      var g=groups[p.product_no];
-      if(!g){g=groups[p.product_no]={product_no:p.product_no,product_name:p.product_name,soldQty:0,unlinkedQty:0,variants:[]};order.push(g);}
-      g.soldQty+=p.soldQty;if(!p.link)g.unlinkedQty+=p.soldQty;g.variants.push(p);
-    });
-    order.sort(function(a,b){return b.soldQty-a.soldQty;}).forEach(function(g){
-      var base=state.links.find(function(l){return String(l.product_no)===String(g.product_no)&&!l.variant_code;});
-      var overrides=state.links.filter(function(l){return String(l.product_no)===String(g.product_no)&&l.variant_code;});
-      var line=el('div','sales-product'),name=el('div','sales-product-name');
-      name.append(el('strong','',g.product_name||('상품 번호 '+g.product_no)),el('small','','판매 '+count(g.soldQty)));
-      name.appendChild(el('small',g.unlinkedQty?'sales-unlinked':'',
-        base?'기본 마진: '+linkText(base)+(overrides.length?' · 옵션별 설정 '+count(overrides.length)+' 우선':'')
-          :g.unlinkedQty?'마진 미등록 '+count(g.unlinkedQty)+(overrides.length?' · 옵션별 설정 '+count(overrides.length):''):'옵션별 설정으로 모두 연결됨'));
-      line.append(name,linkTools({product_no:g.product_no,product_name:g.product_name},''));
-      var toggle=el('button','inline-button sales-variants-toggle','옵션별 설정 ('+count(g.variants.length)+')');toggle.type='button';
-      var list=el('div','sales-variants');list.hidden=true;
-      toggle.addEventListener('click',function(){list.hidden=!list.hidden;});
-      g.variants.forEach(function(v){
-        var own=overrides.find(function(l){return l.variant_code===v.variant_code;});
-        var vr=el('div','sales-variant'),vn=el('div','sales-product-name');
-        vn.append(el('strong','',v.option_value||v.variant_code||'옵션 없음'),
-          el('small',v.link?'':'sales-unlinked','판매 '+count(v.soldQty)+' · '+(own?'옵션별: '+linkText(own):v.link?'상품 기본 적용':'마진 미등록')));
-        vr.append(vn,linkTools({product_no:g.product_no,product_name:g.product_name},v.variant_code));
-        list.appendChild(vr);
-      });
-      line.append(toggle,list);box.appendChild(line);
-    });
-  }
-
-  async function saveLink(product,calc,variant,button){
-    var ctx=app.getContext();if(!calc||!ctx.userId)return;
-    var split=S.splitMargin(calc.input,MC);
-    if(!split){byId('salesMessage').textContent='이 계산은 다시 계산할 수 없어 연결하지 않았어요.';return;}
-    var data={store_id:String(ctx.storeId),product_no:product.product_no,variant_code:variant||'',cafe24_product_name:product.product_name,
-      product_label:String(calc.product_name||'상품').trim().slice(0,40),source_saved_at:calc.saved_at,unit_margin:split.unitMargin,order_adjust:split.orderAdjust,
-      input:calc.input,linked_at:new Date().toISOString()};
-    var existing=state.links.find(function(l){return String(l.product_no)===String(product.product_no)&&(l.variant_code||'')===data.variant_code;});
-    button.disabled=true;
-    var res=existing
-      ?await ctx.client.from('tool_records').update({data:data}).eq('id',existing._id).eq('user_id',ctx.userId)
-      :await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:LINK,data:data});
-    button.disabled=false;
-    if(res.error){byId('salesMessage').textContent='마진 연결을 저장하지 못했어요.';return;}
-    dataKey='';refresh(app.getContext());
   }
 
   byId('salesFxSave').addEventListener('click',async function(){
@@ -267,4 +205,9 @@
     render(ctx);
   }
   app.subscribe(refresh);
+  // 마진 계산기에서 상품 비용을 저장하면 같은 기간으로 다시 계산한다.
+  window.addEventListener('launchroas:product-margin-saved',function(event){
+    if(String(event.detail&&event.detail.storeId)!==String(app.getContext().storeId))return;
+    dataKey='';refresh(app.getContext());
+  });
 })();
