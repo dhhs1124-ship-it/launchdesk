@@ -1,0 +1,63 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const S=require('./sales-core.js');
+const MC=require('./margin-calc.js');
+
+const item=(o)=>Object.assign({product_no:1,variant_code:'P1A',product_name:'타월',quantity:1,claim_quantity:0,order_status:'N40',status_code:'N1'},o);
+
+test('실제 응답에서 확인한 상태 조합: 정상만 판매, 취소·입금 전 취소·교환 원상품은 제외',()=>{
+  assert.deepEqual(S.classifyItem(item({quantity:2})),{sold:2,excluded:{}});
+  assert.deepEqual(S.classifyItem(item({order_status:'N50'})),{sold:1,excluded:{}});
+  assert.deepEqual(S.classifyItem(item({status_code:'C2',order_status:'C40',quantity:3})),{sold:0,excluded:{canceled:3}});
+  assert.deepEqual(S.classifyItem(item({status_code:'C1',order_status:'C47'})),{sold:0,excluded:{canceledBeforePayment:1}});
+  // 교환: 원 상품(E1)은 빼고 교환 상품(N2)만 센다 — 같은 수량이 두 번 잡히지 않는다.
+  assert.deepEqual(S.classifyItem(item({status_code:'E1',order_status:'E40',quantity:6})),{sold:0,excluded:{exchangedOriginal:6}});
+  assert.deepEqual(S.classifyItem(item({status_code:'N2',order_status:'N40',quantity:6})),{sold:6,excluded:{}});
+});
+
+test('반품·입금 전·부분 클레임·모르는 코드는 판매에서 뺀다',()=>{
+  assert.deepEqual(S.classifyItem(item({status_code:'C3',order_status:'R40',quantity:2})),{sold:0,excluded:{returned:2}});
+  assert.deepEqual(S.classifyItem(item({order_status:'N00',quantity:2})),{sold:0,excluded:{unpaid:2}});
+  assert.deepEqual(S.classifyItem(item({quantity:3,claim_quantity:1,order_status:'N20'})),{sold:2,excluded:{claimPending:1}});
+  assert.deepEqual(S.classifyItem(item({status_code:'Z9',quantity:1})),{sold:0,excluded:{unknown:1}});
+});
+
+test('주문당 비용은 상품 수량만큼 곱하지 않고 주문에 한 번만 뺀다',()=>{
+  const input={price:30000,qty:1,sellerDiscount:0,unitCost:12000,customerShipping:0,actualShipping:3000,packaging:500,feeRate:5,
+    feeBase:'after_discount',feeVat:'included',shippingFeeMode:'none',shippingFeeRate:null,pgRate:0,otherCost:0,adMode:'none',adRate:null,adAmount:null,targetProfit:null};
+  const split=S.splitMargin(input,MC);
+  assert.deepEqual(split,{unitMargin:16500,orderAdjust:-3500}); // 30,000 − 12,000 − 1,500 / 배송 3,000 + 포장 500
+  const full=MC.calculate(input).result.preAd;
+  assert.equal(split.unitMargin+split.orderAdjust,full,'수량 1개 주문은 저장한 주문당 잔액과 같다');
+  const links=[{product_no:1,variant_code:'',unit_margin:split.unitMargin,order_adjust:split.orderAdjust}];
+  const s=S.summarize([{order_id:'A',items:[item({quantity:3})]}],links);
+  assert.equal(s.marginTotal,16500*3-3500,'3개 주문: 배송·포장비는 한 번');
+  assert.equal(MC.calculate(Object.assign({},input,{qty:3})).result.preAd,s.marginTotal,'계산기의 3개 주문 결과와 같다');
+});
+
+test('합계: 미등록 상품은 계산에서 빼고 수량만 따로 센다, 취소 주문은 유효 주문이 아니다',()=>{
+  const links=[{product_no:1,variant_code:'',unit_margin:10000,order_adjust:-3000},{product_no:2,variant_code:'P2B',unit_margin:5000,order_adjust:-4000}];
+  const orders=[
+    {order_id:'A',items:[item({quantity:2}),item({product_no:2,variant_code:'P2B'})]},       // 연결 2종 → 주문 비용은 더 큰 4,000원 한 번
+    {order_id:'B',items:[item({product_no:3,variant_code:'P3A',quantity:5})]},              // 미등록 상품만
+    {order_id:'C',items:[item({quantity:1}),item({product_no:3,variant_code:'P3A'})]},     // 연결 + 미등록 섞임
+    {order_id:'D',items:[item({status_code:'C2',order_status:'C40',quantity:4})]},         // 전체 취소
+    {order_id:'E',items:[item({product_no:2,variant_code:'P2C'})]}                          // 다른 옵션 → 미등록
+  ];
+  const s=S.summarize(orders,links);
+  assert.equal(s.orders,5);assert.equal(s.validOrders,4);
+  assert.equal(s.soldQty,2+1+5+1+1+1);
+  assert.equal(s.linkedQty,4);assert.equal(s.unlinkedQty,7);
+  assert.deepEqual(s.excluded,{canceled:4});
+  assert.equal(s.marginTotal,(10000*2+5000-4000)+(10000-3000));
+  assert.equal(s.ordersWithLinked,2);assert.equal(s.ordersMixed,1);
+  assert.equal(s.products.find(p=>p.product_no===3).link,null);
+  assert.equal(S.summarize([],links).marginTotal,null,'판매가 없으면 0원이 아니라 계산 없음');
+});
+
+test('외화 광고비는 저장한 환율이 있을 때만 원화로 바꾼다',()=>{
+  assert.equal(S.adSpendKrw(79.75,'USD',{currency:'USD',krw_per_unit:1400}),111650);
+  assert.equal(S.adSpendKrw(79.75,'USD',null),null);
+  assert.equal(S.adSpendKrw(79.75,'USD',{currency:'EUR',krw_per_unit:1500}),null);
+  assert.equal(S.adSpendKrw(50000,'krw',null),50000);
+});

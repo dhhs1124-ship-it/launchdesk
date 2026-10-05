@@ -45,12 +45,12 @@ test('광고 세트와 광고를 계산기에 연결하며 Meta 전환 수를 �
   button.events.click();
   assert.equal(opened.length,2);
 });
-async function summaries(links,records){
-  const list=node('div'),adsets=links.map((_,i)=>({adset_id:String(100+i),adset_name:'세트'+i,metrics:{spend:30000,purchase:{observed:true,value:4}}}));
-  const client={from:(table)=>query(table==='ad_margin_links'?links:records.map(data=>({data}))),functions:{invoke:async()=>({data:{ok:true,account:{currency:'KRW'},campaigns:[{campaign_name:'캠페인',adsets}]}})}};
-  const ctx={client,userId:'user',storeId:'store',metaAccount:{id:'meta',status:'connected'},period:{kind:'today',date:null}};
+async function summaries(links,records,{currency='KRW',spend=30000,fx=null}={}){
+  const list=node('div'),adsets=links.map((_,i)=>({adset_id:String(100+i),adset_name:'세트'+i,metrics:{spend,purchase:{observed:true,value:4}}}));
+  const client={from:(table)=>query(table==='ad_margin_links'?links:records.map(data=>({data}))),functions:{invoke:async()=>({data:{ok:true,account:{currency},campaigns:[{campaign_name:'캠페인',adsets}]}})}};
+  const ctx={client,userId:'user',storeId:'store',metaAccount:{id:'meta',status:'connected'},period:{kind:'today',date:null},fx};
   const document={getElementById(id){return id==='adPerformanceList'?list:node('p');},createElement:node};
-  vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:{subscribe(fn){fn(ctx);},getContext(){return ctx;}},addEventListener(){}},document,Intl,Number,Date,Math,String,Promise});
+  vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:{subscribe(fn){fn(ctx);},getContext(){return ctx;}},addEventListener(){},LaunchRoasSales:require('./sales-core.js')},document,Intl,Number,Date,Math,String,Promise});
   await settle();await settle();
   return list.children.map(row=>texts(row.children[2]).join(' | '));
 }
@@ -63,7 +63,8 @@ test('예상 잔액 카드는 계산 근거·미반영 항목·저장 시점을 
     {meta_adset_id:'102',product_label:'타월C',pre_ad:10000,source_saved_at:linkedAt},
     {meta_adset_id:'103',product_label:'타월D',pre_ad:10000,source_saved_at:null}
   ],[calc('타월A','2026-09-20T00:00:00.000Z',8000),calc('타월B','2026-09-20T00:00:00.000Z',10000),calc('타월C','2026-08-01T00:00:00.000Z',5000),calc('타월D','2026-09-20T00:00:00.000Z',5000)]);
-  assert.match(changed,/광고 전환 기준 예상 잔액 \| 10,000원/); // 10,000원 × 4건 − 30,000원
+  assert.match(changed,/광고 전환 기준 예상 잔액 \(광고별 추정\) \| 10,000원/); // 10,000원 × 4건 − 30,000원
+  assert.match(changed,/실제 광고별 이익이 아니에요/);
   assert.match(changed,/Meta가 집계한 구매 수로 계산/);
   assert.match(changed,/취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님/);
   assert.match(changed,/사용한 마진 기준: 타월A · 주문당 광고 전 잔액 10,000원 · 2026\. 9\. 1\./);
@@ -72,4 +73,13 @@ test('예상 잔액 카드는 계산 근거·미반영 항목·저장 시점을 
   assert.doesNotMatch(olderOnly,/갱신 필요/); // 연결 이전 기록과는 비교하지 않는다
   assert.match(noDate,/저장 시점 확인 불가/);
   assert.doesNotMatch(noDate,/갱신 필요/); // 연결 시점을 모르면 판단하지 않는다
+});
+
+test('USD 광고계정은 저장한 환율이 있을 때만 광고별 추정을 계산하고, 없으면 0원 대신 환율을 안내한다',async()=>{
+  const link=[{meta_adset_id:'100',product_label:'타월A',pre_ad:10000,source_saved_at:'2026-09-01T00:00:00.000Z'}];
+  const [noFx]=await summaries(link,[],{currency:'USD',spend:20});
+  assert.match(noFx,/계산 안 함 \| 광고비 환율을 저장하면 계산해요/);
+  const [withFx]=await summaries(link,[],{currency:'USD',spend:20,fx:{currency:'USD',krw_per_unit:1400}});
+  assert.match(withFx,/\| 12,000원 \|/); // 10,000원 × 4건 − 20달러 × 1,400원
+  assert.match(withFx,/광고비 28,000원 \(저장한 환율 적용\)/);
 });

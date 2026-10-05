@@ -13,9 +13,11 @@
   var viewState = {cafe:null,meta:null}, listeners = [];
   // OAuth 복귀 직후 한 번만 쓰는 시작 대상({provider,status,target})과 그 판정 결과({provider,status,storeId|null}).
   var returnTarget = null, returnResult = null, RETURN_TTL = 15 * 60 * 1000;
-  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),connectionsLoaded:connectionsLoaded,cafeAccount:selectedCafe,metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date},returnResult:returnResult}; }
+  // 선택 쇼핑몰의 저장된 광고비 환율({currency,krw_per_unit,saved_at}) — sales.js가 불러와 넣는다.
+  var fxRate = null;
+  function context(){ return {client:sb,userId:dashboardReady ? userId : null,storeId:byId('storeSelect').value,stores:stores.slice(),connectionsLoaded:connectionsLoaded,cafeAccount:selectedCafe,metaAccount:selectedMeta,metaData:viewState.meta,period:{kind:period.kind,date:period.date},returnResult:returnResult,fx:fxRate}; }
   function publish(){ listeners.forEach(function(fn){try{fn(context());}catch(e){console.warn('[launchroas] 구독자 오류',e);}}); }
-  window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());},reloadStores:function(){return loadStores(++requestId);},selectStore:function(id){byId('storeSelect').value=id;resetCards();publish();return loadSelected(id,++requestId);},expectReturn:function(info){returnTarget=info;}};
+  window.LaunchRoasApp = {getContext:context,subscribe:function(fn){listeners.push(fn);fn(context());},reloadStores:function(){return loadStores(++requestId);},selectStore:function(id){byId('storeSelect').value=id;resetCards();publish();return loadSelected(id,++requestId);},expectReturn:function(info){returnTarget=info;},setFx:function(v){if(JSON.stringify(v)===JSON.stringify(fxRate))return;fxRate=v;publish();}};
   // 시작 기록이 같은 사용자·제공자·유효 시간이고 현재 사용자의 쇼핑몰일 때만 복원한다.
   function returnStoreId(r){
     var t = r.target || {}, age = Date.now() - Number(t.at);
@@ -38,7 +40,7 @@
     message('orderNote', '연결 상태 확인 전'); message('adNote', '광고계정 상태 확인 전');
     ['briefList','adState','monthSummary'].forEach(function(id){byId(id).replaceChildren();});
     setConnection('cafeConnection','Cafe24 확인 중','loading');setConnection('metaConnection','Meta 확인 중','loading');
-    viewState = {cafe:null,meta:null}; selectedCafe = null; selectedMeta = null; connectionsLoaded = false;
+    viewState = {cafe:null,meta:null}; selectedCafe = null; selectedMeta = null; connectionsLoaded = false; fxRate = null;
   }
   function setConnection(id,text,state){var pill=byId(id);pill.textContent=text;pill.dataset.state=state;}
   function signedOut(){
@@ -218,14 +220,14 @@
     if(id !== requestId) return;
     var data = result.data;
     if(result.error || !data || data.ok !== true){
-      message('adNote','조회 실패');viewState.meta={error:true};showOverview();return;
+      message('adNote','조회 실패');viewState.meta={error:true};showOverview();publish();return;
     }
     viewState.meta=data;
     var today = period.kind==='month' ? data.month || {} : period.kind==='today' ? data.today || {} : data.selected || {};
     var currency = data.account && data.account.currency;
     message('adSpend',metaMoney(today.spend,currency));
     message('adRoas',today.roas == null ? '—' : Math.round(today.roas * 100).toLocaleString('ko-KR')+'%');
-    message('adNote','Meta 광고계정 시간대 기준');
+    message('adNote','Meta 구매 '+(Number(today.purchase_count)||0).toLocaleString('ko-KR')+'건 · 광고계정 시간대'+(data.account&&data.account.timezone_name?' ('+data.account.timezone_name+')':'')+' 기준');
     showOverview();publish();
   }
   byId('authMode').addEventListener('click', function(){

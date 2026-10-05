@@ -5,7 +5,7 @@
   var list=document.getElementById('adPerformanceList');
   var message=document.getElementById('adPerformanceMessage');
   var more=document.getElementById('adPerformanceMore');
-  var currentKey='',generation=0,accountCurrency='KRW',activeRange=null,marginLinks={},marginRecords=null;
+  var currentKey='',generation=0,accountCurrency='KRW',activeRange=null,marginLinks={},marginRecords=null,currentFx=null;
   function money(value){
     try{return new Intl.NumberFormat('ko-KR',{style:'currency',currency:accountCurrency,maximumFractionDigits:2}).format(Number(value)||0);}
     catch(e){return (accountCurrency+' '+(Number(value)||0).toLocaleString('ko-KR'));}
@@ -32,17 +32,19 @@
   function marginSummary(adset,m){
     var link=marginLinks[String(adset.adset_id)],box=element('div','ad-margin-summary');
     if(!link){box.textContent='연결된 상품·마진 없음';return box;}
-    var observed=!!(m.purchase&&m.purchase.observed),computable=accountCurrency==='KRW'&&observed;
+    // 외화 계정은 사용자가 저장한 환율로만 원화 환산한다(없으면 계산하지 않음).
+    var spendKrw=window.LaunchRoasSales?window.LaunchRoasSales.adSpendKrw(m.spend||0,accountCurrency,currentFx):(accountCurrency==='KRW'?Number(m.spend||0):null);
+    var observed=!!(m.purchase&&m.purchase.observed),computable=spendKrw!=null&&observed;
     var title=element('div','ad-margin-title');
-    title.append(element('span','','광고 전환 기준 예상 잔액'),element('strong','',computable?won(Number(link.pre_ad)*Number(m.purchase.value)-Number(m.spend||0)):'계산 안 함'));
+    title.append(element('span','','광고 전환 기준 예상 잔액 (광고별 추정)'),element('strong','',computable?won(Number(link.pre_ad)*Number(m.purchase.value)-spendKrw):'계산 안 함'));
     box.append(title);
-    box.append(element('small','',computable?'Meta가 집계한 구매 수로 계산 · 구매 '+number(m.purchase.value)+'건 × 주문당 광고 전 잔액 − 광고비 '+won(m.spend||0)
-      :accountCurrency!=='KRW'?'원화 광고계정만 계산해요.':'Meta가 집계한 구매 수가 없어 계산하지 않았어요.'));
+    box.append(element('small','',computable?'Meta가 집계한 구매 수로 계산 · 구매 '+number(m.purchase.value)+'건 × 주문당 광고 전 잔액 − 광고비 '+won(spendKrw)+(accountCurrency!=='KRW'?' (저장한 환율 적용)':'')
+      :spendKrw==null?'광고비 환율을 저장하면 계산해요(실제 판매 기준 패널).':'Meta가 집계한 구매가 없어 계산하지 않았어요.'));
     if(computable)box.append(element('p','estimate-caution','취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님'));
     box.append(element('small','','사용한 마진 기준: '+link.product_label+' · 주문당 광고 전 잔액 '+won(link.pre_ad)+' · '+savedDate(link.source_saved_at)));
     var newer=newerMargin(link);
     if(newer)box.append(element('p','margin-stale','마진 기준 갱신 필요 · 같은 상품의 최근 저장 계산은 주문당 광고 전 잔액 '+won(newer.result.preAd)+'이에요. 상품·마진 연결에서 다시 연결해 주세요.'));
-    if(computable)box.append(element('small','','Meta 구매에는 다른 상품 구매가 포함될 수 있어요.'));
+    if(computable)box.append(element('small','','광고별 주문 귀속은 Meta 전환 기준이라 실제 광고별 이익이 아니에요. Meta 구매에는 다른 상품 구매가 포함될 수 있어요.'));
     return box;
   }
   function params(ctx,scope,adsetId){var body={store_id:ctx.storeId,scope:scope,period:ctx.period.kind};if(ctx.period.kind==='date')body.date=ctx.period.date;if(adsetId)body.adset_id=adsetId;return body;}
@@ -51,7 +53,7 @@
     var m=ad.metrics||{},card=element('div','ad-item'),heading=element('div','ad-item-heading');
     heading.append(element('strong','',ad.ad_name||'이름 없는 광고'),element('span','',adset.adset_name||'광고 세트'));
     var stats=element('div','ad-perf-stats');
-    stats.append(metric('광고비',money(m.spend)),metric('Meta 구매',m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'측정 안 됨'),metric('ROAS',percent(m.roas)),metric('링크 클릭',number(m.link_clicks)));
+    stats.append(metric('광고비',money(m.spend)),metric('Meta 구매',m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'0건 (집계 없음)'),metric('ROAS',percent(m.roas)),metric('링크 클릭',number(m.link_clicks)));
     var button=element('button','secondary','상품·마진 연결 →');button.type='button';
     button.addEventListener('click',function(){
       if(!valid(ctx,key))return;
@@ -65,7 +67,7 @@
     var row=element('article','adset-row'),head=element('div','adset-head'),name=element('div','adset-name');
     name.append(element('small','',campaign.campaign_name||'캠페인'),element('strong','',adset.adset_name||'이름 없는 광고 세트'));
     var stats=element('div','ad-perf-stats'),m=adset.metrics||{};
-    stats.append(metric('광고비',money(m.spend)),metric('Meta 구매',m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'측정 안 됨'),metric('ROAS',percent(m.roas)),metric('링크 클릭',number(m.link_clicks)));
+    stats.append(metric('광고비',money(m.spend)),metric('Meta 구매',m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'0건 (집계 없음)'),metric('ROAS',percent(m.roas)),metric('링크 클릭',number(m.link_clicks)));
     var button=element('button','adset-toggle','광고 보기 ↓');button.type='button';button.setAttribute('aria-expanded','false');
     var details=element('div','adset-details');details.hidden=true;
     button.addEventListener('click',async function(){
@@ -103,9 +105,9 @@
     Array.from(list.children).forEach(function(row,index){row.hidden=!expanded&&index>=3;});
   });
   app.subscribe(async function(ctx){
-    var key=ctx.userId+'|'+ctx.storeId+'|'+(ctx.metaAccount&&ctx.metaAccount.id)+'|'+ctx.period.kind+'|'+(ctx.period.date||'');
+    var key=ctx.userId+'|'+ctx.storeId+'|'+(ctx.metaAccount&&ctx.metaAccount.id)+'|'+ctx.period.kind+'|'+(ctx.period.date||'')+'|'+JSON.stringify(ctx.fx||null);
     if(key===currentKey)return;
-    currentKey=key;var id=++generation;list.replaceChildren();marginLinks={};marginRecords=null;more.hidden=true;more.setAttribute('aria-expanded','false');more.textContent='광고 세트 전체 보기 ↓';
+    currentKey=key;currentFx=ctx.fx||null;var id=++generation;list.replaceChildren();marginLinks={};marginRecords=null;more.hidden=true;more.setAttribute('aria-expanded','false');more.textContent='광고 세트 전체 보기 ↓';
     if(!ctx.userId||!ctx.storeId){message.textContent='쇼핑몰을 선택하면 광고별 성과를 볼 수 있어요.';return;}
     if(!ctx.metaAccount||ctx.metaAccount.status!=='connected'){message.textContent='Meta 광고계정을 연결하면 광고별 성과가 표시돼요.';return;}
     message.textContent='광고별 성과를 불러오는 중이에요.';

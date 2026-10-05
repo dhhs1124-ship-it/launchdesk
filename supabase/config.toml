@@ -404,6 +404,10 @@ verify_jwt = true
 [functions.meta-adset-insights]
 verify_jwt = true
 
+# cafe24-order-items — LaunchROAS 실제 판매 집계용 주문 상품 조회(저장하지 않음). 로그인 사용자만.
+[functions.cafe24-order-items]
+verify_jwt = true
+
 # 회원 전용 문의. verify_jwt는 anon 키 JWT도 통과시키므로 1차 관문일 뿐이고,
 # 실제 회원 확인은 함수 안에서 access token을 Supabase Auth에 직접 확인한다.
 [functions.contact-inquiry]
