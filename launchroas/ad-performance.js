@@ -147,7 +147,7 @@
       rows.forEach(function(row,index){var el=renderAdset(row.adset,row.campaign,ctx,key);el.hidden=index>=3;list.appendChild(el);});
       var count=rows.length;
       more.hidden=count<=3;if(count>3)more.textContent='광고 세트 전체 '+count+'개 보기 ↓';
-      message.textContent=count?'광고 세트 '+count+'개 · 광고 보기를 눌러 개별 광고를 확인하세요.':'선택 기간에 성과가 잡힌 광고 세트가 없어요.';
+      message.textContent=count?'광고 세트 '+count+'개':'선택 기간에 성과가 잡힌 광고 세트가 없어요.';
     }catch(e){if(id===generation&&valid(ctx,key))message.textContent='광고별 성과 조회 중 오류가 발생했어요.';}
   });
   window.addEventListener('launchroas:margin-linked',function(event){
