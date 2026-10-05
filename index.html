@@ -431,7 +431,8 @@
         <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5.5 9 2.5 3 5.5v7l6 3 6-3v-7Z"/><path d="M3 5.5 9 8.5l6-3"/><path d="M9 8.5v7"/></svg>
         쇼핑몰 준비
       </a>
-      <a data-match="/tools" href="#/tools" data-tools-target="calc">
+      <!-- 2026-10-05: 마진 계산기 · 운영 현황 메뉴는 LaunchROAS 공개 전까지 숨김(hidden). 화면 · 주소 · 저장 기록은 그대로다. -->
+      <a data-match="/tools" href="#/tools" data-tools-target="calc" hidden>
         <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="12" height="14" rx="2"/><rect x="5.5" y="4" width="7" height="3" rx="0.5"/><circle cx="5.5" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="9" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="12.5" cy="10" r="0.7" fill="currentColor" stroke="none"/><circle cx="5.5" cy="13" r="0.7" fill="currentColor" stroke="none"/><circle cx="9" cy="13" r="0.7" fill="currentColor" stroke="none"/><circle cx="12.5" cy="13" r="0.7" fill="currentColor" stroke="none"/></svg>
         마진 계산기
       </a>
@@ -448,7 +449,7 @@
         자료실
       </a>
       <span class="side-nav-divider" role="separator" aria-hidden="true"></span>
-      <a data-match="/dashboard" href="#/dashboard">
+      <a data-match="/dashboard" href="#/dashboard" hidden>
         <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="14" height="10" rx="1.5"/><polyline points="5,10 8,7 10.5,9.5 13,6"/><line x1="7" y1="16" x2="11" y2="16"/></svg>
         운영 현황
       </a>
@@ -553,7 +554,7 @@
             <div class="desk-stage">
               <nav class="desk-topnav" aria-label="홈 주요 메뉴">
                 <div class="desk-topnav-links">
-                  <a href="#/start/intro">가이드</a><a href="#/start">쇼핑몰 준비</a><a href="#/tools">마진 계산기</a><a href="#/wholesale">도매처</a><a href="#/couriers">택배 집하 상담</a><a href="#/resources">자료실</a><a href="#/dashboard">운영 현황</a><a href="#/services/setup">세팅 도움받기</a>
+                  <a href="#/start/intro">가이드</a><a href="#/start">쇼핑몰 준비</a><a href="#/tools" hidden>마진 계산기</a><a href="#/wholesale">도매처</a><a href="#/couriers">택배 집하 상담</a><a href="#/resources">자료실</a><a href="#/dashboard" hidden>운영 현황</a><a href="#/services/setup">세팅 도움받기</a>
                 </div>
                 <a class="desk-topnav-auth" id="deskNavAuth" href="#/login">로그인</a>
                 <a class="desk-topnav-start" href="#/start">시작하기 →</a>
@@ -578,7 +579,7 @@
               <section class="desk-panel desk-tools" aria-labelledby="deskToolsTitle">
                 <h3 id="deskToolsTitle">준비하면서 함께 쓰는 곳</h3>
                 <div class="desk-tool-list">
-                  <a class="desk-tool" href="#/tools" data-tools-target="calc">
+                  <a class="desk-tool" href="#/tools" data-tools-target="calc" hidden>
                     <span class="desk-tool-icon desk-custom-icon desk-icon-calculator" aria-hidden="true"></span>
                     <span class="desk-tool-text"><b>마진 계산기</b><small>판매 후 남는 금액 확인</small></span>
                     <svg class="desk-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6,4 10,8 6,12"/></svg>
@@ -631,7 +632,7 @@
           <!-- 이미 운영 중인 사장님 안내(2026-09 UI 재설계 2차) — 운영 대시보드는
                #/dashboard(운영 현황, #view-dashboard)로 분리했다. 홈에는 이 작은 링크
                카드 하나만 남기고 #opsdashRoot 계열 id는 홈에 두지 않는다(중복 없음). -->
-          <section class="desk-ops-card" aria-labelledby="deskOpsCardTitle">
+          <section class="desk-ops-card" aria-labelledby="deskOpsCardTitle" hidden>
             <div class="desk-ops-card-text">
               <h2 id="deskOpsCardTitle">이미 쇼핑몰을 운영 중이신가요?</h2>
               <p>운영을 시작한 뒤에 Cafe24 주문과 Meta 광고 성과를 연결해 볼 수 있어요. 아직 쇼핑몰이 없다면 위의 준비 단계부터 시작해도 괜찮아요.</p>
