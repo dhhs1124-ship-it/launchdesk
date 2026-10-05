@@ -140,7 +140,7 @@
     var chips=[];
     if(state.error)chips.push({text:ctx.cafeAccount&&ctx.cafeAccount.status==='connected'?'Cafe24 조회 실패':'Cafe24 미연결',tone:'warn'});
     if(ms)chips.push({text:'Meta '+ms.text,tone:ms.text==='조회 중'?'':'warn'});
-    if(s&&s.unlinkedQty)chips.push({text:'마진 미등록 '+count(s.unlinkedQty)+' → 입력하기',tone:'warn',action:'products'});
+    if(s&&s.unlinkedQty)chips.push({text:'마진 미등록 '+count(s.unlinkedQty)+' · 입력하기',tone:'warn',action:'products'});
     if(s&&s.margin.estimatedOrders)chips.push({text:'판매가 추정 '+count(s.margin.estimatedOrders,'건'),tone:''});
     if(s&&s.margin.savedOnlyOrders)chips.push({text:'저장 판매가 기준 '+count(s.margin.savedOnlyOrders,'건'),tone:''});
     if(!ms&&mp&&spendKrw==null)chips.push({text:'환율 입력 필요',tone:'warn',action:'fx'});
