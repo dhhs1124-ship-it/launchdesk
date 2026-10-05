@@ -127,6 +127,7 @@ test('일부 상품만 마진이 연결되면 부분 계산으로 표시한다',
   const s=S.summarize([paidOrder([item({quantity:1}),item({product_no:9,variant_code:'P9',quantity:2})],1,{})],[linkFor(1,calcInput({}))]);
   assert.equal(s.partial,true);assert.equal(s.linkedQty,1);assert.equal(s.unlinkedQty,2);
   assert.equal(S.summarize([paidOrder([item({quantity:1})],1,{})],[linkFor(1,calcInput({}))]).partial,false);
+  assert.equal(S.summarize([paidOrder([item({quantity:1})],1,{})],[]).partial,false,'연결 상품이 없으면 부분 계산이 아니다');
 });
 
 test('두 기준은 같은 주문끼리만 비교하고, 실제 결제 기준이 일부 주문만 계산하면 완전하지 않다고 표시한다',()=>{

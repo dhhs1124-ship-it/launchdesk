@@ -94,3 +94,54 @@
 
 ### 알려진 테스트 실패 해결
 `tests/privacy-version-consistency.test.js` 1건도 CRLF 문제였다(v1.2 migration의 CR 160개 때문에 여러 줄 비교가 실패). 읽을 때 LF로 맞추도록 바꿔 45/45 통과한다. SQL은 바꾸지 않았다.
+
+## 2026-10-05 (2) 부분 계산 · 실제 결제 기준 · 토큰 동시 갱신
+
+### 실제 결제금액으로 반영할 수 있는 범위 (운영 쇼핑몰 2026-07-06~10-05 주문 300건 응답으로 확인)
+- `orders?embed=items` 목록 응답의 item `payment_amount`는 모든 줄에서 비어 있다. 상품별 실제 결제액은 바로 읽을 수 없다.
+- item `additional_discount_price · coupon_discount_price · app_item_discount_amount`는 571줄 모두 0 또는 비어 있다(상품 단위 할인 없음).
+- 판매 상품의 Σ(product_price+option_price)×quantity = `actual_order_amount.order_price_amount`: 278/278건 일치.
+- 주문 `payment_amount` = 상품 소계 + `shipping_fee` − 주문 단위 할인(적립금 · 예치금 · 쿠폰 · 회원 · 배송비 할인 · 세트 · 앱): 249/278건 일치. 나머지 29건은 결제금액 0원이거나 위 필드에 없는 할인이 있다.
+- 주문 단위 쿠폰 65건, 적립금 10건이 있었다(상품 단위가 아님).
+- 그래서 실제 결제 기준은 다음과 같이 계산한다.
+  - (주문 결제금액 − 고객이 낸 배송비)를 상품 등록가 소계 비율로 나눈다.
+  - 원가 · 수수료율 · 주문당 비용은 연결한 계산값을 쓴다.
+  - 결제금액 0원 주문, 취소 · 클레임이 섞인 주문, 계산 입력값을 찾지 못한 연결은 사유별로 세고 이 기준에서 뺀다.
+- 두 기준은 같은 주문끼리만 비교한다. 실제 결제 기준이 연결 주문 전부를 계산하지 못하면, 예상 잔액은 모든 주문을 덮는 등록 판매가 기준으로 계산한다.
+- 2026-10-05 이번 달 실제 응답에 결제금액 0원 · 판매 상태(N1)인 주문이 1건(7개) 있다. 원인(관리자 수기 주문 · 외부 결제 등)은 Cafe24 관리자 화면에서 확인해야 한다.
+
+### 부분 계산 표시
+- 판매 수량 카드에 "마진 반영 n개 · 마진 미등록 m개"를 함께 표시한다.
+- 미등록 상품이 있으면 마진·잔액 카드 제목을 "일부 상품 기준 …"으로 바꾸고, 점선 테두리와 "· 부분 계산" 표시를 붙인다.
+- 미등록 상품은 0원 마진으로 더하지 않는다. 광고비는 전체 금액을 그대로 뺀다는 것도 안내한다.
+
+### 혼합 주문의 주문당 비용 (현재 기준과 개선안)
+- 현재 기준: 주문마다 한 번만 뺀다. 마진 상품이 2종 이상인 주문은 그중 비용이 가장 큰 상품의 주문당 비용(배송·포장·기타)을 쓴다. 화면에 해당 주문 수와 함께 표시한다.
+- 개선안: 쇼핑몰 단위로 "주문 단위 비용 설정"을 둔다.
+  - 택배비 원가(기본 · 도서산간), 포장비, 주문당 기타 비용, 결제 수수료율을 저장한다.
+  - 상품 마진 연결에는 1개당 값(판매가 · 원가 · 상품 수수료)만 남긴다. 그러면 혼합 주문도 주문 비용을 한 번, 정확한 값으로 뺄 수 있다.
+  - 저장 위치는 `tool_records`(tool_type `order_cost_setting`, store_id별 1건)로 충분하다.
+
+### Cafe24 토큰 동시 갱신 수정
+- 원인: 두 요청이 동시에 만료를 보면 둘 다 Cafe24에 refresh를 요청했다. Cafe24는 새 토큰을 발급하면 이전 refresh_token을 폐기하므로, 한쪽은 RECONNECT_REQUIRED로 실패했다. 저장 순서가 엇갈리면 폐기된 토큰이 DB에 남을 수도 있었다.
+- 수정(`_shared/cafe24-token.ts`):
+  - refresh 전에 `integration_credentials.updated_at`을 읽은 값과 비교·교체(CAS)해 한 요청만 갱신 권한을 얻는다.
+  - 나머지 요청은 최대 12초 동안 새 토큰이 저장되기를 기다렸다가 그 토큰을 쓴다.
+  - 권한을 가진 요청이 죽었으면 한 번 더 권한을 얻어 직접 갱신한다.
+  - DB 구조 변경은 없다.
+- 배포: `cafe24-order-items` v2, `cafe24-orders-sync` v12, `cafe24-store-info` v9(모두 verify_jwt=true).
+  - orders-sync v12에는 저장소에만 있던 "호출자 본인 쇼핑몰만 동기화" 조건도 함께 배포됐다.
+  - 배포 전 원본 백업 위치: `G:\launchroas-backups\cafe24-token-functions-2026-10-05`
+- 테스트: `tests/cafe24-token-concurrency.test.mjs`(가짜 Cafe24가 refresh_token을 1회용으로 폐기). 수정 전 모듈은 동시 요청 테스트에서 실패한다.
+
+### 운영 도메인 · OAuth 복귀 설정 (2026-10-05 확인)
+- `launchroas.co.kr` · `www.launchroas.co.kr`: .kr 레지스트리에서 NXDOMAIN이다. 등록되지 않았거나 위임되지 않은 상태라 사용 중이 아니다.
+- 현재 LaunchROAS 운영 주소는 Vercel 기본 주소 `https://launchroas.vercel.app` 하나다(master Production 배포). 이미 복귀 허용 목록에 있다.
+- Vercel 프로젝트의 사용자 도메인 목록은 Vercel 로그인이 없어 직접 보지 못했다. DNS 기준으로는 연결된 사용자 도메인이 없다.
+- 운영 도메인을 정하면 설정할 값:
+  - 복귀 허용 Origin: `https://<도메인>` (경로 · 끝 슬래시 없이 정확히).
+    - 적용 위치 1: Supabase 프로젝트 `zzhvckikonnalqnyatgn`의 Edge Function secret `LAUNCHROAS_RETURN_ORIGIN`. OAuth 함수 4개가 실행할 때 읽으며 재배포가 필요 없다.
+    - 적용 위치 2: `supabase/functions/_shared/return-origin.ts`의 `ALLOWED_RETURN_ORIGINS`. 이 경우 OAuth 함수 4개를 재배포하고, 콜백 2개는 `--no-verify-jwt`로 배포한다.
+  - 바꾸지 않는 값: Cafe24 · Meta 앱의 Redirect URI. 각각 `https://zzhvckikonnalqnyatgn.supabase.co/functions/v1/cafe24-oauth-callback`, `…/meta-oauth-callback` 그대로다.
+  - 복귀 주소가 없는(런치데스크) 흐름의 기본 복귀: `https://launchdesk.co.kr` (콜백의 `APP_URL`).
+  - Supabase Auth: 이메일·비밀번호 로그인에는 Redirect URL이 필요 없다. 인증 메일을 LaunchROAS로 돌리려면 Auth URL 설정에 새 Origin을 추가하고 `signUp`에 `emailRedirectTo`를 넘겨야 한다(현재 미적용).

@@ -115,7 +115,7 @@
       ['revenue','customerShipping','unitCost','fees','orderCosts','margin'].forEach(function(k){s.actual[k]+=r[k];});
     });
     s.marginTotal=s.linkedQty?Math.round(s.unitMarginTotal+s.orderAdjustTotal):null;
-    s.partial=s.unlinkedQty>0;
+    s.partial=s.linkedQty>0&&s.unlinkedQty>0; // 하나도 연결되지 않았으면 부분 계산이 아니라 계산 없음
     ['revenue','customerShipping','unitCost','fees','orderCosts','margin'].forEach(function(k){s.actual[k]=Math.round(s.actual[k]);});
     s.actual.registeredMargin=Math.round(s.actual.registeredMargin);
     s.actual.complete=s.actual.orders===s.ordersWithLinked;
