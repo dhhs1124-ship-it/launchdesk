@@ -179,3 +179,8 @@ test('미등록은 판매 수량(개)과 상품 종류(옵션은 같은 상품)�
   assert.equal(s.unlinkedQty,5,'판매 수량: L 1개 + 상품2 4개');
   assert.equal(s.productKinds,2);assert.equal(s.unlinkedKinds,2,'상품1은 L 옵션이 미등록이라 남은 설정에 포함');
 });
+
+test('남은 상품 이름을 상품 단위로 판매 많은 순으로 준다',()=>{
+  const s=S.summarize([{order_id:'A',items:[item({product_no:1,variant_code:'M',quantity:1,product_name:'티'}),item({product_no:2,variant_code:'X',quantity:3,product_name:'후드'}),item({product_no:2,variant_code:'Y',quantity:1,product_name:'후드'})]}],[]);
+  assert.deepEqual(s.unlinkedList.map(p=>[p.product_name,p.soldQty]),[['후드',4],['티',1]]);
+});

@@ -144,6 +144,10 @@
     var kinds={},open={};
     s.products.forEach(function(p){kinds[p.product_no]=true;if(!p.link)open[p.product_no]=true;});
     s.productKinds=Object.keys(kinds).length;s.unlinkedKinds=Object.keys(open).length;
+    // 남은 상품 이름(판매 많은 순) — '남은 1종'이 무엇인지 보여주기 위해.
+    var left={};
+    s.products.forEach(function(p){if(p.link)return;var x=left[p.product_no]||(left[p.product_no]={product_no:p.product_no,product_name:p.product_name,soldQty:0});x.soldQty+=p.soldQty;});
+    s.unlinkedList=Object.keys(left).map(function(k){return left[k];}).sort(function(a,b){return b.soldQty-a.soldQty;});
     return s;
   }
 

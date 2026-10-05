@@ -154,7 +154,7 @@
   }
 
   // ---- 처음 설정 안내 · 현재 상황 한 줄 — 둘 다 실제 저장 상태로만 판단한다(버튼을 눌렀다고 완료로 보지 않음) ----
-  function openProducts(){app.showView('calculator');window.dispatchEvent(new CustomEvent('launchroas:open-product-picker'));}
+  function openProducts(productNo){app.showView('calculator');window.dispatchEvent(new CustomEvent('launchroas:open-product-picker',{detail:{product_no:typeof productNo==='number'||typeof productNo==='string'?productNo:null}}));}
   function goResult(){var p=document.querySelector('.sales-profit');if(p)p.scrollIntoView({block:'start',behavior:'smooth'});}
   function setupSteps(ctx,s,profit,spendKrw,ms,mp){
     var cafeOk=!!(ctx.cafeAccount&&ctx.cafeAccount.status==='connected'),metaOk=!!(ctx.metaAccount&&ctx.metaAccount.status==='connected');
@@ -168,6 +168,7 @@
     else if(!s.soldQty)cost.text='이 기간 판매가 없어 확인할 상품이 없어요.';
     else if(!s.unlinkedQty){cost.done=true;cost.text='판매 상품 '+count(s.productKinds,'종')+' 모두 비용 저장됨';cost.button=null;}
     else cost.text=(state.range?state.range.label+' ':'')+'판매 상품 '+count(s.productKinds,'종')+' 중 '+count(s.productKinds-s.unlinkedKinds,'종')+' 저장 · 남은 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+')';
+    if(s&&s.unlinkedList&&s.unlinkedQty)cost.items=s.unlinkedList;
     // 일부 상품만 계산되면 결과는 볼 수 있어도 완료로 표시하지 않는다(전체 손익으로 오해 방지).
     var partialResult=profit!=null&&!!(s&&s.partial);
     var result={title:'광고비 빼고 남은 금액 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};
@@ -188,6 +189,13 @@
       var li=el('li','setup-step'+(x.done?' done':'')+(i===next?' next':''));
       li.append(el('span','setup-num',x.done?'✓':String(i+1)));
       var body=el('div','setup-body');body.append(el('strong','',x.title),el('small','',x.text));li.appendChild(body);
+      if(x.items&&!x.done){
+        // 남은 상품 이름을 바로 보여주고, 누르면 그 상품의 비용 입력 화면을 연다.
+        var ul=el('ul','setup-items');
+        x.items.slice(0,3).forEach(function(p){var li2=el('li'),b=el('button','inline-button',(p.product_name||'상품 '+p.product_no)+' · 판매 '+count(p.soldQty));b.type='button';b.addEventListener('click',function(){openProducts(p.product_no);});li2.appendChild(b);ul.appendChild(li2);});
+        if(x.items.length>3)ul.appendChild(el('li','small','외 '+count(x.items.length-3,'종')));
+        body.appendChild(ul);
+      }
       if(x.button&&!x.done){var b=el('button',i===next?'primary setup-btn':'secondary setup-btn',x.button.label);b.type='button';b.addEventListener('click',x.button.run);li.appendChild(b);}
       list.appendChild(li);
     });

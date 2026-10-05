@@ -189,7 +189,13 @@
   byId('calcShippingType').addEventListener('change',function(){if(this.value==='free')byId('calcCustomerShip').value='0';});
   document.querySelectorAll('[data-calc-mode]').forEach(function(b){b.addEventListener('click',function(){mode=this.getAttribute('data-calc-mode');updateControls();});});
   // 운영 현황의 "마진 미등록 → 입력하기"에서 바로 상품 목록을 연다.
-  window.addEventListener('launchroas:open-product-picker',function(){st.products=null;openPicker();});
+  window.addEventListener('launchroas:open-product-picker',async function(e){
+    var no=e.detail&&e.detail.product_no;st.products=null;
+    if(no==null){openPicker();return;}
+    byId('pmPicker').hidden=false;await loadProducts();
+    var p=(st.products||[]).find(function(x){return String(x.product_no)===String(no);});
+    if(p)select(p,'');
+  });
   app.subscribe(function(ctx){
     var key=ctx.userId+'|'+ctx.storeId;
     if(key===st.key)return;
