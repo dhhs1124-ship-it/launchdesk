@@ -33,6 +33,8 @@ export function slimOrders(orders) {
       market_id: str(order.market_id),
       // 주문 단위 금액(공식 문서 actual_order_amount: 최종 결제 내역). 고객 부담 배송비와 주문 단위 할인을 여기서 본다.
       payment_amount: num(order.payment_amount),
+      // 네이버페이로 낸 금액. 네이버페이 주문은 payment_amount가 0원이고 이 값에 결제액이 들어온다(실제 응답으로 확인).
+      naver_point: num(order.naver_point),
       actual_order_amount: pickAmounts(order.actual_order_amount),
       items: (Array.isArray(order.items) ? order.items : []).map((item) => ({
         order_item_code: str(item.order_item_code),

@@ -50,33 +50,51 @@
   function feeMult(input){return input.feeVat==='excluded'?1.1:1;}
   function shipRate(input){return input.shippingFeeMode==='same'?n(input.feeRate):input.shippingFeeMode==='separate'?n(input.shippingFeeRate):0;}
 
-  // 실제 결제 기준 한 주문(연결 상품만). Cafe24 목록 응답에는 상품별 결제액이 없어(items.payment_amount 비어 있음)
-  // 상품 결제액 = 주문 결제금액 − 고객이 낸 배송비, 이를 등록가 소계(판매가+옵션가)×수량 비율로 상품에 나눈다.
-  // 원가 · 수수료율 · 주문당 비용은 연결한 계산의 입력값을 쓴다(계산기 margin-calc.js와 같은 식).
-  function actualOrder(order,soldLines,costLink){
-    var a=order.actual_order_amount||{},pay=n(order.payment_amount);
-    var shipPaid=Math.max(0,n(a.shipping_fee)-n(a.coupon_shipping_fee_amount)-n(a.shipping_fee_discount_amount));
-    var productPaid=Math.max(0,pay-shipPaid),subtotal=0;
-    soldLines.forEach(function(l){subtotal+=l.gross;});
-    var out={revenue:0,customerShipping:shipPaid,unitCost:0,fees:0,orderCosts:0,margin:0};
-    soldLines.forEach(function(l){
+  var DISCOUNT_FIELDS=['coupon_discount_price','points_spent_amount','credits_spent_amount','membership_discount_amount',
+    'shipping_fee_discount_amount','coupon_shipping_fee_amount','set_product_discount_amount','app_discount_amount','market_other_discount_amount'];
+
+  // 주문 금액 판정. 고객이 낸 금액 = payment_amount + naver_point(네이버페이로 낸 부분, 네이버페이 주문은 payment_amount가 0원).
+  // 이 합이 "상품 소계 + 배송비 − 주문 단위 할인"과 같을 때만 실제 결제로 쓴다(운영 쇼핑몰 7~10월 비취소 주문 284/289건 일치).
+  // 아니면(일부 취소가 섞인 주문 · 마켓 주문처럼 금액이 맞지 않는 주문) Cafe24가 기록한 주문 당시 판매가(상품가+옵션가)×수량으로 추정한다.
+  function orderAmounts(order,lines,hasExcluded){
+    var a=order.actual_order_amount,gross=0;
+    lines.forEach(function(l){gross+=l.gross;});
+    var shipPaid=a?Math.max(0,n(a.shipping_fee)-n(a.coupon_shipping_fee_amount)-n(a.shipping_fee_discount_amount)):0;
+    var paid=n(order.payment_amount)+n(order.naver_point),reason;
+    if(hasExcluded)reason='partialStatus';
+    else if(!a)reason='noAmount';
+    else{
+      var disc=0;DISCOUNT_FIELDS.forEach(function(k){disc+=n(a[k]);});
+      if(paid>0&&Math.abs(paid-(n(a.order_price_amount)+n(a.shipping_fee)-disc))<1)
+        return {mode:'actual',productPaid:Math.max(0,paid-shipPaid),shipPaid:shipPaid,gross:gross};
+      reason=paid>0?'amountMismatch':'zeroPayment';
+    }
+    return {mode:'estimated',reason:reason,productPaid:gross,shipPaid:shipPaid,gross:gross};
+  }
+
+  // 연결 상품의 마진(한 주문). 상품 금액은 등록가 소계 비율로 나누고, 원가 · 수수료율 · 주문당 비용은 연결한 계산의 입력값(계산기와 같은 식).
+  function orderMargin(lines,costLink,amt){
+    var out={revenue:0,customerShipping:amt.shipPaid,unitCost:0,fees:0,orderCosts:0,margin:0};
+    lines.forEach(function(l){
       if(!l.link)return;
-      var input=l.link.input,r=subtotal>0?productPaid*l.gross/subtotal:0,m=feeMult(input);
+      var input=l.link.input,r=amt.gross>0?amt.productPaid*l.gross/amt.gross:0,m=feeMult(input);
       var feeBase=input.feeBase==='before_discount'?l.gross:r;
-      var cost=n(input.unitCost)*l.sold,fee=Math.round(feeBase*n(input.feeRate)/100*m),pg=Math.round(r*n(input.pgRate)/100*m);
-      out.revenue+=r;out.unitCost+=cost;out.fees+=fee+pg;
+      out.revenue+=r;out.unitCost+=n(input.unitCost)*l.sold;
+      out.fees+=Math.round(feeBase*n(input.feeRate)/100*m)+Math.round(r*n(input.pgRate)/100*m);
     });
     var L=costLink.input,mL=feeMult(L);
-    out.fees+=Math.round(shipPaid*shipRate(L)/100*mL)+Math.round(shipPaid*n(L.pgRate)/100*mL);
+    out.fees+=Math.round(amt.shipPaid*shipRate(L)/100*mL)+Math.round(amt.shipPaid*n(L.pgRate)/100*mL);
     out.orderCosts=Math.round(n(L.actualShipping))+Math.round(n(L.packaging))+Math.round(n(L.otherCost));
     out.margin=out.revenue+out.customerShipping-out.unitCost-out.fees-out.orderCosts;
     return out;
   }
 
+  var SUMS=['revenue','customerShipping','unitCost','fees','orderCosts','total'];
   function summarize(orders,links){
-    var s={orders:0,validOrders:0,soldQty:0,excluded:{},linkedQty:0,unlinkedQty:0,unitMarginTotal:0,orderAdjustTotal:0,
+    var s={orders:0,validOrders:0,soldQty:0,excluded:{},linkedQty:0,unlinkedQty:0,
       ordersWithLinked:0,ordersMixed:0,ordersMultiLinked:0,products:{},unknownCodes:{},
-      actual:{orders:0,linkedQty:0,revenue:0,customerShipping:0,unitCost:0,fees:0,orderCosts:0,margin:0,registeredMargin:0,excluded:{}}};
+      margin:{actualOrders:0,estimatedOrders:0,savedOnlyOrders:0,estimated:{},estimatedTotal:0,
+        revenue:0,customerShipping:0,unitCost:0,fees:0,orderCosts:0,total:0}};
     (orders||[]).forEach(function(order){
       s.orders++;
       var sold=0,costLink=null,hasUnlinked=false,hasExcluded=false,lines=[],distinct={};
@@ -91,7 +109,7 @@
         p.soldQty+=c.sold;p.link=link||null;
         lines.push({sold:c.sold,link:link||null,gross:(n(item.product_price)+n(item.option_price))*c.sold});
         if(link){
-          s.linkedQty+=c.sold;s.unitMarginTotal+=Number(link.unit_margin)*c.sold;
+          s.linkedQty+=c.sold;
           distinct[(link.product_no)+'|'+(link.variant_code||'')]=true;
           // 주문당 비용은 주문에 한 번만 — 연결 상품이 여럿이면 비용이 가장 큰(조정액이 가장 작은) 상품 하나 기준.
           if(!costLink||Number(link.order_adjust)<Number(costLink.order_adjust))costLink=link;
@@ -100,26 +118,27 @@
       if(!sold)return;
       s.validOrders++;s.soldQty+=sold;
       if(!costLink)return;
-      s.ordersWithLinked++;s.orderAdjustTotal+=Number(costLink.order_adjust)||0;
+      s.ordersWithLinked++;
       if(hasUnlinked)s.ordersMixed++;
       if(Object.keys(distinct).length>1)s.ordersMultiLinked++;
-      // 실제 결제 기준은 금액을 상품에 나눌 수 있는 주문만 — 아니면 사유별로 세고 빼다.
-      var reason=hasExcluded?'partialStatus':!order.actual_order_amount?'noAmount':!(n(order.payment_amount)>0)?(order.order_place_id==='NCHECKOUT'||order.market_id==='NCHECKOUT'?'naverPay':'zeroPayment'):
-        lines.some(function(l){return l.link&&!l.link.input;})?'noInput':null;
-      if(reason){s.actual.excluded[reason]=(s.actual.excluded[reason]||0)+1;return;}
-      var r=actualOrder(order,lines,costLink);
-      s.actual.orders++;
-      // 같은 주문을 등록 판매가 기준으로 계산한 값 — 두 기준을 같은 주문끼리 비교하기 위함.
-      s.actual.registeredMargin+=Number(costLink.order_adjust)||0;
-      lines.forEach(function(l){if(l.link){s.actual.linkedQty+=l.sold;s.actual.registeredMargin+=Number(l.link.unit_margin)*l.sold;}});
-      ['revenue','customerShipping','unitCost','fees','orderCosts','margin'].forEach(function(k){s.actual[k]+=r[k];});
+      var m=s.margin,amt=orderAmounts(order,lines,hasExcluded);
+      // Cafe24 상품가가 없거나 계산 입력값을 못 찾으면 저장한 1개당 마진 · 주문당 조정액으로만 계산한다.
+      if(!(amt.gross>0)||!costLink.input||lines.some(function(l){return l.link&&!l.link.input;})){
+        m.savedOnlyOrders++;
+        var saved=Number(costLink.order_adjust)||0;
+        lines.forEach(function(l){if(l.link)saved+=Number(l.link.unit_margin)*l.sold;});
+        m.total+=saved;return;
+      }
+      var r=orderMargin(lines,costLink,amt);
+      ['revenue','customerShipping','unitCost','fees','orderCosts'].forEach(function(k){m[k]+=r[k];});
+      m.total+=r.margin;
+      if(amt.mode==='actual')m.actualOrders++;
+      else{m.estimatedOrders++;m.estimated[amt.reason]=(m.estimated[amt.reason]||0)+1;m.estimatedTotal+=r.margin;}
     });
-    s.marginTotal=s.linkedQty?Math.round(s.unitMarginTotal+s.orderAdjustTotal):null;
+    SUMS.forEach(function(k){s.margin[k]=Math.round(s.margin[k]);});
+    s.margin.estimatedTotal=Math.round(s.margin.estimatedTotal);
+    s.marginTotal=s.linkedQty?s.margin.total:null;
     s.partial=s.linkedQty>0&&s.unlinkedQty>0; // 하나도 연결되지 않았으면 부분 계산이 아니라 계산 없음
-    ['revenue','customerShipping','unitCost','fees','orderCosts','margin'].forEach(function(k){s.actual[k]=Math.round(s.actual[k]);});
-    s.actual.registeredMargin=Math.round(s.actual.registeredMargin);
-    s.actual.complete=s.actual.orders===s.ordersWithLinked;
-    if(!s.actual.orders){s.actual.margin=null;s.actual.registeredMargin=null;}
     s.products=Object.keys(s.products).map(function(k){return s.products[k];}).sort(function(a,b){return b.soldQty-a.soldQty;});
     return s;
   }

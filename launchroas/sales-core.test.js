@@ -65,43 +65,67 @@ test('외화 광고비는 저장한 환율이 있을 때만 원화로 바꾼다'
 const calcInput=(o)=>Object.assign({price:30000,qty:1,sellerDiscount:0,unitCost:12000,customerShipping:0,actualShipping:3000,packaging:500,feeRate:5,
   feeBase:'after_discount',feeVat:'included',shippingFeeMode:'none',shippingFeeRate:null,pgRate:0,otherCost:0,adMode:'none',adRate:null,adAmount:null,targetProfit:null},o);
 const linkFor=(product_no,input,variant='')=>{const sp=S.splitMargin(input,MC);return {product_no,variant_code:variant,input,unit_margin:sp.unitMargin,order_adjust:sp.orderAdjust};};
-const paidOrder=(items,pay,amounts)=>({order_id:'X',payment_amount:pay,actual_order_amount:Object.assign({shipping_fee:0},amounts),items});
+// 주문 당시 상품 소계는 Cafe24 필드(order_price_amount)를 따로 주지 않으면 줄 가격으로 채운다.
+const paidOrder=(items,pay,amounts,extra)=>{
+  const sub=items.reduce((t,i)=>t+((i.product_price||0)+(i.option_price||0))*(i.quantity||0),0);
+  return Object.assign({order_id:'X',payment_amount:pay,actual_order_amount:Object.assign({order_price_amount:sub,shipping_fee:0},amounts),items},extra);
+};
 
-test('할인이 없으면 실제 결제 기준 마진은 등록 판매가 기준과 같다(고객 배송비 포함)',()=>{
+test('실제 결제: 할인이 없으면 계산기의 같은 수량 결과와 같다(고객 배송비 포함)',()=>{
   const input=calcInput({customerShipping:3000,shippingFeeMode:'same'});
   const s=S.summarize([paidOrder([item({quantity:3,product_price:30000,option_price:0})],30000*3+3000,{shipping_fee:3000})],[linkFor(1,input)]);
-  assert.equal(s.actual.orders,1);
-  assert.equal(s.actual.margin,s.marginTotal);
+  assert.equal(s.margin.actualOrders,1);
   assert.equal(s.marginTotal,MC.calculate(Object.assign({},input,{qty:3})).result.preAd);
-  assert.deepEqual({rev:s.actual.revenue,ship:s.actual.customerShipping,cost:s.actual.unitCost,orderCosts:s.actual.orderCosts},{rev:90000,ship:3000,cost:36000,orderCosts:3500});
+  assert.deepEqual({rev:s.margin.revenue,ship:s.margin.customerShipping,cost:s.margin.unitCost,orderCosts:s.margin.orderCosts},{rev:90000,ship:3000,cost:36000,orderCosts:3500});
 });
 
-test('주문 단위 쿠폰·적립금은 등록가 소계 비율로 상품에 나눠 실제 결제 기준에 반영한다',()=>{
+test('실제 결제: 주문 단위 쿠폰은 등록가 소계 비율로 상품에 나누고, 주문당 비용은 한 번',()=>{
   const a=calcInput({unitCost:10000}),b=calcInput({price:10000,unitCost:4000});
-  // 등록가 소계 30,000 + 10,000 = 40,000, 쿠폰 4,000 → 실제 상품 결제액 36,000을 3:1로 27,000 / 9,000
   const order=paidOrder([item({product_no:1,quantity:1,product_price:30000}),item({product_no:2,variant_code:'P2',quantity:1,product_price:10000})],36000+3000,
     {shipping_fee:3000,coupon_discount_price:4000});
   const s=S.summarize([order],[linkFor(1,a),linkFor(2,b)]);
-  assert.equal(s.actual.revenue,36000);
-  assert.equal(s.actual.unitCost,14000);
-  assert.equal(s.actual.fees,Math.round(27000*0.05)+Math.round(9000*0.05));
-  assert.equal(s.actual.orderCosts,3500,'두 상품 주문이어도 주문당 비용은 한 번');
-  assert.equal(s.ordersMultiLinked,1);
-  assert.equal(s.actual.margin,36000+3000-14000-1800-3500);
-  assert.ok(s.actual.margin<s.marginTotal+3000,'쿠폰만큼 등록가 기준보다 낮다');
+  assert.equal(s.margin.actualOrders,1);
+  assert.equal(s.margin.revenue,36000);assert.equal(s.margin.unitCost,14000);
+  assert.equal(s.margin.fees,Math.round(27000*0.05)+Math.round(9000*0.05));
+  assert.equal(s.margin.orderCosts,3500);assert.equal(s.ordersMultiLinked,1);
+  assert.equal(s.marginTotal,36000+3000-14000-1800-3500);
 });
 
-test('실제 결제 기준에서 빼는 주문: 일부 취소가 섞인 주문 · 결제금액 0원 · 계산 입력값 없음 (사유별로 센다)',()=>{
-  const input=calcInput({}),link=linkFor(1,input);
+test('네이버페이: payment_amount 0원 + naver_point = 소계 + 배송비면 실제 결제로 계산한다(실제 응답 55/55건 일치)',()=>{
+  const link=linkFor(1,calcInput({}));
+  const naver=paidOrder([item({quantity:3,product_price:21900})],0,{shipping_fee:3000},{order_place_id:'NCHECKOUT',naver_point:65700+3000});
+  const s=S.summarize([naver],[link]);
+  assert.equal(s.margin.actualOrders,1);assert.deepEqual(s.margin.estimated,{});
+  assert.equal(s.margin.revenue,65700,'저장한 판매가(30,000원)가 아니라 주문 당시 판매가(21,900원) 기준');
+  assert.equal(s.marginTotal,65700+3000-12000*3-Math.round(65700*0.05)-3500);
+});
+
+test('실제 금액을 확인할 수 없는 주문은 주문 당시 판매가로 추정하고 사유별로 센다',()=>{
+  const link=linkFor(1,calcInput({}));
   const s=S.summarize([
-    paidOrder([item({quantity:2,product_price:30000}),item({status_code:'C2',order_status:'C40',quantity:1,product_price:30000})],60000,{}), // 부분 취소(줄 분리)
-    paidOrder([item({quantity:1,product_price:30000})],0,{}),
-    paidOrder([item({product_no:5,variant_code:'P5',quantity:1,product_price:30000})],30000,{})
-  ],[link,Object.assign({},linkFor(5,input,'P5'),{input:undefined})]);
-  assert.equal(s.soldQty,4,'부분 취소 주문의 남은 2개는 판매 수량에 들어간다');
-  assert.deepEqual(s.actual.excluded,{partialStatus:1,zeroPayment:1,noInput:1});
-  assert.equal(s.actual.margin,null,'계산 가능한 주문이 없으면 0원이 아니라 계산 없음');
-  assert.notEqual(s.marginTotal,null,'등록 판매가 기준은 그대로 계산된다');
+    paidOrder([item({quantity:2,product_price:21900}),item({status_code:'C2',order_status:'C40',quantity:1,product_price:21900})],43800,{}), // 일부 취소
+    paidOrder([item({quantity:1,product_price:21900})],15000,{},{order_place_id:'ably'}),   // 금액 불일치(마켓)
+    paidOrder([item({quantity:1,product_price:21900})],0,{})                                 // 결제금액 0원(경로 불명)
+  ],[link]);
+  assert.equal(s.margin.actualOrders,0);
+  assert.deepEqual(s.margin.estimated,{partialStatus:1,amountMismatch:1,zeroPayment:1});
+  assert.equal(s.margin.revenue,21900*4,'추정 주문은 Cafe24가 기록한 주문 당시 판매가 × 판매 수량');
+  assert.equal(s.margin.estimatedTotal,s.marginTotal);
+});
+
+test('저장한 판매가를 고쳐도 결과는 같다 — 판매가는 Cafe24 주문에서, 계산에서는 원가·수수료·주문당 비용만 쓴다',()=>{
+  const order=paidOrder([item({quantity:2,product_price:21900})],43800+3000,{shipping_fee:3000});
+  const oldPrice=S.summarize([order],[linkFor(1,calcInput({price:30000}))]).marginTotal;
+  const newPrice=S.summarize([order],[linkFor(1,calcInput({price:21900}))]).marginTotal;
+  assert.equal(oldPrice,newPrice);
+});
+
+test('Cafe24 상품가가 없거나 계산 입력값이 없으면 저장한 1개당 마진으로만 계산한다',()=>{
+  const link=linkFor(1,calcInput({}));
+  const noPrice=S.summarize([paidOrder([item({quantity:2})],1,{})],[link]);
+  assert.equal(noPrice.margin.savedOnlyOrders,1);assert.equal(noPrice.marginTotal,link.unit_margin*2+link.order_adjust);
+  const noInput=S.summarize([paidOrder([item({quantity:1,product_price:30000})],30000,{})],[Object.assign({},link,{input:undefined})]);
+  assert.equal(noInput.margin.savedOnlyOrders,1);
 });
 
 // 아래 두 테스트는 Cafe24 공식 상태값(status_code · order_status · claim_quantity)에 근거한 해석 검사다.
@@ -118,9 +142,9 @@ test('부분 취소·반품 요청: 줄이 나뉘면 남은 정상 줄만, 같�
   assert.equal(split.soldQty,2);assert.deepEqual(split.excluded,{canceled:1});
   const pending=S.summarize([paidOrder([item({quantity:3,claim_quantity:1,order_status:'N40'})],1,{})],[]);
   assert.equal(pending.soldQty,2);assert.deepEqual(pending.excluded,{claimPending:1});
-  assert.deepEqual(pending.actual.excluded,{},'연결 상품이 없으면 실제 결제 기준 대상도 아니다');
+  assert.deepEqual(pending.margin.estimated,{},'연결 상품이 없으면 마진 계산 대상이 아니다');
   const linked=S.summarize([paidOrder([item({quantity:3,claim_quantity:1,order_status:'N40',product_price:30000})],90000,{})],[linkFor(1,calcInput({}))]);
-  assert.deepEqual(linked.actual.excluded,{partialStatus:1},'클레임 진행 중 주문은 결제금액 배분이 확정되지 않아 실제 결제 기준에서 뺀다');
+  assert.deepEqual(linked.margin.estimated,{partialStatus:1},'클레임 진행 중 주문은 결제금액 배분이 확정되지 않아 주문 당시 판매가로 추정한다');
 });
 
 test('일부 상품만 마진이 연결되면 부분 계산으로 표시한다',()=>{
@@ -128,18 +152,6 @@ test('일부 상품만 마진이 연결되면 부분 계산으로 표시한다',
   assert.equal(s.partial,true);assert.equal(s.linkedQty,1);assert.equal(s.unlinkedQty,2);
   assert.equal(S.summarize([paidOrder([item({quantity:1})],1,{})],[linkFor(1,calcInput({}))]).partial,false);
   assert.equal(S.summarize([paidOrder([item({quantity:1})],1,{})],[]).partial,false,'연결 상품이 없으면 부분 계산이 아니다');
-});
-
-test('두 기준은 같은 주문끼리만 비교하고, 실제 결제 기준이 일부 주문만 계산하면 완전하지 않다고 표시한다',()=>{
-  const input=calcInput({}),link=linkFor(1,input);
-  const s=S.summarize([
-    paidOrder([item({quantity:1,product_price:30000})],27000,{coupon_discount_price:3000}), // 계산 가능
-    paidOrder([item({quantity:7,product_price:30000})],0,{})                                 // 결제금액 0원 → 실제 결제 기준 제외
-  ],[link]);
-  assert.equal(s.actual.orders,1);assert.equal(s.actual.complete,false);
-  assert.equal(s.actual.registeredMargin,link.unit_margin*1+link.order_adjust,'같은 주문(1개짜리)만의 등록가 기준');
-  assert.equal(s.marginTotal,link.unit_margin*8+link.order_adjust*2,'등록 판매가 기준은 두 주문 모두');
-  assert.ok(s.actual.margin<s.actual.registeredMargin,'쿠폰 3,000원만큼 실제 결제 기준이 낮다');
 });
 
 test('광고 판단: 근거가 충분할 때만 손익분기 미달·이상, 아니면 판단 보류(권고 없음)',()=>{
@@ -154,13 +166,4 @@ test('광고 판단: 근거가 충분할 때만 손익분기 미달·이상, 아
   assert.equal(S.adVerdict(link,m(5,9,0)).label,'판단 보류','광고비 없음');
   for(const v of [S.adVerdict(link,m(2.5,5)),S.adVerdict(link,m(3,5)),S.adVerdict(null,m(1,1))])
     assert.doesNotMatch(JSON.stringify(v),/중단|증액|늘리|줄이|끄세요/,'권고 문구 없음');
-});
-
-test('네이버페이 주문은 Cafe24 결제금액이 0원이라 실제 결제 기준에서 따로 세고, 등록 판매가 기준에는 판매로 남긴다',()=>{
-  const link=linkFor(1,calcInput({}));
-  const naver=Object.assign(paidOrder([item({quantity:3,product_price:21900})],0,{order_price_amount:65700}),{order_place_id:'NCHECKOUT',paid:'T'});
-  const s=S.summarize([naver],[link]);
-  assert.equal(s.soldQty,3);assert.equal(s.marginTotal,link.unit_margin*3+link.order_adjust);
-  assert.deepEqual(s.actual.excluded,{naverPay:1});
-  assert.deepEqual(S.summarize([paidOrder([item({quantity:1})],0,{})],[link]).actual.excluded,{zeroPayment:1},'경로를 모르는 0원 주문은 별도 사유');
 });
