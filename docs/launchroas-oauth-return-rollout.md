@@ -145,3 +145,17 @@
   - 바꾸지 않는 값: Cafe24 · Meta 앱의 Redirect URI. 각각 `https://zzhvckikonnalqnyatgn.supabase.co/functions/v1/cafe24-oauth-callback`, `…/meta-oauth-callback` 그대로다.
   - 복귀 주소가 없는(런치데스크) 흐름의 기본 복귀: `https://launchdesk.co.kr` (콜백의 `APP_URL`).
   - Supabase Auth: 이메일·비밀번호 로그인에는 Redirect URL이 필요 없다. 인증 메일을 LaunchROAS로 돌리려면 Auth URL 설정에 새 Origin을 추가하고 `signUp`에 `emailRedirectTo`를 넘겨야 한다(현재 미적용).
+
+## 2026-10-05 (3) 네이버페이 금액 · 판매가 출처 정리
+- 네이버페이(order_place_id `NCHECKOUT`) 주문은 Cafe24 `payment_amount`가 0원이거나 일부만 들어온다. 네이버페이로 낸 금액은 주문의 `naver_point`에 들어온다.
+  - 공식 문서는 `naver_point`를 "NAVER points"로만 설명한다. `naverpay_payment_information`은 "P: PG payment / N: NaverPay"이고, 해당 주문은 `N`이다.
+  - 실제 응답(2026-07-01~10-05, 비취소 주문): `payment_amount + naver_point` = 상품 소계 + 배송비 − 주문 단위 할인
+    - 자체몰 · 모바일 · 스마트스토어(self/mobile/shopn): 229/229
+    - 네이버페이: 55/55
+    - 에이블리(ably): 0/5. 에이블리 주문은 실제 판매금액을 확인할 수 없다.
+- 판매가 출처 변경
+  - 주문 금액이 위 식과 맞는 주문은 실제 결제(`payment_amount + naver_point`)를 쓴다.
+  - 맞지 않거나(마켓) 일부 취소 · 클레임이 섞인 주문, 결제금액 0원 주문은 Cafe24가 기록한 주문 당시 판매가(`product_price + option_price`) × 수량으로 추정한다. 사유별로 센다.
+  - 저장한 계산에서는 원가 · 수수료율 · 주문당 비용만 쓴다. 판매가를 고쳐 저장할 필요가 없다.
+  - Cafe24 상품가가 없거나 입력값을 찾지 못한 연결만 저장한 1개당 마진으로 계산한다.
+- 2026-10-05 이번 달 대조: 연결 3건 모두 실제 결제(네이버페이 153,300원 주문 포함)였고, 화면 상품 마진 31,458원 = 원본 응답 독립 재계산 31,458원이었다.
