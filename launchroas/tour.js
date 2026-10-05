@@ -55,7 +55,11 @@
   function scrollTo(node){
     var r=node.getBoundingClientRect(),ch=card.offsetHeight||200,vh=window.innerHeight;
     // 대상이 카드에 가리지 않도록 위쪽 1/5 지점으로(이미 보이면 그대로)
-    if(r.top<72||r.bottom>vh-ch-24)window.scrollTo({top:window.scrollY+r.top-Math.min(96,vh*0.18),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+    if(!(r.top<72||r.bottom>vh-ch-24))return;
+    var top=window.scrollY+r.top-Math.min(96,vh*0.18);
+    window.scrollTo({top:top,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+    // 부드러운 스크롤이 실행되지 않는 환경(백그라운드 탭 등)에서는 바로 이동해 강조 영역이 화면 밖에 남지 않게
+    setTimeout(function(){if(target===node&&Math.abs(window.scrollY-top)>40){window.scrollTo(0,top);place();}},800);
   }
   function render(){
     var s=steps[idx];card.replaceChildren();
