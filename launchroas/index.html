@@ -92,6 +92,11 @@
         <div><p class="eyebrow"><span class="eyebrow-line"></span> TODAY'S OVERVIEW</p><h1>운영 현황<span class="title-period">.</span></h1><p class="intro">주문과 광고의 오늘을 살펴보세요.</p></div>
         <div class="controls"><label for="storeSelect">쇼핑몰</label><select id="storeSelect"></select><button id="refresh" type="button" class="secondary">주문 동기화 · 다시 조회 <span aria-hidden="true">↻</span></button></div>
       </div>
+      <p id="statusSummary" class="status-summary" role="status" hidden></p>
+      <section id="setupGuide" class="setup-guide" hidden aria-labelledby="setupGuideTitle">
+        <div class="setup-head"><h2 id="setupGuideTitle">처음 설정</h2><span id="setupProgress" class="small"></span></div>
+        <ol id="setupSteps" class="setup-steps"></ol>
+      </section>
       <div class="period-controls" role="group" aria-label="운영 현황 조회 기간"><button type="button" data-period="today" aria-pressed="true">오늘</button><button type="button" data-period="yesterday" aria-pressed="false">어제</button><button type="button" data-period="month" aria-pressed="false">이번 달</button><label for="periodDate">날짜 선택</label><input id="periodDate" type="date"></div>
       <p id="pageMessage" class="message page-message" role="status"></p>
       <div class="section-heading"><div><p class="section-kicker">PERFORMANCE</p><h2>오늘의 숫자</h2></div><span>각 서비스의 집계 기준</span></div>
@@ -152,10 +157,11 @@
       </section>
       <section id="calculatorView" hidden aria-labelledby="calculatorTitle">
         <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>마진 계산기</strong></div>
-        <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> PRODUCT MARGIN</p><h1 id="calculatorTitle">마진 계산기<span class="title-period">.</span></h1><p class="intro">상품을 골라 원가·수수료·배송·포장 비용을 저장하세요. 광고비는 운영 현황에서 실제 금액으로 뺍니다.</p></div></div>
+        <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> PRODUCT MARGIN</p><h1 id="calculatorTitle">마진 계산기<span class="title-period">.</span></h1><p class="intro">상품을 고르고 비용을 저장하세요. 광고비는 운영 현황에서 실제 금액으로 뺍니다.</p></div></div>
         <div class="pm-bar"><button id="pmPick" type="button" class="primary pm-pick">상품 선택하기</button><span id="pmSelected" class="small" role="status"></span></div>
         <div id="pmPicker" class="calc-card pm-picker" hidden>
           <div class="pm-picker-head"><input id="pmSearch" type="search" placeholder="상품 이름 검색" aria-label="상품 이름 검색"><button id="pmClose" type="button" class="inline-button">닫기</button></div>
+          <p class="small pm-note">최근 31일 판매 상품과 저장한 상품이 표시됩니다.</p>
           <div id="pmList" class="pm-list"></div>
         </div>
         <div id="pmEditor" hidden>
@@ -165,21 +171,27 @@
             <h2 id="pmFormTitle">상품 비용</h2>
             <div class="calc-fields">
               <label class="pm-wide">상품<input id="calcProduct" readonly></label>
-              <label>판매가 (원) <span>미리보기 · 실제 계산은 Cafe24 주문 금액</span><input id="calcPrice" type="number" min="1" required inputmode="numeric"></label>
-              <label>상품 원가 (개당 원) <b>필수</b><input id="calcCost" type="number" min="0" required inputmode="numeric" placeholder="15000"></label>
-              <label>판매 수수료율 (%) <b>필수</b><input id="calcFee" type="number" min="0" max="100" step="0.01" required inputmode="decimal" placeholder="3"></label>
-              <label>실제 배송비 (주문당 원)<input id="calcActualShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
-              <label>포장·부자재 (주문당 원)<input id="calcPackaging" type="number" min="0" inputmode="numeric" placeholder="1000"></label>
-              <label>배송 조건<select id="calcShippingType"><option value="free">무료배송</option><option value="paid">고객 배송비 별도</option></select></label>
-              <label id="calcCustomerShipWrap" hidden>고객에게 받는 배송비 (원)<input id="calcCustomerShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
-              <label data-detail>판매자 부담 할인 (주문당 원)<input id="calcDiscount" type="number" min="0" placeholder="0"></label>
-              <label data-detail>판매 플랫폼 <span>안내용</span><select id="calcPlatform"><option value="">선택 안 함</option><option value="cafe24">카페24</option><option value="smartstore">스마트스토어</option><option value="coupang">쿠팡</option><option value="other">기타·자사몰</option></select></label>
+            </div>
+            <h3 class="pm-group">상품 1개당 <span>팔린 개수만큼 곱해져요</span></h3>
+            <div class="calc-fields">
+              <label>상품 원가 (원) <b>필수</b><span>1개 매입·제작 비용</span><input id="calcCost" type="number" min="0" required inputmode="numeric" placeholder="15000"></label>
+              <label>판매 수수료율 (%) <b>필수</b><span>판매금액에 붙는 수수료</span><input id="calcFee" type="number" min="0" max="100" step="0.01" required inputmode="decimal" placeholder="3"></label>
+              <label>판매가 (원)<span>미리보기용 · 실제 계산은 Cafe24 주문 금액</span><input id="calcPrice" type="number" min="1" required inputmode="numeric"></label>
               <label data-detail>상품 수수료 기준<select id="calcFeeBase"><option value="after_discount">할인 후 상품금액</option><option value="before_discount">할인 전 상품금액</option></select></label>
               <label data-detail>수수료 부가세<select id="calcFeeVat"><option value="included">포함</option><option value="excluded">별도 (10% 가산)</option></select></label>
+              <label data-detail>별도 PG 수수료율 (%)<span>결제 금액에 붙는 수수료</span><input id="calcPgRate" type="number" min="0" max="100" step="0.01" placeholder="0"></label>
+              <label data-detail>판매 플랫폼 <span>안내용</span><select id="calcPlatform"><option value="">선택 안 함</option><option value="cafe24">카페24</option><option value="smartstore">스마트스토어</option><option value="coupang">쿠팡</option><option value="other">기타·자사몰</option></select></label>
+            </div>
+            <h3 class="pm-group">주문 1건당 <span>여러 개를 함께 사도 한 번만 빠져요</span></h3>
+            <div class="calc-fields">
+              <label>실제 배송비 (원)<span>택배사에 내는 금액</span><input id="calcActualShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
+              <label>포장·부자재 (원)<span>박스·봉투 등</span><input id="calcPackaging" type="number" min="0" inputmode="numeric" placeholder="1000"></label>
+              <label>배송 조건<select id="calcShippingType"><option value="free">무료배송</option><option value="paid">고객 배송비 별도</option></select></label>
+              <label id="calcCustomerShipWrap" hidden>고객에게 받는 배송비 (원)<input id="calcCustomerShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
+              <label data-detail>판매자 부담 할인 (원)<input id="calcDiscount" type="number" min="0" placeholder="0"></label>
               <label data-detail>배송비 수수료<select id="calcShipFeeMode"><option value="none">없음</option><option value="same">상품과 동일</option><option value="separate">별도 요율</option></select></label>
               <label id="calcShipFeeRateWrap" data-detail hidden>배송비 수수료율 (%)<input id="calcShipFeeRate" type="number" min="0" max="100" step="0.01"></label>
-              <label data-detail>별도 PG 수수료율 (%)<input id="calcPgRate" type="number" min="0" max="100" step="0.01" placeholder="0"></label>
-              <label data-detail>기타 주문당 비용 (원)<input id="calcOther" type="number" min="0" placeholder="0"></label>
+              <label data-detail>기타 비용 (원)<input id="calcOther" type="number" min="0" placeholder="0"></label>
             </div>
             <p id="calcError" class="message" role="alert"></p>
           </form>
@@ -189,7 +201,8 @@
             <div id="calcResult" hidden><p class="calc-result-label">1개 판매 주문의 상품 마진</p><strong id="calcPostAd" class="calc-hero-value">—</strong><div id="calcFacts" class="calc-facts"></div></div>
             <button id="pmSave" type="button" class="primary pm-save" disabled>이 상품에 저장</button>
             <p id="pmMessage" class="small" role="status"></p>
-            <details id="pmVariantsBox" class="pm-variants-box" hidden><summary>옵션별 설정 <span id="pmVariantsCount"></span></summary><p class="small">사이즈·색상마다 원가가 다를 때만 설정하세요. 옵션별 값이 상품 기본보다 우선합니다.</p><div id="pmVariants" class="pm-variants"></div></details>
+            <div id="pmNext" class="pm-next" hidden><button id="pmNextProduct" type="button" class="secondary">다음 미입력 상품</button><button id="pmGoResult" type="button" class="inline-button">운영 현황에서 결과 보기</button></div>
+            <details id="pmVariantsBox" class="pm-variants-box" hidden><summary>옵션별 설정 <span id="pmVariantsCount"></span></summary><p class="small">사이즈·색상마다 원가가 다를 때만. 옵션별 값이 우선해요.</p><div id="pmVariants" class="pm-variants"></div></details>
           </div></div>
         </div>
         </div>

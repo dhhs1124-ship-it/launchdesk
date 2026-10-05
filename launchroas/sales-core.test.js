@@ -172,3 +172,10 @@ test('같은 상품 · 옵션의 연결이 여러 개 남아 있으면 가장 �
   const latest=S.latestLinks([{product_no:1,variant_code:'',unit_margin:2},{product_no:1,variant_code:'',unit_margin:1},{product_no:1,variant_code:'V',unit_margin:3}]);
   assert.deepEqual(latest.map(l=>l.unit_margin),[2,3]);
 });
+
+test('미등록은 판매 수량(개)과 상품 종류(옵션은 같은 상품)로 따로 센다',()=>{
+  const s=S.summarize([{order_id:'A',items:[item({product_no:1,variant_code:'M',quantity:2}),item({product_no:1,variant_code:'L',quantity:1}),item({product_no:2,variant_code:'X',quantity:4})]}],
+    [{product_no:1,variant_code:'M',unit_margin:1,order_adjust:0}]);
+  assert.equal(s.unlinkedQty,5,'판매 수량: L 1개 + 상품2 4개');
+  assert.equal(s.productKinds,2);assert.equal(s.unlinkedKinds,2,'상품1은 L 옵션이 미등록이라 남은 설정에 포함');
+});

@@ -140,6 +140,10 @@
     s.marginTotal=s.linkedQty?s.margin.total:null;
     s.partial=s.linkedQty>0&&s.unlinkedQty>0; // 하나도 연결되지 않았으면 부분 계산이 아니라 계산 없음
     s.products=Object.keys(s.products).map(function(k){return s.products[k];}).sort(function(a,b){return b.soldQty-a.soldQty;});
+    // 상품 종류 기준(옵션은 같은 상품으로 묶음): 판매된 상품 종류 · 그중 마진이 빠진 옵션이 하나라도 있는 종류.
+    var kinds={},open={};
+    s.products.forEach(function(p){kinds[p.product_no]=true;if(!p.link)open[p.product_no]=true;});
+    s.productKinds=Object.keys(kinds).length;s.unlinkedKinds=Object.keys(open).length;
     return s;
   }
 

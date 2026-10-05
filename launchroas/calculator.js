@@ -69,9 +69,15 @@
     Object.keys(map).forEach(function(k){var p=map[k];p.variants=Object.keys(p.variants).map(function(v){return p.variants[v];}).sort(function(a,b){return b.sold-a.sold;});list.push(p);});
     return list.sort(function(a,b){return b.sold-a.sold;});
   }
+  // 판매된 옵션 중 비용이 없는 것이 있으면 아직 설정이 남은 상품이다(상품 기본 값은 모든 옵션에 적용).
+  function needsSetup(p){
+    if(linkFor(p.product_no,''))return false;
+    return !p.variants.length||p.variants.some(function(v){return v.sold>0&&!linkFor(p.product_no,v.variant_code);});
+  }
   function status(p){
     var base=linkFor(p.product_no,''),ov=overrides(p.product_no).length;
-    return base?'저장됨'+(ov?' · 옵션별 '+ov+'개':''):ov?'옵션별 '+ov+'개만 저장':'미등록';
+    if(base)return '저장됨'+(ov?' · 옵션별 '+ov+'개':'');
+    return needsSetup(p)?(ov?'옵션 일부만 저장':'비용 미입력'):'옵션별 저장됨';
   }
   function renderList(){
     var box=byId('pmList'),q=byId('pmSearch').value.trim().toLowerCase();box.replaceChildren();
@@ -81,7 +87,7 @@
     if(!shown.length){box.textContent=q?'검색 결과가 없어요.':'최근 '+RECENT_DAYS+'일 판매 상품이 없어요.';return;}
     shown.forEach(function(p){
       var b=el('button','pm-item'),s=status(p);b.type='button';
-      b.append(el('strong','',p.name),el('small','',(p.sold?'최근 '+RECENT_DAYS+'일 판매 '+p.sold+'개':'최근 판매 없음')+(p.price?' · '+won(p.price):'')),el('span','pm-status'+(s==='미등록'?' missing':''),s));
+      b.append(el('strong','',p.name),el('small','',(p.sold?'최근 '+RECENT_DAYS+'일 판매 '+p.sold+'개':'최근 판매 없음')+(p.price?' · '+won(p.price):'')),el('span','pm-status'+(needsSetup(p)?' missing':''),s));
       b.addEventListener('click',function(){select(p,'');});
       box.appendChild(b);
     });
@@ -126,7 +132,7 @@
     byId('calcProduct').value=p.name+(v?' · '+v.option:'');
     byId('pmFormTitle').textContent=v?'옵션별 비용':'상품 비용';
     byId('pmSelected').textContent=own?'저장된 값을 불러왔어요':variant&&base?'상품 기본 값에서 시작해요':'아직 저장 전이에요';
-    byId('pmPicker').hidden=true;byId('pmEditor').hidden=false;
+    byId('pmPicker').hidden=true;byId('pmEditor').hidden=false;byId('pmNext').hidden=true;
     put(input);say('');renderVariants();
     byId('pmEditor').scrollIntoView({block:'start'});
   }
@@ -165,6 +171,8 @@
     say((t.variant_code?t.option+' 옵션':'상품')+' 비용을 저장했어요. 운영 현황에 바로 반영돼요.');
     byId('pmSelected').textContent='저장된 값을 불러왔어요';
     renderVariants();renderList();
+    var left=(st.products||[]).filter(needsSetup).length;
+    byId('pmNextProduct').hidden=!left;byId('pmNextProduct').textContent='다음 미입력 상품 ('+left+'종 남음)';byId('pmNext').hidden=false;
     window.dispatchEvent(new CustomEvent('launchroas:product-margin-saved',{detail:{storeId:ctx.storeId}}));
   }
 
@@ -173,6 +181,8 @@
   byId('pmClose').addEventListener('click',function(){byId('pmPicker').hidden=true;});
   byId('pmSearch').addEventListener('input',renderList);
   byId('pmSave').addEventListener('click',save);
+  byId('pmNextProduct').addEventListener('click',function(){var next=(st.products||[]).find(needsSetup);if(next)select(next,'');});
+  byId('pmGoResult').addEventListener('click',function(){app.showView('overview');var p=document.querySelector('.sales-profit');if(p)p.scrollIntoView({block:'start'});});
   byId('calcForm').addEventListener('submit',function(e){e.preventDefault();});
   byId('calcForm').addEventListener('input',render);
   byId('calcForm').addEventListener('change',function(){updateControls();render();});
@@ -184,7 +194,7 @@
     var key=ctx.userId+'|'+ctx.storeId;
     if(key===st.key)return;
     st={key:key,products:null,links:[],calcs:[],error:'',target:null};ticket++;
-    byId('pmEditor').hidden=true;byId('pmPicker').hidden=true;byId('pmSelected').textContent='';say('');
+    byId('pmEditor').hidden=true;byId('pmPicker').hidden=true;byId('pmNext').hidden=true;byId('pmSelected').textContent='';say('');
     byId('calcForm').reset();put({});
   });
   updateControls();render();

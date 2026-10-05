@@ -58,7 +58,8 @@
     figures.replaceChildren();
     var range=state.range;
     byId('salesPeriod').textContent=range?('Cafe24 주문일 '+range.since+(range.until!==range.since?' ~ '+range.until:'')+' (한국 시간)'):'';
-    if(!ctx.userId||!ctx.storeId){msg.textContent='쇼핑몰을 선택하면 볼 수 있어요.';fxBox.hidden=true;renderHero(null,null,null,false,[]);return;}
+    if(!ctx.userId||!ctx.storeId){msg.textContent='쇼핑몰을 선택하면 볼 수 있어요.';fxBox.hidden=true;renderHero(null,null,null,false,[]);
+      renderGuide(setupSteps(ctx,null,null,null,metaState(ctx),null),!!ctx.userId&&!(ctx.stores||[]).length);byId('statusSummary').hidden=true;return;}
     msg.textContent=state.orders||state.error?'':'불러오는 중…';
 
     // 예전에 저장한 연결에 계산 입력값이 없으면 같은 저장 시각의 계산 기록에서 찾아 실제 결제 기준에 쓴다.
@@ -140,12 +141,64 @@
     var chips=[];
     if(state.error)chips.push({text:ctx.cafeAccount&&ctx.cafeAccount.status==='connected'?'Cafe24 조회 실패':'Cafe24 미연결',tone:'warn'});
     if(ms)chips.push({text:'Meta '+ms.text,tone:ms.text==='조회 중'?'':'warn'});
-    if(s&&s.unlinkedQty)chips.push({text:'마진 미등록 '+count(s.unlinkedQty)+' · 입력하기',tone:'warn',action:'products'});
+    // 미등록은 상품 종류(옵션은 같은 상품)와 판매 수량을 함께 — '19개'가 종류로 오해되지 않게.
+    if(s&&s.unlinkedQty)chips.push({text:'비용 미입력 상품 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+') · 입력하기',tone:'warn',action:'products'});
     if(s&&s.margin.estimatedOrders)chips.push({text:'판매가 추정 '+count(s.margin.estimatedOrders,'건'),tone:''});
     if(s&&s.margin.savedOnlyOrders)chips.push({text:'저장 판매가 기준 '+count(s.margin.savedOnlyOrders,'건'),tone:''});
     if(!ms&&mp&&spendKrw==null)chips.push({text:'환율 입력 필요',tone:'warn',action:'fx'});
     if(s&&!s.soldQty)chips.push({text:'판매 없음',tone:''});
     renderHero(profit,base,spendKrw,partial,chips,s);
+    var ready=!!ctx.connectionsLoaded;
+    renderGuide(setupSteps(ctx,s,profit,spendKrw,ms,mp),ready);
+    renderStatus(ctx,s,profit,spendKrw,ms,mp,partial,ready&&!!(s||state.error));
+  }
+
+  // ---- 처음 설정 안내 · 현재 상황 한 줄 — 둘 다 실제 저장 상태로만 판단한다(버튼을 눌렀다고 완료로 보지 않음) ----
+  function openProducts(){app.showView('calculator');window.dispatchEvent(new CustomEvent('launchroas:open-product-picker'));}
+  function goResult(){var p=document.querySelector('.sales-profit');if(p)p.scrollIntoView({block:'start',behavior:'smooth'});}
+  function setupSteps(ctx,s,profit,spendKrw,ms,mp){
+    var cafeOk=!!(ctx.cafeAccount&&ctx.cafeAccount.status==='connected'),metaOk=!!(ctx.metaAccount&&ctx.metaAccount.status==='connected');
+    var conn={title:'쇼핑몰 · 광고 계정 연결',done:cafeOk&&metaOk,
+      text:'Cafe24 '+(cafeOk?'연결됨':'미연결')+' · Meta '+(metaOk?'연결됨':ctx.metaAccount?'광고계정 선택 필요':'미연결'),
+      button:cafeOk&&metaOk?null:{label:'연결 관리로 이동',run:function(){app.showView('connections');}}};
+    var cost={title:'상품 비용 입력',done:false,button:{label:'상품 비용 입력하기',run:openProducts}};
+    if(!cafeOk)cost.text='Cafe24를 연결하면 판매 상품이 보여요.';
+    else if(!s)cost.text=state.error?'판매 상품을 불러오지 못했어요.':'판매 상품을 확인하는 중이에요.';
+    else if(!s.soldQty)cost.text='이 기간 판매가 없어 확인할 상품이 없어요.';
+    else if(!s.unlinkedQty){cost.done=true;cost.text='판매 상품 '+count(s.productKinds,'종')+' 모두 비용 저장됨';cost.button=null;}
+    else cost.text='판매 상품 '+count(s.productKinds,'종')+' 중 '+count(s.productKinds-s.unlinkedKinds,'종')+' 저장 · 남은 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+')';
+    var result={title:'광고비 빼고 남은 금액 확인',done:profit!=null,button:profit!=null?{label:'결과 보기',run:goResult}:null};
+    result.text=profit!=null?(s&&s.partial?'일부 상품 기준으로 확인할 수 있어요':'확인할 수 있어요')
+      :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
+    if(profit==null&&mp&&spendKrw==null&&!ms)result.button={label:'환율 입력',run:function(){goResult();byId('salesFxRate').focus();}};
+    return [conn,cost,result];
+  }
+  function renderGuide(steps,ready){
+    var box=byId('setupGuide'),list=byId('setupSteps');
+    var done=steps.filter(function(x){return x.done;}).length;
+    box.hidden=!ready||done===steps.length;
+    if(box.hidden)return;
+    byId('setupProgress').textContent=done+'/'+steps.length+' 완료';
+    list.replaceChildren();
+    var next=steps.findIndex(function(x){return !x.done;});
+    steps.forEach(function(x,i){
+      var li=el('li','setup-step'+(x.done?' done':'')+(i===next?' next':''));
+      li.append(el('span','setup-num',x.done?'✓':String(i+1)));
+      var body=el('div','setup-body');body.append(el('strong','',x.title),el('small','',x.text));li.appendChild(body);
+      if(x.button&&!x.done){var b=el('button',i===next?'primary setup-btn':'secondary setup-btn',x.button.label);b.type='button';b.addEventListener('click',x.button.run);li.appendChild(b);}
+      list.appendChild(li);
+    });
+  }
+  function renderStatus(ctx,s,profit,spendKrw,ms,mp,partial,ready){
+    var box=byId('statusSummary');box.hidden=!ready;if(!ready)return;
+    var range=state.range,label=range?range.label:'',parts=[];
+    if(profit!=null){
+      box.replaceChildren(el('span','',label+' 광고비를 빼고 남은 금액은 '),el('strong',profit<0?'deficit':'',won(profit)),el('span','',(partial?' (판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+' 기준)':'')+'이에요.'));
+    }else box.replaceChildren(el('span','',label+' 남은 금액은 아직 계산할 수 없어요.'));
+    if(!ms&&mp&&mp.roas!=null)parts.push('Meta ROAS '+Math.round(Number(mp.roas)*100).toLocaleString('ko-KR')+'%');
+    if(spendKrw!=null)parts.push('광고비 '+won(spendKrw));
+    if(s)parts.push('판매 '+count(s.soldQty));
+    if(parts.length)box.appendChild(el('small','',' '+parts.join(' · ')));
   }
 
   function renderHero(profit,base,spendKrw,partial,chips,s){
@@ -159,7 +212,7 @@
     chips.forEach(function(c){
       var chip=el(c.action?'button':'span','sales-chip'+(c.tone?' '+c.tone:''),c.text);
       if(c.action){chip.type='button';chip.addEventListener('click',function(){
-        if(c.action==='products'){app.showView('calculator');window.dispatchEvent(new CustomEvent('launchroas:open-product-picker'));}
+        if(c.action==='products')openProducts();
         else byId('salesFxRate').focus();
       });}
       box.appendChild(chip);
