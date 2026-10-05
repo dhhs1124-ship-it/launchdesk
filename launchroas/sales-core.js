@@ -104,7 +104,7 @@
       if(hasUnlinked)s.ordersMixed++;
       if(Object.keys(distinct).length>1)s.ordersMultiLinked++;
       // 실제 결제 기준은 금액을 상품에 나눌 수 있는 주문만 — 아니면 사유별로 세고 빼다.
-      var reason=hasExcluded?'partialStatus':!order.actual_order_amount?'noAmount':!(n(order.payment_amount)>0)?'zeroPayment':
+      var reason=hasExcluded?'partialStatus':!order.actual_order_amount?'noAmount':!(n(order.payment_amount)>0)?(order.order_place_id==='NCHECKOUT'||order.market_id==='NCHECKOUT'?'naverPay':'zeroPayment'):
         lines.some(function(l){return l.link&&!l.link.input;})?'noInput':null;
       if(reason){s.actual.excluded[reason]=(s.actual.excluded[reason]||0)+1;return;}
       var r=actualOrder(order,lines,costLink);

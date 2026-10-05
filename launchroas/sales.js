@@ -93,7 +93,7 @@
     var coverage=s?(partial?'전체 판매 '+count(s.soldQty)+' 중 마진 반영 '+count(s.linkedQty)+'만 계산 · 미등록 '+count(s.unlinkedQty)+'는 0원으로 보지 않고 제외':'판매 '+count(s.soldQty)+' 전부 마진 반영'):'';
     var rule=s&&s.ordersWithLinked?'주문당 비용(배송·포장·기타)은 주문마다 한 번 — 마진 상품이 2종 이상 담긴 주문 '+count(s.ordersMultiLinked,'건')+'은 그중 비용이 가장 큰 상품 기준으로 한 번만 뺐어요.':'';
     var margin=s?s.marginTotal:null,actual=s?s.actual:null,actualMargin=actual?actual.margin:null;
-    var ACTUAL_EXCLUDED={partialStatus:'취소·클레임이 섞인 주문',zeroPayment:'결제금액 0원 주문',noAmount:'결제 내역 없음',noInput:'계산 입력값을 찾지 못한 연결'};
+    var ACTUAL_EXCLUDED={partialStatus:'취소·클레임이 섞인 주문',zeroPayment:'결제금액 0원 주문',naverPay:'네이버페이 주문(Cafe24에 결제금액 없음)',noAmount:'결제 내역 없음',noInput:'계산 입력값을 찾지 못한 연결'};
     figures.appendChild(row(scope+'마진 (등록 판매가 기준)',margin==null?'—':won(margin),s?[
       coverage,rule,'저장한 판매가·판매자 할인·고객 배송비로 계산 — Cafe24 실제 결제 할인·쿠폰은 반영 안 함',
       margin==null&&s.soldQty?'판매된 상품에 마진을 연결하면 계산돼요.':''
@@ -111,14 +111,17 @@
     else if(mp){
       spendKrw=S.adSpendKrw(mp.spend,currency,ctx.fx);
       if(currency!=='KRW'){
-        fxBox.hidden=false;byId('salesFxCurrency').textContent=currency||'외화';
+        // 환율 입력칸은 환율이 필요할 때나 '환율 변경'을 눌렀을 때만 연다.
+        fxBox.hidden=!(spendKrw==null||state.fxEdit);byId('salesFxCurrency').textContent=currency||'외화';
         if(!byId('salesFxRate').matches(':focus'))byId('salesFxRate').value=ctx.fx&&ctx.fx.currency===currency?ctx.fx.krw_per_unit:'';
         spendNotes.push('원본 '+currency+' '+Number(mp.spend||0).toLocaleString('en-US',{maximumFractionDigits:2}));
         spendNotes.push(spendKrw==null?'환율을 입력·저장하면 원화로 바꿔 계산해요.':'적용 환율 1 '+currency+' = '+Number(ctx.fx.krw_per_unit).toLocaleString('ko-KR')+'원 (직접 저장한 값 · 일별 환율 아님)');
       }
       spendNotes.push('Meta 광고계정 시간대'+(tz?' '+tz:'')+' 기준 같은 날짜 범위'+(tz&&tz!=='Asia/Seoul'?' — 한국 시간과 달라 날짜 경계가 몇 시간 어긋날 수 있어요.':''));
     }
-    figures.appendChild(row('원화 광고비',ms?ms.text:spendKrw==null?'환율 입력 필요':won(spendKrw),spendNotes));
+    var spendRow=row('원화 광고비',ms?ms.text:spendKrw==null?'환율 입력 필요':won(spendKrw),spendNotes);
+    if(!ms&&mp&&currency!=='KRW'&&spendKrw!=null){var edit=el('button','inline-button','환율 변경');edit.type='button';edit.addEventListener('click',function(){state.fxEdit=true;byId('salesFx').hidden=false;byId('salesFxRate').focus();});spendRow.appendChild(edit);}
+    figures.appendChild(spendRow);
 
     // 5. 광고비 차감 후 예상 이익 — 필요한 값이 없으면 0원으로 표시하지 않는다
     //    실제 결제 기준 마진이 있으면 그것을, 없으면 등록 판매가 기준을 쓴다.
@@ -256,7 +259,7 @@
     this.disabled=false;
     if(res.error){byId('salesFxNote').textContent='환율을 저장하지 못했어요.';return;}
     if(!state.fxRecord)state.fxRecord={id:res.data.id,data:data};else state.fxRecord.data=data;
-    byId('salesFxNote').textContent='환율을 저장했어요.';
+    byId('salesFxNote').textContent='';state.fxEdit=false;
     app.setFx({currency:currency,krw_per_unit:rate,saved_at:data.saved_at});
   });
 

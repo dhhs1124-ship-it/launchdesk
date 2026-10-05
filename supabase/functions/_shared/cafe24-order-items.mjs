@@ -28,6 +28,9 @@ export function slimOrders(orders) {
       order_date: str(order.order_date),
       paid: str(order.paid),
       canceled: str(order.canceled),
+      // 주문 경로 — 네이버페이(NCHECKOUT) 주문은 Cafe24 결제금액이 0원으로 온다(결제가 네이버 쪽에서 이뤄짐).
+      order_place_id: str(order.order_place_id),
+      market_id: str(order.market_id),
       // 주문 단위 금액(공식 문서 actual_order_amount: 최종 결제 내역). 고객 부담 배송비와 주문 단위 할인을 여기서 본다.
       payment_amount: num(order.payment_amount),
       actual_order_amount: pickAmounts(order.actual_order_amount),

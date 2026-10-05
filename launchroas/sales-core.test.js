@@ -155,3 +155,12 @@ test('광고 판단: 근거가 충분할 때만 손익분기 미달·이상, 아
   for(const v of [S.adVerdict(link,m(2.5,5)),S.adVerdict(link,m(3,5)),S.adVerdict(null,m(1,1))])
     assert.doesNotMatch(JSON.stringify(v),/중단|증액|늘리|줄이|끄세요/,'권고 문구 없음');
 });
+
+test('네이버페이 주문은 Cafe24 결제금액이 0원이라 실제 결제 기준에서 따로 세고, 등록 판매가 기준에는 판매로 남긴다',()=>{
+  const link=linkFor(1,calcInput({}));
+  const naver=Object.assign(paidOrder([item({quantity:3,product_price:21900})],0,{order_price_amount:65700}),{order_place_id:'NCHECKOUT',paid:'T'});
+  const s=S.summarize([naver],[link]);
+  assert.equal(s.soldQty,3);assert.equal(s.marginTotal,link.unit_margin*3+link.order_adjust);
+  assert.deepEqual(s.actual.excluded,{naverPay:1});
+  assert.deepEqual(S.summarize([paidOrder([item({quantity:1})],0,{})],[link]).actual.excluded,{zeroPayment:1},'경로를 모르는 0원 주문은 별도 사유');
+});
