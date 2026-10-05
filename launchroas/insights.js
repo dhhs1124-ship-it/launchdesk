@@ -47,7 +47,7 @@
     }
     if(row.linked&&row.verdict&&row.verdict.tone==='below')out.push({score:5,
       action:'예산을 늘리기 전에 이 광고 세트의 소재 · 타깃부터 테스트해 보세요',
-      facts:'Meta ROAS '+pct((num(m.roas)||0)*100)+' < 연결 상품 손익분기 '+pct(row.verdict.breakeven*100)+' (구매 '+cnt(purchases)+'건)',
+      facts:'Meta ROAS '+Math.round((num(m.roas)||0)*100)+'% < 연결 상품 손익분기 '+Math.round(row.verdict.breakeven*100)+'%'+' (구매 '+cnt(purchases)+'건)',
       cause:'확인: 연결한 상품 마진 기준으로 이 광고 세트는 손익분기에 못 미침(Meta 귀속 기준)',
       test:'소재 1개를 바꾼 새 광고를 같은 예산으로 1주 운영해 ROAS 비교'});
     return out;
@@ -71,7 +71,7 @@
       status.push((sales.partial?'일부 상품 기준(판매 '+cnt(s.soldQty,'개')+' 중 '+cnt(s.linkedQty,'개')+') ':'')+'광고비 빼고 남은 금액 '+won(sales.profit));
       if(sales.partial)status.push(sales.profit<0?'미등록 상품의 마진이 빠져 있어 광고 전체가 적자인지는 판단할 수 없어요':'미등록 상품까지 넣으면 금액이 달라져요');
     }else gaps.push(sales.error?'Cafe24 판매를 불러오지 못함':'남은 금액 계산 전(상품 비용 · 광고비 확인 필요)');
-    if(sales.meta&&sales.meta.roas!=null)status.push('Meta ROAS '+pct(Number(sales.meta.roas)*100)+' · 광고비 '+(sales.spendKrw!=null?won(sales.spendKrw):'환율 입력 필요')+' (Meta 귀속 기준)');
+    if(sales.meta&&sales.meta.roas!=null)status.push('Meta ROAS '+Math.round(Number(sales.meta.roas)*100).toLocaleString('ko-KR')+'%'+' · 광고비 '+(sales.spendKrw!=null?won(sales.spendKrw):'환율 입력 필요')+' (Meta 귀속 기준)');
     else if(sales.metaIssue)gaps.push('Meta '+sales.metaIssue);
     if(s&&s.unlinkedQty)gaps.push('비용 미입력 상품 '+cnt(s.unlinkedKinds,'종')+' (판매 '+cnt(s.unlinkedQty,'개')+')');
     if(!ads||ads.loading)return {status:status,gaps:gaps,items:[],adsLoading:true};

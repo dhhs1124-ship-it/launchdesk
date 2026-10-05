@@ -63,7 +63,7 @@
     var skip=el('button','tour-skip','건너뛰기');skip.type='button';skip.addEventListener('click',close);head.appendChild(skip);
     var title=el('h2','tour-title');title.id='tourTitle';
     // 키네틱 타이포: 단어 단위로 짧게 등장(움직임 줄이기 설정이면 CSS가 끈다)
-    s.title.split(' ').forEach(function(w,i){var sp=el('span','tour-word',w+' ');sp.style.setProperty('--w',i);title.appendChild(sp);});
+    s.title.split(' ').forEach(function(w,i){if(i)title.appendChild(document.createTextNode(' '));var sp=el('span','tour-word',w);sp.style.setProperty('--w',i);title.appendChild(sp);});
     card.append(head,title,el('p','tour-text',s.text));
     if(s.state)card.appendChild(el('p','tour-state'+(s.done?' done':''),(s.done?'✓ ':'')+s.state));
     var nav=el('div','tour-nav');
