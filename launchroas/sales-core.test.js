@@ -216,21 +216,51 @@ test('옵션 추가금은 1개 기준으로 수량만큼, 결제금액에 이미
   assert.equal(s.unlinkedQty,0,'원가가 같은 옵션(M)은 따로 입력하지 않아도 된다');
 });
 
-test('합배송: 같은 배송코드의 여러 상품은 배송 · 포장비 한 번, 실제로 배송코드가 나뉘면 배송 단위마다',()=>{
+test('배송코드가 나뉘어도 실제 발송 여부를 알 수 없어 배송 · 포장비는 주문당 한 번(가장 큰 설정값) — 추가 비용 상품에 택배비를 넣어도 두 번 빠지지 않는다',()=>{
   const tee=linkFor(1,calcInput({unitCost:10000,actualShipping:3000,packaging:500})),hood=linkFor(2,calcInput({unitCost:20000,actualShipping:3500,packaging:500}));
-  const together=paidOrder([item({product_no:1,quantity:1,product_price:30000,shipping_code:'D1'}),item({product_no:2,variant_code:'H',quantity:1,product_price:30000,shipping_code:'D1'})],63000,{shipping_fee:3000});
-  const s1=S.summarize([together],[tee,hood]);
-  assert.equal(s1.margin.orderCosts,4000,'더 큰 비용(3,500+500) 한 번');assert.equal(s1.margin.multiShipmentOrders,0);
-  const split=Object.assign({},together,{items:[item({product_no:1,quantity:1,product_price:30000,shipping_code:'D1'}),item({product_no:2,variant_code:'H',quantity:1,product_price:30000,shipping_code:'D2'})]});
-  const s2=S.summarize([split],[tee,hood]);
-  assert.equal(s2.margin.orderCosts,3500+4000);assert.equal(s2.margin.multiShipmentOrders,1);
+  const press=linkFor(9,calcInput({price:5000,unitCost:1000})); // 사용자가 택배비 3,000 · 포장 500을 그대로 둔 경우
+  const order=paidOrder([item({product_no:1,quantity:1,product_price:30000,shipping_code:'D1'}),item({product_no:2,variant_code:'H',quantity:1,product_price:30000,shipping_code:'D1'}),
+    item({product_no:9,variant_code:'',quantity:3,product_price:5000,shipping_code:'D2'})],75000+3000,{shipping_fee:3000});
+  const s=S.summarize([order],[tee,hood,press]);
+  assert.equal(s.margin.orderCosts,4000,'세 상품 중 가장 큰 3,500+500 한 번');
+  assert.equal(s.margin.multiCodeOrders,1,'나뉜 배송코드는 참고로만 센다');
 });
 
-test('추가 비용 상품(배송비 무료 · 배송·포장 0원으로 저장)이 다른 배송코드여도 배송비가 두 번 빠지지 않는다',()=>{
-  const tee=linkFor(1,calcInput({unitCost:10000})),press=linkFor(9,calcInput({price:5000,unitCost:1000,actualShipping:0,packaging:0}));
-  const order=paidOrder([item({quantity:3,product_price:24900,option_price:9000,shipping_code:'D1'}),item({product_no:9,variant_code:'',quantity:3,product_price:5000,shipping_code:'D2'})],
-    33900*3+15000+3000,{shipping_fee:3000});
-  const s=S.summarize([order],[tee,press]);
-  assert.equal(s.margin.orderCosts,3500);
-  assert.equal(s.marginTotal,(33900*3+15000)+3000-(10000*3+1000*3)-(Math.round(33900*3*0.05)+Math.round(15000*0.05))-3500);
+test('무료배송쿠폰(일반 쿠폰 칸에 기록)은 쿠폰 이름으로 배송비 쿠폰으로 보고, 쿠폰을 못 가져오면 상품 할인 · 구분 불가로 센다',()=>{
+  const link=linkFor(1,calcInput({unitCost:10000,shippingFeeMode:'same'}));
+  const base=()=>paidOrder([item({quantity:2,product_price:21900})],43800,{shipping_fee:3000,coupon_discount_price:3000});
+  const named=Object.assign(base(),{coupons:[{order_item_code:null,coupon_name:'무료배송쿠폰',coupon_value_final:null}]});
+  const s=S.summarize([named],[link]);
+  assert.equal(s.margin.revenue,43800);assert.equal(s.margin.customerShipping,0);assert.deepEqual(s.margin.coupon,{shipping:1});
+  const unknown=S.summarize([base()],[link]);
+  assert.equal(unknown.margin.revenue,40800);assert.equal(unknown.margin.customerShipping,3000);assert.deepEqual(unknown.margin.coupon,{unknown:1});
+  assert.equal(s.marginTotal-unknown.marginTotal,0,'수수료율이 같으면(배송비도 상품과 같은 요율) 합계 차이 없음');
+  const twoCoupons=Object.assign(paidOrder([item({quantity:1,product_price:62700})],62700+3000-6135,{shipping_fee:3000,coupon_discount_price:6135}),
+    {coupons:[{coupon_name:'무료배송쿠폰'},{coupon_name:'5% 할인 쿠폰'}]});
+  const t2=S.summarize([twoCoupons],[link]);
+  assert.equal(t2.margin.customerShipping,0);assert.equal(t2.margin.revenue,62700-3135,'남는 3,135원은 상품 할인');
+});
+
+test('적립금은 판매자 부담 혜택으로 따로 빼고, 예치금 · 네이버페이(포인트 포함)는 정산되는 결제라 빼지 않는다 — 같은 금액을 두 번 빼지 않는다',()=>{
+  const link=linkFor(1,calcInput({unitCost:10000,actualShipping:0,packaging:0,feeRate:0,pgRate:3}));
+  const pts=paidOrder([item({quantity:1,product_price:43800})],43800+3000-1000,{shipping_fee:3000,points_spent_amount:1000});
+  const a=S.summarize([pts],[link]);
+  assert.equal(a.margin.actualOrders,1);assert.equal(a.margin.revenue,43800,'상품 판매금액은 적립금 포함');
+  assert.equal(a.margin.points,1000);assert.equal(a.margin.pointsOrders,1);
+  assert.equal(a.margin.fees,Math.round(43800*(45800/46800)*0.03)+Math.round(3000*(45800/46800)*0.03),'PG 수수료는 적립금 제외 결제분에만');
+  assert.equal(a.marginTotal,43800+3000-1000-10000-a.margin.fees);
+  const cr=paidOrder([item({quantity:1,product_price:43800})],43800+3000-5000,{shipping_fee:3000,credits_spent_amount:5000});
+  const b=S.summarize([cr],[link]);
+  assert.equal(b.margin.actualOrders,1);assert.equal(b.margin.revenue,43800);assert.equal(b.margin.points,0,'예치금은 빼지 않음');assert.equal(b.margin.creditsOrders,1);
+  const naver=paidOrder([item({quantity:1,product_price:43800})],0,{shipping_fee:3000},{order_place_id:'NCHECKOUT',naver_point:46800});
+  assert.equal(S.summarize([naver],[link]).margin.revenue,43800);
+});
+
+test('실제 0원 판매(사은품)는 매출 0원 · 원가 반영, 판매가 값이 없을 때만 저장 판매가로 추정',()=>{
+  const tee=linkFor(1,calcInput({unitCost:10000})),gift=linkFor(5,calcInput({price:0,unitCost:800,actualShipping:0,packaging:0}));
+  const order=paidOrder([item({quantity:1,product_price:21900}),item({product_no:5,variant_code:'',quantity:1,product_price:0,option_price:0})],21900+3000,{shipping_fee:3000});
+  const s=S.summarize([order],[tee,gift]);
+  assert.equal(s.margin.actualOrders,1);assert.equal(s.margin.revenue,21900,'사은품 매출 0원');assert.equal(s.margin.unitCost,10800,'사은품 원가 800원 반영');
+  const missing=S.summarize([paidOrder([item({quantity:1,product_price:null})],0,{})],[linkFor(1,calcInput({}))]);
+  assert.deepEqual(missing.margin.estimated,{savedPrice:1});assert.equal(missing.margin.revenue,30000);
 });

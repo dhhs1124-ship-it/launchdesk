@@ -12,7 +12,7 @@ function str(value) {
 
 const ORDER_AMOUNT_FIELDS = ["order_price_amount", "shipping_fee", "points_spent_amount", "credits_spent_amount",
   "coupon_discount_price", "coupon_shipping_fee_amount", "membership_discount_amount", "shipping_fee_discount_amount",
-  "set_product_discount_amount", "app_discount_amount", "total_amount_due", "payment_amount"];
+  "set_product_discount_amount", "app_discount_amount", "market_other_discount_amount", "total_amount_due", "payment_amount"];
 function pickAmounts(amounts) {
   if (!amounts || typeof amounts !== "object") return null;
   const out = {};
@@ -54,11 +54,32 @@ export function slimOrders(orders) {
         coupon_discount_price: num(item.coupon_discount_price),
         app_item_discount_amount: num(item.app_item_discount_amount),
         payment_amount: num(item.payment_amount),
-        // 배송 단위 확인용 — 같은 주문이라도 shipping_code가 다르면 따로 발송된 것이다.
-        // shipping_fee_type(T 무료 · M 조건부 등)과 개별 배송비는 상품별 배송비 설정 여부를 본다.
+        // 참고용 — shipping_code가 달라도 실제로 따로 발송했다는 뜻은 아니다(운영 쇼핑몰: 추가 비용 상품이 별도 코드).
+        // shipping_fee_type(T 무료 · X 기본 등)과 개별 배송비는 상품별 배송비 설정을 본다.
         shipping_code: str(item.shipping_code),
         shipping_fee_type: str(item.shipping_fee_type),
         individual_shipping_fee: num(item.individual_shipping_fee),
       })),
     }));
+}
+
+// 쿠폰 할인이 있는 주문만 GET /api/v2/admin/orders/coupons 로 품목별 쿠폰을 붙인다(공식 문서: order_item_code ·
+// coupon_name · coupon_value_final). 어느 품목에 적용된 쿠폰인지 확인하기 위함.
+export function ordersNeedingCoupons(orders) {
+  return orders.filter((o) => (o.actual_order_amount?.coupon_discount_price ?? 0) > 0).map((o) => o.order_id);
+}
+export function attachCoupons(orders, rows, failedIds) {
+  const byOrder = new Map();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!r || !r.order_id) continue;
+    const list = byOrder.get(String(r.order_id)) ?? [];
+    list.push({ order_item_code: str(r.order_item_code), coupon_name: str(r.coupon_name), coupon_value_final: num(r.coupon_value_final) });
+    byOrder.set(String(r.order_id), list);
+  }
+  const failed = new Set(failedIds ?? []);
+  for (const o of orders) {
+    if (byOrder.has(o.order_id)) o.coupons = byOrder.get(o.order_id);
+    else if (failed.has(o.order_id)) o.coupons = null; // 조회 실패 — 쿠폰 없음과 구분
+  }
+  return orders;
 }

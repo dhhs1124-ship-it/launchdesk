@@ -91,18 +91,21 @@
     // 3. 광고 전 상품 마진 — 주문 금액이 맞는 주문은 실제 결제(payment_amount + naver_point),
     //    확인할 수 없는 주문은 Cafe24가 기록한 주문 당시 판매가로 추정한다. 미등록 상품은 0원으로 더하지 않는다.
     var partial=!!(s&&s.partial),scope=partial?'일부 상품 기준 ':'';
-    var rule=s&&s.ordersWithLinked?'배송·포장·기타 비용은 저장한 설정값(실제 택배 지출액 아님) — Cafe24 배송 단위마다 한 번, 함께 보낸 상품은 그중 비용이 가장 큰 상품 기준 한 번'+(s.margin.multiShipmentOrders?' · 배송 단위가 나뉜 주문 '+count(s.margin.multiShipmentOrders,'건'):''):'';
+    var rule=s&&s.ordersWithLinked?'배송·포장·기타: 실제 택배 지출액을 알 수 없어 저장한 설정값으로 추정 — 추정 규칙: 주문 1건에 한 번, 담긴 상품 중 가장 큰 설정값'+(s.margin.multiCodeOrders?' · Cafe24 배송코드가 나뉜 주문 '+count(s.margin.multiCodeOrders,'건')+'도 실제 분할 발송을 확인할 수 없어 한 번으로 계산':''):'';
+    var cpn=s&&s.ordersWithLinked?s.margin.coupon:null;
+    var couponNote=cpn&&(cpn.shipping||cpn.product||cpn.unknown)?'쿠폰: 주문 쿠폰 이름으로 구분 — 무료배송 쿠폰 '+count(cpn.shipping||0,'건')+'(고객 배송비에서 뺌) · 상품 쿠폰 '+count(cpn.product||0,'건')+(cpn.unknown?' · 구분 불가 '+count(cpn.unknown,'건')+'(상품 할인으로 봄 — 상품 · 배송비 수수료율이 다르면 수수료가 쿠폰 금액 × 요율 차이만큼 달라질 수 있음)':''):'';
+    var payNote=s&&s.ordersWithLinked?'적립금 사용 '+count(s.margin.pointsOrders,'건')+'은 쇼핑몰이 지급한 혜택이라 판매자 부담으로 따로 뺌 · 예치금 '+count(s.margin.creditsOrders,'건')+' · 네이버페이(포인트 포함)는 정산되는 결제라 빼지 않음':'';
     var ship=s&&s.ordersWithLinked?s.margin.ship:null;
     var shipNote=ship?'고객 배송비: 주문에 실제 부과된 금액(현재 무료배송 조건으로 다시 계산하지 않음) — 부과 '+count(ship.charged,'건')+' · 0원 '+count(ship.free,'건')+(ship.unknown?' · 확인 불가 '+count(ship.unknown,'건')+'(0원으로 계산)':''):'';
     var margin=s?s.marginTotal:null,mm=s?s.margin:null;
-    var ESTIMATED={savedPrice:'Cafe24 판매가 0원(저장한 판매가로 추정)',partialStatus:'일부 취소·클레임 주문',amountMismatch:'결제금액이 맞지 않는 주문(마켓 등)',zeroPayment:'결제금액 0원 주문',noAmount:'결제 내역 없음'};
+    var ESTIMATED={savedPrice:'Cafe24 판매가 정보 없음(저장한 판매가로 추정)',partialStatus:'일부 취소·클레임 주문',amountMismatch:'결제금액이 맞지 않는 주문(마켓 등)',zeroPayment:'결제금액 0원 주문',noAmount:'결제 내역 없음'};
     var est=mm?Object.keys(mm.estimated).map(function(k){return ESTIMATED[k]+' '+count(mm.estimated[k],'건');}).join(' · '):'';
     figures.appendChild(row(scope+'상품 마진',margin==null?'—':won(margin),s&&s.linkedQty?[
       partial?'판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+'만 계산 · 미등록 '+count(s.unlinkedQty)+'는 0원으로 보지 않고 제외':'판매 '+count(s.soldQty)+' 전부 반영',
       '실제 결제 '+count(mm.actualOrders,'건')+(mm.estimatedOrders?' · 주문 당시 판매가로 추정 '+count(mm.estimatedOrders,'건')+' ('+won(mm.estimatedTotal)+')':'')+(mm.savedOnlyOrders?' · 저장한 1개당 마진만 '+count(mm.savedOnlyOrders,'건'):''),
       est?'추정 사유: '+est:'',
-      '상품 금액은 옵션 추가금 · 할인이 반영된 Cafe24 주문 금액(배송비 포함 결제금액에서 고객 배송비를 뺀 값), 원가 · 수수료율은 저장한 값(옵션별 원가가 있으면 우선)',
-      shipNote,rule
+      '상품 금액은 옵션 추가금 · 쿠폰 · 할인이 반영된 Cafe24 주문 금액(판매가 0원 사은품은 매출 0원 · 원가는 반영), 원가 · 수수료율은 저장한 값(옵션별 원가가 있으면 우선)',
+      shipNote,couponNote,payNote,rule
     ]:[s&&s.soldQty?'판매된 상품에 마진을 연결하면 계산돼요.':''],partial?'partial':''));
 
     // 4. 원화 광고비
@@ -237,9 +240,9 @@
     var box=byId('salesBreakdown'),m=s&&s.margin;box.replaceChildren();
     box.parentElement.hidden=!(s&&s.marginTotal!=null);
     if(box.parentElement.hidden)return;
-    var computed=m.revenue+m.customerShipping-m.unitCost-m.fees-m.orderCosts,lines=[
+    var computed=m.revenue+m.customerShipping-m.points-m.unitCost-m.fees-m.orderCosts,lines=[
       ['상품 금액 (실제 결제 '+count(m.actualOrders,'건')+(m.estimatedOrders?' · 추정 '+count(m.estimatedOrders,'건'):'')+')',m.revenue,'+'],
-      ['고객에게 받은 배송비',m.customerShipping,'+'],['상품 원가',m.unitCost,'−'],
+      ['고객에게 받은 배송비',m.customerShipping,'+'],['적립금 사용 (판매자 부담)',m.points,'−'],['상품 원가',m.unitCost,'−'],
       ['판매·PG·배송비 수수료',m.fees,'−'],['배송·포장·기타 (설정값 추정)',m.orderCosts,'−']];
     if(m.savedOnlyOrders)lines.push(['저장한 1개당 마진으로만 계산한 주문 '+count(m.savedOnlyOrders,'건'),m.total-computed,'+']);
     lines.push(['상품 마진',m.total,'=']);

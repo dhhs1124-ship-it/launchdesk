@@ -94,7 +94,8 @@
       return n;
     }
 
-    input.price = req('price', { min: 0.000001, emptyMsg: '판매가를 입력해주세요', rangeMsg: '판매가는 0보다 커야 해요' });
+    // 0원(사은품 등)도 허용 — 매출 0원이어도 원가 · 배송비를 저장해 운영 현황에서 뺄 수 있게.
+    input.price = req('price', { min: 0, emptyMsg: '판매가를 입력해주세요 (사은품은 0)', rangeMsg: '판매가는 0 이상이어야 해요' });
     input.qty = req('qty', { min: 1, integer: true, emptyMsg: '판매 수량을 입력해주세요', rangeMsg: '판매 수량은 1 이상의 정수여야 해요' });
     input.unitCost = req('unitCost', { min: 0, emptyMsg: '개당 구입원가를 입력해주세요 (없으면 0)', rangeMsg: '구입원가는 0 이상이어야 해요' });
     input.feeRate = req('feeRate', { min: 0, max: 100, emptyMsg: '판매 수수료율을 입력해주세요 (없으면 0)', rangeMsg: '수수료율은 0~100% 사이여야 해요' });

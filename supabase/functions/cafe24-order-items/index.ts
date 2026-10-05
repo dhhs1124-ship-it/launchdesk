@@ -4,7 +4,7 @@ import {
   getValidCafe24AccessToken,
   cafe24TokenErrorStatus,
 } from "../_shared/cafe24-token.ts";
-import { slimOrders } from "../_shared/cafe24-order-items.mjs";
+import { slimOrders, ordersNeedingCoupons, attachCoupons } from "../_shared/cafe24-order-items.mjs";
 
 // LaunchROAS 실제 판매 기준 집계용 — 선택 기간의 Cafe24 주문 상품(수량 · 상태)을 조회만 한다.
 // DB에 주문을 저장하지 않으며(기존 cafe24-orders-sync와 별개), 토큰 갱신 때만 자격증명을 쓴다.
@@ -80,6 +80,33 @@ export default {
         orders.push(...page);
         if (!Array.isArray(data.orders) || data.orders.length < PAGE_LIMIT) break;
       }
+
+      // 쿠폰 상세(읽기 전용). 실패해도 주문 조회는 그대로 돌려주고, 해당 주문은 coupons: null로 표시한다.
+      const couponIds = truncated ? [] : ordersNeedingCoupons(orders);
+      const couponRows: unknown[] = [];
+      const couponFailed: string[] = [];
+      for (let i = 0; i < couponIds.length; i += 100) {
+        const ids = couponIds.slice(i, i + 100);
+        const url = new URL(`https://${mallId}.cafe24api.com/api/v2/admin/orders/coupons`);
+        url.searchParams.set("shop_no", "1");
+        url.searchParams.set("order_id", ids.join(","));
+        url.searchParams.set("limit", "500");
+        const res = await fetch(url.toString(), {
+          headers: {
+            Authorization: `Bearer ${tokenResult.accessToken}`,
+            "Content-Type": "application/json",
+            "X-Cafe24-Api-Version": API_VERSION,
+          },
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || !Array.isArray(data.coupons)) {
+          console.error("Cafe24 order coupons API failed:", res.status);
+          couponFailed.push(...ids);
+          continue;
+        }
+        couponRows.push(...data.coupons);
+      }
+      attachCoupons(orders, couponRows, couponFailed);
 
       return Response.json({ ok: true, start_date, end_date, timezone: "Asia/Seoul", truncated, orders });
     } catch (error) {
