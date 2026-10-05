@@ -14,12 +14,15 @@ function el(tag){
 const texts=(n)=>[n.textContent,...(n.children||[]).flatMap(texts)].filter(Boolean);
 const find=(n,pred)=>pred(n)?n:(n.children||[]).map(c=>find(c,pred)).find(Boolean);
 function query(state,table){
-  const q={_f:{}};['select','in','order','limit'].forEach(k=>{q[k]=()=>q;});
+  const q={_f:{}};['select','order','limit'].forEach(k=>{q[k]=()=>q;});
+  q.in=(k,v)=>{if(k==='id')q._ids=v;return q;};
+  q.delete=()=>{q._del=true;return q;};
   q.eq=(k,v)=>{q._f[k]=v;return q;};
   q.insert=(row)=>{const rec={id:state.nextId++,tool_type:row.tool_type,data:row.data,created_at:new Date().toISOString()};state.rows.push(rec);q._ins=rec;return q;};
   q.update=(patch)=>{q._patch=patch;return q;};
   q.single=async()=>({data:q._ins?{id:q._ins.id}:null,error:null});
   q.then=(ok,fail)=>{
+    if(q._del){state.rows=state.rows.filter(x=>!(q._ids||[]).includes(x.id));state.deletes++;return Promise.resolve({error:null}).then(ok,fail);}
     if(q._patch){const r=state.rows.find(x=>x.id===q._f.id);if(r)r.data=q._patch.data;state.updates++;return Promise.resolve({error:null}).then(ok,fail);}
     return Promise.resolve({data:state.rows.slice(),error:null}).then(ok,fail);
   };
@@ -51,7 +54,7 @@ async function pick(r,name){r.nodes.pmPick.events.click();await settle();const b
 function fill(r,v){Object.entries(v).forEach(([k,val])=>{r.nodes[k].value=val;});r.nodes.calcForm.events.input();}
 
 test('상품 선택 → 비용 입력 → 이 상품에 저장 → 다시 열면 저장값이 보이고 운영 현황에 알린다',async()=>{
-  const state={rows:[],nextId:1,updates:0,dispatched:[]};
+  const state={rows:[],nextId:1,updates:0,deletes:0,dispatched:[]};
   const r=await boot(state);
   r.nodes.pmPick.events.click();await settle();
   assert.deepEqual(items(r).map(x=>texts(x)[0]),['가족티','후드티'],'최근 판매 상품 목록(판매 많은 순)');
@@ -78,7 +81,7 @@ test('상품 선택 → 비용 입력 → 이 상품에 저장 → 다시 열면
 test('옵션별 설정은 필요할 때만, 옵션 저장은 상품 기본을 덮지 않고 따로 남는다',async()=>{
   const state={rows:[{id:1,tool_type:'product_margin_link',data:{store_id:'4',product_no:152,variant_code:'',product_label:'가족티',unit_margin:1,order_adjust:-1,
     input:{price:21900,qty:1,unitCost:9000,feeRate:3,actualShipping:3000,packaging:500,customerShipping:0,sellerDiscount:0,otherCost:0,pgRate:0,feeBase:'after_discount',feeVat:'included',shippingFeeMode:'none',adMode:'none'}}}],
-    nextId:2,updates:0,dispatched:[]};
+    nextId:2,updates:0,deletes:0,dispatched:[]};
   const r=await boot(state);
   await pick(r,'가족티');
   assert.equal(r.nodes.pmVariantsBox.hidden,false);assert.equal(r.nodes.pmVariantsBox.open,false,'옵션 목록은 접혀 있다');
@@ -101,4 +104,17 @@ test('index.html은 계산 모듈을 쓰는 화면 스크립트보다 먼저 불
   const before=(dep,user)=>assert.ok(order.indexOf(dep)>=0&&order.indexOf(dep)<order.indexOf(user),dep+' → '+user);
   for(const user of ['calculator.js','sales.js','ad-performance.js']){before('app.js',user);before('margin-calc.js',user);before('sales-core.js',user);}
   before('ops-period-core.js','calculator.js');before('ops-period-core.js','sales.js');
+});
+
+test('같은 상품을 다시 저장하면 새 값으로 바뀌고 이전 기록은 지운다(tool_records에 수정 권한이 없어 저장 후 삭제)',async()=>{
+  const state={rows:[],nextId:1,updates:0,deletes:0,dispatched:[]};
+  const r=await boot(state);
+  await pick(r,'후드티');fill(r,{calcCost:'20000',calcFee:'3'});await r.nodes.pmSave.events.click();await settle();
+  await pick(r,'후드티');assert.equal(r.nodes.calcCost.value,'20000');
+  fill(r,{calcCost:'18000'});await r.nodes.pmSave.events.click();await settle();
+  assert.equal(state.updates,0,'UPDATE를 쓰지 않는다');
+  assert.equal(state.rows.length,1,'이전 기록은 지워진다');
+  assert.equal(state.rows[0].data.input.unitCost,18000);
+  await pick(r,'가족티');await pick(r,'후드티');
+  assert.equal(r.nodes.calcCost.value,'18000','다시 열면 최신 값');
 });

@@ -36,7 +36,7 @@
     if(id!==ticket)return;
     if(!records.error){
       var rows=records.data||[],store=String(ctx.storeId);
-      state.links=rows.filter(function(r){return r.tool_type===LINK&&String(r.data&&r.data.store_id)===store;}).map(function(r){return Object.assign({_id:r.id},r.data);});
+      state.links=S.latestLinks(rows.filter(function(r){return r.tool_type===LINK&&String(r.data&&r.data.store_id)===store;}).map(function(r){return Object.assign({_id:r.id},r.data);}));
       state.calcs=rows.filter(function(r){return r.tool_type===CALC&&r.data&&r.data.calc_version===2&&r.data.input;}).map(function(r){return r.data;});
       state.fxRecord=rows.find(function(r){return r.tool_type===FX&&String(r.data&&r.data.store_id)===store;})||null;
       app.setFx(state.fxRecord?{currency:state.fxRecord.data.currency,krw_per_unit:state.fxRecord.data.krw_per_unit,saved_at:state.fxRecord.data.saved_at}:null);
@@ -186,12 +186,12 @@
     if(!ctx.userId||!ctx.storeId||!(rate>0)||!/^[A-Z]{3}$/.test(currency)){byId('salesFxNote').textContent='0보다 큰 환율을 입력해 주세요.';return;}
     var data={store_id:String(ctx.storeId),currency:currency,krw_per_unit:rate,saved_at:new Date().toISOString()};
     this.disabled=true;
-    var res=state.fxRecord
-      ?await ctx.client.from('tool_records').update({data:data}).eq('id',state.fxRecord.id).eq('user_id',ctx.userId)
-      :await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:FX,data:data}).select('id').single();
+    // tool_records는 수정(UPDATE) 권한이 없다 — 새로 저장한 뒤 이 쇼핑몰의 이전 환율 기록을 지운다.
+    var res=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:FX,data:data}).select('id').single();
+    if(!res.error&&state.fxRecord)await ctx.client.from('tool_records').delete().eq('id',state.fxRecord.id).eq('user_id',ctx.userId).eq('tool_type',FX);
     this.disabled=false;
     if(res.error){byId('salesFxNote').textContent='환율을 저장하지 못했어요.';return;}
-    if(!state.fxRecord)state.fxRecord={id:res.data.id,data:data};else state.fxRecord.data=data;
+    state.fxRecord={id:res.data.id,data:data};
     byId('salesFxNote').textContent='';state.fxEdit=false;
     app.setFx({currency:currency,krw_per_unit:rate,saved_at:data.saved_at});
   });

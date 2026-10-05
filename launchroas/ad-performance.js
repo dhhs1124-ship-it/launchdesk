@@ -156,7 +156,7 @@
       (linked.data||[]).forEach(function(row){marginLinks[String(row.meta_adset_id)]=row;});
       if(!loaded[1].error){
         var recs=loaded[1].data||[];
-        productLinks=recs.filter(function(r){return r.tool_type==='product_margin_link'&&r.data&&String(r.data.store_id)===String(ctx.storeId)&&r.data.input;}).map(function(r){return r.data;});
+        productLinks=window.LaunchRoasSales.latestLinks(recs.filter(function(r){return r.tool_type==='product_margin_link'&&r.data&&String(r.data.store_id)===String(ctx.storeId)&&r.data.input;}).map(function(r){return r.data;}));
         // 갱신 필요 판단: 예전 계산 기록 + 상품별 마진 설정(같은 이름 · 더 최근 저장)
         marginRecords=recs.filter(function(r){return r.tool_type==='margin_calc';}).map(function(r){return r.data;})
           .concat(productLinks.map(function(l){var r=preAdOf(l);return r?{calc_version:2,product_name:l.product_label,saved_at:l.linked_at,result:{preAd:r.preAd}}:null;}).filter(Boolean));

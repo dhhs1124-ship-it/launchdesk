@@ -93,7 +93,8 @@
     var recs=await ctx.client.from('tool_records').select('id,tool_type,data,created_at').eq('user_id',ctx.userId).in('tool_type',[LINK,CALC]).order('created_at',{ascending:false}).limit(300);
     if(id!==ticket)return;
     var rows=recs.error?[]:recs.data||[],store=String(ctx.storeId);
-    st.links=rows.filter(function(r){return r.tool_type===LINK&&String(r.data&&r.data.store_id)===store;}).map(function(r){return Object.assign({_id:r.id},r.data);});
+    st.links=S.latestLinks(rows.filter(function(r){return r.tool_type===LINK&&String(r.data&&r.data.store_id)===store;}).map(function(r){return Object.assign({_id:r.id},r.data);}));
+    st.linkIds=rows.filter(function(r){return r.tool_type===LINK&&String(r.data&&r.data.store_id)===store;}).map(function(r){return {id:r.id,key:r.data.product_no+'|'+(r.data.variant_code||'')};});
     st.calcs=rows.filter(function(r){return r.tool_type===CALC&&r.data&&r.data.input;}).map(function(r){return r.data;});
     var orders=[];
     if(ctx.cafeAccount&&ctx.cafeAccount.status==='connected'){
@@ -151,13 +152,16 @@
     var data={store_id:String(ctx.storeId),product_no:t.product.product_no,variant_code:t.variant_code,cafe24_product_name:name,
       product_label:String(name).trim().slice(0,40),unit_margin:out.split.unitMargin,order_adjust:out.split.orderAdjust,
       input:out.calc.input,source_saved_at:now,linked_at:now};
-    var existing=linkFor(t.product.product_no,t.variant_code),btn=byId('pmSave');btn.disabled=true;
-    var res=existing
-      ?await ctx.client.from('tool_records').update({data:data}).eq('id',existing._id).eq('user_id',ctx.userId)
-      :await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:LINK,data:data}).select('id').single();
+    // tool_records는 수정(UPDATE) 권한이 없다 — 새로 저장한 뒤 같은 상품 · 옵션의 이전 기록을 지운다.
+    var key=t.product.product_no+'|'+t.variant_code,oldIds=(st.linkIds||[]).filter(function(x){return x.key===key;}).map(function(x){return x.id;});
+    var btn=byId('pmSave');btn.disabled=true;
+    var res=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:LINK,data:data}).select('id').single();
+    if(!res.error&&oldIds.length)await ctx.client.from('tool_records').delete().in('id',oldIds).eq('user_id',ctx.userId).eq('tool_type',LINK);
     btn.disabled=false;
     if(res.error){say('저장하지 못했어요. 다시 시도해 주세요.');return;}
-    if(existing)Object.assign(existing,data);else st.links.push(Object.assign({_id:res.data&&res.data.id},data));
+    var saved=Object.assign({_id:res.data&&res.data.id},data);
+    st.links=[saved].concat(st.links.filter(function(l){return l.product_no+'|'+(l.variant_code||'')!==key;}));
+    st.linkIds=[{id:saved._id,key:key}].concat((st.linkIds||[]).filter(function(x){return x.key!==key;}));
     say((t.variant_code?t.option+' 옵션':'상품')+' 비용을 저장했어요. 운영 현황에 바로 반영돼요.');
     byId('pmSelected').textContent='저장된 값을 불러왔어요';
     renderVariants();renderList();

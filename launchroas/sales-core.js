@@ -143,6 +143,13 @@
     return s;
   }
 
+  // 상품 · 옵션별로 가장 최근 저장만 남긴다(created_at 내림차순 목록 기준). tool_records는 수정(UPDATE) 권한이 없어
+  // 새로 저장한 뒤 이전 기록을 지우는데, 지우기가 실패해 중복이 남아도 최신 값만 쓰기 위함.
+  function latestLinks(links){
+    var seen={};
+    return (links||[]).filter(function(l){var k=l.product_no+'|'+(l.variant_code||'');if(seen[k])return false;seen[k]=true;return true;});
+  }
+
   // 광고비 원화 환산 — 원화 계정이면 그대로, 외화는 사용자가 저장한 환율이 있어야 한다(없으면 null).
   function adSpendKrw(spend,currency,fx){
     var amount=Number(spend);
@@ -169,5 +176,5 @@
       :{label:'손익분기 이상',tone:'above',reason:'',breakeven:breakeven};
   }
 
-  return {classifyItem:classifyItem,splitMargin:splitMargin,findLink:findLink,summarize:summarize,adSpendKrw:adSpendKrw,adVerdict:adVerdict,MIN_PURCHASES:MIN_PURCHASES};
+  return {classifyItem:classifyItem,splitMargin:splitMargin,findLink:findLink,summarize:summarize,adSpendKrw:adSpendKrw,adVerdict:adVerdict,MIN_PURCHASES:MIN_PURCHASES,latestLinks:latestLinks};
 });

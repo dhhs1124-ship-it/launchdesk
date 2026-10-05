@@ -167,3 +167,8 @@ test('광고 판단: 근거가 충분할 때만 손익분기 미달·이상, 아
   for(const v of [S.adVerdict(link,m(2.5,5)),S.adVerdict(link,m(3,5)),S.adVerdict(null,m(1,1))])
     assert.doesNotMatch(JSON.stringify(v),/중단|증액|늘리|줄이|끄세요/,'권고 문구 없음');
 });
+
+test('같은 상품 · 옵션의 연결이 여러 개 남아 있으면 가장 최근(목록 앞쪽) 것만 쓴다',()=>{
+  const latest=S.latestLinks([{product_no:1,variant_code:'',unit_margin:2},{product_no:1,variant_code:'',unit_margin:1},{product_no:1,variant_code:'V',unit_margin:3}]);
+  assert.deepEqual(latest.map(l=>l.unit_margin),[2,3]);
+});
