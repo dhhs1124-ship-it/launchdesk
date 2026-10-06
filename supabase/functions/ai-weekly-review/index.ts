@@ -4,7 +4,7 @@ import { getValidMetaAccessToken } from "../_shared/meta-token.ts";
 import { GRAPH_API_VERSION, buildInsightsUrl, fetchAllInsightsRows } from "../_shared/meta-adset-normalize.mjs";
 import {
   config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
-  batchContent, parseBatch, priorities, costUsd, scopeOf, SYSTEM_PROMPT,
+  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT,
 } from "../_shared/ai-weekly-core.mjs";
 
 // LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
@@ -189,11 +189,12 @@ export default {
         if (!rows.length) return await finish({ status: "no_data", error: "지난주 광고비가 집행된 광고가 없어요." });
 
         const adsetIds = [...new Set(rows.map((r: any) => String(r.adset_id)))];
-        const adsets = await byIds(adsetIds, "optimization_goal,attribution_spec", token);
+        const adsets = await byIds(adsetIds, "optimization_goal,attribution_spec,targeting", token);
         const ads = rows.map((r: any) => {
           const set = adsets.out[String(r.adset_id)] || {};
           return { ad_id: String(r.ad_id), ad_name: r.ad_name, campaign_name: r.campaign_name, adset_name: r.adset_name, objective: r.objective || null,
             optimization_goal: set.optimization_goal || r.optimization_goal || null,
+            placement: adsets.out[String(r.adset_id)] ? placementInfo(set.targeting) : null,
             attribution: Array.isArray(set.attribution_spec) ? set.attribution_spec.map((a: any) => `${a.event_type} ${a.window_days}일`).join(", ") : null,
             current: adMetrics(r), previous: prevById[String(r.ad_id)] || null };
         });
@@ -285,7 +286,7 @@ export default {
         priorities: priorities(results, adsById),
         ads: snap.ads.map((a: any) => ({ ad_id: a.ad_id, ad_name: a.ad_name, campaign_name: a.campaign_name, scope: a.scope,
           current: a.current, previous: a.previous, new_ad: !a.previous, analysis: results[a.ad_id] || null,
-          creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, notes: a.creative?.notes } })),
+          creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, notes: a.creative?.notes, headline: a.placement?.headline || "unknown" } })),
         coverage: { total: snap.counts.total, analyzed: Object.keys(results).length, requested: snap.counts.analyzed,
           skipped: snap.skipped, failed_ads: batches.flatMap((b: any) => b.status === "done" ? b.missing || [] : b.ad_ids) },
         notes: budgetHit ? snap.notes.concat(["이번 달 AI 운영 한도에 도달해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"]) : snap.notes, model: cfg.model,

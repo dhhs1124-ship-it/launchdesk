@@ -73,3 +73,21 @@ test('근거 설명은 보이는 값을 다시 말하는 문장과 "단정하지
   assert.equal(t('클릭 7일 외에 조회 1일, 영상 참여 1일 귀속이 포함되어 있습니다. 구매가 모두 링크 클릭에서 나왔다고 볼 수 없습니다.','클릭 후 7일, 조회 후 1일, 영상 참여 후 1일'),'구매가 모두 링크 클릭에서 나왔다고 볼 수 없습니다.');
   assert.ok(!/단정/.test(t('2.62%로 전주(2.64%)와 거의 같습니다. 이 수치만으로 좋고 나쁨을 단정하지는 않습니다.','2.62%')),'전주 비교 문장은 남기고 상투 문장만 뺀다');
 });
+
+test('AI 실행 전 확인 신호는 실제 측정값과 조건으로만, 최대 2개',()=>{
+  const m={spend:50000,impressions:10000,link_clicks:60,link_ctr:0.6,frequency:3.4,purchase:{observed:true,value:5},funnel_status:{usable:true}};
+  assert.deepEqual(I.ruleSignals(m,false,null),['클릭률 0.6% · 노출 10,000회 중 1% 미만','빈도 3.4회 · 같은 사람에게 반복 노출']);
+  assert.deepEqual(I.ruleSignals({spend:10,impressions:300,link_ctr:0.2,link_clicks:4,purchase:{observed:false}},false,null),[],'노출 · 클릭이 적으면 신호 없음(구매 기록 없음을 픽셀 문제로 단정하지 않음)');
+  assert.deepEqual(I.ruleSignals({spend:90,impressions:9000,link_ctr:1.5,link_clicks:135,purchase:{observed:false}},false,null),['링크 클릭 135회 · 구매 기록 없음']);
+  assert.deepEqual(I.ruleSignals({spend:10,impressions:5000,link_ctr:2.5,purchase:{observed:true,value:8},funnel_status:{usable:true}},false,null),[]);
+  assert.match(I.ruleSignals({roas:3.2,purchase:{observed:true,value:9}},true,{tone:'below',breakeven:4.1})[0],/ROAS 320% · 손익분기 410% 미달/);
+});
+
+test('제목이 비었다는 이유만의 제목 제안은 제목이 보이는 게재 위치로 확인됐을 때만 보여 준다',()=>{
+  const an={recommendation:{current:'제목이 없습니다',proposed:'제목만 추가한 새 광고',example:'제목: 아기 얼굴로 만드는 우리 가족 커스텀 티셔츠'}};
+  assert.equal(I.recUsable({creative:{title:null}},an),false,'저장된 결과처럼 게재 위치 정보가 없으면 숨김');
+  assert.equal(I.recUsable({creative:{title:null,headline:'partial'}},an),true);
+  assert.equal(I.recUsable({creative:{title:null,headline:'none'}},an),false);
+  assert.equal(I.recUsable({creative:{}},{recommendation:{current:'본문 첫 줄',proposed:'첫 줄에 혜택',example:'오늘만 무료배송'}}),true,'제목과 무관한 제안은 그대로');
+  assert.equal(I.recUsable({creative:{}},{recommendation:null}),false);
+});

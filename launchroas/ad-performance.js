@@ -127,7 +127,10 @@
     var actions=element('div','adset-actions');actions.append(linker(adset,ctx,key),button);
     extra.append(facts,element('small','adset-basis','판단 기준: Meta ROAS와 연결한 상품 마진의 손익분기 ROAS(총 수입 ÷ 광고 전 잔액) 비교 · Meta 구매 '+(window.LaunchRoasSales?window.LaunchRoasSales.MIN_PURCHASES:3)+'건 이상일 때만'),
       marginSummary(adset,m),actions,details);
-    head.append(name,more);row.append(head,stats,extra);return row;
+    // AI 점검 전에도 보이는 짧은 확인 신호(규칙 기반 · 실제 측정값과 조건만)
+    var sig=window.LaunchRoasInsights?window.LaunchRoasInsights.ruleSignals(m,!!link,verdict):[],sigEl=null;
+    if(sig.length){sigEl=element('p','ad-signal');sigEl.append(element('span','ad-signal-tag','확인 신호 · 규칙 기반'),element('span','',sig.join(' · ')));}
+    head.append(name,more);row.append(head,stats);if(sigEl)row.appendChild(sigEl);row.appendChild(extra);return row;
   }
   more.addEventListener('click',function(){
     var expanded=this.getAttribute('aria-expanded')!=='true';

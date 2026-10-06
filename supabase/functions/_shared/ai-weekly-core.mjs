@@ -171,6 +171,21 @@ export function extractCreative(c) {
   return out;
 }
 
+// ---- 게재 위치 — 제목(헤드라인)이 실제로 보이는 위치에 게재되는지 ----
+// publisher_platforms가 없으면 자동 게재 위치(페이스북 피드 포함 · 릴스/스토리 등은 제목 없음) → 일부
+const HEADLINE_FB = ["feed", "marketplace", "search", "video_feeds"];
+export function placementInfo(t) {
+  if (!t || typeof t !== "object") return { label: "확인 못 함", headline: "unknown" };
+  const pp = t.publisher_platforms;
+  if (!Array.isArray(pp) || !pp.length) return { label: "자동 게재 위치", headline: "partial" };
+  const fbp = t.facebook_positions;
+  const feed = pp.includes("facebook") && (!Array.isArray(fbp) || fbp.some((p) => HEADLINE_FB.includes(p)));
+  const only = feed && pp.length === 1 && Array.isArray(fbp) && fbp.every((p) => HEADLINE_FB.includes(p));
+  const label = pp.map((p) => p + (Array.isArray(t[p + "_positions"]) ? ": " + t[p + "_positions"].join("/") : "")).join(", ");
+  return { label, headline: only ? "all" : feed ? "partial" : "none" };
+}
+const HEADLINE_TEXT = { all: "모든 게재 위치에서 표시", partial: "일부 위치(페이스북 피드 등)에서만 표시 · 릴스 · 스토리 등에는 표시 안 됨", none: "제목이 표시되지 않는 위치에만 게재", unknown: "확인 못 함" };
+
 // ---- 처리 범위: 광고비 순 상위 maxAds개 분석, 나머지는 이유와 함께 누락 처리 ----
 export function planBatches(ads, cfg) {
   const sorted = [...ads].sort((a, b) => (b.current.spend || 0) - (a.current.spend || 0));
@@ -198,6 +213,8 @@ export const SYSTEM_PROMPT = `너는 한국 쇼핑몰의 Meta 광고를 점검�
 - 근거(evidence)는 입력 JSON 안의 경로만 쓴다(예: metrics_current.link_ctr_pct). 경로는 광고 객체 기준이다.
 - 경로 · 필드명 · 코드는 evidence.metric에만 쓴다. 사용자가 읽는 문장(headline · next_action · changes · funnel · peers · hypotheses · recommendation · budget_note · limits · evidence.note)에는 link_ctr_pct, funnel_ratio_usable, LPV_EXCEEDS_LINK_CLICKS, SHOP_NOW 같은 이름을 쓰지 말고 "클릭률", "랜딩 페이지 조회가 링크 클릭보다 많음", "지금 구매하기 버튼"처럼 한국어로 쓴다.
 - next_action은 한 문장(60자 안팎)으로, 무엇을 할지만 쓴다.
+- 제목(title)이 비었다는 이유만으로 개선 대상으로 보지 마라. 제목 추가 · 변경은 creative.headline_display가 "모든"/"일부"로 시작할 때만 제안하고, "일부"면 제목이 보이는 위치에서만 효과가 있다는 한계를 proposed에 쓴다. 그 밖이면 제목을 제안하지 마라.
+- verdict가 "유지"여도 근거 있는 개선 여지가 있으면 recommendation에 선택적 제안으로 쓸 수 있다. 근거가 약하면 recommendation은 null이다. recommendation.basis에는 이 제안의 근거가 된 입력 사실을 한 문장으로 쓴다.
 - 확인한 사실, 설정값 기반 추정, 개선 가설을 구분한다. 원인은 가설로 쓰고 확인 방법을 붙인다.
 - new_ad가 true면 증감률을 말하지 마라. 미측정(null)은 0이 아니다.
 - 보편적인 CTR 기준 하나로 좋고 나쁨을 단정하지 마라. 비교는 peers(같은 목적 · 최적화 목표)가 있을 때만 하고, 조건이 다른 광고끼리 순위를 매기지 마라.
@@ -218,7 +235,7 @@ export const SYSTEM_PROMPT = `너는 한국 쇼핑몰의 Meta 광고를 점검�
  "peers":"비교 가능한 광고와의 차이 또는 '비교 대상 없음'",
  "evidence":[{"metric":"경로","note":"해석"}],
  "hypotheses":[{"text":"원인 가설","basis":"근거가 된 사실","check":"확인 방법"}],
- "recommendation":null 또는 {"element":"문구|이미지|타깃|예산|랜딩|기타","current":"현재안","proposed":"변경안","example":"바로 쓸 수정 예시","example_is_provisional":false,"needs_info":[],"test":{"method":"","compare_metrics":[],"decision_rule":"","sample_note":""}},
+ "recommendation":null 또는 {"element":"문구|이미지|타깃|예산|랜딩|기타","basis":"제안 근거(입력 사실)","current":"현재안","proposed":"변경안","example":"바로 쓸 수정 예시","example_is_provisional":false,"needs_info":[],"test":{"method":"","compare_metrics":[],"decision_rule":"","sample_note":""}},
  "budget_note":null,
  "limits":["판단할 수 없는 부분"]}`;
 
@@ -231,7 +248,8 @@ export function adPayload(a, peers) {
     metrics_current: a.current, metrics_previous: a.previous || null, change: changes(a.current, a.previous),
     peers: peers[(a.objective || "?") + "|" + (a.optimization_goal || "?")] || null,
     creative: { format: c.format, title: c.title, body: c.body, description: c.description, cta: c.cta,
-      link_domain: c.link_url ? safeHost(c.link_url) : null, cards: c.cards, variants: c.variants, notes: (c.notes || []).concat(a.imageNote ? [a.imageNote] : []) },
+      link_domain: c.link_url ? safeHost(c.link_url) : null, cards: c.cards, variants: c.variants, notes: (c.notes || []).concat(a.imageNote ? [a.imageNote] : []),
+      placements: a.placement ? a.placement.label : "확인 못 함", headline_display: HEADLINE_TEXT[a.placement ? a.placement.headline : "unknown"] },
   };
 }
 function safeHost(u) { try { return new URL(u).hostname; } catch { return null; } }
@@ -293,7 +311,7 @@ export function parseBatch(raw, batch, adsById, peers) {
       peers: t(r.peers, 300), evidence, dropped_evidence: dropped,
       hypotheses: (Array.isArray(r.hypotheses) ? r.hypotheses : []).slice(0, 4).map((h) => ({ text: t(h && h.text, 300), basis: t(h && h.basis, 300), check: t(h && h.check, 300) })).filter((h) => h.text),
       recommendation: rec ? {
-        element: t(rec.element, 20), current: t(rec.current, 400), proposed: t(rec.proposed, 400), example: t(rec.example, 800),
+        element: t(rec.element, 20), basis: t(rec.basis, 300), current: t(rec.current, 400), proposed: t(rec.proposed, 400), example: t(rec.example, 800),
         example_is_provisional: rec.example_is_provisional === true, needs_info: list(rec.needs_info, 5, 200),
         test: { method: t(test.method, 400), compare_metrics: list(test.compare_metrics, 6, 80), decision_rule: t(test.decision_rule, 300), sample_note: t(test.sample_note, 300) },
       } : null,

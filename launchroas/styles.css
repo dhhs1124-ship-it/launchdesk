@@ -263,3 +263,11 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .wk-hyp small{display:block;color:#b3bcbc;font-size:12px}
 .wk-optional{margin:0;color:#b9efcf}
 @media(max-width:760px){.wk-ev{grid-template-columns:1fr;gap:2px}.wk-ev dd{margin-bottom:8px}.wk-line{flex-direction:column;gap:0}}
+
+/* ---- AI 점검 전 확인 신호(규칙 기반) · 광고 개선안 ---- */
+.wk-pre{display:grid;gap:8px}
+.wk-rule-tag,.ad-signal-tag{padding:2px 8px;border-radius:99px;border:1px dashed #ffffff3a;color:#b6bfc0;font-size:11.5px;font-weight:700;white-space:nowrap}
+.ad-signal{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:12px 0 0;color:#e3e8e6;font-size:13px;line-height:1.5;word-break:keep-all}
+.wk-improve .wk-rec dt{color:#ffbd92}
+.wk-improve .wk-full{padding-top:2px}
+.wk-held{color:#aab3b5}

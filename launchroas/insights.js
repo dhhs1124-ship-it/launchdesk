@@ -109,12 +109,34 @@
       });
     return out.slice(0,2).join(' ');
   }
+  // AI 실행 전 확인 신호(규칙 기반 · AI 분석 아님) — 광고 세트 실제 측정값과 조건만, 최대 2개
+  function pctTxt(v){return (Math.round(v*10)/10).toLocaleString('ko-KR')+'%';}
+  function ruleSignals(m,linked,verdict){
+    m=m||{};var out=[],n=function(v){var x=Number(v);return Number.isFinite(x)?x:null;},obsv=function(x){return x&&x.observed?n(x.value):null;};
+    var imp=n(m.impressions)||0,clicks=n(m.link_clicks)||0,ctr=n(m.link_ctr),freq=n(m.frequency),lpv=obsv(m.landing_page_view),buy=obsv(m.purchase),usable=m.funnel_status&&m.funnel_status.usable;
+    if(linked&&verdict&&verdict.tone==='below'&&verdict.breakeven)out.push('ROAS '+Math.round((n(m.roas)||0)*100)+'% · 손익분기 '+Math.round(verdict.breakeven*100)+'% 미달');
+    if(imp>=2000&&ctr!=null&&ctr<1)out.push('클릭률 '+pctTxt(ctr)+' · 노출 '+imp.toLocaleString('ko-KR')+'회 중 1% 미만');
+    if(freq!=null&&freq>=3)out.push('빈도 '+(Math.round(freq*10)/10)+'회 · 같은 사람에게 반복 노출');
+    if(usable&&clicks>=30&&n(m.landing_rate)!=null&&m.landing_rate<70)out.push('랜딩률 '+pctTxt(m.landing_rate)+' · 클릭 후 이탈 확인');
+    if(usable&&lpv!=null&&lpv>=50&&buy!=null&&n(m.purchase_rate)!=null&&m.purchase_rate<1)out.push('구매율 '+pctTxt(m.purchase_rate)+' · 랜딩 '+lpv+'회 중 1% 미만');
+    if(m.funnel_status&&m.funnel_status.code==='LPV_EXCEEDS_LINK_CLICKS')out.push('랜딩 조회가 링크 클릭보다 많음 · 집계 기준 확인');
+    // Meta는 구매가 없을 때도 '기록 없음'으로 준다 — 픽셀 문제로 단정하지 않고, 클릭이 충분히 쌓였을 때만 신호
+    if(buy==null){if(clicks>=100)out.push('링크 클릭 '+clicks.toLocaleString('ko-KR')+'회 · 구매 기록 없음');}else if(buy<3)out.push('구매 '+buy+'건 · 판단하기엔 표본 부족');
+    return out.slice(0,2);
+  }
+  // 개선안을 보여 줄지 — 제목이 비었다는 이유만으로 나온 제목 제안은 제목이 보이는 게재 위치로 확인됐을 때만
+  function recUsable(a,an){
+    var rec=an&&an.recommendation,c=a&&a.creative||{};if(!rec)return false;
+    var aboutTitle=/제목/.test([rec.current,rec.proposed,rec.example].join(' '));
+    if(aboutTitle&&!c.title&&c.headline!=='all'&&c.headline!=='partial')return false;
+    return true;
+  }
   // 확인 사항 — 실제 지표의 데이터 상태로만
   function checkLine(a){
     var c=a&&a.current||{},out=[];
     if(c.funnel_note==='LPV_EXCEEDS_LINK_CLICKS')out.push('랜딩 조회 집계 기준 확인');
     else if(c.funnel_note==='LPV_NOT_OBSERVED')out.push('랜딩 페이지 조회 측정 설정 확인');
-    if(c.purchases==null)out.push('구매 측정 설정 확인');else if(c.purchases<3)out.push('구매 3건 미만 · 표본 부족');
+    if(c.purchases==null)out.push('구매 기록 없음');else if(c.purchases<3)out.push('구매 3건 미만 · 표본 부족');
     return out.join(' · ');
   }
   function numbersLine(a,cur){
@@ -128,14 +150,14 @@
       return a.rank-b.rank||((x.analysis&&x.analysis.priority)||9)-((y.analysis&&y.analysis.priority)||9)||((y.current&&y.current.spend)||0)-((x.current&&x.current.spend)||0);
     });
   }
-  return {trimNote:trimNote,keyLine:keyLine,actionLine:actionLine,checkLine:checkLine,metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
+  return {ruleSignals:ruleSignals,recUsable:recUsable,trimNote:trimNote,keyLine:keyLine,actionLine:actionLine,checkLine:checkLine,metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
 });
 
 
 (function(){
   if(typeof document==='undefined'||!window.LaunchRoasApp)return;
   var I=window.LaunchRoasInsights,app=window.LaunchRoasApp,S=window.LaunchRoasSales,sales=null,ads=null,lastSig='';
-  var wk={state:'idle',data:null,message:'',storeId:null,busy:false},ui={open:null,all:false};
+  var wk={state:'idle',data:null,message:'',storeId:null,busy:false},ui={panel:{},all:false};
   function byId(id){return document.getElementById(id);}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
   function won(v){return v==null?'—':(v<0?'−':'')+Math.abs(Math.round(v)).toLocaleString('ko-KR')+'원';}
@@ -168,7 +190,7 @@
     if(wk.message)wrap.appendChild(el('p','wk-message'+(wk.state==='error'?' is-error':''),wk.message));
     else if(d&&d.error&&!r)wrap.appendChild(el('p','wk-message is-error',I.koText(d.error)));
     if(r)wrap.appendChild(renderResult(r,d.status));
-    else if(!wk.busy&&wk.state==='ready')wrap.appendChild(el('p','wk-empty','지난주 광고별 지표 · 문구 · 이미지를 보고 이번 주에 먼저 확인할 광고를 골라 드려요.'));
+    else if(!wk.busy){if(wk.state==='ready')wrap.appendChild(el('p','wk-empty','지난주 광고별 지표 · 문구 · 이미지를 보고 어떤 광고를 왜 확인할지, 무엇을 바꾸면 되는지 알려 드려요.'));wrap.appendChild(renderSignals());}
     wrap.appendChild(el('small','wk-foot','계정당 주 1회 · 한국 시간 월요일 00시 갱신(다음 '+day(w.next)+') · 위의 기간 선택과 관계없이 지난주 고정'));
     return wrap;
   }
@@ -206,20 +228,24 @@
     return frag;
   }
   function renderAd(a,cur){
-    var an=a.analysis,v=I.verdictView(an&&an.verdict),open=ui.open&&ui.open.id===a.ad_id?ui.open.panel:null,li=el('li','wk-ad'+(open?' is-open':''));
+    // 개선 필요 + 쓸 수 있는 개선안이면 개선안을 기본으로 펼친다(사용자가 접으면 접힌 채로)
+    var an=a.analysis,v=I.verdictView(an&&an.verdict),usable=I.recUsable(a,an);
+    var open=Object.prototype.hasOwnProperty.call(ui.panel,a.ad_id)?ui.panel[a.ad_id]:(an&&an.verdict==='개선 필요'&&usable?'improve':null);
+    var li=el('li','wk-ad'+(open?' is-open':''));
     var head=el('div','wk-ad-head');head.append(el('strong','wk-ad-name',a.ad_name||'이름 없는 광고'),el('span','wk-badge '+v.tone,v.label));
     var check=I.checkLine(a);
     li.append(head,el('p','wk-key',I.keyLine(a,cur)));
     var act=el('p','wk-line');act.append(el('span','wk-k','권장 행동'),el('span','',I.actionLine(an)));li.appendChild(act);
     if(check){var ck=el('p','wk-line');ck.append(el('span','wk-k','확인 사항'),el('span','',check));li.appendChild(ck);}
+    if(an&&an.recommendation&&!usable){var hold=el('p','wk-line wk-held');hold.append(el('span','wk-k','개선안'),el('span','','보류 · 제목이 보이는 게재 위치인지 확인되지 않아 보여 주지 않아요(다음 점검부터 확인)'));li.appendChild(hold);}
     if(an){
       var tabs=el('div','wk-tabs');
       var tab=function(key,label){var b=el('button','wk-tab',label);b.type='button';b.setAttribute('aria-expanded',open===key?'true':'false');
-        b.addEventListener('click',function(){ui.open=open===key?null:{id:a.ad_id,panel:key};render();});tabs.appendChild(b);};
-      tab('why','판단 근거');if(an.recommendation)tab('test','테스트 제안');
+        b.addEventListener('click',function(){ui.panel[a.ad_id]=open===key?null:key;render();});tabs.appendChild(b);};
+      tab('why','판단 근거');if(usable)tab('improve',v.tone==='keep'?'광고 개선안 (선택)':'광고 개선안');
       li.appendChild(tabs);
       if(open==='why')li.appendChild(renderWhy(a,an,cur));
-      if(open==='test'&&an.recommendation)li.appendChild(renderTest(an,v));
+      if(open==='improve'&&usable)li.appendChild(renderImprove(an,v));
     }
     return li;
   }
@@ -247,19 +273,42 @@
     full.appendChild(fl);box.appendChild(full);
     return box;
   }
-  // 테스트 제안 — 유지 광고면 현재 광고를 바꾸지 않는 선택 사항으로
-  function renderTest(an,v){
-    var rec=an.recommendation,t=rec.test||{},box=el('div','wk-panel'),g=el('dl','wk-rec');
-    if(v.tone==='keep')box.appendChild(el('p','wk-sub wk-optional','현재 광고는 그대로 두고, 새 광고로 비교해 볼 수 있는 선택 사항이에요.'));
-    var add=function(k,txt){if(txt){g.append(el('dt','',k),el('dd','',I.koText(txt)));}};
-    add('현재',rec.current);
-    add('바꿔 볼 것',String(rec.proposed||'').replace(/^현재 광고는 유지\s*·\s*새 광고로 비교\s*[:：]\s*/,''));
-    if(rec.example){g.append(el('dt','',rec.example_is_provisional?'수정 예시 (정보 확인 전 임시)':'수정 예시'),el('dd','wk-example',rec.example));}
-    if(rec.needs_info&&rec.needs_info.length)add('먼저 확인할 정보',rec.needs_info.join(' / '));
-    add('비교 방법',t.method);
-    if(t.compare_metrics&&t.compare_metrics.length)add('비교 지표',t.compare_metrics.map(function(x){return /^[a-z_]+$/.test(x)?I.metricName(x):x;}).join(', '));
-    add('판단 기준',[t.decision_rule,t.sample_note].filter(Boolean).join(' '));
-    box.appendChild(g);return box;
+  // 광고 개선안 — 무엇을 바꿀지 → 수정 예시 → 비교 방법을 먼저, 세부 지표 · 판단 기준은 더 펼쳐서
+  function renderImprove(an,v){
+    var rec=an.recommendation,t=rec.test||{},box=el('div','wk-panel wk-improve'),g=el('dl','wk-rec');
+    var add=function(dl,k,txt){if(txt){dl.append(el('dt','',k),el('dd','',I.koText(txt)));}};
+    if(v.tone==='keep')box.appendChild(el('p','wk-sub wk-optional','지금 광고는 바꿀 필요가 없다는 판단이에요. 아래는 새 광고로 비교해 볼 수 있는 선택적 개선안이에요.'));
+    add(g,'무엇을 바꿀지',String(rec.proposed||'').replace(/^현재 광고는 유지\s*·\s*새 광고로 비교\s*[:：]\s*/,''));
+    if(rec.example)g.append(el('dt','',rec.example_is_provisional?'바로 쓸 수정 예시 (정보 확인 전 임시)':'바로 쓸 수정 예시'),el('dd','wk-example',rec.example));
+    add(g,'비교 방법',t.method);
+    add(g,'제안 근거',rec.basis);
+    box.appendChild(g);
+    var more=el('details','wk-full');more.appendChild(el('summary','','세부 지표 · 판단 기준'));
+    var m=el('dl','wk-rec');
+    add(m,'현재',rec.current);
+    if(rec.needs_info&&rec.needs_info.length)add(m,'먼저 확인할 정보',rec.needs_info.join(' / '));
+    if(t.compare_metrics&&t.compare_metrics.length)add(m,'비교 지표',t.compare_metrics.map(function(x){return /^[a-z_]+$/.test(x)?I.metricName(x):x;}).join(', '));
+    add(m,'판단 기준',[t.decision_rule,t.sample_note].filter(Boolean).join(' '));
+    more.appendChild(m);box.appendChild(more);
+    return box;
+  }
+  // AI 점검 전 — 광고 세트별 규칙 기반 확인 신호만 짧게(AI 분석과 구분)
+  function renderSignals(){
+    var box=el('div','wk-pre'),h=el('div','wk-list-head');
+    h.append(el('h3','','AI 점검 전 확인 신호'),el('span','wk-rule-tag','규칙 기반 · AI 분석 아님'));box.appendChild(h);
+    if(!ads||ads.loading){box.appendChild(el('p','wk-sub','광고 세트 지표를 불러오는 중이에요.'));return box;}
+    if(ads.error){box.appendChild(el('p','wk-sub','광고 세트 지표를 불러오지 못했어요.'));return box;}
+    var rows=(ads.rows||[]).filter(function(r){return Number(r.metrics&&r.metrics.spend)>0;}).sort(function(x,y){return Number(y.metrics.spend)-Number(x.metrics.spend);}).slice(0,3);
+    if(!rows.length){box.appendChild(el('p','wk-sub','선택한 기간에 광고비가 쓰인 광고 세트가 없어요.'));return box;}
+    var ul=el('ul','wk-ads');
+    rows.forEach(function(r){
+      var m=r.metrics||{},buy=m.purchase&&m.purchase.observed?m.purchase.value+'건':'미측정',sig=I.ruleSignals(m,r.linked,r.verdict),li=el('li','wk-ad');
+      li.append(el('strong','wk-ad-name',r.name),el('p','wk-key',['광고비 '+I.shortMoney(m.spend,ads.currency),'구매 '+buy,'ROAS '+(m.roas==null?'미측정':Math.round(m.roas*100)+'%')].join(' / ')));
+      var l=el('p','wk-line');l.append(el('span','wk-k','확인 신호'),el('span','',sig.length?sig.join(' · '):'뚜렷한 신호 없음'));li.appendChild(l);
+      ul.appendChild(li);
+    });
+    box.append(ul,el('small','wk-foot','운영 현황에서 선택한 기간의 광고 세트 기준 · 원인 · 변경안은 AI 점검에서 확인해요'));
+    return box;
   }
 
   // ---- 오른쪽 요약 ----
@@ -300,7 +349,7 @@
   }
   async function loadStatus(){
     var ctx=app.getContext();if(!ctx.storeId||wk.storeId===ctx.storeId)return;
-    wk={state:'idle',data:null,message:'',storeId:ctx.storeId,busy:false};ui={open:null,all:false};render();
+    wk={state:'idle',data:null,message:'',storeId:ctx.storeId,busy:false};ui={panel:{},all:false};render();
     var r=await call(ctx,{store_id:ctx.storeId,action:'status'});
     if(app.getContext().storeId!==ctx.storeId)return;
     if(r.unavailable)wk.state='unavailable',wk.message='주간 AI 점검을 준비하고 있어요.';

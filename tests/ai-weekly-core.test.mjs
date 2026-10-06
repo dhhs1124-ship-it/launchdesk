@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  config, weekRanges, decideRun, changes, totals, peerGroups, extractCreative, planBatches, parseBatch, priorities, costUsd, scopeOf, batchContent,
+  config, weekRanges, decideRun, changes, totals, peerGroups, extractCreative, planBatches, parseBatch, priorities, costUsd, scopeOf, batchContent, placementInfo,
 } from "../supabase/functions/_shared/ai-weekly-core.mjs";
 
 const cfg = config((k) => ({ AI_MAX_ADS: "3", AI_ADS_PER_BATCH: "2", AI_MAX_IMAGES: "3", AI_IMAGES_PER_AD: "2" })[k] || "");
@@ -105,4 +105,12 @@ test("기본값: 묶음당 광고 1개 · 동시 5묶음 · 출력 16000(실측 
   assert.equal(d.imagesPerAd, 3);
   assert.equal(d.maxImages, 40);
   assert.equal(config((k) => ({ AI_IMAGES_PER_AD: "0" })[k] || "").imagesPerAd, 0, "명시한 0은 그대로");
+});
+
+test("게재 위치: 제목이 보이는 위치인지(2026-10-06 실제 광고 세트는 publisher_platforms 없음 = 자동 게재 위치)", () => {
+  assert.deepEqual(placementInfo({ age_min: 18, geo_locations: {} }), { label: "자동 게재 위치", headline: "partial" });
+  assert.equal(placementInfo({ publisher_platforms: ["facebook"], facebook_positions: ["feed"] }).headline, "all");
+  assert.equal(placementInfo({ publisher_platforms: ["instagram"], instagram_positions: ["reels", "story"] }).headline, "none");
+  assert.equal(placementInfo({ publisher_platforms: ["facebook", "instagram"] }).headline, "partial");
+  assert.equal(placementInfo(undefined).headline, "unknown");
 });
