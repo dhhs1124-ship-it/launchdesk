@@ -7,9 +7,9 @@
      결과 기록은 action_id로 변경 기록에 묶는다. tool_records는 입력 · 삭제만 가능하므로 결과 · 메모는 덧붙인다.
 
    같은 날 중복(직접 입력 ↔ Meta 하루 합계) — 같은 쇼핑몰 · 같은 날짜 · 채널 '메타'만으로는 중복으로 보지 않는다.
-   - 확정 중복: 같은 광고계정(직접 입력에 계정을 고른 경우)이거나, 계정 정보가 없어도 원화 금액이 같음
-   - 다른 계정: 직접 입력의 계정이 Meta 하루 합계 계정과 다름 → 중복 아님
-   - 중복 가능: 위로 판단할 수 없음(예전 기록 · 금액 다름) → 기본은 합계에 포함하고 '선택 필요'로 표시
+   - 확정 중복: 광고계정 · 기간(같은 하루) · 집계 범위(계정 하루 전체) · 같은 원화 금액이 모두 일치할 때만
+   - 다른 계정: 직접 입력의 계정이 Meta 하루 합계 계정과 다르거나 '다른 광고계정'으로 입력 → 중복 아님
+   - 중복 가능: 근거가 하나라도 없음(예전 기록 · 계정 · 범위 미입력 · 금액 다름) → 기본은 합계에 포함하고 '선택 필요'로 표시
    사용자가 고른 포함 · 제외(tool_type='ad_log_decision', 기록별 최신 1건)가 있으면 그 선택이 우선한다.
 
    통화 — 통화가 없는 기록은 원화: 예전 입력칸이 원화로만 받음(메인 index.html '지출 (원)' · '전환 매출 (원)',
@@ -49,15 +49,19 @@
     if(!ISO.test(String(r.date || ''))) return { status: 'none', reason: '날짜 형식을 알 수 없어 비교하지 않음' };
     var same = autos.filter(function(a){ return String(a.store_id) === String(r.store_id) && a.date === r.date; });
     if(!same.length) return { status: 'none' };
-    if(r.meta_account_id){
-      var hit = same.filter(function(a){ return autoAccount(a) === String(r.meta_account_id); })[0];
-      if(hit) return { status: 'confirmed', autoId: hit.id, reason: '같은 광고계정 · 같은 날짜의 Meta 하루 합계에 이미 포함' };
-      return { status: 'other_account', reason: '다른 광고계정 기록 · 중복 아님' };
-    }
-    var spend = toKrw(r, num(r.spend));
-    var eq = spend !== null && same.filter(function(a){ var s = toKrw(a, num(a.spend)); return s !== null && Math.abs(s - spend) < 1; })[0];
-    if(eq) return { status: 'confirmed', autoId: eq.id, reason: '같은 날짜 · 같은 금액의 Meta 하루 합계가 있음' };
-    return { status: 'possible', autoId: same[0].id, reason: '같은 날 Meta 하루 합계가 있음 · 광고계정 · 집계 범위를 알 수 없음' };
+    // 다른 광고계정이라고 입력한 기록은 같은 날 합계와 겹치지 않는다
+    if(r.meta_account === 'other') return { status: 'other_account', reason: '다른 광고계정으로 입력 · 중복 아님' };
+    if(r.meta_account_id && !same.some(function(a){ return autoAccount(a) === String(r.meta_account_id); })) return { status: 'other_account', reason: '다른 광고계정 기록 · 중복 아님' };
+    // 확정 중복은 네 가지가 모두 맞을 때만: 같은 광고계정 · 같은 날짜(하루) · 집계 범위 '계정 하루 전체' · 같은 원화 금액
+    var spend = toKrw(r, num(r.spend)), missing = [];
+    var acc = r.meta_account_id ? same.filter(function(a){ return autoAccount(a) === String(r.meta_account_id); }) : [];
+    if(!r.meta_account_id) missing.push('광고계정');
+    if(r.scope !== 'account_total') missing.push(r.scope === 'partial' ? '집계 범위(일부 캠페인 · 광고)' : '집계 범위');
+    var pool = acc.length ? acc : same;
+    var eq = spend !== null && pool.filter(function(a){ var s = toKrw(a, num(a.spend)); return s !== null && Math.abs(s - spend) < 1; })[0];
+    if(!eq) missing.push('같은 금액');
+    if(!missing.length) return { status: 'confirmed', autoId: eq.id, reason: '같은 광고계정 · 같은 날짜 · 계정 하루 전체 · 같은 금액' };
+    return { status: 'possible', autoId: (eq || pool[0]).id, reason: '같은 날 Meta 하루 합계가 있음 · 확인 안 된 근거: ' + missing.join(', ') };
   }
 
   // 기록별 최신 선택만 남긴다 — decisions: tool_type='ad_log_decision'의 data 배열

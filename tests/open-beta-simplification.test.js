@@ -1865,3 +1865,21 @@ test('광고 기록(메인 호환): LaunchROAS 변경 · 결과 기록은 ₩NaN
   assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩22,000');
   assert.equal(env.doc.getElementById('adlogSumRoas').textContent, '3.0x');
 });
+
+// 같은 기록 세트를 미리보기(launchroas/adlog-core.test.js '운영과 같은 기록 세트')와 비교한다 — 운영 메인은 중복 판정 · 사용자 선택 · 환율을 쓰지 않는다
+test('광고 기록(운영 메인과 미리보기 차이): 운영 메인은 금액 기록을 모두 더하고 외화 금액도 원화 숫자로 더한다', async () => {
+  const env = await boot(periodFixture());
+  await settle();
+  const store = env.sandbox.launchdeskStore;
+  for (const r of [
+    { id: 31, date: '2026-09-20', name: 'A 직접', spend: 10000, revenue: 30000, channel: '메타', store_id: '1' },
+    { id: 32, source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-20', date: '2026-09-20', name: 'B 자동', spend: 12000, revenue: 36000, channel: '메타', store_id: '1', currency: 'KRW' },
+    { id: 33, date: '2026-09-21', name: 'C 직접(계정 하루 전체)', spend: 12000, revenue: 30000, channel: '메타', store_id: '1', meta_account_id: 'act_1', scope: 'account_total', currency: 'KRW' },
+    { id: 34, source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-21', date: '2026-09-21', name: 'D 자동', spend: 12000, revenue: 30000, channel: '메타', store_id: '1', currency: 'KRW' },
+    { id: 35, date: '2026-09-22', name: 'E 외화', spend: 10, revenue: 30, channel: '인스타', store_id: '1', currency: 'USD' },
+    { id: 36, source: 'change', action_id: 'a1', date: '2026-09-22', name: 'F 변경', channel: '메타', store_id: '1' },
+  ]) store.addAdlogRecord(r);
+  env.sandbox.launchdeskAdlog.render();
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩46,010');
+  assert.match(env.doc.getElementById('adlogTbody').innerHTML, /<td class="num">₩10<\/td>/);
+});

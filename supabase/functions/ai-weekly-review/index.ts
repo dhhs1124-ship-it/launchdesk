@@ -213,7 +213,7 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
       usage.calls++; usage.images += p.images;
       if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
       if (res.ok) usage.stop_reasons.push(res.stop);
-      const parsed = res.ok ? parseBatch(res.text, p.b, adsById, peers, casesById) : null;
+      const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, p.b, adsById, peers, casesById) : null;
       if (parsed) Object.assign(results, parsed);
       failed.push(...p.b.ad_ids.filter((id: string) => !parsed || !parsed[id]));
     }

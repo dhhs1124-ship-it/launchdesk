@@ -262,6 +262,7 @@
     // 메타 기록이면 광고계정 · 집계 범위를 함께 남겨 같은 날 Meta 하루 합계와의 중복을 판정한다(모르면 비워 둠)
     var acc=byId('adlogAccount').value,scope=byId('adlogScope').value;
     if(channel==='메타'&&acc==='connected'&&ctx.metaAccount&&ctx.metaAccount.external_account_id)record.meta_account_id=String(ctx.metaAccount.external_account_id);
+    if(channel==='메타'&&acc==='other')record.meta_account='other';
     if(channel==='메타'&&scope)record.scope=scope;
     if(await insert(record)){this.reset();this.hidden=true;status('광고 기록을 저장했어요.');}
   });

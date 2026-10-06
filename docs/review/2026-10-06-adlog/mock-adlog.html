@@ -14,7 +14,7 @@ function add(type, data){ db[type].unshift({ data: data }); }
 var base = { store_id: '4', channel: '메타' };
 add('ad_log', Object.assign({ id: 101, date: '2026-09-28', name: '직접 입력 · 니트 캠페인', spend: 84000, revenue: 210000 }, base));
 add('ad_log', Object.assign({ id: 102, source: 'meta_auto', meta_auto_key: '4|act_9|2026-09-28', date: '2026-09-28', name: 'Meta 캠페인 전체 합계', spend: 152000, revenue: 418000, currency: 'KRW' }, base));
-add('ad_log', Object.assign({ id: 103, date: '2026-09-29', name: '직접 입력 · 같은 금액', spend: 131000, revenue: 300000 }, base));
+add('ad_log', Object.assign({ id: 103, date: '2026-09-29', name: '직접 입력 · 계정 하루 전체', meta_account_id: 'act_9', scope: 'account_total', spend: 131000, revenue: 300000 }, base));
 add('ad_log', Object.assign({ id: 104, source: 'meta_auto', meta_auto_key: '4|act_9|2026-09-29', date: '2026-09-29', name: 'Meta 캠페인 전체 합계', spend: 131000, revenue: 302000, currency: 'KRW' }, base));
 add('ad_log', Object.assign({}, base, { id: 105, date: '2026-09-30', name: '해외 계정 테스트 광고', spend: 48.5, revenue: 120, currency: 'USD', channel: '인스타' }));
 add('ad_log', Object.assign({}, base, { id: 106, date: '2026-09-30', name: '네이버 검색', spend: 30000, revenue: 96000, channel: '네이버' }));

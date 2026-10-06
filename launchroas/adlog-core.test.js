@@ -22,12 +22,28 @@ test('같은 날 · 메타라는 이유만으로는 빼지 않는다: 계정 · 
   assert.deepEqual(AC.rowLabel(rows[0], s.duplicates), ['중복 가능 · 합계 포함 중 · 선택 필요']);
 });
 
-test('확정 중복: 같은 광고계정이거나, 계정을 모를 때 같은 금액이면 합계에서 뺀다', () => {
-  assert.equal(AC.summarize([manual({ meta_account_id: 'act_9' }), auto()]).totalSpend, 12000);
-  assert.equal(AC.summarize([manual({ spend: 12000 }), auto()]).totalSpend, 12000);
-  const s = AC.summarize([manual({ meta_account_id: 'act_7' }), auto()]);
-  assert.equal(s.totalSpend, 22000, '다른 광고계정은 중복이 아니다');
-  assert.equal(s.duplicates['1'], undefined);
+test('확정 중복은 광고계정 · 기간 · 집계 범위 · 같은 금액이 모두 맞을 때만, 하나라도 없으면 중복 가능', () => {
+  const full = { meta_account_id: 'act_9', scope: 'account_total', spend: 12000 };
+  const s0 = AC.summarize([manual(full), auto()]);
+  assert.equal(s0.totalSpend, 12000);
+  assert.equal(s0.duplicates['1'].status, 'confirmed');
+  const cases = [
+    [{ meta_account_id: 'act_9', scope: 'account_total' }, '같은 금액'],      // 금액 다름
+    [{ spend: 12000 }, '광고계정'],                                          // 같은 금액만
+    [{ meta_account_id: 'act_9', spend: 12000 }, '집계 범위'],              // 계정 + 금액, 범위 모름
+    [{ meta_account_id: 'act_9', scope: 'partial', spend: 12000 }, '일부 캠페인'],
+    [{ scope: 'account_total', spend: 12000 }, '광고계정'],
+  ];
+  for (const [o, why] of cases) {
+    const s = AC.summarize([manual(o), auto()]);
+    assert.equal(s.duplicates['1'].status, 'possible', JSON.stringify(o));
+    assert.match(s.duplicates['1'].reason, new RegExp(why));
+    assert.equal(s.totalSpend, 12000 + (o.spend || 10000), '중복 가능은 합계에 포함');
+  }
+  const day2 = AC.summarize([manual(Object.assign({ date: '2026-10-02' }, full)), auto()]);
+  assert.equal(day2.duplicates['1'], undefined, '다른 날짜는 비교하지 않는다');
+  assert.equal(AC.summarize([manual({ meta_account_id: 'act_7' }), auto()]).duplicates['1'], undefined, '다른 광고계정');
+  assert.equal(AC.summarize([manual({ meta_account: 'other' }), auto()]).duplicates['1'], undefined, '다른 광고계정으로 입력');
 });
 
 test('사용자 선택이 판정보다 우선하고, 같은 기록은 최신 선택만 쓴다(다시 불러와도 같은 결과)', () => {
@@ -42,7 +58,7 @@ test('사용자 선택이 판정보다 우선하고, 같은 기록은 최신 선
   assert.equal(flipped.excluded.chosen, 1);
   assert.deepEqual(AC.rowLabel(rows[0], flipped.duplicates), ['중복 확인 · 사용자가 합계 제외 선택']);
   // 확정 중복도 사용자가 포함으로 되돌릴 수 있다
-  assert.equal(AC.summarize([manual({ spend: 12000 }), auto()], [{ record_id: 1, include: true, decided_at: 'x' }]).totalSpend, 24000);
+  assert.equal(AC.summarize([manual({ meta_account_id: 'act_9', scope: 'account_total', spend: 12000 }), auto()], [{ record_id: 1, include: true, decided_at: 'x' }]).totalSpend, 24000);
 });
 
 test('외화: 원본 · 통화 · 적용 환율을 그대로 보여 주고, 환율이 없으면 합계 제외를 표시한다', () => {
@@ -140,4 +156,19 @@ test('결과 기록은 action_id로 변경 기록을 가리키고 금액 칸이 
   assert.equal(rr.action_id, c.action_id);
   assert.equal(rr.spend, undefined);
   assert.equal(AC.linkChanges([c, rr]).changes[c.action_id].latest.id, rr.id);
+});
+
+test('운영과 같은 기록 세트(tests/open-beta 운영 메인 ₩46,010): 미리보기는 확정 중복 · 선택 제외 · 환율 없는 외화 · 변경 기록을 빼 ₩24,000', () => {
+  const rows = [
+    { id: 31, store_id: '1', date: '2026-09-20', name: 'A 직접', spend: 10000, revenue: 30000, channel: '메타' },
+    { id: 32, store_id: '1', source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-20', date: '2026-09-20', spend: 12000, revenue: 36000, channel: '메타', currency: 'KRW' },
+    { id: 33, store_id: '1', date: '2026-09-21', spend: 12000, revenue: 30000, channel: '메타', meta_account_id: 'act_1', scope: 'account_total', currency: 'KRW' },
+    { id: 34, store_id: '1', source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-21', date: '2026-09-21', spend: 12000, revenue: 30000, channel: '메타', currency: 'KRW' },
+    { id: 35, store_id: '1', date: '2026-09-22', spend: 10, revenue: 30, channel: '인스타', currency: 'USD' },
+    { id: 36, store_id: '1', source: 'change', action_id: 'a1', date: '2026-09-22', channel: '메타' },
+  ];
+  const s = AC.summarize(rows, [{ record_id: 31, include: false, decided_at: '2026-10-06T00:00:00Z' }]);
+  assert.equal(s.totalSpend, 24000);
+  assert.deepEqual({ ...s.excluded }, { duplicate: 1, chosen: 1, currency: 1, nonAmount: 1 });
+  assert.equal(AC.summarize(rows).totalSpend, 34000, '선택 전에는 A(중복 가능)를 포함');
 });
