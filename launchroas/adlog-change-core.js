@@ -24,6 +24,26 @@
   function daysBetween(a, b){ return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / DAY) + 1; }
   function num(v){ return typeof v === 'number' && isFinite(v) ? v : null; }
 
+  // 확정 판단 시작일 = 변경 후 마지막 날 + 귀속 창 + 1일. 안내 문구와 잠정 판정이 같은 함수를 쓴다(따로 계산하면 어긋난다)
+  //   창 7일(노출일 가정)이면 마지막 날 + 8일 — 그날부터 확정, 그 전날까지 잠정
+  function finalFrom(until, win){ return addDays(until, win + 1); }
+  // 결과 비교가 요청하는 귀속 창(meta-adset-insights attribution_mode:'explicit' → 7d_click · 1d_view) 중 긴 쪽 — 비교 전 안내용 예상값.
+  //   실제 판정은 응답에서 확인한 창(attributionWindowDays)으로 한다
+  var EXPECTED_WINDOW_DAYS = 7;
+  // 광고계정 시간대의 오늘(YYYY-MM-DD) — Meta 하루 지표의 날짜는 광고계정 시간대 기준이다.
+  //   시간대를 모르거나 잘못되면 한국 날짜 − 1일(어느 시간대의 날짜보다 늦지 않음 — 비교 가능 · 확정을 앞당기지 않음)
+  function accountToday(nowMs, timezone){
+    if(timezone){
+      try{
+        var parts = new Intl.DateTimeFormat('en-CA', { timeZone: String(timezone), year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(nowMs));
+        var get = function(t){ return (parts.filter(function(p){ return p.type === t; })[0] || {}).value; };
+        var d = get('year') + '-' + get('month') + '-' + get('day');
+        if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+      }catch(e){}
+    }
+    return addDays(new Date(nowMs + 9 * 3600e3).toISOString().slice(0, 10), -1);
+  }
+
   // 변경 전 · 후 비교 기간 — 같은 길이(days). 변경 후 기간은 시작일부터.
   function periods(startDate, days){
     return { before: { since: addDays(startDate, -days), until: addDays(startDate, -1) }, after: { since: startDate, until: addDays(startDate, days - 1) } };
@@ -176,7 +196,10 @@
     res.attribution_vs_weekly = weeklyDiff(attr); w.push(res.attribution_vs_weekly.note);
     var win = attributionWindowDays(attr);
     if(win === null){ res.provisional = true; res.blockers.push('attribution_unverified'); w.push('요청한 귀속 창이 Meta 응답에 실제로 적용된 근거가 없어(미확인) 개선 · 악화를 확정하지 않아요'); }
-    else if(daysBetween(after.until, today) - 1 <= win){ res.provisional = true; res.blockers.push('provisional'); w.push('귀속 창(' + win + '일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정) 안이라 구매가 더 늘어날 수 있어 잠정 결과예요 — ' + addDays(after.until, win + 1) + '부터 확정 판단'); }
+    else {
+      res.final_from = finalFrom(after.until, win);
+      if(today < res.final_from){ res.provisional = true; res.blockers.push('provisional'); w.push('귀속 창(' + win + '일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정) 안이라 구매가 더 늘어날 수 있어 잠정 결과예요 — ' + res.final_from + '부터 확정 판단'); }
+    }
     // 저장 당시 기준값은 이후 귀속으로 늘어난 구매가 빠져 있어 변경 후와 같은 시점 값이 아니다 — 관찰만, 신호로 판정하지 않는다
     if(!fresh){ res.blockers.push('baseline_not_refetched'); w.push('변경 전 지표가 기록 당시 값이라(비교 시점 재조회 아님) 늦게 귀속된 구매가 빠져 있을 수 있어 개선 · 악화를 확정하지 않아요'); }
     if(newAd){ res.blockers.push('different_ads'); w.push('새 광고의 변경 후 기간과 기존 광고의 변경 전 기간 비교 — 서로 다른 광고 · 기간이라 관찰값만 보여 주고 효율 신호로 판정하지 않아요'); }
@@ -328,12 +351,12 @@
     return { id: newId(t), source: 'change_result', action_id: change.action_id, store_id: change.store_id, date: new Date(t + 9 * 3600e3).toISOString().slice(0, 10),
       name: (change.ad && change.ad.ad_name || '광고') + ' · 결과 ' + STATUS_TEXT[cmp.status], channel: '메타', measured_at: new Date(t).toISOString(),
       after: after, before: before || null, result: { judgement_version: JUDGEMENT_VERSION, status: cmp.status, comparison: cmp.comparison || null, baseline_source: cmp.baseline_source || 'saved',
-        saved_baseline: cmp.saved_baseline || null, attribution: cmp.attribution || null, attribution_vs_weekly: cmp.attribution_vs_weekly || null, reasons: cmp.reasons, warnings: cmp.warnings, provisional: cmp.provisional, separable: cmp.separable,
+        saved_baseline: cmp.saved_baseline || null, attribution: cmp.attribution || null, attribution_vs_weekly: cmp.attribution_vs_weekly || null, reasons: cmp.reasons, warnings: cmp.warnings, provisional: cmp.provisional, final_from: cmp.final_from || null, separable: cmp.separable,
         blockers: cmp.blockers || [], observations: cmp.observations || [], test: cmp.test || null,
         spend: cmp.spend || null, purchases: cmp.purchases || null, cpa: cmp.cpa || null, roas: cmp.roas || null, profit: cmp.profit || null,
         margin_change: cmp.marginChange || null, missing_cost: cmp.missingCost || null }, memo: String(memo || '') };
   }
 
   return { ELEMENTS: ELEMENTS, CONCURRENT: CONCURRENT, PROFIT_FORMULA: PROFIT_FORMULA, STATUS_TEXT: STATUS_TEXT,
-    addDays: addDays, periods: periods, attributionWindowDays: attributionWindowDays, WEEKLY_ATTRIBUTION: WEEKLY_ATTRIBUTION, aggregate: aggregate, buildChangeRecord: buildChangeRecord, compare: compare, buildResultRecord: buildResultRecord, estProfit: estProfit, outcomeSummary: outcomeSummary, currentOf: currentOf, JUDGEMENT_VERSION: JUDGEMENT_VERSION };
+    addDays: addDays, periods: periods, finalFrom: finalFrom, accountToday: accountToday, EXPECTED_WINDOW_DAYS: EXPECTED_WINDOW_DAYS, attributionWindowDays: attributionWindowDays, WEEKLY_ATTRIBUTION: WEEKLY_ATTRIBUTION, aggregate: aggregate, buildChangeRecord: buildChangeRecord, compare: compare, buildResultRecord: buildResultRecord, estProfit: estProfit, outcomeSummary: outcomeSummary, currentOf: currentOf, JUDGEMENT_VERSION: JUDGEMENT_VERSION };
 });

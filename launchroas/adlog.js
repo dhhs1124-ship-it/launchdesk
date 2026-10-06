@@ -100,7 +100,7 @@
     var shown=live&&live.cmp?{before:live.before,after:live.after,cmp:live.cmp,saved:false}:now?{before:now.record.before,after:now.record.after,cmp:now.record.result,saved:true,stale:now.state==='stale',legacy:!now.record.result.judgement_version}:null;
     var r=shown&&shown.cmp;
     var h=el('div','adlog-change-head');
-    h.append(el('strong','',c.ad&&c.ad.ad_name||c.name),el('span','adlog-tag adlog-status-'+(r?r.status:'wait'),r?(shown.stale?'갱신 실패 · 이전 결과 · ':'')+CH.STATUS_TEXT[r.status]+(shown.legacy?' · 이전 판정 기준':'')+(r.provisional?' · 잠정':'')+(shown.saved?'':' · 저장 전'):'결과 대기'));
+    h.append(el('strong','',c.ad&&c.ad.ad_name||c.name),el('span','adlog-tag adlog-status-'+(r?r.status:'wait'),r?(shown.stale?'갱신 실패 · 이전 결과 · ':'')+CH.STATUS_TEXT[r.status]+(shown.legacy?' · 이전 판정 기준':'')+(r.provisional?' · 잠정'+(r.final_from?'('+r.final_from+'부터 확정)':''):'')+(shown.saved?'':' · 저장 전'):'결과 대기'));
     card.appendChild(h);
     if(r&&r.observations&&r.observations.length)card.appendChild(el('p','adlog-change-obs',r.observations.join(' · ')+' · '+(r.status==='improved'||r.status==='worse'?CH.STATUS_TEXT[r.status]:r.status==='unknown'?'판단 불가':'판단 보류')));
     card.appendChild(el('p','adlog-change-line','바꾼 것 · '+c.change.element+(c.change.method==='new_ad'?' (새 광고 추가)':' (기존 광고 수정)')+' — '+String(c.change.after).slice(0,60)+(String(c.change.after).length>60?'…':'')));
@@ -116,7 +116,7 @@
       else tile('이익','계산 보류',p&&p.reason?p.reason.replace('이익 변화 계산 보류 · ',''):'계산 범위 확인 불가');
       card.appendChild(g2);
       if(r.reasons&&r.reasons.length)card.appendChild(el('p','adlog-result-verdict',r.reasons[0]));
-    } else if(!(live&&live.error)) card.appendChild(el('p','small','비교 기간 '+c.compare.after.since+' ~ '+c.compare.after.until+' 이후 결과를 비교해요'));
+    } else if(!(live&&live.error)) card.appendChild(el('p','small','비교 기간 '+c.compare.after.since+' ~ '+c.compare.after.until+' 이후 결과를 비교해요 · 귀속 창('+CH.EXPECTED_WINDOW_DAYS+'일) 동안은 잠정이고 '+CH.finalFrom(c.compare.after.until,CH.EXPECTED_WINDOW_DAYS)+'부터 확정 판단(광고계정 시간대 날짜 기준)'));
     // 비교 근거(펼침)
     var more=el('details','adlog-basis');more.appendChild(el('summary','','비교 근거'));
     var dl=el('dl','adlog-change-dl'),add=function(k,v){if(v){dl.append(el('dt','',k),el('dd','',v));}};
@@ -149,8 +149,9 @@
       mf.append(el('span','small','마진이 낮아진 이유가 빠졌던 비용 때문이라면 항목과 금액을 확인해 기록하세요'),it,am,ok);more.appendChild(mf);
     }
     card.appendChild(more);
-    var ended=c.compare.after.until<today();
-    var btn=el('button','secondary',live&&live.loading?'불러오는 중…':ended?'결과 비교하기':'비교 기간이 '+c.compare.after.until+'에 끝나요');
+    // 비교 가능은 한국 날짜로 먼저 열고(실제 판정은 광고계정 날짜로 core가 다시 거른다), 확정 전이면 잠정 결과임을 버튼에 미리 알린다
+    var ended=c.compare.after.until<today(),fin=CH.finalFrom(c.compare.after.until,CH.EXPECTED_WINDOW_DAYS);
+    var btn=el('button','secondary',live&&live.loading?'불러오는 중…':!ended?'비교 기간이 '+c.compare.after.until+'에 끝나요':today()<fin?'결과 비교하기(잠정 · '+fin+'부터 확정)':'결과 비교하기');
     btn.type='button';btn.disabled=!ended||!!(live&&live.loading);btn.addEventListener('click',function(){runCompare(c);});
     var act=el('div','form-actions');act.appendChild(btn);
     if(live&&live.cmp){var sv=el('button','primary','결과 저장');sv.type='button';sv.disabled=!CHANGE_ON;sv.title=CHANGE_ON?'':'운영 화면 호환 수정 배포 전이라 저장을 꺼 두었어요';sv.addEventListener('click',function(){saveResult(c,live);});act.appendChild(sv);}
@@ -163,12 +164,12 @@
   // 귀속 기준: 요청값(설정)과 적용 근거를 나눈다 — 요청값은 정상 조회한 날이 모두 같은 값을 돌려줬을 때만 쓰고(아니면 null),
   // 창 적용은 대상 광고 행에 요청한 창별 값이 모두 보인 날이 하루라도 있을 때만 response_evidence. 보고 시점은 근거가 없어 항상 unconfirmed
   async function dailyAds(ctx,adsetId,adId,since,until){
-    var rows=[],currency=null,reqs=[],seen={},d=since;
+    var rows=[],currency=null,timezone=null,reqs=[],seen={},d=since;
     while(d<=until){
       var res;
       try{res=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'ads',period:'date',date:d,adset_id:adsetId,attribution_mode:'explicit'}});}catch(e){res={error:e};}
       if(!res.error&&res.data&&res.data.ok){
-        currency=res.data.account&&res.data.account.currency||currency;reqs.push(JSON.stringify(res.data.attribution&&res.data.attribution.requested||null));
+        currency=res.data.account&&res.data.account.currency||currency;timezone=res.data.account&&res.data.account.timezone||timezone;reqs.push(JSON.stringify(res.data.attribution&&res.data.attribution.requested||null));
         var hit=(res.data.ads||[]).filter(function(a){return String(a.ad_id)===String(adId);})[0];
         if(hit&&Array.isArray(hit.attribution_windows_seen))hit.attribution_windows_seen.forEach(function(w){seen[w]=true;});
         rows.push({date:d,metrics:hit?hit.metrics:null,state:hit?'ok':res.data.truncated?'truncated':'absent'});
@@ -181,7 +182,7 @@
       attribution={source:'request',windows:req.windows,action_report_time:req.action_report_time,
         applied:{windows:got.length===req.windows.length?'response_evidence':'unconfirmed',windows_seen:got,action_report_time:'unconfirmed'}};
     }
-    return {agg:CH.aggregate(rows,since,until),currency:currency,attribution:attribution};
+    return {agg:CH.aggregate(rows,since,until),currency:currency,timezone:timezone,attribution:attribution};
   }
   // 변경 전 · 후 두 조회의 귀속 — 요청값이 같을 때만, 창 적용 근거는 두 기간 모두에 있을 때만 response_evidence
   function joinAttribution(a,b){
@@ -226,7 +227,8 @@
       var ga=await dailyAds(ctx,c.ad.adset_id,target,c.compare.after.since,c.compare.after.until);
       var attribution=joinAttribution(gb.attribution,ga.attribution);
       var basis=basisFor(ctx,ga.currency||gb.currency,await marginFor(ctx,c.ad.adset_id),attribution);
-      var cmp=CH.compare(c,ga.agg,basis,today(),{before:gb.agg,attribution:attribution,confirmedMissingCost:confirm});
+      // 판정 날짜는 광고계정 시간대의 오늘(Meta 하루 지표 날짜 기준) — 한국 날짜로 보면 계정 시간대가 늦을 때 확정이 하루 앞당겨진다
+      var cmp=CH.compare(c,ga.agg,basis,CH.accountToday(Date.now(),ga.timezone||gb.timezone),{before:gb.agg,attribution:attribution,confirmedMissingCost:confirm});
       results[c.action_id]={before:gb.agg,after:ga.agg,cmp:cmp,confirm:confirm};
     }catch(e){results[c.action_id]={error:'결과 지표를 불러오지 못했어요.'};}
     render();

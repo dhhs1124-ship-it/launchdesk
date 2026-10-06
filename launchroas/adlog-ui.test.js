@@ -19,9 +19,11 @@ const byClass = (n, cls) => all(n).filter((x) => String(x.className || '').split
 const REQ = { windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
 // 화면이 만든 귀속 기준 — 두 기간 모두 대상 광고 행에서 요청 창을 봤을 때만 response_evidence
 const ATTR = { source: 'request', ...REQ, applied: { windows: 'response_evidence', windows_seen: REQ.windows, action_report_time: 'unconfirmed' } };
-function setup({ flag, rows, decisions, failDecisions, failRecords }){
+function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezone }){
   // failDates: 조회 실패할 날짜 · truncDates: 페이지 누락(광고 없음) 날짜 · noAttribution: 재배포 전 서버(귀속 기준 응답 없음) · noEvidence: 요청값은 오지만 광고 행에 창별 값이 없음
+  // now: 화면의 현재 시각 고정(ms · 없으면 실제 시각) · timezone: 응답 광고계정 시간대
   const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false, noEvidence: false };
+  const account = { currency: 'KRW', ...(timezone ? { timezone } : {}) };
   const db = { ad_log: rows.map((data) => ({ data })), ad_log_decision: (decisions || []).map((data) => ({ data })) }, inserts = [], calls = [];
   const ids = {};
   const document = {
@@ -46,16 +48,17 @@ function setup({ flag, rows, decisions, failDecisions, failRecords }){
     calls.push(body);
     if (control.failDates.includes(body.date)) return { data: null, error: { message: '조회 실패(테스트)' } };
     const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: { source: 'request', requested: REQ, windows_seen: control.noEvidence ? [] : REQ.windows, action_report_time_applied: 'unconfirmed' } } : {};
-    if (control.truncDates.includes(body.date)) return { data: { ok: true, account: { currency: 'KRW' }, ads: [], truncated: true, ...attribution } };
+    if (control.truncDates.includes(body.date)) return { data: { ok: true, account, ads: [], truncated: true, ...attribution } };
     const buy = body.date < '2026-09-01' ? 1 : 2;
-    return { data: { ok: true, account: { currency: 'KRW' }, ...attribution, ads: [{ ad_id: '111', ...(attribution.attribution ? { attribution_windows_seen: control.noEvidence ? [] : REQ.windows } : {}), metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
+    return { data: { ok: true, account, ...attribution, ads: [{ ad_id: '111', ...(attribution.attribution ? { attribution_windows_seen: control.noEvidence ? [] : REQ.windows } : {}), metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
   } } };
   const ctx = { client, userId: 'u1', storeId: '4', stores: [{ id: '4' }], metaAccount: { id: 'm', status: 'connected', external_account_id: 'act_9' }, fx: null };
   const listeners = [], views = [];
   const app = { getContext: () => ctx, subscribe: (fn) => { listeners.push(fn); fn(ctx); }, showView: (v) => views.push(v) };
   const window = { LaunchRoasApp: app, launchdeskAdlogMeta: { buildMetaAdlogRecord(){} }, confirm: () => true };
   if(flag) window.LAUNCHROAS_FLAGS = { adlogChangeRecords: true };
-  const sandbox = { window, document, Date, Math, JSON, Number, String, Promise, Object, Array, setTimeout, console };
+  const FixedDate = now == null ? Date : class extends Date { constructor(...a){ super(...(a.length ? a : [now])); } static now(){ return now; } };
+  const sandbox = { window, document, Date: FixedDate, Math, JSON, Number, String, Promise, Object, Array, setTimeout, console };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   for(const f of ['adlog-core.js', 'adlog-change-core.js']) vm.runInContext(fs.readFileSync(__dirname + '/' + f, 'utf8'), sandbox);
@@ -233,4 +236,42 @@ test('저장된 결과: 최신이 조회 실패뿐이면 갱신 실패 · 이전
   const t = text(s.ids.adlogChanges);
   assert.match(t, /갱신 실패 · 이전 결과 · 구매당 광고비 개선 신호/);
   assert.match(t, /구매당 광고비 개선 신호 · 이전 판정 기준/);
+});
+
+test('확정 판단일 안내 · 잠정 판정 날짜가 화면에서도 같다(시각 고정) — 판정은 광고계정 시간대 날짜', async () => {
+  const CH = require('./adlog-change-core.js');
+  const p = CH.periods('2026-09-01', 7); // 변경 후 마지막 날 2026-09-07 → 2026-09-15부터 확정
+  const day = (d) => ({ date: d, metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: 1, observed: true }, purchase_value: { value: 30000, observed: true } } });
+  const c = CH.buildChangeRecord({ storeId: '4', ad: { ad_id: '111', adset_id: '222', ad_name: '니트 광고' }, element: '문구', after: 'x', method: 'edit', startDate: '2026-09-01', compareDays: 7,
+    baseline: { metrics: CH.aggregate(Array.from({ length: 7 }, (_, i) => day(CH.addDays(p.before.since, i))), p.before.since, p.before.until) }, basis: { currency: 'KRW', attribution: ATTR, margin: null } }, Date.parse('2026-09-01T00:00:00Z')).record;
+  const card = (s) => byClass(s.ids.adlogChanges, 'adlog-change')[0];
+  const button = (s) => all(card(s)).find((x) => x.tagName === 'button' && /비교/.test(x.textContent));
+  const compareAt = async (iso, timezone) => {
+    const s = setup({ flag: false, rows: [c], now: Date.parse(iso), timezone });
+    await settle();
+    return s;
+  };
+  // 비교 기간 중(한국 9/7 12:00): 비교 불가 · 확정일 안내
+  let s = await compareAt('2026-09-07T03:00:00Z', 'Asia/Seoul');
+  assert.equal(button(s).textContent, '비교 기간이 2026-09-07에 끝나요'); assert.equal(button(s).disabled, true);
+  assert.match(text(card(s)), /귀속 창\(7일\) 동안은 잠정이고 2026-09-15부터 확정 판단\(광고계정 시간대 날짜 기준\)/);
+  // 확정일 전날(한국 9/14): 비교는 되지만 잠정 — 버튼 · 결과 모두 같은 날짜
+  s = await compareAt('2026-09-14T03:00:00Z', 'Asia/Seoul');
+  assert.equal(button(s).textContent, '결과 비교하기(잠정 · 2026-09-15부터 확정)');
+  await button(s).events.click(); await settle(); await settle();
+  assert.match(text(card(s)), /잠정\(2026-09-15부터 확정\)/);
+  assert.match(text(card(s)), /2026-09-15부터 확정 판단/);
+  // 확정일(한국 9/15 01:30) · 계정 시간대 서울 → 확정
+  s = await compareAt('2026-09-14T16:30:00Z', 'Asia/Seoul');
+  assert.equal(button(s).textContent, '결과 비교하기');
+  await button(s).events.click(); await settle(); await settle();
+  assert.doesNotMatch(text(card(s)), /잠정/);
+  // 같은 시각이라도 계정 시간대가 로스앤젤레스(9/14 09:30)면 아직 귀속 창 안 → 잠정(한국 날짜로 앞당기지 않음)
+  s = await compareAt('2026-09-14T16:30:00Z', 'America/Los_Angeles');
+  await button(s).events.click(); await settle(); await settle();
+  assert.match(text(card(s)), /잠정\(2026-09-15부터 확정\)/);
+  // 응답에 시간대가 없으면 한국 날짜 − 1일(9/14) → 잠정
+  s = await compareAt('2026-09-14T16:30:00Z', null);
+  await button(s).events.click(); await settle(); await settle();
+  assert.match(text(card(s)), /잠정\(2026-09-15부터 확정\)/);
 });

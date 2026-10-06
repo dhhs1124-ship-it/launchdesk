@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const AC = require('./adlog-core.js');
 const CH = require('./adlog-change-core.js');
+const fs = require('node:fs');
 
 const manual = (o) => Object.assign({ id: 1, store_id: '4', date: '2026-10-01', name: '직접 입력', spend: 10000, revenue: 30000, channel: '메타' }, o);
 const auto = (o) => Object.assign({ id: 2, source: 'meta_auto', meta_auto_key: '4|act_9|2026-10-01', store_id: '4', date: '2026-10-01', name: 'Meta 캠페인 전체 합계', spend: 12000, revenue: 36000, channel: '메타', currency: 'KRW' }, o);
@@ -374,4 +375,53 @@ test('운영과 같은 기록 세트(tests/open-beta 운영 메인 ₩46,010): �
   assert.equal(s.totalSpend, 24000);
   assert.deepEqual({ ...s.excluded }, { duplicate: 1, chosen: 1, currency: 1, nonAmount: 1 });
   assert.equal(AC.summarize(rows).totalSpend, 34000, '선택 전에는 A(중복 가능)를 포함');
+});
+
+test('확정 판단일 경계: 안내(마지막 날 + 8일)와 잠정 판정이 같은 날짜에서 바뀐다', () => {
+  const x = caseOf(100000, 10, 100000, 30); // 변경 후 마지막 날 2026-09-14
+  assert.equal(CH.finalFrom('2026-09-14', 7), '2026-09-22');
+  assert.equal(CH.finalFrom('2026-09-14', CH.EXPECTED_WINDOW_DAYS), '2026-09-22', '화면 안내의 예상 확정일 = 마지막 날 + 8일');
+  assert.equal(CH.finalFrom('2026-09-28', 7), '2026-10-06', '월 경계');
+  assert.equal(CH.finalFrom('2026-12-30', 7), '2027-01-07', '연 경계');
+  // 마지막 날 당일은 비교 기간 미종료
+  assert.ok(compareNow(x.c, x.after, basis(20000), '2026-09-14').blockers.includes('period_open'));
+  // 다음 날 ~ 확정일 전날(+1 ~ +7일)은 잠정 · 안내 날짜는 판정 날짜와 같다
+  for (const d of ['2026-09-15', '2026-09-18', '2026-09-21']) {
+    const r = compareNow(x.c, x.after, basis(20000), d);
+    assert.equal(r.provisional, true, d); assert.ok(r.blockers.includes('provisional'), d); assert.equal(r.final_from, '2026-09-22', d);
+    assert.ok(r.warnings.some((w) => w.includes(r.final_from + '부터 확정 판단')), d);
+  }
+  // 확정일(+8일) 당일부터 잠정 아님
+  for (const d of ['2026-09-22', '2026-09-23']) {
+    const r = compareNow(x.c, x.after, basis(20000), d);
+    assert.equal(r.provisional, false, d); assert.ok(!r.blockers.includes('provisional'), d); assert.equal(r.status, 'improved', d);
+  }
+  // 전환일 보고가 응답 근거로 확인되면 창 0일 → 마지막 날 + 1일부터 확정
+  const conv = { ...ATTR, action_report_time: 'conversion', applied: { ...ATTR.applied, action_report_time: 'response_evidence' } };
+  const c0 = compareNow(x.c, x.after, basis(20000), '2026-09-15', { attribution: conv });
+  assert.equal(c0.final_from, '2026-09-15'); assert.equal(c0.provisional, false);
+  // 저장 기록에도 확정일을 남긴다
+  const r = compareNow(x.c, x.after, basis(20000), '2026-09-21');
+  assert.equal(CH.buildResultRecord(x.c, x.after, r, Date.parse('2026-09-21T00:00:00Z'), '', x.c.baseline.metrics).result.final_from, '2026-09-22');
+});
+
+test('판정 날짜는 광고계정 시간대의 오늘 — 모르면 한국 날짜 − 1일(확정을 앞당기지 않음)', () => {
+  const now = Date.parse('2026-09-21T16:30:00Z'); // 한국 9/22 01:30 · 로스앤젤레스 9/21 09:30
+  assert.equal(CH.accountToday(now, 'Asia/Seoul'), '2026-09-22');
+  assert.equal(CH.accountToday(now, 'America/Los_Angeles'), '2026-09-21');
+  assert.equal(CH.accountToday(now, 'Pacific/Kiritimati'), '2026-09-22', 'UTC+14');
+  assert.equal(CH.accountToday(now, null), '2026-09-21', '모르면 한국 날짜 − 1일');
+  assert.equal(CH.accountToday(now, 'Not/AZone'), '2026-09-21', '잘못된 시간대도 보수적으로');
+  // 한국 날짜로는 확정일이지만 계정 시간대(LA)로는 아직 귀속 창 안 → 잠정
+  const x = caseOf(100000, 10, 100000, 30);
+  assert.equal(compareNow(x.c, x.after, basis(20000), CH.accountToday(now, 'America/Los_Angeles')).provisional, true);
+  assert.equal(compareNow(x.c, x.after, basis(20000), CH.accountToday(now, 'Asia/Seoul')).provisional, false);
+});
+
+test('안내용 예상 귀속 창은 결과 비교가 실제로 요청하는 창(meta-adset-insights)과 같다', async () => {
+  const src = fs.readFileSync(__dirname + '/../supabase/functions/_shared/meta-adset-normalize.mjs', 'utf8');
+  const m = /windows: Object\.freeze\(\[([^\]]+)\]\)/.exec(src);
+  assert.ok(m, '요청 창 정의를 찾지 못함');
+  const days = m[1].split(',').map((w) => Number(/(\d+)d_/.exec(w)[1]));
+  assert.equal(CH.EXPECTED_WINDOW_DAYS, Math.max(...days));
 });
