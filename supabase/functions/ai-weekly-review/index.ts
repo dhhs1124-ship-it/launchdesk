@@ -7,6 +7,7 @@ import {
   batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT,
 } from "../_shared/ai-weekly-core.mjs";
 import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases } from "../_shared/ai-policy.mjs";
+import { VIDEO_SYSTEM_PROMPT, VIDEO_PROMPT_VERSION, VIDEO_LIMITS, prepareVideoVerify, finishVideoVerify } from "../_shared/ai-video-core.mjs";
 
 // LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
 // 계정당 주 1회(한국 시간 월요일 00시 갱신) · 여러 광고를 묶어 전체 점검 1회로 계산.
@@ -75,12 +76,12 @@ const SYSTEM = POLICY ? policySystemPrompt(SYSTEM_PROMPT) : SYSTEM_PROMPT;
 const policyMeta = () => POLICY ? { policy_version: POLICY_VERSION, playbook_version: PLAYBOOK_VERSION } : { policy_version: null, playbook_version: null };
 const casesFor = (ads: any[], peers: any) => { if (!POLICY) return null; const m: Record<string, string[]> = {}; for (const a of ads) m[a.ad_id] = selectCases(a, peers); return m; };
 
-async function claude(key: string, model: string, maxTokens: number, content: unknown[], effort?: string) {
+async function claude(key: string, model: string, maxTokens: number, content: unknown[], effort?: string, system: string = SYSTEM) {
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: maxTokens, system: SYSTEM, messages: [{ role: "user", content }], ...(effort ? { output_config: { effort } } : {}) }),
+      body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: "user", content }], ...(effort ? { output_config: { effort } } : {}) }),
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data) return { ok: false as const, status: res.status, usage: data?.usage };
@@ -235,6 +236,35 @@ function salesBlock(s: any) {
     margin_total_krw: num(s.margin_total_krw), partial: !!s.partial, estimated_orders: num(s.estimated_orders) };
 }
 
+// 운영자 영상 검증 — 허용 사용자(AI_VERIFY_USER_IDS)만 · 월 예산 · 1회 상한 검사 후 1회 호출 · 결과는 ai_weekly_verifications에
+// 프레임은 운영자 브라우저(화면에 보이는 탭)가 뽑아 보낸다. 영상 파일은 받지도 저장하지도 않는다. 음성 전사가 없으면 '음성 미확인'.
+// dry_run=true면 요청 검사 · 구성 · 비용 추정만 돌려주고 AI를 부르지 않으며 저장하지 않는다.
+async function verifyVideo(admin: Admin, userId: string, storeId: unknown, body: any, cfg: ReturnType<typeof config>) {
+  const allowed = env("AI_VERIFY_USER_IDS").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!allowed.includes(userId)) return json({ ok: false, code: "FORBIDDEN" }, 403);
+  const prep: any = prepareVideoVerify(body, { model: cfg.model } as any);
+  if (!prep.ok) return json({ ok: false, code: "BAD_REQUEST", errors: prep.errors }, 400);
+  const summary = { prompt_version: VIDEO_PROMPT_VERSION, frames_seen: prep.frames_seen, transcript_provided: prep.transcript_provided, request_bytes: prep.request_bytes, worst_usd: prep.worst_usd };
+  if (body?.dry_run === true) return json({ ok: true, dry_run: true, called_ai: false, ...summary });
+  const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");
+  if (!key) return json({ ok: false, code: "AI_NOT_CONFIGURED" });
+  if (prep.worst_usd > VERIFY_CAP_USD) return json({ ok: false, code: "OVER_VERIFY_BUDGET", worst_usd: prep.worst_usd, cap_usd: VERIFY_CAP_USD });
+  const spent = await monthSpent(admin);
+  if (spent == null) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
+  if (spent + prep.worst_usd > cfg.monthlyBudgetUsd) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: spent });
+  const effort = ["low", "medium", "high"].includes(body?.effort) ? body.effort : "medium";
+  const t0 = Date.now();
+  const res = await claude(key, cfg.model, VIDEO_LIMITS.maxOutputTokens, prep.content, effort, VIDEO_SYSTEM_PROMPT);
+  const usage = { calls: 1, input_tokens: res.usage?.input_tokens || 0, output_tokens: res.usage?.output_tokens || 0, frames: prep.frames_seen.length, stop_reasons: res.ok ? [res.stop] : [] };
+  const fin = res.ok ? finishVideoVerify(res.text, prep.frames_seen, prep.transcript_provided) : { ok: false, output: null, validation: { ok: false, errors: ["AI 호출 실패"] } };
+  const row = { user_id: userId, store_id: storeId, label: String(body?.label || "video").slice(0, 60), effort, model: cfg.model, status: fin.ok ? "completed" : "failed",
+    usage, cost_usd: Math.round((costUsd(cfg.model, res.usage || {}) || 0) * 10000) / 10000, duration_ms: Date.now() - t0,
+    result: { kind: "video", ad_id: String(body.ad_id), ...summary, output: fin.output, validation: fin.validation } };
+  const ins = await admin.from("ai_weekly_verifications").insert(row).select("id").single();
+  if (ins.error) console.error("ai-weekly-review verify_video save:", ins.error.message);
+  return json({ ok: true, id: ins.data?.id ?? null, saved: !ins.error, ...row });
+}
+
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
     const started = Date.now();
@@ -243,7 +273,7 @@ export default {
     if (!userId) return json({ ok: false, code: "UNAUTHORIZED" }, 401);
     const body = await req.json().catch(() => null);
     const storeId = body?.store_id, action = body?.action;
-    if (!storeId || !["status", "run", "verify"].includes(action)) return json({ ok: false, code: "BAD_REQUEST" }, 400);
+    if (!storeId || !["status", "run", "verify", "verify_video"].includes(action)) return json({ ok: false, code: "BAD_REQUEST" }, 400);
     const { data: store } = await ctx.supabase.from("stores").select("id").eq("id", storeId).eq("user_id", userId).single();
     if (!store) return json({ ok: false, code: "STORE_NOT_FOUND" }, 404);
 
@@ -257,6 +287,7 @@ export default {
     }
     if (action === "status") return json({ ok: true, enabled: cfg.enabled, ...publicView(row, weeks) });
     if (action === "verify") return await verify(ctx, admin, userId, storeId, body, weeks, cfg);
+    if (action === "verify_video") return await verifyVideo(admin, userId, storeId, body, cfg);
 
     // ---- 실행 ----
     const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");

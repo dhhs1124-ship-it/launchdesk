@@ -40,3 +40,33 @@ test("출력 검증: 본 프레임 밖 시간대 · 근거 없는 문제 · 전�
   assert.ok(r.errors.includes("limits에 음성 미확인 없음"));
   assert.equal(validateVideoOutput(bad.suggestions && { ...good, suggestions: [{ ...good.suggestions[0], change: "내레이션 첫 문장을 바꿈" }] }, seen, true).ok, true, "전사가 있으면 음성 언급 허용");
 });
+
+import { prepareVideoVerify, finishVideoVerify, VIDEO_LIMITS } from "../supabase/functions/_shared/ai-video-core.mjs";
+
+test("운영자 영상 검증 요청 검사: 광고 ID · 프레임 형식 · 오름차순 · 장수 상한을 거르고, 최악 비용을 미리 계산한다", () => {
+  const frame = (t) => ({ t, mediaType: "image/jpeg", base64: "QUJD" });
+  assert.deepEqual(prepareVideoVerify({ ad_id: "x", frames: [] }).errors, ["ad_id", "frames 없음"]);
+  assert.ok(prepareVideoVerify({ ad_id: "123456", frames: [frame(1), frame(0.5)] }).errors.includes("frames 시각은 오름차순 · 중복 없이"));
+  assert.ok(prepareVideoVerify({ ad_id: "123456", frames: [{ t: 0, mediaType: "text/html", base64: "QUJD" }] }).errors.includes("frames[0] 형식"));
+  assert.ok(prepareVideoVerify({ ad_id: "123456", frames: Array.from({ length: VIDEO_LIMITS.maxFrames + 1 }, (_, i) => frame(i)) }).errors.some((e) => e.startsWith("frames 최대")));
+  const ok = prepareVideoVerify({ ad_id: "123456", frames: [frame(0), frame(0.5), frame(3)] }, { model: "claude-sonnet-5-5" });
+  assert.equal(ok.ok, true); assert.deepEqual(ok.frames_seen, [0, 0.5, 3]); assert.equal(ok.transcript_provided, false);
+  assert.ok(ok.worst_usd > 0 && ok.worst_usd < 0.5);
+  assert.match(ok.content[ok.content.length - 1].text, /음성은 미확인/);
+});
+
+test("운영자 영상 검증 응답 처리: JSON이 아니거나 검증을 통과하지 못하면 실패로 남긴다", () => {
+  assert.equal(finishVideoVerify("설명만 있음", [0], false).ok, false);
+  const good = JSON.stringify({ suggestions: [{ t_from: 0, t_to: 0.5, change: "첫 자막을 소재 정보로", compare_method: "같은 광고 세트에 새 광고 · 동시 집행 비교(균등 배분 아님)", basis: "0~0.5초 상품명만 보임" }], issues: [], limits: ["음성 미확인"] });
+  assert.equal(finishVideoVerify("결과:\n" + good, [0, 0.5], false).ok, true);
+  const voice = good.replace("첫 자막을 소재 정보로", "내레이션 첫 문장 변경");
+  const r = finishVideoVerify(voice, [0, 0.5], false);
+  assert.equal(r.ok, false); assert.ok(r.validation.errors.some((e) => e.includes("전사 없이 음성 언급")));
+});
+
+import { createRequire } from "node:module";
+test("브라우저 프레임 계획(video-frames.js)과 서버 계획(ai-video-core.mjs)이 같은 시각을 만든다", () => {
+  const require = createRequire(import.meta.url);
+  const VF = require("../launchroas/video-frames.js") && globalThis.LaunchRoasVideoFrames;
+  for (const d of [0, 2.4, 13.1, 20.2, 26.9, 70.3, 81.4, 180]) assert.deepEqual(VF.planFrameTimes(d), planFrameTimes(d), "길이 " + d);
+});

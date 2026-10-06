@@ -1,0 +1,51 @@
+{
+  "prompt_version": "video-2026-10-06.1",
+  "called_ai": false,
+  "request": {
+    "frames": 17,
+    "frames_seen": [
+      0,
+      0.5,
+      1,
+      1.5,
+      2,
+      2.5,
+      3,
+      4,
+      6,
+      8,
+      10,
+      12,
+      14,
+      16,
+      18,
+      20,
+      21.4
+    ],
+    "frame_size": {
+      "h": 640,
+      "w": 360
+    },
+    "transcript_provided": false,
+    "request_bytes": 595450
+  },
+  "cost": {
+    "estimated_usd": 0.0415,
+    "estimated_input_tokens": 8236,
+    "worst_usd_precheck": 0.0984,
+    "note": "측정 전 추정값"
+  },
+  "last_text_block": "음성 전사 없음 — 음성은 미확인으로 둔다.",
+  "validation_mock_good": {
+    "ok": true,
+    "errors": []
+  },
+  "validation_mock_bad": {
+    "ok": false,
+    "errors": [
+      "suggestions[0] 본 프레임 밖 시간대",
+      "suggestions[0] 전사 없이 음성 언급",
+      "limits에 음성 미확인 없음"
+    ]
+  }
+}

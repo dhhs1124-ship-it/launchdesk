@@ -77,3 +77,42 @@ export function validateVideoOutput(out, framesSeen, hasTranscript) {
   if (!hasTranscript && !/음성/.test(limits)) errors.push("limits에 음성 미확인 없음");
   return { ok: errors.length === 0, errors };
 }
+
+// ---- 운영자 검증 호출 경로(ai-weekly-review action: "verify_video")가 쓰는 순수 함수 ----
+// 요청 검사 · 구성: 프레임은 클라이언트(화면에 보이는 탭)가 뽑아 보낸다. 서버는 영상을 받거나 저장하지 않는다.
+export const VIDEO_LIMITS = { maxFrames: 24, maxFrameBase64: 400000, maxTranscript: 4000, maxOutputTokens: 4000 };
+export function prepareVideoVerify(body, { model, inPerM = 2, outPerM = 10 } = {}) {
+  const errors = [], b = body || {};
+  const frames = Array.isArray(b.frames) ? b.frames : [];
+  if (!/^\d{5,25}$/.test(String(b.ad_id || ""))) errors.push("ad_id");
+  if (!frames.length) errors.push("frames 없음");
+  if (frames.length > VIDEO_LIMITS.maxFrames) errors.push("frames 최대 " + VIDEO_LIMITS.maxFrames + "장");
+  const clean = [];
+  frames.slice(0, VIDEO_LIMITS.maxFrames).forEach((f, i) => {
+    const t = Number(f && f.t), data = String(f && (f.base64 || f.data) || ""), mt = (f && (f.mediaType || f.media_type)) || "image/jpeg";
+    if (!(t >= 0)) errors.push(`frames[${i}].t`);
+    if (!/^image\/(jpeg|png|webp)$/.test(mt)) errors.push(`frames[${i}] 형식`);
+    if (!data || data.length > VIDEO_LIMITS.maxFrameBase64 || !/^[A-Za-z0-9+/=]+$/.test(data)) errors.push(`frames[${i}] 데이터`);
+    clean.push({ t: Math.round(t * 10) / 10, mediaType: mt, base64: data });
+  });
+  const ts = clean.map((f) => f.t);
+  if (ts.some((t, i) => i > 0 && t <= ts[i - 1])) errors.push("frames 시각은 오름차순 · 중복 없이");
+  const transcript = b.transcript ? String(b.transcript).slice(0, VIDEO_LIMITS.maxTranscript) : null;
+  if (errors.length) return { ok: false, errors };
+  const content = buildVideoContent({ ad: { ad_id: String(b.ad_id), ad_name: b.ad_name || null, objective: b.objective || null }, metrics: b.metrics || null, copy: b.copy || null, frames: clean, transcript, userFacts: b.user_facts || null });
+  // 최악 비용(사전 검사용): 프레임 크기를 모르므로 장당 1,600토큰(긴 변 1,568px 수준)으로 높게 잡는다
+  const inputWorst = clean.length * 1600 + Math.ceil(VIDEO_SYSTEM_PROMPT.length / 2) + 1500 + (transcript ? Math.ceil(transcript.length / 2) : 0);
+  const worstUsd = Math.round(((inputWorst * inPerM + VIDEO_LIMITS.maxOutputTokens * outPerM) / 1e6) * 10000) / 10000;
+  return { ok: true, content, frames_seen: ts, transcript_provided: !!transcript, model,
+    request_bytes: JSON.stringify({ system: VIDEO_SYSTEM_PROMPT, messages: [{ role: "user", content }] }).length, worst_usd: worstUsd };
+}
+// 응답 처리: JSON 추출 → 출력 검증. 검증을 통과하지 못하면 저장 상태를 failed로 둔다(결과는 근거로 보관)
+export function finishVideoVerify(rawText, framesSeen, hasTranscript) {
+  if (typeof rawText !== "string") return { ok: false, output: null, validation: { ok: false, errors: ["응답 없음"] } };
+  const s = rawText.indexOf("{"), e = rawText.lastIndexOf("}");
+  let out = null;
+  try { out = s >= 0 && e > s ? JSON.parse(rawText.slice(s, e + 1)) : null; } catch { out = null; }
+  if (!out) return { ok: false, output: null, validation: { ok: false, errors: ["JSON 아님"] } };
+  const validation = validateVideoOutput(out, framesSeen, hasTranscript);
+  return { ok: validation.ok, output: out, validation };
+}
