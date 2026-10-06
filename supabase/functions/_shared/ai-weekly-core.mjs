@@ -17,6 +17,8 @@ export function config(env) {
   return {
     enabled: env("AI_WEEKLY_ENABLED") === "true",
     model: env("AI_MODEL") || MODEL_DEFAULT,
+    // 2026-10-06 운영자 검증(광고 1개, 같은 입력): high 42.4초 · $0.0645 / medium 17.9초 · $0.0340 — 판정 · 근거 · 개선안 방향 동일 → 기본 medium
+    effort: ["low", "medium", "high"].includes(env("AI_EFFORT")) ? env("AI_EFFORT") : "medium",
     maxAds: int("AI_MAX_ADS", 50, 1, 200),
     // 2026-10-06 실측: 광고 1개(문구 + 썸네일 + 개선안)에 출력 5,774토큰(생각 토큰 포함, Sonnet 5.5 기본 effort high) · 약 1분
     // → 묶음 1개 = 광고 1개, 여러 묶음을 동시에. 6개 · 8,000이면 잘린다

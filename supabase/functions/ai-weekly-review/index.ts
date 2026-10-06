@@ -327,7 +327,7 @@ export default {
             if (got) images[id].push({ ...got, label: im.label });
           }
         }
-        const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images));
+        const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images), cfg.effort);
         usage.calls++;
         if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
         usage.images += Object.values(images).reduce((t, l) => t + l.length, 0);
@@ -360,7 +360,7 @@ export default {
           creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, notes: a.creative?.notes, headline: a.placement?.headline || "unknown" } })),
         coverage: { total: snap.counts.total, analyzed: Object.keys(results).length, requested: snap.counts.analyzed,
           skipped: snap.skipped, failed_ads: batches.flatMap((b: any) => b.status === "done" ? b.missing || [] : b.ad_ids) },
-        notes: budgetHit ? snap.notes.concat(["이번 달 AI 운영 한도에 도달해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"]) : snap.notes, model: cfg.model,
+        notes: budgetHit ? snap.notes.concat(["이번 달 AI 운영 한도에 도달해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"]) : snap.notes, model: cfg.model, effort: cfg.effort,
       };
       return await finish({ status, batches, result, usage, cost_usd: Math.round(cost * 10000) / 10000,
         retry_count: (row?.retry_count || 0) + (retried ? 1 : 0), period: snap.period,

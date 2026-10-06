@@ -114,3 +114,9 @@ test("게재 위치: 제목이 보이는 위치인지(2026-10-06 실제 광고 �
   assert.equal(placementInfo({ publisher_platforms: ["facebook", "instagram"] }).headline, "partial");
   assert.equal(placementInfo(undefined).headline, "unknown");
 });
+
+test("기본 effort는 medium(운영자 비교 결과), AI_EFFORT로 바꿀 수 있고 잘못된 값은 무시", () => {
+  assert.equal(config(() => "").effort, "medium");
+  assert.equal(config((k) => ({ AI_EFFORT: "high" })[k] || "").effort, "high");
+  assert.equal(config((k) => ({ AI_EFFORT: "max" })[k] || "").effort, "medium");
+});
