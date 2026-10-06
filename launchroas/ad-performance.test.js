@@ -65,10 +65,12 @@ test('예상 잔액 카드는 계산 근거·미반영 항목·저장 시점을 
     {meta_adset_id:'102',product_label:'타월C',pre_ad:10000,source_saved_at:linkedAt},
     {meta_adset_id:'103',product_label:'타월D',pre_ad:10000,source_saved_at:null}
   ],[calc('타월A','2026-09-20T00:00:00.000Z',8000),calc('타월B','2026-09-20T00:00:00.000Z',10000),calc('타월C','2026-08-01T00:00:00.000Z',5000),calc('타월D','2026-09-20T00:00:00.000Z',5000)]);
-  assert.match(changed,/광고 전환 기준 예상 잔액 \(광고별 추정\) \| 10,000원/); // 10,000원 × 4건 − 30,000원
-  assert.match(changed,/실제 광고별 이익이 아니에요/);
-  assert.match(changed,/Meta가 집계한 구매 수로 계산/);
-  assert.match(changed,/취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님/);
+  // 마진 기준이 최근 저장값과 다르면(갱신 필요) 예상 잔액을 계산하지 않는다 — 비용 정보가 맞지 않으면 손익 판단 보류
+  assert.match(changed,/광고 전환 기준 예상 잔액 \(광고별 추정\) \| 계산 안 함 \| 연결한 상품 마진이 최근 저장값과 달라/);
+  assert.match(same,/광고 전환 기준 예상 잔액 \(광고별 추정\) \| 10,000원/); // 10,000원 × 4건 − 30,000원
+  assert.match(same,/실제 광고별 이익이 아니에요/);
+  assert.match(same,/Meta가 집계한 구매 수로 계산/);
+  assert.match(same,/취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님/);
   assert.match(changed,/사용한 마진 기준: 타월A · 주문당 광고 전 잔액 10,000원 · 2026\. 9\. 1\./);
   assert.match(changed,/마진 기준 갱신 필요.*8,000원/);
   assert.doesNotMatch(same,/갱신 필요/);
@@ -97,10 +99,10 @@ test('광고 세트 첫 줄은 광고비 · ROAS · 판단만 보이고, 자세�
   vm.runInNewContext(fs.readFileSync(__dirname+'/ad-performance.js','utf8'),{window:{LaunchRoasApp:{subscribe(fn){fn(ctx);},getContext(){return ctx;}},addEventListener(){},LaunchRoasSales:require('./sales-core.js')},document,Intl,Number,Date,Math,String,Promise});
   await settle();await settle();
   const [below,few]=list.children;
-  assert.deepEqual(texts(find(below,'adset-summary')).filter(x=>/광고비|ROAS|손익|보류/.test(x)),['광고비','ROAS','손익분기 미달']);
+  assert.deepEqual(texts(find(below,'adset-summary')).filter(x=>/광고비|ROAS|손익|보류|참고값/.test(x)),['광고비','ROAS','참고값 미달','일부 상품 기준 손익분기 참고값 · 광고 전체 손익 아님']);
   assert.equal(find(below,'adset-extra').hidden,true,'자세한 지표는 접혀 있다');
   assert.match(texts(find(few,'adset-summary')).join(' '),/판단 보류 Meta 구매 1건 — 3건 미만/);
   find(below,'adset-more').events.click();
   assert.equal(find(below,'adset-extra').hidden,false);
-  assert.match(texts(find(below,'adset-extra')).join(' '),/손익분기 ROAS 300%/);
+  assert.match(texts(find(below,'adset-extra')).join(' '),/손익분기 ROAS \(참고\) 300%/);
 });

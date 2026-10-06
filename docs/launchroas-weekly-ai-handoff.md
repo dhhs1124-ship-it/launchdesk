@@ -40,6 +40,13 @@
 - 내부 필드명 · 코드 · null은 `launchroas/insights.js`의 koText · metricName · formatValue · trimNote로 한국어 변환(테스트: insights.test.js). 프롬프트에도 같은 규칙 추가(배포됨, 다음 실행부터 적용 · 재실행 검증 안 함).
 - 화면 스크립트가 찾는 요소 ID는 dom-ids.test.js가 index.html과 대조한다(개편 중 광고비 카드가 멈춘 원인).
 
+## 운영자 검증 경로 · effort 비교 (2026-10-06)
+
+- `action: "verify"`(화면 없음, 시크릿 `AI_VERIFY_USER_IDS`의 계정만) → `ai_weekly_verifications`에 따로 기록. 주간 기록 · 이용 횟수는 건드리지 않고, 비용은 월 예산 합계(monthSpent)에 포함. 1회 최악 비용 상한 $0.50.
+- 실측(광고 1개 · 같은 입력): high 42.4초 · $0.0645 / medium 17.9초 · $0.0340. 상세와 화면 캡처(실제/모의 구분)는 `docs/review/2026-10-06/README.md`.
+- 기본 effort는 아직 바꾸지 않음(결정 필요).
+- 게재 위치(`targeting`)로 제목 노출 여부를 판단해 AI에 넘긴다(자동 게재 위치 = 일부). 연결 마진이 최근 저장값과 다르면 손익분기 판정 · 예상 잔액은 보류.
+
 ## 관련 파일
 
 | 파일 | 내용 |

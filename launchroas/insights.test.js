@@ -76,11 +76,11 @@ test('근거 설명은 보이는 값을 다시 말하는 문장과 "단정하지
 
 test('AI 실행 전 확인 신호는 실제 측정값과 조건으로만, 최대 2개',()=>{
   const m={spend:50000,impressions:10000,link_clicks:60,link_ctr:0.6,frequency:3.4,purchase:{observed:true,value:5},funnel_status:{usable:true}};
-  assert.deepEqual(I.ruleSignals(m,false,null),['클릭률 0.6% · 노출 10,000회 중 1% 미만','빈도 3.4회 · 같은 사람에게 반복 노출']);
+  assert.deepEqual(I.ruleSignals(m,false,null),['클릭률 0.6% · 참고 기준 1% 미만(노출 10,000회)','빈도 3.4회 · 참고 기준 3회 이상']);
   assert.deepEqual(I.ruleSignals({spend:10,impressions:300,link_ctr:0.2,link_clicks:4,purchase:{observed:false}},false,null),[],'노출 · 클릭이 적으면 신호 없음(구매 기록 없음을 픽셀 문제로 단정하지 않음)');
-  assert.deepEqual(I.ruleSignals({spend:90,impressions:9000,link_ctr:1.5,link_clicks:135,purchase:{observed:false}},false,null),['링크 클릭 135회 · 구매 기록 없음']);
+  assert.deepEqual(I.ruleSignals({spend:90,impressions:9000,link_ctr:1.5,link_clicks:135,purchase:{observed:false}},false,null),['링크 클릭 135회 · 구매 기록 없음(참고 기준 클릭 100회)']);
   assert.deepEqual(I.ruleSignals({spend:10,impressions:5000,link_ctr:2.5,purchase:{observed:true,value:8},funnel_status:{usable:true}},false,null),[]);
-  assert.match(I.ruleSignals({roas:3.2,purchase:{observed:true,value:9}},true,{tone:'below',breakeven:4.1})[0],/ROAS 320% · 손익분기 410% 미달/);
+  assert.match(I.ruleSignals({roas:3.2,purchase:{observed:true,value:9}},true,{tone:'below',breakeven:4.1})[0],/ROAS 320% · 일부 상품 기준 손익분기 참고값 410%보다 낮음/);
 });
 
 test('제목이 비었다는 이유만의 제목 제안은 제목이 보이는 게재 위치로 확인됐을 때만 보여 준다',()=>{
@@ -90,4 +90,9 @@ test('제목이 비었다는 이유만의 제목 제안은 제목이 보이는 �
   assert.equal(I.recUsable({creative:{title:null,headline:'none'}},an),false);
   assert.equal(I.recUsable({creative:{}},{recommendation:{current:'본문 첫 줄',proposed:'첫 줄에 혜택',example:'오늘만 무료배송'}}),true,'제목과 무관한 제안은 그대로');
   assert.equal(I.recUsable({creative:{}},{recommendation:null}),false);
+});
+
+test('신호 문구는 픽셀 오류 · 광고 실패로 단정하지 않는다',()=>{
+  const all=[I.ruleSignals({spend:90,impressions:9000,link_ctr:0.5,link_clicks:300,frequency:4,purchase:{observed:false}},false,null),I.ruleSignals({purchase:{observed:false},link_clicks:500},false,null)].flat().join(' ');
+  assert.doesNotMatch(all,/픽셀|오류|실패|문제/);
 });

@@ -158,8 +158,9 @@ test('일부 상품만 마진이 연결되면 부분 계산으로 표시한다',
 test('광고 판단: 근거가 충분할 때만 손익분기 미달·이상, 아니면 판단 보류(권고 없음)',()=>{
   const link={pre_ad:10000,total_income:30000}; // 손익분기 ROAS 300%
   const m=(roas,purchases,spend=100)=>({roas,spend,purchase:{observed:purchases!=null,value:purchases||0}});
-  assert.equal(S.adVerdict(link,m(2.5,5)).label,'손익분기 미달');
-  assert.equal(S.adVerdict(link,m(3.0,5)).label,'손익분기 이상');
+  assert.equal(S.adVerdict(link,m(2.5,5)).label,'참고값 미달');
+  assert.equal(S.adVerdict(link,m(3.0,5)).label,'참고값 이상');
+  assert.match(S.adVerdict(link,m(2.5,5)).reason,/일부 상품 기준 손익분기 참고값 · 광고 전체 손익 아님/,'광고 전체 손익으로 확정하지 않는다');
   assert.deepEqual(S.adVerdict(null,m(9,9)),{label:'판단 보류',tone:'hold',reason:'상품 마진 미연결'});
   assert.equal(S.adVerdict(link,m(9,2)).label,'판단 보류','구매 3건 미만');
   assert.equal(S.adVerdict(link,m(null,null)).label,'판단 보류','구매 집계 없음');

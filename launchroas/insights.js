@@ -114,14 +114,14 @@
   function ruleSignals(m,linked,verdict){
     m=m||{};var out=[],n=function(v){var x=Number(v);return Number.isFinite(x)?x:null;},obsv=function(x){return x&&x.observed?n(x.value):null;};
     var imp=n(m.impressions)||0,clicks=n(m.link_clicks)||0,ctr=n(m.link_ctr),freq=n(m.frequency),lpv=obsv(m.landing_page_view),buy=obsv(m.purchase),usable=m.funnel_status&&m.funnel_status.usable;
-    if(linked&&verdict&&verdict.tone==='below'&&verdict.breakeven)out.push('ROAS '+Math.round((n(m.roas)||0)*100)+'% · 손익분기 '+Math.round(verdict.breakeven*100)+'% 미달');
-    if(imp>=2000&&ctr!=null&&ctr<1)out.push('클릭률 '+pctTxt(ctr)+' · 노출 '+imp.toLocaleString('ko-KR')+'회 중 1% 미만');
-    if(freq!=null&&freq>=3)out.push('빈도 '+(Math.round(freq*10)/10)+'회 · 같은 사람에게 반복 노출');
-    if(usable&&clicks>=30&&n(m.landing_rate)!=null&&m.landing_rate<70)out.push('랜딩률 '+pctTxt(m.landing_rate)+' · 클릭 후 이탈 확인');
-    if(usable&&lpv!=null&&lpv>=50&&buy!=null&&n(m.purchase_rate)!=null&&m.purchase_rate<1)out.push('구매율 '+pctTxt(m.purchase_rate)+' · 랜딩 '+lpv+'회 중 1% 미만');
+    if(linked&&verdict&&verdict.tone==='below'&&verdict.breakeven)out.push('ROAS '+Math.round((n(m.roas)||0)*100)+'% · 일부 상품 기준 손익분기 참고값 '+Math.round(verdict.breakeven*100)+'%보다 낮음');
+    if(imp>=2000&&ctr!=null&&ctr<1)out.push('클릭률 '+pctTxt(ctr)+' · 참고 기준 1% 미만(노출 '+imp.toLocaleString('ko-KR')+'회)');
+    if(freq!=null&&freq>=3)out.push('빈도 '+(Math.round(freq*10)/10)+'회 · 참고 기준 3회 이상');
+    if(usable&&clicks>=30&&n(m.landing_rate)!=null&&m.landing_rate<70)out.push('랜딩률 '+pctTxt(m.landing_rate)+' · 참고 기준 70% 미만');
+    if(usable&&lpv!=null&&lpv>=50&&buy!=null&&n(m.purchase_rate)!=null&&m.purchase_rate<1)out.push('구매율 '+pctTxt(m.purchase_rate)+' · 참고 기준 1% 미만(랜딩 '+lpv+'회)');
     if(m.funnel_status&&m.funnel_status.code==='LPV_EXCEEDS_LINK_CLICKS')out.push('랜딩 조회가 링크 클릭보다 많음 · 집계 기준 확인');
     // Meta는 구매가 없을 때도 '기록 없음'으로 준다 — 픽셀 문제로 단정하지 않고, 클릭이 충분히 쌓였을 때만 신호
-    if(buy==null){if(clicks>=100)out.push('링크 클릭 '+clicks.toLocaleString('ko-KR')+'회 · 구매 기록 없음');}else if(buy<3)out.push('구매 '+buy+'건 · 판단하기엔 표본 부족');
+    if(buy==null){if(clicks>=100)out.push('링크 클릭 '+clicks.toLocaleString('ko-KR')+'회 · 구매 기록 없음(참고 기준 클릭 100회)');}else if(buy<3)out.push('구매 '+buy+'건 · 판단하기엔 표본 부족');
     return out.slice(0,2);
   }
   // 개선안을 보여 줄지 — 제목이 비었다는 이유만으로 나온 제목 제안은 제목이 보이는 게재 위치로 확인됐을 때만
@@ -295,7 +295,7 @@
   // AI 점검 전 — 광고 세트별 규칙 기반 확인 신호만 짧게(AI 분석과 구분)
   function renderSignals(){
     var box=el('div','wk-pre'),h=el('div','wk-list-head');
-    h.append(el('h3','','AI 점검 전 확인 신호'),el('span','wk-rule-tag','규칙 기반 · AI 분석 아님'));box.appendChild(h);
+    h.append(el('h3','','AI 점검 전 확인 신호'),el('span','wk-rule-tag','규칙 기반 · 참고 기준 · AI 분석 아님'));box.appendChild(h);
     if(!ads||ads.loading){box.appendChild(el('p','wk-sub','광고 세트 지표를 불러오는 중이에요.'));return box;}
     if(ads.error){box.appendChild(el('p','wk-sub','광고 세트 지표를 불러오지 못했어요.'));return box;}
     var rows=(ads.rows||[]).filter(function(r){return Number(r.metrics&&r.metrics.spend)>0;}).sort(function(x,y){return Number(y.metrics.spend)-Number(x.metrics.spend);}).slice(0,3);
@@ -307,7 +307,7 @@
       var l=el('p','wk-line');l.append(el('span','wk-k','확인 신호'),el('span','',sig.length?sig.join(' · '):'뚜렷한 신호 없음'));li.appendChild(l);
       ul.appendChild(li);
     });
-    box.append(ul,el('small','wk-foot','운영 현황에서 선택한 기간의 광고 세트 기준 · 원인 · 변경안은 AI 점검에서 확인해요'));
+    box.append(ul,el('small','wk-foot','선택한 기간의 광고 세트 기준 · 기준값은 업종마다 다른 참고 기준이라 문제로 단정하지 않아요 · 원인 · 변경안은 AI 점검에서 확인해요'));
     return box;
   }
 

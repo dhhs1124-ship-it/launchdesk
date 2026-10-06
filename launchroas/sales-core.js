@@ -229,8 +229,9 @@
     if(purchases<MIN_PURCHASES)return hold('Meta 구매 '+purchases+'건 — '+MIN_PURCHASES+'건 미만');
     var breakeven=income/pre;
     return roas<breakeven
-      ?{label:'손익분기 미달',tone:'below',reason:'',breakeven:breakeven}
-      :{label:'손익분기 이상',tone:'above',reason:'',breakeven:breakeven};
+      // 광고 세트에 연결한 상품 1개의 마진 기준 — Meta 구매에는 다른 상품도 섞일 수 있어 광고 전체 손익이 아닌 참고값
+      ?{label:'참고값 미달',tone:'below',reason:'일부 상품 기준 손익분기 참고값 · 광고 전체 손익 아님',breakeven:breakeven}
+      :{label:'참고값 이상',tone:'above',reason:'일부 상품 기준 손익분기 참고값 · 광고 전체 손익 아님',breakeven:breakeven};
   }
 
   return {classifyItem:classifyItem,splitMargin:splitMargin,findLink:findLink,summarize:summarize,adSpendKrw:adSpendKrw,adVerdict:adVerdict,MIN_PURCHASES:MIN_PURCHASES,latestLinks:latestLinks};
