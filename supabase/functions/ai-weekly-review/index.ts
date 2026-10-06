@@ -4,9 +4,9 @@ import { getValidMetaAccessToken } from "../_shared/meta-token.ts";
 import { GRAPH_API_VERSION, buildInsightsUrl, fetchAllInsightsRows } from "../_shared/meta-adset-normalize.mjs";
 import {
   config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
-  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT,
+  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks,
 } from "../_shared/ai-weekly-core.mjs";
-import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases } from "../_shared/ai-policy.mjs";
+import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases, policyVariants, casesForAds } from "../_shared/ai-policy.mjs";
 import { VIDEO_SYSTEM_PROMPT, VIDEO_PROMPT_VERSION, VIDEO_LIMITS, prepareVideoVerify, finishVideoVerify } from "../_shared/ai-video-core.mjs";
 
 // LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
@@ -180,53 +180,74 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
   if (!allowed.includes(userId)) return json({ ok: false, code: "FORBIDDEN" }, 403);
   const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");
   if (!key) return json({ ok: false, code: "AI_NOT_CONFIGURED" });
-  const efforts = (Array.isArray(body?.efforts) ? body.efforts : ["high", "medium"]).filter((e: string) => ["low", "medium", "high"].includes(e)).slice(0, 2);
+  // compare_policy: 같은 입력(한 번 만든 스냅샷 · 이미지)에 이전 지시문 · 새 지시문을 나란히 — 시크릿 · 주간 이용 횟수와 무관
+  const comparePolicy = body?.compare_policy === true;
+  const efforts = comparePolicy
+    ? [["low", "medium", "high"].includes(body?.effort) ? body.effort : "medium"]
+    : (Array.isArray(body?.efforts) ? body.efforts : ["high", "medium"]).filter((e: string) => ["low", "medium", "high"].includes(e)).slice(0, 2);
   if (!efforts.length) return json({ ok: false, code: "BAD_REQUEST" }, 400);
+  const variants = comparePolicy ? policyVariants(SYSTEM_PROMPT)
+    : [{ key: POLICY ? "policy_on" : "policy_off", system: SYSTEM, withCases: POLICY, meta: policyMeta() }];
+  // 기간 고정(선택): 같은 주로 다시 돌릴 수 있게 — 없으면 지난주
+  let useWeeks = weeks;
+  if (body?.weeks) {
+    const pin = pinnedWeeks(body.weeks, weeks);
+    if (!pin.ok) return json({ ok: false, code: "BAD_REQUEST", error: pin.error }, 400);
+    useWeeks = pin.weeks as ReturnType<typeof weekRanges>;
+  }
   const cap = Math.min(VERIFY_CAP_USD, Number(body?.budget_usd) > 0 ? Number(body.budget_usd) : VERIFY_CAP_USD);
   const spent = await monthSpent(admin);
   if (spent == null) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
-  const built = await buildSnapshot(ctx, admin, storeId, body, weeks, cfg);
+  const built = await buildSnapshot(ctx, admin, storeId, body, useWeeks, cfg);
   if (!built.ok) return json({ ok: false, code: "NO_SNAPSHOT", error: built.error });
   const { snap, batches } = built;
-  const worst = batches.length * efforts.length * (costUsd(cfg.model, { input_tokens: 20000, output_tokens: cfg.maxOutputTokens }) || 0);
-  if (worst > cap) return json({ ok: false, code: "OVER_VERIFY_BUDGET", calls: batches.length * efforts.length, worst_usd: worst, cap_usd: cap });
+  const calls = batches.length * efforts.length * variants.length;
+  const worst = calls * (costUsd(cfg.model, { input_tokens: 20000, output_tokens: cfg.maxOutputTokens }) || 0);
+  if (worst > cap) return json({ ok: false, code: "OVER_VERIFY_BUDGET", calls, worst_usd: worst, cap_usd: cap });
   if (spent + worst > cfg.monthlyBudgetUsd) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: spent });
   const adsById: Record<string, any> = {};
   for (const a of snap.ads) adsById[a.ad_id] = a;
   const peers = peerGroups(snap.ads);
   const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency };
-  const casesById = casesFor(snap.ads, peers);
-  // 입력은 한 번만 만든다(이미지 포함) — 두 effort가 바이트 단위로 같은 입력을 받는다
-  const prepared = await Promise.all(batches.map(async (b: any) => {
+  const cases = casesForAds(snap.ads, peers);
+  // 입력 지문 — 두 변형이 같은 기간 · 지표 · 소재를 받았는지 확인용(이미지는 아래에서 한 번만 받아 공유)
+  const inputs = JSON.stringify({ period: snap.period, ads: snap.ads.map((a: any) => ({ ad_id: a.ad_id, current: a.current, previous: a.previous, creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, video_id: a.creative?.video_id ?? null }, placement: a.placement })) });
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(inputs));
+  const fingerprint = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const imagesByBatch = await Promise.all(batches.map(async (b: any) => {
     const images: Record<string, any[]> = {};
     for (const id of b.ad_ids) {
       images[id] = [];
       for (const im of adsById[id].imagePlan || []) { const got = await downloadImage(im.url); im.sent = !!got; if (got) images[id].push({ ...got, label: im.label }); }
     }
-    return { b, content: batchContent(b, adsById, peers, context, images, casesById), images: Object.values(images).reduce((t, l) => t + l.length, 0) };
+    return images;
   }));
-  const label = String(body?.label || "verify").slice(0, 60);
-  const runs = await Promise.all(efforts.map(async (effort: string) => {
+  const label = String(body?.label || (comparePolicy ? "policy-compare" : "verify")).slice(0, 48);
+  const jobs: any[] = [];
+  for (const effort of efforts) for (const v of variants) jobs.push({ effort, v });
+  const runs = await Promise.all(jobs.map(async ({ effort, v }: any) => {
     const t0 = Date.now(), usage: any = { calls: 0, input_tokens: 0, output_tokens: 0, images: 0, stop_reasons: [] }, results: Record<string, any> = {}, failed: string[] = [];
+    const casesById = v.withCases ? cases : null;
     let cost = 0;
-    for (const p of prepared) {
-      const res = await claude(key, cfg.model, cfg.maxOutputTokens, p.content, effort);
-      usage.calls++; usage.images += p.images;
+    for (let i = 0; i < batches.length; i++) {
+      const b = batches[i], images = imagesByBatch[i];
+      const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images, casesById), effort, v.system);
+      usage.calls++; usage.images += Object.values(images).reduce((t: number, l: any) => t + l.length, 0);
       if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
       if (res.ok) usage.stop_reasons.push(res.stop);
-      const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, p.b, adsById, peers, casesById) : null;
+      const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, b, adsById, peers, casesById) : null;
       if (parsed) Object.assign(results, parsed);
-      failed.push(...p.b.ad_ids.filter((id: string) => !parsed || !parsed[id]));
+      failed.push(...b.ad_ids.filter((id: string) => !parsed || !parsed[id]));
     }
-    const row = { user_id: userId, store_id: storeId, label, effort, model: cfg.model, status: failed.length ? "failed" : "completed",
+    const row = { user_id: userId, store_id: storeId, label: comparePolicy ? label + ":" + v.key : label, effort, model: cfg.model, status: failed.length ? "failed" : "completed",
       usage, cost_usd: Math.round(cost * 10000) / 10000, duration_ms: Date.now() - t0,
-      result: { ...policyMeta(), ads_by_id: results, failed_ads: failed, period: snap.period,
+      result: { ...v.meta, variant: v.key, input_fingerprint: fingerprint, ads_by_id: results, failed_ads: failed, period: snap.period,
         inputs: snap.ads.map((a: any) => ({ ad_id: a.ad_id, placement: a.placement, title: a.creative?.title ?? null, images_sent: (a.imagePlan || []).filter((im: any) => im.sent).length })) } };
     const ins = await admin.from("ai_weekly_verifications").insert(row).select("id").single();
     if (ins.error) console.error("ai-weekly-review verify save:", ins.error.message);
     return { id: ins.data?.id ?? null, saved: !ins.error, ...row };
   }));
-  return json({ ok: true, runs });
+  return json({ ok: true, compare_policy: comparePolicy, input_fingerprint: fingerprint, runs });
 }
 
 function num(v: unknown) { const n = Number(v); return Number.isFinite(n) ? n : null; }

@@ -120,3 +120,10 @@ test("기본 effort는 medium(운영자 비교 결과), AI_EFFORT로 바꿀 수 
   assert.equal(config((k) => ({ AI_EFFORT: "high" })[k] || "").effort, "high");
   assert.equal(config((k) => ({ AI_EFFORT: "max" })[k] || "").effort, "medium");
 });
+
+import { extractCreative as extractCreativeV } from "../supabase/functions/_shared/ai-weekly-core.mjs";
+test("영상 소재는 video_id를 함께 남기고, ID가 없는 VIDEO 형식은 null", () => {
+  assert.equal(extractCreativeV({ video_id: 123456789, object_type: "VIDEO" }).video_id, "123456789");
+  assert.equal(extractCreativeV({ object_story_spec: { video_data: { video_id: "987" } } }).video_id, "987");
+  assert.equal(extractCreativeV({ object_type: "VIDEO" }).video_id, null);
+});

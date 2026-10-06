@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>영상 검증 · 운영자</title>
+  <link rel="stylesheet" href="./styles.css">
+  <style>
+    .vv { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 16px; }
+    .vv label { display: grid; gap: 6px; font-size: 14px; }
+    .vv input[type=text], .vv input[type=number], .vv textarea { font: inherit; padding: 8px 10px; border: 1px solid #c9ccd1; border-radius: 8px; }
+    .vv .frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+    .vv figure { margin: 0; font-size: 12px; text-align: center; }
+    .vv figure img { width: 100%; border-radius: 6px; display: block; }
+    .vv pre { white-space: pre-wrap; word-break: break-all; background: #f4f5f7; padding: 12px; border-radius: 8px; font-size: 12px; max-height: 420px; overflow: auto; }
+    .vv .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .vv .note { font-size: 13px; color: #555; }
+  </style>
+</head>
+<body>
+<main class="vv">
+  <h1>광고 영상 검증 (운영자 전용)</h1>
+  <p class="note">영상 파일은 이 브라우저 안에서만 열어 프레임을 뽑고, 서버에는 프레임 이미지만 보냅니다. 영상 파일은 저장하지 않습니다. 허용된 운영자 계정만 호출할 수 있습니다. 음성 전사를 넣지 않으면 결과는 ‘음성 미확인’으로 남습니다.</p>
+  <p class="note" id="who">로그인 확인 중…</p>
+  <label>매장 ID <input type="number" id="store" min="1"></label>
+  <label>광고 ID (Meta 광고 ID — 이 영상이 쓰인 광고) <input type="text" id="ad" inputmode="numeric" placeholder="숫자만"></label>
+  <label>영상 파일 (직접 제공한 원본 · MP4 권장) <input type="file" id="file" accept="video/*"></label>
+  <label>음성 전사 (선택 · 직접 확인한 내용만) <textarea id="transcript" rows="3" maxlength="4000"></textarea></label>
+  <div class="row"><button type="button" id="extract" disabled>프레임 뽑기</button><span class="note" id="extractInfo"></span></div>
+  <div class="frames" id="frames"></div>
+  <div class="row">
+    <button type="button" id="dry" disabled>드라이런 (AI 호출 없음)</button>
+    <label class="row" style="display:flex"><input type="checkbox" id="confirmPaid"> 유료 호출 1회에 동의</label>
+    <button type="button" id="paid" disabled>실제 분석</button>
+  </div>
+  <pre id="out" aria-live="polite"></pre>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+<script src="./video-frames.js"></script>
+<script>
+(function(){
+  'use strict';
+  var sb = window.supabase.createClient('https://zzhvckikonnalqnyatgn.supabase.co', 'sb_publishable_hu9XkhXJKyoWVL7zMQD8_g_iMmDymMK');
+  var $ = function(id){ return document.getElementById(id); };
+  var frames = null;
+  function show(x){ $('out').textContent = typeof x === 'string' ? x : JSON.stringify(x, null, 2); }
+  function ready(){ var ok = !!frames && /^\d{5,25}$/.test($('ad').value.trim()) && Number($('store').value) > 0; $('dry').disabled = !ok; $('paid').disabled = !ok || !$('confirmPaid').checked; }
+  sb.auth.getSession().then(function(r){
+    var u = r.data && r.data.session && r.data.session.user;
+    $('who').textContent = u ? '로그인됨 — 허용 목록에 없는 계정이면 서버가 거절합니다.' : '로그인되어 있지 않아요. 같은 주소의 LaunchROAS에서 먼저 로그인해 주세요.';
+    if(u) sb.from('stores').select('id').limit(1).then(function(s){ if(s.data && s.data[0] && !$('store').value){ $('store').value = s.data[0].id; ready(); } });
+  });
+  $('file').addEventListener('change', function(){ frames = null; $('frames').textContent = ''; $('extract').disabled = !this.files[0]; ready(); });
+  ['ad', 'store'].forEach(function(id){ $(id).addEventListener('input', ready); });
+  $('confirmPaid').addEventListener('change', ready);
+  $('extract').addEventListener('click', async function(){
+    var f = $('file').files[0]; if(!f) return;
+    this.disabled = true; $('extractInfo').textContent = '뽑는 중…';
+    try {
+      var r = await window.LaunchRoasVideoFrames.extractFrames(f);
+      frames = r.frames;
+      $('extractInfo').textContent = r.frames.length + '장 · 길이 ' + r.duration.toFixed(1) + '초 · ' + r.width + '×' + r.height + ' · 방식 ' + r.method;
+      $('frames').textContent = '';
+      r.frames.forEach(function(fr){ var fig = document.createElement('figure'), im = new Image(), cap = document.createElement('figcaption'); im.src = 'data:image/jpeg;base64,' + fr.base64; im.alt = fr.t + '초 프레임'; cap.textContent = fr.t + '초'; fig.append(im, cap); $('frames').append(fig); });
+    } catch(e){ frames = null; $('extractInfo').textContent = '프레임을 뽑지 못했어요: ' + e.message; }
+    this.disabled = false; ready();
+  });
+  async function call(dryRun){
+    var body = { action: 'verify_video', store_id: Number($('store').value), ad_id: $('ad').value.trim(), ad_name: ($('file').files[0] || {}).name || null,
+      frames: frames, transcript: $('transcript').value.trim() || null, label: 'video-upload', dry_run: dryRun };
+    show(dryRun ? '드라이런 요청 중…' : '분석 중…');
+    var res = await sb.functions.invoke('ai-weekly-review', { body: body });
+    if(res.error){ var detail = null; try { detail = await res.error.context.json(); } catch(_){} show({ error: res.error.message, detail: detail }); return; }
+    show(res.data);
+  }
+  $('dry').addEventListener('click', function(){ call(true); });
+  $('paid').addEventListener('click', function(){ if(!$('confirmPaid').checked) return; $('confirmPaid').checked = false; ready(); call(false); });
+})();
+</script>
+</body>
+</html>

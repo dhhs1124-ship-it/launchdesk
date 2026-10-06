@@ -81,3 +81,23 @@ test("출력 검증: '추가 확인'이어도 확인한 소재 근거의 선택�
   assert.deepEqual([...r.hold_scope], ["랜딩 · 구매 전환 구간", "예산"]);
   assert.equal(r.budget_note, null);
 });
+
+import { policyVariants, casesForAds } from "../supabase/functions/_shared/ai-policy.mjs";
+import { pinnedWeeks } from "../supabase/functions/_shared/ai-weekly-core.mjs";
+test("정책 비교: 같은 입력에 이전/새 지시문 두 가지 · 새 지시문에만 사례 · 시크릿과 무관", () => {
+  const v = policyVariants(SYSTEM_PROMPT);
+  assert.deepEqual(v.map((x) => x.key), ["policy_off", "policy_on"]);
+  assert.equal(v[0].system, SYSTEM_PROMPT); assert.equal(v[0].withCases, false); assert.equal(v[0].meta.policy_version, null);
+  assert.match(v[1].system, /분석 기준 policy-2026-10-06\.3/); assert.equal(v[1].withCases, true);
+  const ads = [ad("1", 0.5, "video"), ad("2", 1.5, "video")];
+  assert.equal(casesForAds(ads, peerGroups(ads))["1"].length, 2);
+});
+test("기간 고정: 7일씩 연속 · 끝난 주만 허용", () => {
+  const base = { quotaWeek: "2026-10-05", current: { since: "2026-09-28", until: "2026-10-04" }, previous: { since: "2026-09-21", until: "2026-09-27" } };
+  assert.equal(pinnedWeeks({ current: { since: "2026-09-28", until: "2026-10-04" }, previous: { since: "2026-09-21", until: "2026-09-27" } }, base).ok, true);
+  assert.equal(pinnedWeeks({ current: { since: "2026-10-05", until: "2026-10-11" }, previous: { since: "2026-09-28", until: "2026-10-04" } }, base).error, "끝나지 않은 주는 고정할 수 없음");
+  assert.equal(pinnedWeeks({ current: { since: "2026-09-28", until: "2026-10-03" }, previous: { since: "2026-09-21", until: "2026-09-27" } }, base).error, "각 기간은 7일");
+  assert.equal(pinnedWeeks({ current: { since: "2026-09-28", until: "2026-10-04" }, previous: { since: "2026-09-14", until: "2026-09-20" } }, base).error, "그 전주는 분석 주 바로 앞 7일");
+  assert.equal(pinnedWeeks(null, base).ok, false);
+  assert.equal(pinnedWeeks({ current: { since: "2026-09-21", until: "2026-09-27" }, previous: { since: "2026-09-14", until: "2026-09-20" } }, base).weeks.quotaWeek, "2026-10-05", "이용 주(quotaWeek)는 바꾸지 않는다");
+});

@@ -161,6 +161,7 @@ export function extractCreative(c) {
     out.notes.push(`캐러셀 카드 ${link.child_attachments.length}장: 카드별 성과는 조회하지 않아 광고 전체 지표만 있음`);
   } else if (c.video_id || video.video_id || c.object_type === "VIDEO") {
     out.format = "video";
+    out.video_id = String(c.video_id || video.video_id || "") || null; // 영상 원본 확인(ad-video-source) · 검증 기록용 — 이전 결과에는 없음
     const thumb = c.thumbnail_url || video.image_url;
     if (thumb) out.images.push({ url: thumb, label: "영상 썸네일", thumbnail: true });
     out.notes.push("영상: 썸네일만 확인(영상 · 음성은 분석하지 않음)");
@@ -363,3 +364,15 @@ export function scopeOf(a) {
 }
 
 export { toNumber };
+
+// 운영자 검증 기간 고정 — 같은 기간으로 다시 돌릴 수 있게 한다. 7일씩 · 연속 · 이미 끝난 주(기본 '지난주' 이전 또는 같음)만
+export function pinnedWeeks(input, base) {
+  const iso = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const day = (s) => Date.parse(s + "T00:00:00Z") / DAY;
+  const c = input && input.current, p = input && input.previous;
+  if (!c || !p || ![c.since, c.until, p.since, p.until].every(iso)) return { ok: false, error: "기간 형식(YYYY-MM-DD)" };
+  if (day(c.until) - day(c.since) !== 6 || day(p.until) - day(p.since) !== 6) return { ok: false, error: "각 기간은 7일" };
+  if (day(c.since) - day(p.until) !== 1) return { ok: false, error: "그 전주는 분석 주 바로 앞 7일" };
+  if (day(c.until) > day(base.current.until)) return { ok: false, error: "끝나지 않은 주는 고정할 수 없음" };
+  return { ok: true, weeks: { ...base, current: { since: c.since, until: c.until }, previous: { since: p.since, until: p.until } } };
+}

@@ -86,7 +86,7 @@
 | 운영자용 영상 분석 호출 경로 | **구현됨(미배포)** — `ai-weekly-review` `action: "verify_video"`(6장) |
 | 음성 | 사용자 전사 입력이 없으면 ‘음성 미확인’으로 둔다(유료 전사 도구는 쓰지 않음) |
 
-- 영상이 현재 계정에 있는지부터 확인 필요(지금 분석된 광고 1개의 소재 형식은 이미지 기반으로 기록됨 — 영상 광고가 없으면 업로드 방식으로 검증).
+- [정정 8-1] 지금 분석된 광고 1개(‘9월 전환광고’)의 소재 형식은 저장 결과에 `video`로 기록됨. 영상 ID는 미조회 — 원본을 못 받으면 직접 제공 방식(8-3)으로 검증.
 - 호출 수: **1회**(+ 출력 검증 실패 시 재시도 최대 1회). 추정 1회 $0.03~0.06(프레임 24장 × 약 620토큰 + 지시문 · 출력) → **상한 $0.15로 잡음**.
 
 ### 4-3. 예산 합계
@@ -110,7 +110,7 @@
 | 읽기 전용 보장 | 로컬 서버(`scripts/local-readonly-server.js`)가 두 화면에 쓰기 차단 스크립트를 넣어 DB insert · upsert · update · delete · rpc와 쓰기 함수(주문 동기화 등) 호출을 막고 기록 — 확인 중 차단된 시도 0건(앱이 쓰기를 시도하지 않음). 운영 메인의 게스트 데이터 이전 조건(`ld-*` 키) 없음 확인 · 분석 동의 배너는 누르지 않음 | 서버 코드 |
 | 2 저장 → 재조회 → 선택 조회 실패 → 재시도(두 화면 연결 · 로컬 모의 DB) | **8개 항목 모두 통과**: 저장 후 두 화면 합계 일치(₩22,000) · 미결 중복 · 외화 제외 표시 · 선택 저장 후 ₩12,000 일치 · 새로 띄운 뒤 유지 · 선택 조회 실패 시 두 화면 ‘₩22,000 (미확정)’ · 다시 불러오기 표시 · 재시도 후 ₩12,000 · 변경 기록이 운영 메인에 ₩NaN 없이 합계 제외 | `scripts/verify-adlog-cross-screen.js` · `cross-screen-mock.txt` |
 | 3 영상 운영자 검증 경로 | `ai-weekly-review`에 `action: "verify_video"` 추가(미배포): 기존 로그인 · `AI_VERIFY_USER_IDS` · 월 예산(`monthSpent`) · 1회 상한($0.50) 재사용, 결과는 `ai_weekly_verifications`(label `video`). `dry_run: true`면 AI를 부르지 않고 저장하지 않음. 음성 전사가 없으면 요청에 ‘음성 미확인’을 넣고 출력 검증이 강제 | 코드 · `tests/ai-video-core.test.mjs` |
-| 3 드라이런 | 프레임 추출: 실제 추출 모듈로 MP4 1개(경쟁사 영상 21.7초 — 사용자 계정에 영상 광고가 없어 대신 사용, 파일은 로컬 임시 폴더에만)에서 17장. 숨김 탭이라 `<video>`가 열리지 않아 **WebCodecs 대체 경로**로 추출됨. 요청 구성: 595KB · 입력 약 8,236토큰 · 추정 $0.0415 · 사전 검사 최악 $0.0984. 출력 검증: 모의 정상 응답 통과 · 모의 위반 응답(본 프레임 밖 시간대 · 전사 없이 음성 언급 · 음성 미확인 누락) 3건 모두 거름 | `video-extract.json` · `video-dryrun.json` |
+| 3 드라이런 | 프레임 추출: 실제 추출 모듈로 MP4 1개(경쟁사 영상 21.7초 — 사용자 광고 영상 원본을 확보하지 않아 처리 경로 확인용으로 사용(사용자 광고 분석 검증 아님), 파일은 로컬 임시 폴더에만)에서 17장. 숨김 탭이라 `<video>`가 열리지 않아 **WebCodecs 대체 경로**로 추출됨. 요청 구성: 595KB · 입력 약 8,236토큰 · 추정 $0.0415 · 사전 검사 최악 $0.0984. 출력 검증: 모의 정상 응답 통과 · 모의 위반 응답(본 프레임 밖 시간대 · 전사 없이 음성 언급 · 음성 미확인 누락) 3건 모두 거름 | `video-extract.json` · `video-dryrun.json` |
 
 ## 7. 실제 검증에 필요한 적용 항목 (한 번에 정리)
 
@@ -149,3 +149,64 @@ Meta 조회(무료, 기존 함수): 실행 기록 저장 약 8~10회 · 결과 �
 ### 7-4. 진행 순서
 
 1. 운영 메인 호환 배포(승인) → 2. 운영 메인에서 실제 저장 · 재조회 · 선택 실패(네트워크 차단) · 재시도 확인(2단계 표) → 3. 저장 스위치 켜고 미리보기 배포(승인) → 4. 사용자가 광고 · 문구를 확정하고 실제 수정 → 실행 기록 저장 → 5. 시작일 + 11일 뒤 결과 비교 · 저장 → 6. 함수 재배포 · 정책 비교 2회(승인) → 7. 영상 1개 검증(영상 확보 · 승인).
+
+## 8. 2026-10-06 후속 — 영상 여부 정정 · 광고 수정 없는 AI 검증 · 직접 제공 영상 · 리뷰 안내
+
+### 8-1. ‘영상 광고 없음’ 보고 정정
+
+| 항목 | 확인 결과 |
+|---|---|
+| 조회 계정 | 매장 4 · Meta `act_4384942328316978`(connected) |
+| 기간 | 주간 점검 1회차(이용 주 2026-10-05): 분석 주 2026-09-28~10-04 · 그 전주 2026-09-21~09-27 |
+| 활성 상태 필터 | 없음 — 광고 단위 성과(`level=ad`)에서 해당 기간에 노출된 광고만 대상. 그 기간에 노출되지 않은 영상 광고는 처음부터 조회 대상이 아님 |
+| ‘9월 전환광고’ 소재 형식 | 저장된 결과에 `video`로 기록됨(소재에 영상 ID가 있거나 형식이 VIDEO일 때만 이렇게 기록). 썸네일만 분석 |
+| 해당 광고 video_id | **미조회** — 주간 점검이 형식만 남기고 영상 ID는 저장하지 않았고(이번에 저장하도록 수정 · 미배포), 이후 Meta에 별도로 조회하지 않음. 조회 실패도 아니고, 영상 부재 확인도 아님 |
+| 이전 보고가 틀린 이유 | 이 문서 4장의 ‘이미지 기반으로 기록됨’이 저장 결과와 다른 잘못된 기록이었고, 6장 드라이런 설명이 이를 근거로 ‘영상 광고가 없어’라고 적음. 실제 조회 없이 쓴 문장 — 정정함 |
+| 다음 확인(무료 · 읽기만) | `ai-weekly-review` 재배포 뒤 다음 점검 결과에 `video_id`가 남거나, `ad-video-source` 배포 뒤 해당 광고의 원본 주소 확인. 원본을 못 받으면 8-3의 직접 제공 방식 |
+
+### 8-2. 광고를 수정하지 않는 AI 검증 — 정책 비교
+
+- 운영자 검증(`action: "verify"`)에 `compare_policy: true` 추가(미배포). **한 번의 요청**에서 스냅샷(기간 · 지표 · 소재 · 이미지)을 한 번만 만들고, 같은 입력에 이전 지시문과 새 지시문(정책 · 사례 포함)을 각각 1회 돌림.
+- 같은 입력이었는지는 두 결과의 `input_fingerprint`(기간 · 지표 · 소재 문구 · 영상 ID · 노출 위치의 SHA-256)가 같은지로 확인. 이미지는 한 번 받은 것을 두 호출이 공유.
+- 기간 고정: `weeks: { current, previous }`(7일씩 · 연속 · 끝난 주만). 나중에 다시 돌려도 같은 주를 쓸 수 있음. 단, Meta 귀속 지표가 늦게 바뀌면 지문이 달라지므로 비교는 한 요청 안의 두 결과끼리만 한다.
+- 주간 이용 횟수: 운영자 검증은 `ai_weekly_reviews`(주 1회 이용)를 건드리지 않고 `ai_weekly_verifications`에만 저장 — 사용자의 이번 주 점검 횟수는 그대로.
+- 시크릿 `AI_POLICY_VERSION`과 무관하게 동작 → **정책 비교만 할 거라면 시크릿 설정은 필요 없음**(7-1의 시크릿 항목은 사용자 주간 점검에 새 정책을 켤 때만).
+- 통제: 허용 사용자 · 1회 상한(최악 비용 = 호출 수 × 입력 2만 토큰 + 출력 상한) · 월 한도를 호출 전에 검사.
+- 요청 예: `{ action: "verify", store_id: 4, compare_policy: true, effort: "medium", weeks: { current: { since: "2026-09-28", until: "2026-10-04" }, previous: { since: "2026-09-21", until: "2026-09-27" } }, label: "policy-compare" }` → 호출 2회 · 저장 2행(`policy-compare:policy_off`, `policy-compare:policy_on`).
+
+### 8-3. 직접 제공한 영상으로 검증
+
+- `launchroas/video-verify.html`(운영자 전용 · 메뉴에 연결하지 않음 · `noindex`): 파일 선택 → 브라우저에서 프레임 추출(파일은 서버로 보내지 않음) → 프레임 미리보기 → **드라이런**(`verify_video` + `dry_run: true`, AI 호출 · 저장 없음) → 동의 체크 후 **실제 분석 1회**.
+- 음성 전사 칸은 비워 두면 결과에 ‘음성 미확인’이 강제됨.
+- 같은 로그인 세션 사용(같은 주소의 LaunchROAS에서 로그인). 로컬에서 화면이 열리고 로그인 · 매장 ID를 읽는 것까지 확인. 함수가 배포되지 않아 서버 호출은 아직 할 수 없음.
+- 6장의 경쟁사 영상 드라이런은 **처리 경로 검증**(추출 · 요청 구성 · 출력 검사)일 뿐이며, 사용자 광고 영상 분석 검증이 아님.
+
+### 8-4. 리뷰 안내 (현재 커밋 기준)
+
+기준: 미리보기 브랜치 `preview/launchroas-apple`(master 대비) + 운영 메인 호환 브랜치 `compat/main-adlog-parity`(0a3c764). 작업 트리의 `supabase/migrations/20260921230000_ad_margin_links.sql` 수정은 이 작업과 무관 — 리뷰 · 커밋 대상 아님.
+
+| 검토 영역 | 파일 | 볼 점 |
+|---|---|---|
+| 새 정책 연결 | `supabase/functions/_shared/ai-policy.mjs` · `ai-weekly-core.mjs`(`batchContent` · `parseBatch` · `pinnedWeeks`) · `ai-weekly-review/index.ts`(`SYSTEM` · `POLICY` · `verify`) · `tests/ai-policy.test.mjs` | 시크릿 없으면 기존 지시문 그대로 · 사례는 새 지시문에만 · 비교 시 두 변형 입력 동일(지문) · 고정 기간 검사 |
+| verify_video 권한 · 예산 | `ai-weekly-review/index.ts`(`verifyVideo` · `monthSpent` · `VERIFY_CAP_USD` · 요청 처리부의 로그인 · action 목록) | 로그인(withSupabase) → 허용 목록 → 입력 검사 → dry_run은 키 · 예산 확인 전에 끝나고 저장 없음 → 키 → 1회 상한 → 월 한도 → 호출 · 저장 순서 |
+| 영상 입력 · 출력 검증 | `_shared/ai-video-core.mjs`(`prepareVideoVerify` · `finishVideoVerify` · `validateVideoOutput`) · `launchroas/video-frames.js` · `launchroas/video-verify.html` · `scripts/video-review-dryrun.mjs` · `tests/ai-video-core.test.mjs` | 광고 ID · 프레임 수 · 형식 · 크기 · 시각 순서 · 전사 길이 제한 · 본 프레임 밖 시간대 · 전사 없는 음성 언급 거절 · 브라우저와 서버의 프레임 계획 일치 |
+| 광고 기록 계산 | `launchroas/adlog-core.js` · `adlog-change-core.js` · `adlog.js` · `adlog-meta.js` · `launchroas/adlog-core.test.js` · `adlog-ui.test.js` | 확정 중복(계정 · 날짜 · 범위 · 금액) · 외화 환율 · 사용자 선택 우선 · 관찰과 판단 분리 · 최신 결과 기준 요약 · 기간 중복 제거 |
+| 운영 메인 호환 | `compat/main-adlog-parity`: `adlog-core.js` · `store.js` · `tools.js` · `index.html` · `tests/open-beta-simplification.test.js` | 변경 기록이 합계에 안 섞임 · 선택 조회 실패 시 ‘미확정’ · 다시 불러오기 · ₩NaN 없음 |
+| 검증 보조(배포 안 함) | `scripts/local-readonly-server.js` · `scripts/verify-adlog-cross-screen.js` | 쓰기 차단 범위 · 두 화면을 같은 모의 DB로 묶는 방식 |
+
+실행할 검증 명령(유료 호출 · 원격 변경 없음):
+
+```sh
+# 미리보기 브랜치 전체 테스트
+node --test tests/*.test.js tests/*.test.mjs launchroas/*.test.js
+# 함수 형식 검사(배포 아님)
+npx --yes deno check supabase/functions/ai-weekly-review/index.ts supabase/functions/ad-video-source/index.ts
+# 영상 처리 드라이런(프레임 폴더 필요 — video-verify.html 또는 video-frames.js로 뽑은 0.0.jpg … 형식)
+node scripts/video-review-dryrun.mjs <frames-dir> --ad=<광고ID>
+# 두 화면 연결 모의 검증(운영 메인 호환 브랜치를 임시 작업 트리로)
+git worktree add ../main-parity-wt compat/main-adlog-parity
+node scripts/verify-adlog-cross-screen.js ../main-parity-wt
+git worktree remove ../main-parity-wt
+# 운영 메인 호환 브랜치 자체 테스트(작업 트리를 지우기 전에)
+#   cd ../main-parity-wt && node --test tests/*.test.js
+```

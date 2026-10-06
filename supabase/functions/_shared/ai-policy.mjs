@@ -94,3 +94,16 @@ export function casesBlock(adId, ids) {
 }
 
 export function policyOn(env) { return env("AI_POLICY_VERSION") === POLICY_VERSION; }
+
+// 정책 비교(운영자 검증 compare_policy) — 같은 입력에 이전 지시문 · 새 지시문을 나란히 돌린다. 시크릿(AI_POLICY_VERSION)과 무관
+export function policyVariants(basePrompt) {
+  return [
+    { key: "policy_off", system: basePrompt, withCases: false, meta: { policy_version: null, playbook_version: null } },
+    { key: "policy_on", system: policySystemPrompt(basePrompt), withCases: true, meta: { policy_version: POLICY_VERSION, playbook_version: PLAYBOOK_VERSION } },
+  ];
+}
+export function casesForAds(ads, peers) {
+  const m = {};
+  for (const a of ads) m[a.ad_id] = selectCases(a, peers);
+  return m;
+}
