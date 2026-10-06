@@ -262,6 +262,9 @@ function makeSupabase(opts){
     q.order = () => q;
     q.maybeSingle = () => { single = true; return q; };
     q.then = (res, rej) => Promise.resolve().then(() => {
+      if (tableName === 'tool_records' && filters.tool_type === 'ad_log_decision' && opts.failDecisions) {
+        return { data: null, error: { message: '선택 조회 실패(테스트)' } };
+      }
       if (opts.errorTables && opts.errorTables.includes(tableName)) {
         return { data: null, error: { message: '강제 조회 오류(테스트)' } };
       }
@@ -1897,4 +1900,24 @@ test('광고 기록(운영 · 미리보기 합계 일치): 저장된 선택이 �
   assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩34,000');
   assert.match(env.doc.getElementById('adlogSumNote').textContent, /중복 가능 1건 포함 · 선택 필요/);
   assert.match(env.doc.getElementById('adlogTbody').innerHTML, /중복 가능 · 합계 포함 중 · 선택은 LaunchROAS 광고 기록에서/);
+});
+
+test('광고 기록(운영 메인): 선택 조회 실패는 저장된 선택 없음과 구분 — 합계 미확정 · 다시 불러오기 → 성공하면 선택 반영', async () => {
+  const fx = parityFixture([{ record_id: 31, store_id: '1', include: false, decided_at: '2026-10-06T00:00:00Z' }]);
+  fx.failDecisions = true;
+  const env = await boot(fx);
+  await settle(); env.sandbox.launchdeskAdlog.render();
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩34,000 (미확정)');
+  assert.match(env.doc.getElementById('adlogSumNote').textContent, /선택을 불러오지 못해 합계 미확정/);
+  const note = env.doc.getElementById('adlogSumNote');
+  const retry = (note.children || note.childNodes || []).find((x) => x && x.textContent === '다시 불러오기');
+  assert.ok(retry, '다시 불러오기 버튼');
+  fx.failDecisions = false;
+  retry.click ? retry.click() : retry.dispatchEvent({ type: 'click' });
+  await settle(); await settle(); env.sandbox.launchdeskAdlog.render();
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩24,000');
+  assert.doesNotMatch(env.doc.getElementById('adlogSumNote').textContent, /미확정/);
+  const none = await boot(parityFixture([]));
+  await settle(); none.sandbox.launchdeskAdlog.render();
+  assert.equal(none.doc.getElementById('adlogSumSpend').textContent, '₩34,000', '저장된 선택이 없던 경우는 미확정이 아니다');
 });

@@ -190,7 +190,8 @@ test('이미 external_store_id가 NULL인 store를 해제해도 정상 동작(st
 
 // ===== 2) 실제 소스 구조 검증 ================================================
 const MIGRATION_PATH = path.join(ROOT, 'supabase', 'migrations', '20260922120000_cafe24_disconnect.sql');
-const MIGRATION_SRC = fs.readFileSync(MIGRATION_PATH, 'utf8');
+// CRLF로 체크아웃·커밋된 파일도 LF와 같은 내용으로 검사한다(SQL 내용은 바꾸지 않음).
+const MIGRATION_SRC = fs.readFileSync(MIGRATION_PATH, 'utf8').replace(/\r\n/g, '\n');
 const FN_SRC = fs.readFileSync(
   path.join(ROOT, 'supabase', 'functions', 'cafe24-disconnect', 'index.ts'),
   'utf8'

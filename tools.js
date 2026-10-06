@@ -915,7 +915,8 @@
       return { totalSpend: scoped.reduce(function(s, r){ return s + (Number(r.spend) || 0); }, 0), averageRoas: revSpend > 0 ? revTotal / revSpend : null,
         best: withRevenue.slice().sort(function(a, b){ return adlogRoas(b) - adlogRoas(a); })[0] || null };
     })();
-    document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(sum.totalSpend).toLocaleString('ko-KR');
+    var decisionsFailed = !!(AC && window.launchdeskStore && window.launchdeskStore.isAdlogDecisionsFailed && window.launchdeskStore.isAdlogDecisionsFailed());
+    document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(sum.totalSpend).toLocaleString('ko-KR') + (decisionsFailed ? ' (미확정)' : '');
     document.getElementById('adlogSumRoas').textContent = sum.averageRoas != null ? sum.averageRoas.toFixed(1) + 'x' : '—';
     document.getElementById('adlogSumBest').textContent = sum.best ? (sum.best.name + ' (' + sum.best.date + ')') : '—';
     // 합계 상태 — 미결 중복 · 환율 없는 외화 · 확정 중복/선택 제외 건수(선택 UI는 LaunchROAS 광고 기록)
@@ -926,7 +927,13 @@
       if(ex && ex.duplicate) notes.push('확정 중복 ' + ex.duplicate + '건 제외');
       if(ex && ex.chosen) notes.push('선택으로 제외 ' + ex.chosen + '건');
       if(ex && ex.currency) notes.push('환율 없는 외화 ' + ex.currency + '건 제외');
-      noteEl.textContent = notes.join(' · ');
+      noteEl.textContent = (decisionsFailed ? '포함 · 제외 선택을 불러오지 못해 합계 미확정(기본 판정으로 계산) · ' : '') + notes.join(' · ');
+      if(decisionsFailed){
+        var retry = document.createElement('button');
+        retry.type = 'button'; retry.className = 'btn btn-sm'; retry.id = 'adlogDecisionRetry'; retry.textContent = '다시 불러오기';
+        retry.addEventListener('click', function(){ window.launchdeskStore.reloadAdlogDecisions(); });
+        noteEl.appendChild(retry);
+      }
     }
   }
   window.launchdeskAdlog = { render: renderAdlog };
