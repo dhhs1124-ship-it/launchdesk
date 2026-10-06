@@ -39,21 +39,24 @@
   function shortMoney(v,cur){
     if(v==null||!Number.isFinite(Number(v)))return '—';var n=Number(v);
     if(!cur||cur==='KRW'){var a=Math.abs(n);return a>=1e8?(Math.round(n/1e7)/10)+'억원':a>=1e4?(Math.round(n/1e3)/10)+'만원':Math.round(n).toLocaleString('ko-KR')+'원';}
-    try{return new Intl.NumberFormat('en-US',{style:'currency',currency:cur,maximumFractionDigits:Math.abs(n)>=100?0:2}).format(n);}catch(e){return Math.round(n)+' '+cur;}
+    try{return new Intl.NumberFormat('en-US',{style:'currency',currency:cur,minimumFractionDigits:0,maximumFractionDigits:Math.abs(n)>=100?0:2}).format(n);}catch(e){return Math.round(n)+' '+cur;}
   }
   function koText(text){
     if(text==null)return '';
     return String(text)
+      .replace(/\((?:title|body|cta|description|link_domain)\)/g,'').replace(/\(null\)/g,'').replace(/null입니다/g,'없습니다').replace(/null이고/g,'비어 있고')
+      .replace(/구매당 지출/g,'구매당 광고비').replace(/\bCTR\b/g,'클릭률').replace(/\bCPC\b/g,'클릭당 비용').replace(/\bCPM\b/g,'1,000회 노출당 비용').replace(/spend\s*[÷\/]\s*purchases,?\s*/g,'')
       .replace(/funnel_ratio_usable\s*=\s*false/g,'전환 단계 비율 계산 불가').replace(/funnel_ratio_usable\s*=\s*true/g,'전환 단계 비율 계산 가능')
       .replace(/\b(?:metrics_current|metrics_previous|change|creative|peers)\.[a-z_]+(?:\.[a-z_]+)*/g,metricName)
       .replace(/\b([A-Z][A-Z_]{3,})\b/g,function(m){return CODES[m]||m;})
-      .replace(/\b([a-z]+(?:_[a-z]+)+|attribution|roas|peers)\b/g,function(m){return m==='roas'?'ROAS':m==='peers'?'비교 광고':LABELS[m]||m;})
+      .replace(/\b([a-z]+(?:_[a-z]+)+|attribution|roas|peers|title|body|cta|spend|purchases)\b/g,function(m){return m==='roas'?'ROAS':m==='peers'?'비교 광고':LABELS[m]||m;})
+      .replace(/\bnull\b/g,'없음').replace(/\(\s*\)/g,'')
       .replace(/(클릭 후|조회 후|영상 참여 후) (\d+)일/g,'$1 $2일');
   }
   // 근거 값 → 화면 표시
   function formatValue(path,v,cur){
     var key=String(path||'').split('.').pop();
-    if(v===null||v===undefined||v==='')return '없음';
+    if(v===null||v===undefined||v==='')return /^creative\./.test(path)?(LABELS[key]||'소재 정보')+' 없음':'없음';
     if(typeof v==='boolean')return v?'예':'아니오';
     if(typeof v==='string')return koText(v);
     if(/^change\./.test(path)&&key==='pct')return (v>0?'+':'')+v+'%';
@@ -63,7 +66,7 @@
     if(key==='frequency')return v+'회';
     return Number(v).toLocaleString('ko-KR');
   }
-  var VERDICT={'개선 필요':{label:'점검',tone:'check',rank:0},'판단 보류':{label:'판단 보류',tone:'hold',rank:1},'유지':{label:'유지',tone:'keep',rank:2}};
+  var VERDICT={'개선 필요':{label:'우선 확인',tone:'check',rank:0},'판단 보류':{label:'판단 보류',tone:'hold',rank:1},'유지':{label:'유지',tone:'keep',rank:2}};
   function verdictView(v){return VERDICT[v]||{label:'분석 없음',tone:'none',rank:3};}
   // 핵심 변화 한 줄 — 실제 지표로만(구매 · ROAS, 부족하면 광고비)
   function changeLine(a,cur){
@@ -74,6 +77,45 @@
     if(c.roas!=null&&p.roas!=null)parts.push('ROAS '+r(p.roas)+'→'+r(c.roas));
     if(parts.length<2&&c.spend!=null&&p.spend>0)parts.push('광고비 '+(c.spend>=p.spend?'+':'')+Math.round((c.spend-p.spend)/p.spend*100)+'%');
     return parts.length?parts.join(' · '):'전주와 비교할 지표 없음';
+  }
+  // 목록 핵심 숫자: 구매 변화 / 광고비 변화 / 현재 ROAS
+  function keyLine(a,cur){
+    var c=a&&a.current||{},p=a&&a.previous,parts=[];
+    var roas='ROAS '+(c.roas==null?'미측정':Math.round(c.roas*100).toLocaleString('ko-KR')+'%');
+    var buy=function(x){return x==null?'미측정':x+'건';};
+    if(!p)return ['신규 광고','광고비 '+shortMoney(c.spend,cur),'구매 '+buy(c.purchases),roas].join(' / ');
+    parts.push(c.purchases!=null&&p.purchases!=null?'구매 '+p.purchases+'→'+c.purchases+'건':'구매 '+buy(c.purchases));
+    parts.push(c.spend!=null&&p.spend>0?'광고비 '+(c.spend>=p.spend?'+':'')+Math.round((c.spend-p.spend)/p.spend*100)+'%':'광고비 '+shortMoney(c.spend,cur));
+    parts.push(roas);
+    return parts.join(' / ');
+  }
+  // 권장 행동 한 줄 — 유지 · 판단 보류는 판정 그대로(수정안을 억지로 권하지 않음), 우선 확인은 AI 다음 행동의 첫 문장
+  function actionLine(an){
+    if(!an)return 'AI 분석 결과 없음';
+    if(an.verdict==='유지')return '현재 광고 유지';
+    if(an.verdict==='판단 보류')return '데이터를 더 쌓은 뒤 판단';
+    return koText(String(an.next_action||'').split(/(?<=[.!?])\s+/)[0]);
+  }
+  // 근거 설명 줄이기 — 위에 보인 값만 다시 말하는 문장 · "단정하지 않음" 같은 반복 문장은 빼고 최대 2문장
+  function trimNote(note,shown){
+    var flat=function(x){return String(x).replace(/\s/g,'');},key=flat(shown).slice(-6,-1),out=[];
+    String(note||'').replace(/^[^:]{2,40}:\s*/,function(m){return flat(m).indexOf(flat(shown).slice(0,6))===0?'':m;})
+      .split(/(?<=[.!?])\s+/).forEach(function(s){
+        var nums=s.match(/\d+(?:\.\d+)?/g)||[];
+        if(!s.trim()||/단정하지(는)? 않/.test(s))return;
+        if(nums.length&&nums.every(function(n){return String(shown).indexOf(n)>=0;}))return;
+        if(!nums.length&&key.length>=4&&flat(s).indexOf(key)>=0)return;
+        out.push(s.trim());
+      });
+    return out.slice(0,2).join(' ');
+  }
+  // 확인 사항 — 실제 지표의 데이터 상태로만
+  function checkLine(a){
+    var c=a&&a.current||{},out=[];
+    if(c.funnel_note==='LPV_EXCEEDS_LINK_CLICKS')out.push('랜딩 조회 집계 기준 확인');
+    else if(c.funnel_note==='LPV_NOT_OBSERVED')out.push('랜딩 페이지 조회 측정 설정 확인');
+    if(c.purchases==null)out.push('구매 측정 설정 확인');else if(c.purchases<3)out.push('구매 3건 미만 · 표본 부족');
+    return out.join(' · ');
   }
   function numbersLine(a,cur){
     var c=a&&a.current||{};
@@ -86,7 +128,7 @@
       return a.rank-b.rank||((x.analysis&&x.analysis.priority)||9)-((y.analysis&&y.analysis.priority)||9)||((y.current&&y.current.spend)||0)-((x.current&&x.current.spend)||0);
     });
   }
-  return {metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
+  return {trimNote:trimNote,keyLine:keyLine,actionLine:actionLine,checkLine:checkLine,metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
 });
 
 
@@ -130,80 +172,94 @@
     wrap.appendChild(el('small','wk-foot','계정당 주 1회 · 한국 시간 월요일 00시 갱신(다음 '+day(w.next)+') · 위의 기간 선택과 관계없이 지난주 고정'));
     return wrap;
   }
+  // 지표 도움말 — 누를 때만 보이는 짧은 설명(브라우저 기본 팝오버)
+  var HELP={'클릭률':'링크 클릭 ÷ 노출. 광고를 본 사람 중 링크를 누른 비율이에요.','ROAS':'Meta가 광고에 귀속한 구매금액 ÷ 광고비. Cafe24 실제 매출과 다른 값이에요.',
+    '랜딩 페이지 조회':'광고를 누른 뒤 페이지가 열린 횟수(Meta 픽셀 집계). 집계 방식이 달라 링크 클릭보다 많게 나올 수 있어요.',
+    '귀속 기준':'Meta가 구매를 광고 성과로 인정하는 기간이에요(예: 클릭 후 7일, 조회 후 1일).','빈도':'한 사람에게 평균 몇 번 보였는지예요.',
+    '클릭당 비용':'광고비 ÷ 링크 클릭.','구매당 광고비':'광고비 ÷ 구매 수.','결제 시작률':'장바구니 중 결제를 시작한 비율이에요.'},helpSeq=0;
+  function withHelp(label){
+    var wrap=el('span','term',label),term=Object.keys(HELP).find(function(k){return label.indexOf(k)>=0;});
+    if(!term||!('popover' in HTMLElement.prototype))return wrap;
+    var id='termHelp'+(++helpSeq),b=el('button','help');b.type='button';b.setAttribute('popovertarget',id);b.setAttribute('aria-label',term+' 설명');
+    b.innerHTML='<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r=".6" class="dot"/></svg>';
+    var pop=el('div','help-pop');pop.id=id;pop.setAttribute('popover','');pop.append(el('strong','',term),el('p','',HELP[term]));
+    wrap.append(b,pop);return wrap;
+  }
   function renderResult(r,status){
     var frag=el('div','wk-result'),s=r.summary||{},c=s.cafe24&&s.cafe24.current,m=s.meta||{},ep=s.expected_profit||{},cur=m.currency;
     var last=el('p','wk-last');
     last.append(el('span','wk-last-label','지난주'),el('span','','주문 '+(c?won(c.gross_sales_krw):'—')),el('span','','광고비 '+I.money(m.current&&m.current.spend,cur)),
-      el('span','','예상 남은 금액 '+won(ep.current)+(ep.partial?'(일부 상품)':'')));
+      el('span','','광고비 차감 후 예상 이익 '+won(ep.current)+(ep.partial?' (일부 상품 기준)':'')));
     frag.appendChild(last);
     var list=I.orderAds(r.ads),shown=ui.all?list:list.slice(0,3);
-    var h=el('div','wk-list-head');h.append(el('h3','',list.length?'이번 주 먼저 확인할 광고 '+shown.length+'개':'분석한 광고가 없어요'));
+    var need=list.filter(function(a){return a.analysis&&a.analysis.verdict==='개선 필요';}).length;
+    var h=el('div','wk-list-head');
+    h.append(el('h3','',list.length?'점검 결과 '+list.length+'개':'분석한 광고가 없어요'));
+    if(list.length)h.appendChild(el('span','wk-need'+(need?' is-warn':''),need?'우선 확인 '+need+'개':'우선 확인할 광고 없음'));
     if(status==='partial')h.appendChild(el('span','wk-partial','일부만 분석됨'));
     frag.appendChild(h);
-    var ol=el('ol','wk-ads');
-    shown.forEach(function(a,i){ol.appendChild(renderAd(a,i,cur));});
-    frag.appendChild(ol);
-    if(list.length>3){var more=el('button','wk-all',ui.all?'접기 ↑':'분석한 광고 전체 '+list.length+'개 보기 ↓');more.type='button';more.addEventListener('click',function(){ui.all=!ui.all;render();});frag.appendChild(more);}
+    var ol=el('ul','wk-ads');shown.forEach(function(a){ol.appendChild(renderAd(a,cur));});frag.appendChild(ol);
+    if(list.length>3){var more=el('button','wk-all',ui.all?'접기 ↑':'점검 결과 전체 '+list.length+'개 보기 ↓');more.type='button';more.addEventListener('click',function(){ui.all=!ui.all;render();});frag.appendChild(more);}
     var cov=r.coverage||{},notes=(r.notes||[]).map(I.koText).concat((cov.skipped||[]).map(function(x){return (x.ad_name||'광고')+' — '+I.koText(x.reason);}));
     var basis=el('details','wk-basis');basis.appendChild(el('summary','','분석 범위 · 기준 (광고 '+(cov.total||0)+'개 중 '+(cov.analyzed||0)+'개 분석)'));
     var ul=el('ul');notes.forEach(function(t){ul.appendChild(el('li','',t));});basis.appendChild(ul);frag.appendChild(basis);
     return frag;
   }
-  function renderAd(a,i,cur){
-    var an=a.analysis,v=I.verdictView(an&&an.verdict),li=el('li','wk-ad'+(ui.open===a.ad_id?' is-open':''));
-    var row=el('button','wk-ad-row');row.type='button';row.setAttribute('aria-expanded',ui.open===a.ad_id?'true':'false');
-    var main=el('span','wk-ad-main');
-    main.append(el('strong','wk-ad-name',a.ad_name||'이름 없는 광고'),el('span','wk-change',I.changeLine(a,cur)),el('span','wk-next',an?I.koText(an.next_action):'AI 분석 결과가 없어요(재시도 대상)'));
-    row.append(el('span','wk-rank',String(i+1)),el('span','wk-badge '+v.tone,v.label),main,el('span','wk-nums',I.numbersLine(a,cur)),el('span','wk-more',ui.open===a.ad_id?'접기':'상세'));
-    row.addEventListener('click',function(){ui.open=ui.open===a.ad_id?null:a.ad_id;render();});
-    li.appendChild(row);
-    if(ui.open===a.ad_id&&an)li.appendChild(renderDetail(a,an,v,cur));
+  function renderAd(a,cur){
+    var an=a.analysis,v=I.verdictView(an&&an.verdict),open=ui.open&&ui.open.id===a.ad_id?ui.open.panel:null,li=el('li','wk-ad'+(open?' is-open':''));
+    var head=el('div','wk-ad-head');head.append(el('strong','wk-ad-name',a.ad_name||'이름 없는 광고'),el('span','wk-badge '+v.tone,v.label));
+    var check=I.checkLine(a);
+    li.append(head,el('p','wk-key',I.keyLine(a,cur)));
+    var act=el('p','wk-line');act.append(el('span','wk-k','권장 행동'),el('span','',I.actionLine(an)));li.appendChild(act);
+    if(check){var ck=el('p','wk-line');ck.append(el('span','wk-k','확인 사항'),el('span','',check));li.appendChild(ck);}
+    if(an){
+      var tabs=el('div','wk-tabs');
+      var tab=function(key,label){var b=el('button','wk-tab',label);b.type='button';b.setAttribute('aria-expanded',open===key?'true':'false');
+        b.addEventListener('click',function(){ui.open=open===key?null:{id:a.ad_id,panel:key};render();});tabs.appendChild(b);};
+      tab('why','판단 근거');if(an.recommendation)tab('test','테스트 제안');
+      li.appendChild(tabs);
+      if(open==='why')li.appendChild(renderWhy(a,an,cur));
+      if(open==='test'&&an.recommendation)li.appendChild(renderTest(an,v));
+    }
     return li;
   }
-  function section(title){var s=el('section','wk-sec');s.appendChild(el('h4','',title));return s;}
-  function renderDetail(a,an,v,cur){
-    var box=el('div','wk-detail');
-    // 1. 판단 이유
-    var why=section('판단 이유');why.appendChild(el('p','wk-lead',I.koText(an.headline)));
-    var dl=el('dl','wk-ev');
-    (an.evidence||[]).slice(0,5).forEach(function(e){
-      var dd=el('dd');dd.append(el('strong','',I.formatValue(e.metric,e.value,cur)));if(e.note)dd.appendChild(el('small','',I.koText(e.note)));
-      dl.append(el('dt','',I.metricName(e.metric)),dd);
+  // 판단 근거 — 근거 지표와 원인 가설만(목록에 이미 나온 행동 · 숫자는 반복하지 않음)
+  function renderWhy(a,an,cur){
+    var box=el('div','wk-panel'),dl=el('dl','wk-ev');
+    (an.evidence||[]).filter(function(e){return !/^peers\./.test(e.metric);}).slice(0,4).forEach(function(e){
+      var dd=el('dd'),shown=I.formatValue(e.metric,e.value,cur),note=I.trimNote(I.koText(e.note),shown);dd.appendChild(el('strong','',shown));if(note)dd.appendChild(el('small','',note));
+      var dt=el('dt');dt.appendChild(withHelp(I.metricName(e.metric)));dl.append(dt,dd);
     });
-    why.appendChild(dl);
-    if(an.funnel&&an.funnel.stage&&an.funnel.stage!=='문제 없음')why.appendChild(el('p','wk-sub','의심 구간: '+an.funnel.stage+(an.funnel.evidence?' — '+I.koText(an.funnel.evidence):'')));
-    box.appendChild(why);
-    // 2. 지금 할 일
-    var todo=section('지금 할 일');todo.appendChild(el('p','wk-lead',I.koText(an.next_action)));
-    var checks=(an.hypotheses||[]).map(function(h){return h.check;}).filter(Boolean).slice(0,3);
-    if(checks.length){var ul=el('ul','wk-checks');checks.forEach(function(t){ul.appendChild(el('li','',I.koText(t)));});todo.appendChild(ul);}
-    if(an.budget_note)todo.appendChild(el('p','wk-sub','예산: '+I.koText(an.budget_note)));
-    box.appendChild(todo);
-    // 3. 변경 예시와 테스트 — 변경안이 없으면 만들지 않는다
-    var ch=section('변경 예시와 테스트'),rec=an.recommendation;
-    if(rec){
-      var g=el('dl','wk-rec');
-      var add=function(k,t){if(t){g.append(el('dt','',k),el('dd','',I.koText(t)));}};
-      add('현재',rec.current);add('바꿔 볼 것',rec.proposed);
-      if(rec.example){g.append(el('dt','',rec.example_is_provisional?'수정 예시 (정보 확인 전 임시)':'수정 예시'));var ex=el('dd','wk-example',rec.example);g.appendChild(ex);}
-      if(rec.needs_info&&rec.needs_info.length)add('먼저 확인할 정보',rec.needs_info.join(' / '));
-      var t=rec.test||{};
-      add('테스트 방법',t.method);
-      if(t.compare_metrics&&t.compare_metrics.length)add('비교 지표',t.compare_metrics.map(function(x){return /^[a-z_]+$/.test(x)?I.metricName(x):x;}).join(', '));
-      add('판단 기준',t.decision_rule);add('필요한 표본',t.sample_note);
-      ch.appendChild(g);
-    }else ch.appendChild(el('p','wk-sub',v.tone==='hold'?'표본이 작아 변경안을 만들지 않았어요. 데이터가 더 쌓인 뒤 다시 확인해요.':'지금은 바꿀 것을 권하지 않았어요. 현재 광고를 유지하며 지켜봐요.'));
-    box.appendChild(ch);
-    // 분석 전문 — 기본은 접힘
-    var full=el('details','wk-full');full.appendChild(el('summary','','분석 전문 보기'));
-    var fl=el('dl','wk-rec');
-    var addf=function(k,t){if(t){fl.append(el('dt','',k),el('dd','',I.koText(t)));}};
-    addf('전주 대비',an.changes);addf('비교 광고',an.peers);
-    (an.hypotheses||[]).forEach(function(h,i){addf('원인 가설 '+(i+1),h.text+(h.basis?' · 근거: '+h.basis:'')+(h.check?' · 확인: '+h.check:''));});
-    addf('판단 한계',(an.limits||[]).join(' / '));
-    addf('분석 범위',(a.scope&&a.scope.label?a.scope.label:'')+(a.creative&&a.creative.notes&&a.creative.notes.length?' · '+a.creative.notes.join(' / '):''));
+    box.appendChild(dl);
+    var hyp=(an.hypotheses||[]).slice(0,3);
+    if(hyp.length){
+      box.appendChild(el('h4','','원인 가설'));var ol=el('ol','wk-hyp');
+      hyp.forEach(function(h){var li=el('li');li.appendChild(el('span','',I.koText(h.text)));if(h.check)li.appendChild(el('small','','확인: '+I.koText(h.check)));ol.appendChild(li);});
+      box.appendChild(ol);
+    }
+    if(an.peers)box.appendChild(el('p','wk-sub','비교: '+I.koText(an.peers)));
+    if(an.budget_note)box.appendChild(el('p','wk-sub','예산: '+I.koText(an.budget_note)));
+    var full=el('details','wk-full');full.appendChild(el('summary','','분석 전문'));
+    var fl=el('dl','wk-rec'),add=function(k,t){if(t){fl.append(el('dt','',k),el('dd','',I.koText(t)));}};
+    add('판단 요약',an.headline);add('전주 대비',an.changes);add('의심 구간',an.funnel&&an.funnel.stage?an.funnel.stage+(an.funnel.evidence?' — '+an.funnel.evidence:''):'');
+    add('판단 한계',(an.limits||[]).join(' / '));
+    add('분석 범위',(a.scope&&a.scope.label?a.scope.label:'')+(a.creative&&a.creative.notes&&a.creative.notes.length?' · '+a.creative.notes.join(' / '):''));
     full.appendChild(fl);box.appendChild(full);
     return box;
+  }
+  // 테스트 제안 — 유지 광고면 현재 광고를 바꾸지 않는 선택 사항으로
+  function renderTest(an,v){
+    var rec=an.recommendation,t=rec.test||{},box=el('div','wk-panel'),g=el('dl','wk-rec');
+    if(v.tone==='keep')box.appendChild(el('p','wk-sub wk-optional','현재 광고는 그대로 두고, 새 광고로 비교해 볼 수 있는 선택 사항이에요.'));
+    var add=function(k,txt){if(txt){g.append(el('dt','',k),el('dd','',I.koText(txt)));}};
+    add('현재',rec.current);
+    add('바꿔 볼 것',String(rec.proposed||'').replace(/^현재 광고는 유지\s*·\s*새 광고로 비교\s*[:：]\s*/,''));
+    if(rec.example){g.append(el('dt','',rec.example_is_provisional?'수정 예시 (정보 확인 전 임시)':'수정 예시'),el('dd','wk-example',rec.example));}
+    if(rec.needs_info&&rec.needs_info.length)add('먼저 확인할 정보',rec.needs_info.join(' / '));
+    add('비교 방법',t.method);
+    if(t.compare_metrics&&t.compare_metrics.length)add('비교 지표',t.compare_metrics.map(function(x){return /^[a-z_]+$/.test(x)?I.metricName(x):x;}).join(', '));
+    add('판단 기준',[t.decision_rule,t.sample_note].filter(Boolean).join(' '));
+    box.appendChild(g);return box;
   }
 
   // ---- 오른쪽 요약 ----
@@ -215,8 +271,9 @@
     row(sa,'광고비 집행 광고 세트',ads&&ads.error?'조회 실패':ads&&ads.loading||!ads?'확인 중':rows.length+'개');
     var r=wk.data&&wk.data.result,list=r?r.ads||[]:[];
     var need=list.filter(function(a){return a.analysis&&a.analysis.verdict==='개선 필요';}).length;
-    row(sa,'점검 필요 (지난주 AI)',r?need+'개':'—',need?'is-warn':'');
-    var q=wk.data&&wk.data.quota,st=wk.data&&wk.data.status;
+    row(sa,'지난주 점검 결과',r?list.length+'개':'—');
+    row(sa,'우선 확인',r?need+'개':'—',need?'is-warn':'');
+    var st=wk.data&&wk.data.status,q=wk.data&&wk.data.quota;
     row(sa,'이번 주 AI 점검',wk.busy?'진행 중':st==='completed'?'완료':st==='partial'?'일부 완료':q&&q.can_run?'아직 안 함':'—');
     var s=sales&&sales.summary,links=sales&&sales.links||[],saved={};
     links.forEach(function(l){saved[l.product_no]=1;});

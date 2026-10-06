@@ -125,13 +125,13 @@
     figures.appendChild(row('원화 광고비',ms?ms.text:spendKrw==null?'환율 입력 필요':won(spendKrw),spendNotes));
     renderSpend(mp,ms,currency,spendKrw,ctx.fx);
 
-    // 5. 광고비 빼고 남은 금액 — 필요한 값이 없으면 0원으로 표시하지 않는다.
+    // 5. 광고비 차감 후 예상 이익 — 필요한 값이 없으면 0원으로 표시하지 않는다.
     var base=margin,profitNotes=[],profit=null;
     if(base==null)profitNotes.push('마진이 연결된 판매 상품이 필요해요.');
     if(ms)profitNotes.push('광고비를 확인할 수 없어 계산하지 않았어요.');
     else if(mp&&spendKrw==null)profitNotes.push('광고비 환율이 필요해요.');
     if(base!=null&&spendKrw!=null)profit=base-spendKrw;
-    var p=row(partial?'일부 상품 기준 남은 금액':'광고비 빼고 남은 금액',profit==null?'계산 불가':won(profit),profitNotes,(profit!=null&&profit<0?'deficit ':'')+(partial?'partial':''));
+    var p=row('광고비 차감 후 예상 이익'+(partial?' (일부 상품 기준)':''),profit==null?'계산 불가':won(profit),profitNotes,(profit!=null&&profit<0?'deficit ':'')+(partial?'partial':''));
     if(profit!=null){
       p.appendChild(el('small','','상품 마진 '+won(base)+' − 원화 광고비 '+won(spendKrw)));
       if(partial)p.appendChild(el('small','sales-partial-note','미등록 '+count(s.unlinkedQty)+'의 마진 없이 광고비 전체를 뺐어요 · 쇼핑몰 전체 손익 아님'));
@@ -177,7 +177,7 @@
     if(s&&s.unlinkedList&&s.unlinkedQty)cost.items=s.unlinkedList;
     // 일부 상품만 계산되면 결과는 볼 수 있어도 완료로 표시하지 않는다(전체 손익으로 오해 방지).
     var partialResult=profit!=null&&!!(s&&s.partial);
-    var result={title:'광고비 빼고 남은 금액 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};
+    var result={title:'광고비 차감 후 예상 이익 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};
     result.text=profit!=null?(partialResult?'지금은 일부 상품 기준(판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')이에요':'전체 판매 상품 기준으로 확인할 수 있어요')
       :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
     if(profit==null&&mp&&spendKrw==null&&!ms)result.button={label:'환율 입력',run:openFx};
@@ -246,7 +246,7 @@
     });
   }
 
-  // 주문 금액 → 원가·비용 → 광고비 → 남은 금액 순서의 계산 내역(대조용).
+  // 주문 금액 → 원가·비용 → 광고비 → 예상 이익 순서의 계산 내역(대조용).
   function renderBreakdown(s,spendKrw,profit){
     var box=byId('salesBreakdown'),m=s&&s.margin;box.replaceChildren();
     box.parentElement.hidden=!(s&&s.marginTotal!=null);
@@ -257,7 +257,7 @@
       ['판매 수수료 (상품금액 · 적립금 포함 × 판매 수수료율)',m.feeSales,'−'],['PG 수수료 (적립금 · 예치금 뺀 결제분 × PG 수수료율)',m.feePg,'−'],['배송비 수수료',m.feeShip,'−'],['배송·포장·기타 (설정값 추정)',m.orderCosts,'−']];
     if(m.savedOnlyOrders)lines.push(['저장한 1개당 마진으로만 계산한 주문 '+count(m.savedOnlyOrders,'건'),m.total-computed,'+']);
     lines.push(['상품 마진',m.total,'=']);
-    if(spendKrw!=null){lines.push(['원화 광고비 (전체)',spendKrw,'−']);lines.push([s.partial?'일부 상품 기준 남은 금액':'남은 금액',profit,'=']);}
+    if(spendKrw!=null){lines.push(['원화 광고비 (전체)',spendKrw,'−']);lines.push([s.partial?'광고비 차감 후 예상 이익 (일부 상품 기준)':'광고비 차감 후 예상 이익',profit,'=']);}
     lines.forEach(function(l){var r=el('div','breakdown-row'+(l[2]==='='?' total':''));r.append(el('span','',l[2]+' '+l[0]),el('strong','',won(l[1])));box.appendChild(r);});
   }
 

@@ -100,19 +100,18 @@
       <p id="pageMessage" class="message page-message" role="status"></p>
       <div class="key-grid">
         <article class="key-card">
-          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 7h11l-.8 9.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8L4.5 7Z"/><path d="M7.5 7V5.5a2.5 2.5 0 0 1 5 0V7"/></svg>주문금액</span>
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 7h11l-.8 9.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8L4.5 7Z"/><path d="M7.5 7V5.5a2.5 2.5 0 0 1 5 0V7"/></svg>주문금액<button type="button" class="help" popovertarget="helpOrder" aria-label="주문금액 설명"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r=".6" class="dot"/></svg></button><div id="helpOrder" popover class="help-pop"><strong>주문금액</strong><p>Cafe24에 들어온 주문의 결제 금액 합계예요. 취소 · 환불 · 미입금은 빼지 않았고, 마지막 주문 동기화 이후 주문은 빠질 수 있어요.</p></div></span>
           <strong id="orderAmount" class="key-value">—</strong>
           <small id="orderNote" class="key-note">연결 상태 확인 전</small>
         </article>
         <article class="key-card">
-          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 8.5v3h2.5l6 3.5v-10l-6 3.5H3.5Z"/><path d="M14.5 7.5a3.5 3.5 0 0 1 0 5"/></svg>광고비</span>
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 8.5v3h2.5l6 3.5v-10l-6 3.5H3.5Z"/><path d="M14.5 7.5a3.5 3.5 0 0 1 0 5"/></svg>광고비<button type="button" class="help" popovertarget="helpSpend" aria-label="광고비 설명"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r=".6" class="dot"/></svg></button><div id="helpSpend" popover class="help-pop"><strong>광고비</strong><p>Meta 광고계정의 광고비예요. 외화 계정은 직접 저장한 환율로 원화로 바꿔요(일별 환율 아님).</p><strong>ROAS</strong><p>Meta가 광고에 귀속한 구매금액 ÷ 광고비예요. Cafe24 실제 매출과 다른 값이고, 구매 기록이 없으면 계산하지 않아요.</p></div></span>
           <strong id="adSpend" class="key-value">—</strong>
           <small id="adNote" class="key-note">광고계정 상태 확인 전</small>
         </article>
         <article class="key-card key-profit">
-          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="5.5" rx="5.5" ry="2.2"/><path d="M4.5 5.5v4.5c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V5.5"/><path d="M4.5 10v4.5c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V10"/></svg>예상 남은 금액<span class="key-tag">예상</span></span>
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="5.5" rx="5.5" ry="2.2"/><path d="M4.5 5.5v4.5c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V5.5"/><path d="M4.5 10v4.5c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V10"/></svg>광고비 차감 후 예상 이익<button type="button" class="help" popovertarget="helpProfit" aria-label="광고비 차감 후 예상 이익 설명"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r=".6" class="dot"/></svg></button><div id="helpProfit" popover class="help-pop"><strong>광고비 차감 후 예상 이익</strong><p id="salesFormula" class="help-formula"></p><p>비용을 저장한 상품의 판매만 계산해요.</p><ul><li>더함: 상품 판매금액(쿠폰 · 할인 반영, 취소 · 반품 제외) + 고객이 낸 배송비</li><li>뺌: 적립금 사용 · 상품 원가 · 판매 수수료 · PG 수수료 · 배송비 수수료</li><li>뺌: 택배비 · 포장비 · 기타 비용(저장한 설정값, 주문당 1회)</li><li>뺌: Meta 광고비 전체(원화 환산)</li></ul><p>세금(부가세 등) · 인건비 · 임대료 · 반품 배송비는 빼지 않았어요. 순이익이 아니에요.</p><p>비용을 저장하지 않은 상품이 팔렸으면 그 판매는 빠지고 광고비는 전체를 빼서 '일부 상품 기준'으로 표시해요.</p></div></span>
           <div class="key-amount"><strong id="salesAmount" class="key-value">—</strong><span id="salesScope" class="sales-scope" hidden>일부 상품 기준</span></div>
-          <small id="salesFormula" class="key-note"></small>
           <div id="salesChips" class="sales-chips"></div>
           <small id="salesMessage" class="key-note" role="status"></small>
         </article>
@@ -128,7 +127,6 @@
         <div class="setup-head"><h2 id="setupGuideTitle">처음 설정</h2><span id="setupProgress" class="small"></span></div>
         <ol id="setupSteps" class="setup-steps"></ol>
       </section>
-      <p class="footnote">주문금액은 Cafe24 주문 기준(취소·환불 미차감), 광고비 · ROAS는 Meta 귀속 기준이라 서로 합산하지 않아요. 예상 남은 금액은 비용을 저장한 상품 기준 추정이에요.</p>
       </div>
       <section id="adsView" hidden aria-labelledby="adPerformanceTitle">
         <div class="view-head"><h1 id="adPerformanceTitle">광고 성과</h1><p id="adsPeriodLabel" class="ov-period">운영 현황에서 선택한 기간 · Meta 귀속 기준</p></div>
