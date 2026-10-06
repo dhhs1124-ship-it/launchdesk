@@ -50,11 +50,11 @@
 |---|---|
 | 대상 | 지금 집행 중인 광고 1개(현재 주간 점검에서 분석된 광고는 ‘9월 전환광고’ 1개) — 사용자가 고른다 |
 | 바꿀 요소 | 한 가지만(예: 본문 첫 줄). 실제로 바꾼 내용을 그대로 입력 |
-| 방식 | **기존 광고 수정(전후 비교)** 을 권장 — 같은 광고의 같은 길이 전후를 비교한다. 새 광고 추가는 현재 화면이 새 광고 변경 후 ↔ 기존 광고 변경 전을 비교하므로 동시 집행 비교가 아니다(한계 표시됨) |
-| 시작일 · 비교 기간 | 수정한 날을 시작일로, 7일씩. 변경 전 7일은 저장할 때 자동 조회 |
-| 결과 확인일 | 변경 후 기간 마지막 날 + 4일 이후(최근 3일 귀속 지연 → 잠정 방지) |
+| 방식 | **기존 광고 수정(전후 비교)** 을 권장 — 같은 광고의 같은 길이 전후를 비교한다. 방식은 기본값 없이 직접 고른다. 새 광고 추가는 새 광고 변경 후 ↔ 기존 광고 변경 전 비교라 **관찰값만** 기록하고 신호 · 지출 집계에서 뺀다(9장) |
+| 시작일 · 비교 기간 | 수정한 날을 시작일로, 7일씩. 변경 전 7일은 저장할 때 자동 조회(하루라도 조회 실패 · 페이지 누락이면 저장 거절) |
+| 결과 확인일 | 변경 후 기간 마지막 날 + 8일부터(귀속 창 7일 클릭 · 노출일 보고 — 그 전은 잠정). 결과 비교 때 변경 전 · 후를 함께 다시 조회한다 |
 | 함께 바뀐 조건 | 같은 기간 예산 · 할인 · 상품 · 타깃 변경을 체크(있으면 신호를 확정하지 않음) |
-| Meta 조회 | 저장 시 약 8~10회(광고 세트 찾기 + 하루 단위 7회), 결과 비교 시 7회 — 기존 함수 · 무료 |
+| Meta 조회 | 저장 시 약 8~10회(광고 세트 찾기 + 하루 단위 7회), 결과 비교 시 14회(변경 전 · 후 재조회) — `meta-adset-insights` 재배포 후(명시 귀속) · 무료 |
 | 해석 | 결과는 ‘관찰’(구매 · 광고비 · 구매당 광고비 변화)과 ‘신호’(구매당 광고비 개선 · 악화 신호 / 판단 보류 / 판단 불가)로 나온다. 1건 · 7일 비교는 대부분 ‘판단 보류’가 예상되며, 이것은 기능 검증이지 효과 검증이 아니다 |
 | 결과 저장 | ‘결과 저장’으로 결과 기록 1건 추가 · 기존 실행 기록은 수정되지 않음을 확인 |
 
@@ -200,7 +200,7 @@ Meta 조회(무료, 기존 함수): 실행 기록 저장 약 8~10회 · 결과 �
 # 미리보기 브랜치 전체 테스트
 node --test tests/*.test.js tests/*.test.mjs launchroas/*.test.js
 # 함수 형식 검사(배포 아님)
-npx --yes deno check supabase/functions/ai-weekly-review/index.ts supabase/functions/ad-video-source/index.ts
+npx --yes deno check supabase/functions/meta-adset-insights/index.ts supabase/functions/ai-weekly-review/index.ts supabase/functions/ad-video-source/index.ts
 # 영상 처리 드라이런(프레임 폴더 필요 — video-verify.html 또는 video-frames.js로 뽑은 0.0.jpg … 형식)
 node scripts/video-review-dryrun.mjs <frames-dir> --ad=<광고ID>
 # 두 화면 연결 모의 검증(운영 메인 호환 브랜치를 임시 작업 트리로)
@@ -210,3 +210,39 @@ git worktree remove ../main-parity-wt
 # 운영 메인 호환 브랜치 자체 테스트(작업 트리를 지우기 전에)
 #   cd ../main-parity-wt && node --test tests/*.test.js
 ```
+
+## 9. 2026-10-07 수정 결과 — 광고 기록 비교 기준(v3) · 운영 메인 조회 실패 표시 (로컬 · 원격 변경 없음)
+
+### 9-1. 수정한 것
+
+| # | 문제 | 수정 | 위치 |
+|---|---|---|---|
+| 1 | 변경 전 지표가 저장 시점에 고정 → 늦게 귀속된 구매가 빠져 개선 쪽 편향 | 결과 비교 때 변경 전 · 후를 같은 명시 귀속으로 함께 다시 조회해 비교. 저장 당시 값만 있으면 관찰만 · 신호 없음(`baseline_not_refetched`). 저장 당시 값은 `saved_baseline` 이력, 재조회 값은 결과 기록 `before` | `adlog-change-core.js compare` · `adlog.js runCompare` |
+| 6 | 새 광고 비교가 신호를 냄 · 방식 기본값 new_ad | 새 광고 ↔ 기존 광고 비교는 관찰값만(`different_ads`) · 신호 · 지출 집계 제외(`observed_only_new_ad`). 방식 기본값 없음(‘선택해 주세요’) · 미선택이면 저장 거절 | `compare` · `outcomeSummary` · `buildChangeRecord` · `index.html chgMethod` |
+| 7 | 귀속 기준 고정 문자열 · 잠정 3일 | `meta-adset-insights`가 요청에 넣은 귀속 기준을 응답(`attribution`)으로 돌려준 것만 확인된 기준. 없으면 보류(`attribution_unverified`). 잠정 기간 = 귀속 창(7일 클릭 · 노출일 보고 → 변경 후 마지막 날 + 8일부터 확정) | `attributionWindowDays` · `dailyAds` · `meta-adset-insights` |
+| 8 | 변경 전 조회 실패해도 저장 · 응답에 없는 광고 0 처리 | 하루 상태 구분: ok · absent(정상 조회 · 광고 없음 = 0) · failed · truncated(페이지 누락이고 광고 없음). 실패 · 누락이 있으면 저장 거절 · 비교 안 함(`fetch_failed`) | `aggregate` · `dailyAds` · `buildChangeRecord` |
+| — | 재조회 기간이 기록된 기간과 다를 때 | 비교하지 않음(`condition_mismatch`) | `compare` |
+| — | 결과 카드 통화 표시 오류(`var cur` 재선언으로 ‘광고비 null 70000.00’) | 변수 분리 | `adlog.js changeCard` |
+| 낮음 | 기록 조회 실패가 ‘기록 없음 · ₩0’으로 보임(두 화면) | 합계 ‘—’ · ‘불러오지 못했어요’ · 다시 불러오기. 미리보기 `recordsFailed`, 운영 메인 `isAdlogFailed` · `reloadAdlogRecords` | `adlog.js` · `compat/main-adlog-parity` `store.js` · `tools.js`(d4d56c7) |
+
+판정 버전: `adlog-compare-v3` — v2 이하로 저장된 결과는 ‘이전 판정 기준’으로 따로 세고 신호에 넣지 않는다.
+
+### 9-2. 로컬 검증 결과
+
+- 미리보기 전체 테스트 776개 통과(새 회귀 테스트: 재조회 기준 · 새 광고 관찰값만 · 귀속 확인 불가 보류 · 귀속 창 잠정 경계 · 실패/누락/부재 구분 · 불완전 기준 거절 · 방식 기본값 없음 · 기록 조회 실패 · 명시 귀속 옵션)
+- 운영 메인 호환 브랜치 전체 테스트 639개 통과
+- 두 화면 모의 검증 10/10(기록 조회 실패 · 다시 불러오기 2개 추가) · 공용 DB 쓰기 0
+- `deno check` 통과: `meta-adset-insights` · `ai-weekly-review`(기존 `meta-adset-insights` 형식 오류 2건도 정리). `ad-video-source`는 수정 전부터 형식 오류 3건(`connected_accounts` 조회 결과 타입이 `never`) — 이번 범위 밖 · 미수정
+
+### 9-3. 원격 적용 항목(추가 · 승인 후)
+
+- `meta-adset-insights` 재배포 — `attribution_mode:'explicit'` 요청에만 `action_attribution_windows=["7d_click","1d_view"]` · `action_report_time=impression`을 넣고 응답에 `attribution`을 돌려준다. 다른 화면 요청은 URL · 응답 그대로.
+  재배포 전에는 응답에 `attribution`이 없어 결과 비교가 모두 ‘귀속 기준 확인 불가 · 판단 보류’로 나온다(안전한 쪽).
+- 재배포 후 무료 조회 1회로 확인: 명시 귀속 시 `actions[].value`가 지정 창 합계인지(창별 키 `7d_click` · `1d_view`가 함께 오는지), 구매 수가 기본 귀속 조회와 크게 다르지 않은지.
+- 운영 메인 호환 배포(`compat/main-adlog-parity` d4d56c7) → 그 뒤 미리보기 저장 스위치. 저장 스위치는 지금도 꺼져 있다.
+
+### 9-4. 남은 제한
+
+- 전후 비교는 인과를 증명하지 않는다(계절 · 행사 · 노출 배분). 같은 기간 두 광고 비교(새 광고 추가)는 이 화면에서 판정하지 않는다.
+- 귀속 창 동안 잠정 처리는 노출일 보고 기준의 가정 — Meta의 사후 데이터 정정(최대 28일)은 반영하지 못한다.
+- 결과 비교 1회에 Meta 조회 14회(하루 단위) — 비교 기간 28일이면 56회.

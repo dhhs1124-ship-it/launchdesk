@@ -15,8 +15,10 @@ const all = (n) => [n, ...(n.children || []).flatMap(all)];
 const text = (n) => all(n).map((x) => x.textContent || '').join(' ');
 const byClass = (n, cls) => all(n).filter((x) => String(x.className || '').split(' ').includes(cls));
 
-function setup({ flag, rows, decisions, failDecisions }){
-  const control = { failDecisions: !!failDecisions };
+const ATTR = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
+function setup({ flag, rows, decisions, failDecisions, failRecords }){
+  // failDates: 조회 실패할 날짜 · truncDates: 페이지 누락(광고 없음) 날짜 · noAttribution: 재배포 전 서버(귀속 기준 응답 없음)
+  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false };
   const db = { ad_log: rows.map((data) => ({ data })), ad_log_decision: (decisions || []).map((data) => ({ data })) }, inserts = [], calls = [];
   const ids = {};
   const document = {
@@ -33,13 +35,17 @@ function setup({ flag, rows, decisions, failDecisions }){
       insert: (row) => { inserts.push({ table, row }); if(table === 'tool_records') (db[row.tool_type] = db[row.tool_type] || []).unshift({ data: row.data }); return Promise.resolve({ error: null }); },
       then: (ok, fail) => Promise.resolve(table === 'ad_margin_links' ? { data: [{ meta_adset_id: '222', product_label: '니트', pre_ad: 20000, source_saved_at: 's1' }], error: null }
         : f.tool_type === 'ad_log_decision' && control.failDecisions ? { data: null, error: { message: '조회 실패(테스트)' } }
+        : f.tool_type === 'ad_log' && control.failRecords ? { data: null, error: { message: '조회 실패(테스트)' } }
         : { data: (db[f.tool_type] || []).slice(), error: null }).then(ok, fail) };
     return q;
   }
   const client = { from, functions: { invoke: async (name, { body }) => {
     calls.push(body);
+    if (control.failDates.includes(body.date)) return { data: null, error: { message: '조회 실패(테스트)' } };
+    const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: ATTR } : {};
+    if (control.truncDates.includes(body.date)) return { data: { ok: true, account: { currency: 'KRW' }, ads: [], truncated: true, ...attribution } };
     const buy = body.date < '2026-09-01' ? 1 : 2;
-    return { data: { ok: true, account: { currency: 'KRW' }, ads: [{ ad_id: '111', metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
+    return { data: { ok: true, account: { currency: 'KRW' }, ...attribution, ads: [{ ad_id: '111', metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
   } } };
   const ctx = { client, userId: 'u1', storeId: '4', stores: [{ id: '4' }], metaAccount: { id: 'm', status: 'connected', external_account_id: 'act_9' }, fx: null };
   const listeners = [], views = [];
@@ -124,6 +130,62 @@ test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준
   assert.doesNotMatch(text(s.ids.adlogChanges), /저장 전/);
   assert.equal(result.result.status, 'inconclusive');
   assert.match(text(s.ids.adlogChanges), /판단 보류/);
+  // 비교 시점에 변경 전 · 후를 같은 명시 귀속으로 함께 다시 조회했다
+  const cmpCalls = s.calls.slice(7);
+  assert.deepEqual([...cmpCalls.map((b) => b.date)], ['2026-08-25', '2026-08-26', '2026-08-27', '2026-08-28', '2026-08-29', '2026-08-30', '2026-08-31',
+    '2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05', '2026-09-06', '2026-09-07']);
+  assert.ok(s.calls.every((b) => b.attribution_mode === 'explicit'));
+  assert.deepEqual(JSON.parse(JSON.stringify(c.basis.attribution)), ATTR, '기록 당시 귀속 기준은 응답 값');
+  assert.equal(result.result.baseline_source, 'refetched'); assert.equal(result.before.purchases.value, 7);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.result.attribution)), ATTR);
+  const t2 = text(s.ids.adlogChanges);
+  assert.match(t2, /변경 전 지표\(비교 시점 재조회\) 광고비 ₩70,000 · 구매 7건/, '통화가 null로 바뀌지 않는다');
+  assert.match(t2, /귀속 기준 요청에서 지정 · 7d_click, 1d_view · 보고 기준 노출일/);
+});
+
+test('실행 기록: 변경 방식 기본값 없음 · 변경 전 조회 실패(누락)가 있으면 저장하지 않는다', async () => {
+  const s = setup({ flag: true, rows: [] });
+  await settle();
+  s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조' });
+  assert.equal(s.ids.chgMethod.value, '', '기존 광고 수정 · 새 광고 추가 중 기본 선택 없음');
+  s.ids.chgStart.value = '2026-09-01';
+  await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
+  assert.match(s.ids.chgStatus.textContent, /변경 방식\(기존 광고 수정 · 새 광고 추가\)/);
+  s.ids.chgMethod.value = 'edit'; s.control.failDates = ['2026-08-27'];
+  s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조' });
+  s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit';
+  await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
+  assert.match(s.ids.chgStatus.textContent, /변경 전 지표 일부를 불러오지 못함\(조회 실패 · 페이지 누락 1일\)/);
+  assert.equal(s.inserts.length, 0);
+});
+
+test('결과 비교: 페이지 누락은 비교하지 않고 · 귀속 기준 응답이 없으면(재배포 전 서버) 확정하지 않는다', async () => {
+  const CH = require('./adlog-change-core.js');
+  const p = CH.periods('2026-09-01', 7);
+  const day = (d) => ({ date: d, metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: 1, observed: true }, purchase_value: { value: 30000, observed: true } } });
+  const c = CH.buildChangeRecord({ storeId: '4', ad: { ad_id: '111', adset_id: '222', ad_name: '니트 광고' }, element: '문구', after: 'x', method: 'edit', startDate: '2026-09-01', compareDays: 7,
+    baseline: { metrics: CH.aggregate(Array.from({ length: 7 }, (_, i) => day(CH.addDays(p.before.since, i))), p.before.since, p.before.until) }, basis: { currency: 'KRW', attribution: ATTR, margin: null } }, Date.now()).record;
+  const s = setup({ flag: false, rows: [c] });
+  await settle();
+  const press = async () => { await all(byClass(s.ids.adlogChanges, 'adlog-change')[0]).find((x) => x.textContent === '결과 비교하기').events.click(); await settle(); await settle(); return text(byClass(s.ids.adlogChanges, 'adlog-change')[0]); };
+  s.control.truncDates = ['2026-09-03'];
+  assert.match(await press(), /판단 불가 · 저장 전.*일부 페이지가 빠진 날이 있어 비교하지 않아요/);
+  s.control.truncDates = []; s.control.noAttribution = true;
+  const t = await press();
+  assert.match(t, /귀속 기준을 확인하지 못해 개선 여부를 확정하지 않아요/);
+  assert.match(t, /귀속 기준 확인 불가\(응답에 귀속 기준 없음\)/);
+});
+
+test('광고 기록 조회 실패: 기록 없음(₩0)과 구분해 합계 — · 불러오지 못함 · 다시 불러오기', async () => {
+  const s = setup({ flag: false, rows: [manual], failRecords: true });
+  await settle();
+  assert.equal(s.ids.adlogTotalSpend.textContent, '—');
+  assert.match(s.ids.adlogTotalNote.textContent, /광고 기록을 불러오지 못했어요/);
+  assert.match(text(s.ids.adlogRows), /불러오지 못했어요\(기록이 없는 것이 아니에요\)/);
+  assert.doesNotMatch(text(s.ids.adlogChanges), /아직 실행 기록이 없어요/);
+  s.control.failRecords = false;
+  await all(s.ids.adlogTotalNote).find((x) => x.textContent === '다시 불러오기').events.click(); await settle();
+  assert.equal(s.ids.adlogTotalSpend.textContent, '₩10,000');
 });
 
 test('선택 조회 실패: 저장된 선택이 없던 경우와 구분해 합계 미확정 · 다시 불러오기 → 성공하면 선택을 반영한다', async () => {
@@ -148,12 +210,13 @@ test('저장된 결과: 최신이 조회 실패뿐이면 갱신 실패 · 이전
   const day = (d, s, b) => ({ date: d, metrics: { spend: s, impressions: s * 10, link_clicks: s / 100, purchase: { value: b, observed: true }, purchase_value: { value: b * 30000, observed: true } } });
   const span = (st, tot, b) => Array.from({ length: 7 }, (_, i) => day(CH.addDays(st, i), tot / 7, i === 0 ? b : 0));
   const p = CH.periods('2026-09-08', 7);
-  const mk = (id) => CH.buildChangeRecord({ storeId: '4', ad: { ad_id: '111', adset_id: '222', ad_name: '광고' + id }, element: '문구', after: 'x', startDate: '2026-09-08', compareDays: 7,
+  const mk = (id) => CH.buildChangeRecord({ storeId: '4', ad: { ad_id: '111', adset_id: '222', ad_name: '광고' + id }, element: '문구', after: 'x', method: 'edit', startDate: '2026-09-08', compareDays: 7,
     baseline: { metrics: CH.aggregate(span(p.before.since, 100000, 10), p.before.since, p.before.until) }, basis: { currency: 'KRW', attribution: 'A', margin: null } }, Date.now() + id).record;
   const c1 = mk(1), c2 = mk(2);
   const good = CH.aggregate(span(p.after.since, 100000, 30), p.after.since, p.after.until), bad = CH.aggregate(span(p.after.since, 100000, 30).slice(0, 6), p.after.since, p.after.until);
-  const r1 = CH.buildResultRecord(c1, good, CH.compare(c1, good, null, '2026-09-30'), Date.parse('2026-09-30T00:00:00Z'), '');
-  const r2 = CH.buildResultRecord(c1, bad, CH.compare(c1, bad, null, '2026-10-03'), Date.parse('2026-10-03T00:00:00Z'), '');
+  const again = { before: c1.baseline.metrics, attribution: ATTR }; // 비교 시점 재조회(화면과 같은 입력)
+  const r1 = CH.buildResultRecord(c1, good, CH.compare(c1, good, null, '2026-09-30', again), Date.parse('2026-09-30T00:00:00Z'), '', again.before);
+  const r2 = CH.buildResultRecord(c1, bad, CH.compare(c1, bad, null, '2026-10-03', again), Date.parse('2026-10-03T00:00:00Z'), '', again.before);
   const legacy = { id: 9, source: 'change_result', action_id: c2.action_id, store_id: '4', measured_at: '2026-09-20T00:00:00Z', after: good, result: { status: 'improved', reasons: ['예전 규칙'], warnings: [] } };
   const s = setup({ flag: false, rows: [c1, r1, r2, c2, legacy] });
   await settle();

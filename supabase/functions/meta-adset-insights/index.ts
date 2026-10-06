@@ -16,6 +16,7 @@ import {
   groupAdsetsByCampaign,
   fetchAllInsightsRows,
   buildInsightsUrl,
+  EXPLICIT_ATTRIBUTION,
 } from "../_shared/meta-adset-normalize.mjs";
 
 // Meta 캠페인/광고 세트/광고 레벨 Insights — 진단 1단계(원본 성과 조회·정규화만).
@@ -120,13 +121,16 @@ export default {
           { status: validated.status }
         );
       }
-      const { store_id, scope, period, date, adset_id } = validated as {
+      const { store_id, scope, period, date, adset_id, attribution_mode } = validated as {
         store_id: string;
         scope: Scope;
         period: Period;
         date: string | undefined;
         adset_id: string | undefined;
+        attribution_mode: "explicit" | undefined;
       };
+      // 명시 귀속은 요청한 화면(광고 기록 결과 비교)에만 — 다른 요청은 Meta 기본 귀속 그대로
+      const attribution = attribution_mode === "explicit" ? EXPLICIT_ATTRIBUTION : undefined;
 
       // 1. store_id 소유권 확인 — ctx.supabase는 RLS가 적용되므로 다른
       //    사용자의 store_id는 여기서 이미 걸러진다(meta-oauth-start.ts와
@@ -217,6 +221,7 @@ export default {
           preset,
           after,
           filteringAdsetId: scope === "ads" ? adset_id : undefined,
+          attribution,
         });
         const result = await fetchMetaJson(url, accessToken);
         if (!result.ok) return result;
@@ -244,7 +249,7 @@ export default {
         return errorResponse(cls.code as keyof typeof META_ERROR_MESSAGES, cls.status);
       }
 
-      const normalizedRows = pageResult.rows.map((row: any) => normalizeIdentityRow(row, level));
+      const normalizedRows = (pageResult.rows || []).map((row: any) => normalizeIdentityRow(row, level));
 
       const accountPayload = {
         id: externalAccountId,
@@ -257,6 +262,10 @@ export default {
         truncated: pageResult.truncated,
         fetched_rows: pageResult.fetchedRows,
         page_count: pageResult.pageCount,
+        // 요청에 실제로 넣은 귀속 기준 — 명시 귀속 요청에만 있다(없으면 화면은 귀속 기준 확인 불가로 본다)
+        ...(attribution
+          ? { attribution: { source: "request", windows: [...attribution.windows], action_report_time: attribution.action_report_time } }
+          : {}),
       };
 
       if (scope === "adsets") {

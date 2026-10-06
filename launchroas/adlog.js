@@ -5,9 +5,8 @@
   // 실행 기록(변경 · 결과) 저장 스위치 — 운영 메인(tools.js)의 호환 수정이 배포되기 전까지 꺼 둔다.
   // 공용 DB(tool_records ad_log)에 새 종류 기록이 들어가면 예전 메인 화면에 ₩NaN 줄이 생기기 때문(docs/ai/ad-improvement-loop-design.md 5-6).
   var CHANGE_ON=!!(window.LAUNCHROAS_FLAGS&&window.LAUNCHROAS_FLAGS.adlogChangeRecords===true);
-  var ATTRIBUTION='API 기본(클릭 후 7일 · 조회 후 1일)'; // meta-adset-insights는 귀속 기간을 지정하지 않음(Meta 인사이트 레퍼런스 기본값)
   var byId=function(id){return document.getElementById(id);};
-  var records=[], decisions=[], decisionsFailed=false, currentUser=null, currentStore=null, epoch=0, busy=false, draft=null, results={};
+  var records=[], recordsFailed=false, decisions=[], decisionsFailed=false, currentUser=null, currentStore=null, epoch=0, busy=false, draft=null, results={};
   var money=function(n){return '₩'+Math.round(Number(n)||0).toLocaleString('ko-KR');};
   function status(text){byId('adlogMessage').textContent=text||'';}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -20,7 +19,7 @@
     var visible=records.filter(function(r){return String(r.store_id||'')===storeId || !r.store_id || ids.indexOf(String(r.store_id))<0;});
     var rows=byId('adlogRows');rows.replaceChildren();
     var sum=AC.summarize(scope,decisions.filter(function(d){return String(d.store_id||'')===storeId;})),links=AC.linkChanges(records);
-    if(!visible.length){var empty=document.createElement('tr');cell(empty,'아직 기록이 없어요. 기록 추가나 Meta 성과 기록하기로 시작하세요.').colSpan=7;rows.appendChild(empty);}
+    if(!visible.length){var empty=document.createElement('tr');cell(empty,recordsFailed?'광고 기록을 불러오지 못했어요(기록이 없는 것이 아니에요).':'아직 기록이 없어요. 기록 추가나 Meta 성과 기록하기로 시작하세요.').colSpan=7;rows.appendChild(empty);}
     visible.forEach(function(r){
       var tr=document.createElement('tr'), matched=String(r.store_id||'')===storeId, dup=sum.duplicates[String(r.id)];
       var tags=AC.rowLabel(r,sum.duplicates,links).concat(!matched?[!r.store_id?'쇼핑몰 미지정 · 합계 제외':'삭제된 쇼핑몰 기록 · 합계 제외']:[]);
@@ -45,6 +44,12 @@
     if(decisionsFailed){var rb=el('button','secondary adlog-retry','다시 불러오기');rb.type='button';rb.addEventListener('click',function(){loadDecisions(app.getContext());});tn.appendChild(rb);}
     byId('adlogAverageRoas').textContent=sum.averageRoas!=null?sum.averageRoas.toFixed(1)+'x':'—';
     byId('adlogBest').textContent=sum.best?sum.best.name+' ('+sum.best.date+')':'—';
+    // 기록 조회 실패: '기록 없음(₩0)'과 구분 — 합계를 내지 않고 다시 불러오기를 둔다
+    if(recordsFailed){
+      byId('adlogTotalSpend').textContent='—';byId('adlogAverageRoas').textContent='—';byId('adlogBest').textContent='—';
+      tn.textContent='광고 기록을 불러오지 못했어요 · 합계를 계산하지 않았어요 ';
+      var rr=el('button','secondary adlog-retry','다시 불러오기');rr.type='button';rr.addEventListener('click',function(){load(app.getContext());});tn.appendChild(rr);
+    }
     byId('adlogMetaSave').disabled=busy || !ctx.userId || !ctx.storeId || !ctx.metaAccount || ctx.metaAccount.status!=='connected';
     renderChanges(links,storeId);
     renderDraft();
@@ -81,6 +86,7 @@
     var list=Object.keys(links.changes).map(function(k){return links.changes[k];}).filter(function(g){return String(g.change.store_id)===storeId;});
     var head=el('div','adlog-sub-head');head.append(el('h2','','실행 기록 · 결과 비교'),el('span','small',CHANGE_ON?'AI 개선안에서 바꾼 내용과 결과':'저장 꺼짐 · 운영 화면 호환 수정 배포 후 켜요'));
     box.appendChild(head);
+    if(recordsFailed){box.appendChild(el('p','small','실행 기록을 불러오지 못했어요. 위의 다시 불러오기를 눌러 주세요.'));return;}
     if(!list.length){box.appendChild(el('p','small','아직 실행 기록이 없어요. 운영 현황의 광고 개선안에서 “실행 기록”을 눌러 시작하세요.'));return;}
     list.forEach(function(g){box.appendChild(changeCard(g));});
   }
@@ -90,8 +96,8 @@
   function changeCard(g){
     var c=g.change,cur=c.basis&&c.basis.currency||'KRW',card=el('article','adlog-change'),latest=g.latest,live=results[c.action_id];
     // 저장된 결과는 최신 기준. 최신이 조회 실패뿐이면 마지막 유효 결과를 '갱신 실패 · 이전 결과'로 보여 준다
-    var cur=g.results.length?CH.currentOf(g.results):null;
-    var shown=live&&live.cmp?{after:live.after,cmp:live.cmp,saved:false}:cur?{after:cur.record.after,cmp:cur.record.result,saved:true,stale:cur.state==='stale',legacy:!cur.record.result.judgement_version}:null;
+    var now=g.results.length?CH.currentOf(g.results):null;
+    var shown=live&&live.cmp?{before:live.before,after:live.after,cmp:live.cmp,saved:false}:now?{before:now.record.before,after:now.record.after,cmp:now.record.result,saved:true,stale:now.state==='stale',legacy:!now.record.result.judgement_version}:null;
     var r=shown&&shown.cmp;
     var h=el('div','adlog-change-head');
     h.append(el('strong','',c.ad&&c.ad.ad_name||c.name),el('span','adlog-tag adlog-status-'+(r?r.status:'wait'),r?(shown.stale?'갱신 실패 · 이전 결과 · ':'')+CH.STATUS_TEXT[r.status]+(shown.legacy?' · 이전 판정 기준':'')+(r.provisional?' · 잠정':'')+(shown.saved?'':' · 저장 전'):'결과 대기'));
@@ -117,10 +123,11 @@
     add('바꾼 내용',(c.change.before?c.change.before+' → ':'')+c.change.after+(c.change.method==='new_ad'?' (새 광고 ID '+c.ad.new_ad_id+')':''));
     add('연결된 제안',c.suggestion?(c.suggestion.week+' 주간 점검 · '+(c.suggestion.verdict||'')+(c.suggestion.policy_version?' · 기준 '+c.suggestion.policy_version:' · 이전 기준 결과')):'직접 입력');
     add('비교 기간','변경 전 '+c.compare.before.since+' ~ '+c.compare.before.until+' / 변경 후 '+c.compare.after.since+' ~ '+c.compare.after.until+' ('+c.compare.days+'일씩 · 전후 비교)');
-    add('변경 전 지표',metricLine(c.baseline.metrics,cur));
+    if(shown&&shown.before)add('변경 전 지표(비교 시점 재조회)',metricLine(shown.before,cur));
+    add(shown&&shown.before?'변경 전 지표(기록 당시 · 이력)':'변경 전 지표(기록 당시)',metricLine(c.baseline.metrics,cur));
     if(shown&&shown.after)add('변경 후 지표',metricLine(shown.after,cur));
     if(r&&r.cpa)add('구매당 광고비',(r.cpa.before==null?'—':amt(r.cpa.before,cur))+' → '+(r.cpa.after==null?'—':amt(r.cpa.after,cur)));
-    add('귀속 기준',c.basis.attribution);
+    add('귀속 기준',attrText(r&&r.baseline_source==='refetched'?r.attribution:c.basis.attribution));
     add('통화 · 환율',cur+(c.basis.fx_krw_per_unit?' · 1 '+cur+' = '+c.basis.fx_krw_per_unit+'원(당시 저장값)':''));
     add('연결 상품 마진',c.basis.margin?c.basis.margin.product_label+' 주문당 '+money(c.basis.margin.pre_ad)+' — 귀속 구매가 이 상품이라는 근거 없음':'없음');
     if(r&&r.profit&&r.profit.kind==='reference')add('참고 계산',r.profit.basis);
@@ -149,15 +156,27 @@
     return card;
   }
 
-  // meta-adset-insights(scope=ads)를 하루씩 불러 기간 합산 — 서버 변경 없이 쓰는 기존 함수
+  // meta-adset-insights(scope=ads)를 하루씩 불러 기간 합산 — 명시 귀속(attribution_mode:'explicit')으로 요청하고 응답의 귀속 기준을 모은다
+  // 하루 상태: ok(광고 행 있음) · absent(정상 조회 · 광고 없음 = 집행 0) · failed(조회 실패) · truncated(페이지 누락이고 광고 없음 — 빠졌을 수 있음)
+  // 귀속 기준: 정상 조회한 날이 모두 같은 기준을 돌려줬을 때만 그 값, 하나라도 없거나 다르면 null(확인 불가)
   async function dailyAds(ctx,adsetId,adId,since,until){
-    var rows=[],currency=null,d=since;
+    var rows=[],currency=null,attrs=[],d=since;
     while(d<=until){
-      var res=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'ads',period:'date',date:d,adset_id:adsetId}});
-      if(!res.error&&res.data&&res.data.ok){currency=res.data.account&&res.data.account.currency||currency;var hit=(res.data.ads||[]).filter(function(a){return String(a.ad_id)===String(adId);})[0];rows.push({date:d,metrics:hit?hit.metrics:null});}
+      var res;
+      try{res=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'ads',period:'date',date:d,adset_id:adsetId,attribution_mode:'explicit'}});}catch(e){res={error:e};}
+      if(!res.error&&res.data&&res.data.ok){
+        currency=res.data.account&&res.data.account.currency||currency;attrs.push(JSON.stringify(res.data.attribution||null));
+        var hit=(res.data.ads||[]).filter(function(a){return String(a.ad_id)===String(adId);})[0];
+        rows.push({date:d,metrics:hit?hit.metrics:null,state:hit?'ok':res.data.truncated?'truncated':'absent'});
+      } else rows.push({date:d,metrics:null,state:'failed'});
       d=CH.addDays(d,1);
     }
-    return {agg:CH.aggregate(rows,since,until),currency:currency};
+    var same=attrs.length&&attrs.every(function(a){return a===attrs[0];});
+    return {agg:CH.aggregate(rows,since,until),currency:currency,attribution:same?JSON.parse(attrs[0]):null};
+  }
+  function attrText(a){
+    if(a&&typeof a==='object'&&a.source==='request')return '요청에서 지정 · '+(a.windows||[]).join(', ')+' · 보고 기준 '+(a.action_report_time==='impression'?'노출일':a.action_report_time==='conversion'?'전환일':String(a.action_report_time));
+    return (typeof a==='string'&&a?a+' · ':'')+'확인 불가(응답에 귀속 기준 없음)';
   }
   async function findAdset(ctx,adId){
     var res=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'adsets',period:'month'}});
@@ -174,25 +193,28 @@
     var m=!res.error&&res.data&&res.data[0];
     return m?{product_label:m.product_label,pre_ad:Number(m.pre_ad),source_saved_at:m.source_saved_at||null}:null;
   }
-  function basisFor(ctx,currency,margin){
+  function basisFor(ctx,currency,margin,attribution){
     var fx=ctx.fx&&currency!=='KRW'&&ctx.fx.currency===currency?ctx.fx:null;
-    return {currency:currency||'KRW',fx_krw_per_unit:fx?Number(fx.krw_per_unit):null,fx_saved_at:fx?fx.saved_at:null,attribution:ATTRIBUTION,margin:margin};
+    return {currency:currency||'KRW',fx_krw_per_unit:fx?Number(fx.krw_per_unit):null,fx_saved_at:fx?fx.saved_at:null,attribution:attribution||null,margin:margin};
   }
+  // 결과 비교 — 변경 전 · 후를 지금 같은 귀속 기준으로 함께 다시 조회한다(저장 당시 변경 전 지표는 이력으로만).
+  // 변경 전은 원래 광고, 변경 후는 대상 광고(새 광고 추가면 새 광고 — core가 관찰값만으로 둔다)
   async function runCompare(c){
     var ctx=app.getContext(),prev=results[c.action_id],confirm=prev&&prev.confirm||null;results[c.action_id]={loading:true,confirm:confirm};render();
     try{
       var target=c.change.method==='new_ad'?c.ad.new_ad_id:c.ad.ad_id;
-      var got=await dailyAds(ctx,c.ad.adset_id,target,c.compare.after.since,c.compare.after.until);
-      var basis=basisFor(ctx,got.currency,await marginFor(ctx,c.ad.adset_id));
-      var cmp=CH.compare(c,got.agg,basis,today(),{confirmedMissingCost:confirm});
-      if(c.change.method==='new_ad')cmp.warnings.push('새 광고의 변경 후 기간을 기존 광고의 변경 전 기간과 비교했어요 · 같은 기간 두 광고 비교는 광고 성과 화면에서 확인하세요');
-      results[c.action_id]={after:got.agg,cmp:cmp,confirm:confirm};
+      var gb=await dailyAds(ctx,c.ad.adset_id,c.ad.ad_id,c.compare.before.since,c.compare.before.until);
+      var ga=await dailyAds(ctx,c.ad.adset_id,target,c.compare.after.since,c.compare.after.until);
+      var attribution=JSON.stringify(gb.attribution)===JSON.stringify(ga.attribution)?ga.attribution:null;
+      var basis=basisFor(ctx,ga.currency||gb.currency,await marginFor(ctx,c.ad.adset_id),attribution);
+      var cmp=CH.compare(c,ga.agg,basis,today(),{before:gb.agg,attribution:attribution,confirmedMissingCost:confirm});
+      results[c.action_id]={before:gb.agg,after:ga.agg,cmp:cmp,confirm:confirm};
     }catch(e){results[c.action_id]={error:'결과 지표를 불러오지 못했어요.'};}
     render();
   }
   async function saveResult(c,live){
     if(!CHANGE_ON)return;
-    var rec=CH.buildResultRecord(c,live.after,live.cmp,Date.now(),'');
+    var rec=CH.buildResultRecord(c,live.after,live.cmp,Date.now(),'',live.before);
     if(await insert(rec)){results[c.action_id]=null;status('결과를 저장했어요. 기존 실행 기록은 그대로 두고 결과만 덧붙였어요.');render();}
   }
 
@@ -210,7 +232,7 @@
     draft={ad:{ad_id:String(p.ad.ad_id),ad_name:p.ad.ad_name||'광고',adset_id:p.ad.adset_id||null},suggestion:p.suggestion||null,creative:p.creative||null,message:''};
     var sel=byId('chgElement');sel.value=p.element&&CH.ELEMENTS.indexOf(p.element)>=0?p.element:'문구';
     byId('chgBefore').value=p.before||'';byId('chgAfter').value=p.after||'';byId('chgStart').value=today();byId('chgDays').value='7';
-    byId('chgMethod').value='new_ad';byId('chgNewAd').value='';byId('chgMemo').value='';byId('chgConcurrentNote').value='';
+    byId('chgMethod').value='';byId('chgNewAd').value='';byId('chgMemo').value='';byId('chgConcurrentNote').value='';
     document.querySelectorAll('#adlogChangeForm input[name=chgConcurrent]').forEach(function(b){b.checked=false;});
     if(app.showView)app.showView('records');
     render();byId('adlogChangeForm').scrollIntoView({block:'start'});
@@ -228,7 +250,7 @@
       var built=CH.buildChangeRecord({storeId:ctx.storeId,ad:{ad_id:draft.ad.ad_id,adset_id:adsetId,ad_name:draft.ad.ad_name},suggestion:draft.suggestion,
         element:byId('chgElement').value,before:byId('chgBefore').value,after:byId('chgAfter').value,method:byId('chgMethod').value,newAdId:byId('chgNewAd').value.trim(),
         startDate:start,compareDays:days,baseline:{metrics:got.agg,fetched_at:new Date().toISOString(),source:'meta-adset-insights · 하루 단위 합산'},
-        basis:basisFor(ctx,got.currency,await marginFor(ctx,adsetId)),creative:draft.creative,
+        basis:basisFor(ctx,got.currency,await marginFor(ctx,adsetId),got.attribution),creative:draft.creative,
         concurrent:[].slice.call(document.querySelectorAll('#adlogChangeForm input[name=chgConcurrent]:checked')).map(function(b){return b.value;}),
         concurrentNote:byId('chgConcurrentNote').value,memo:byId('chgMemo').value},Date.now());
       if(!built.ok){draft.message='확인해 주세요: '+built.errors.join(', ');return;}
@@ -238,12 +260,13 @@
   }
 
   async function load(ctx){
-    records=[];decisions=[];decisionsFailed=false;results={};render();var stamp=++epoch;
+    records=[];recordsFailed=false;decisions=[];decisionsFailed=false;results={};render();var stamp=++epoch;
     if(!ctx.userId) return;
     var q=function(type){return ctx.client.from('tool_records').select('data,created_at').eq('user_id',ctx.userId).eq('tool_type',type).order('created_at',{ascending:false});};
-    var both=await Promise.all([q('ad_log'),q('ad_log_decision')]);
+    var both;
+    try{both=await Promise.all([q('ad_log'),q('ad_log_decision')]);}catch(e){both=[{error:e},{error:e}];}
     if(stamp!==epoch)return;
-    if(both[0].error){status('광고 기록을 불러오지 못했어요.');return;}
+    if(both[0].error){recordsFailed=true;status('광고 기록을 불러오지 못했어요.');render();return;}
     records=(both[0].data||[]).map(function(row){return row.data;}).filter(function(row){return !!row;});
     decisionsFailed=!!both[1].error;
     decisions=decisionsFailed?[]:(both[1].data||[]).map(function(row){return row.data;}).filter(Boolean);

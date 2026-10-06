@@ -20,7 +20,7 @@ let H;
 try { H = require(harnessPath); } finally { fs.unlinkSync(harnessPath); }
 
 // ---- 공유 메모리 DB(user u1 · 쇼핑몰 1) ----
-const shared = { rows: [], failDecisions: false };
+const shared = { rows: [], failDecisions: false, failAdlog: false };
 
 // ---- 미리보기 화면(가짜 DOM) ----
 function node(tag){
@@ -39,6 +39,7 @@ function bootPreview(flag){
       insert: (row) => { shared.rows.push({ user_id: row.user_id, tool_type: row.tool_type, data: row.data }); return Promise.resolve({ error: null }); },
       then: (ok, fail) => Promise.resolve(table === 'ad_margin_links' ? { data: [], error: null }
         : f.tool_type === 'ad_log_decision' && shared.failDecisions ? { data: null, error: { message: '선택 조회 실패(모의)' } }
+        : f.tool_type === 'ad_log' && shared.failAdlog ? { data: null, error: { message: '기록 조회 실패(모의)' } }
         : { data: shared.rows.filter((r) => r.user_id === f.user_id && r.tool_type === f.tool_type).slice().reverse(), error: null }).then(ok, fail) };
     return q;
   }
@@ -57,6 +58,7 @@ async function bootMain(){
   const fx = H.periodFixture();
   fx.toolRecords = shared.rows; // 같은 배열을 그대로 읽는다(실시간)
   Object.defineProperty(fx, 'failDecisions', { get: () => shared.failDecisions });
+  Object.defineProperty(fx, 'failAdlog', { get: () => shared.failAdlog });
   const env = await H.boot(fx); await H.settle();
   env.sandbox.launchdeskAdlog.render();
   return env;
@@ -114,6 +116,16 @@ function check(name, ok, detail){ results.push({ name, ok: !!ok, detail }); }
   await pv.window.LaunchRoasAdlog.refresh(); await tick(); mn = await bootMain();
   const tbody = mn.doc.getElementById('adlogTbody').innerHTML;
   check('변경 기록: 운영 메인 ₩NaN 없음 · 합계 제외 태그 · 합계 그대로', !/NaN/.test(tbody) && /변경 기록 · 합계 제외/.test(tbody) && mainTotal(mn) === '₩12,000' && pv.$('adlogTotalSpend').textContent === '₩12,000', { main: mainTotal(mn) });
+
+  // 7) 광고 기록 조회 실패 → 두 화면 모두 '기록 없음(₩0)'이 아니라 불러오지 못함 · 합계 — · 다시 불러오기 → 성공하면 ₩12,000
+  shared.failAdlog = true;
+  pv = bootPreview(false); await tick(); mn = await bootMain();
+  check('기록 조회 실패 시 두 화면 모두 합계 — · 불러오지 못함(기록 없음과 구분)', pv.$('adlogTotalSpend').textContent === '—' && mainTotal(mn) === '—' && /불러오지 못했어요/.test(pv.$('adlogTotalNote').textContent) && /불러오지 못했어요/.test(mainNote(mn))
+    && !/아직 기록이 없어요/.test(mn.doc.getElementById('adlogTbody').innerHTML), { preview: pv.$('adlogTotalSpend').textContent, main: mainTotal(mn) });
+  shared.failAdlog = false;
+  await all(pv.$('adlogTotalNote')).find((x) => x.textContent === '다시 불러오기').events.click(); await tick();
+  (mn.doc.getElementById('adlogSumNote').children || []).find((x) => x && x.textContent === '다시 불러오기').click(); await H.settle(); mn.sandbox.launchdeskAdlog.render();
+  check('기록 다시 불러오기 성공 후 두 화면 합계 ₩12,000', pv.$('adlogTotalSpend').textContent === '₩12,000' && mainTotal(mn) === '₩12,000', { preview: pv.$('adlogTotalSpend').textContent, main: mainTotal(mn) });
 
   const failed = results.filter((r) => !r.ok);
   results.forEach((r) => console.log((r.ok ? '통과' : '실패') + ' · ' + r.name + (r.ok ? '' : ' · ' + JSON.stringify(r.detail))));

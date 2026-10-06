@@ -30,6 +30,24 @@ test('adsets 요청은 level=adset을 쓴다', async () => {
   assert.equal(url.searchParams.get('level'), 'adset');
 });
 
+test('명시 귀속(attribution_mode=explicit)일 때만 귀속 창 · 보고 시점을 넣고, 넣은 값을 응답에 돌려준다 · 다른 요청은 그대로', async () => {
+  const m = await modPromise;
+  const base = { accountId: 'act_1', level: 'ad', since: '2026-09-01', until: '2026-09-01', filteringAdsetId: '12345' };
+  const plain = new URL(m.buildInsightsUrl(base));
+  assert.equal(plain.searchParams.get('action_attribution_windows'), null);
+  assert.equal(plain.searchParams.get('action_report_time'), null);
+  const explicit = new URL(m.buildInsightsUrl({ ...base, attribution: m.EXPLICIT_ATTRIBUTION }));
+  assert.deepEqual(JSON.parse(explicit.searchParams.get('action_attribution_windows')), ['7d_click', '1d_view']);
+  assert.equal(explicit.searchParams.get('action_report_time'), 'impression');
+  const body = { store_id: 's1', scope: 'ads', period: 'date', date: '2026-09-01', adset_id: '12345' };
+  assert.equal(m.validateAdsetInsightsRequest(body).attribution_mode, undefined);
+  assert.equal(m.validateAdsetInsightsRequest({ ...body, attribution_mode: 'explicit' }).attribution_mode, 'explicit');
+  const bad = m.validateAdsetInsightsRequest({ ...body, attribution_mode: '28d_click' });
+  assert.equal(bad.ok, false); assert.equal(bad.code, 'UNSUPPORTED_ATTRIBUTION_MODE');
+  assert.match(NEW_FN_SRC, /attribution: \{ source: "request", windows: \[\.\.\.attribution\.windows\], action_report_time: attribution\.action_report_time \}/);
+  assert.match(NEW_FN_SRC, /const attribution = attribution_mode === "explicit" \? EXPLICIT_ATTRIBUTION : undefined;/);
+});
+
 test('ads 요청은 level=ad를 쓴다', async () => {
   const m = await modPromise;
   const url = new URL(m.buildInsightsUrl({ accountId: 'act_1', level: 'ad', since: '2026-09-01', until: '2026-09-21', filteringAdsetId: '12345' }));
