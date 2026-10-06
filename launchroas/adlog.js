@@ -1,7 +1,7 @@
 (function(){
   'use strict';
-  var app=window.LaunchRoasApp, builder=window.launchdeskAdlogMeta;
-  if(!app || !builder) return;
+  var app=window.LaunchRoasApp, builder=window.launchdeskAdlogMeta, AC=window.launchdeskAdlogCore;
+  if(!app || !builder || !AC) return;
   var byId=function(id){return document.getElementById(id);};
   var records=[], currentUser=null, currentStore=null, epoch=0, busy=false;
   var money=function(n){return '₩'+Math.round(Number(n)||0).toLocaleString('ko-KR');};
@@ -12,22 +12,26 @@
     var scope=records.filter(function(r){return String(r.store_id||'')===storeId && !!storeId;});
     var visible=records.filter(function(r){return String(r.store_id||'')===storeId || !r.store_id || ids.indexOf(String(r.store_id))<0;});
     var rows=byId('adlogRows');rows.replaceChildren();
+    // 공통 계산 규칙(adlog-core.js — 메인과 같은 파일): 중복 직접 입력 · 원화 아닌 기록 · 변경/결과 기록
+    var sum=AC.summarize(scope),links=AC.linkChanges(records);
     if(!visible.length){var empty=document.createElement('tr');cell(empty,'아직 기록이 없어요. 기록 추가나 Meta 성과 기록하기로 시작하세요.').colSpan=7;rows.appendChild(empty);}
     visible.forEach(function(r){
       var tr=document.createElement('tr'), matched=String(r.store_id||'')===storeId;
-      var label=String(r.name||'')+(r.source==='meta_auto'?' · Meta 자동':'')+(!matched?(!r.store_id?' · 쇼핑몰 미지정 · 합계 제외':' · 삭제된 쇼핑몰 기록 · 합계 제외'):'');
+      var tags=AC.rowLabel(r,sum.duplicates,links).concat(!matched?[!r.store_id?'쇼핑몰 미지정 · 합계 제외':'삭제된 쇼핑몰 기록 · 합계 제외']:[]);
+      var label=String(r.name||'')+(tags.length?' · '+tags.join(' · '):'');
+      var spend=AC.isAmount(r)?AC.toKrw(r,r.spend):null,revenue=AC.isAmount(r)?AC.toKrw(r,r.revenue):null;
       cell(tr,String(r.date||''));cell(tr,String(r.channel||''));cell(tr,label);
-      cell(tr,money(r.spend));cell(tr,typeof r.revenue==='number'&&Number.isFinite(r.revenue)?money(r.revenue):'—');
-      cell(tr,typeof r.revenue==='number'&&Number(r.spend)>0?(r.revenue/r.spend).toFixed(1)+'x':'—');
+      cell(tr,AC.moneyText(r,r.spend));cell(tr,AC.moneyText(r,r.revenue));
+      cell(tr,revenue!=null&&spend>0?(revenue/spend).toFixed(1)+'x':'—');
       var actions=cell(tr,'');var del=document.createElement('button');del.type='button';del.className='delete-record';del.textContent='삭제';del.setAttribute('aria-label',label+' 기록 삭제');
       del.addEventListener('click',function(){remove(r.id);});actions.appendChild(del);rows.appendChild(tr);
     });
-    var spent=scope.reduce(function(n,r){return n+(Number(r.spend)||0);},0);
-    var measured=scope.filter(function(r){return typeof r.revenue==='number'&&Number(r.spend)>0;});
-    var spendMeasured=measured.reduce(function(n,r){return n+r.spend;},0), revenue=measured.reduce(function(n,r){return n+r.revenue;},0);
-    var best=measured.slice().sort(function(a,b){return b.revenue/b.spend-a.revenue/a.spend;})[0];
-    byId('adlogTotalSpend').textContent=money(spent);byId('adlogAverageRoas').textContent=spendMeasured?(revenue/spendMeasured).toFixed(1)+'x':'—';
-    byId('adlogBest').textContent=best?best.name+' ('+best.date+')':'—';
+    var ex=sum.excluded,notes=[];
+    if(ex.duplicate)notes.push('중복 가능 직접 입력 '+ex.duplicate+'건');
+    if(ex.currency)notes.push('환율 없는 외화 기록 '+ex.currency+'건');
+    byId('adlogTotalSpend').textContent=money(sum.totalSpend)+(notes.length?' (합계 제외: '+notes.join(', ')+')':'');
+    byId('adlogAverageRoas').textContent=sum.averageRoas!=null?sum.averageRoas.toFixed(1)+'x':'—';
+    byId('adlogBest').textContent=sum.best?sum.best.name+' ('+sum.best.date+')':'—';
     byId('adlogMetaSave').disabled=busy || !ctx.userId || !ctx.storeId || !ctx.metaAccount || ctx.metaAccount.status!=='connected';
   }
   async function load(ctx){

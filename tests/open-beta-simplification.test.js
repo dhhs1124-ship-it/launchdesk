@@ -20,6 +20,7 @@ const APP_SRC = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 const MARGIN_CALC_SRC = fs.readFileSync(path.join(ROOT, 'margin-calc.js'), 'utf8');
 const PLANS_CORE_SRC = fs.readFileSync(path.join(ROOT, 'plans-core.js'), 'utf8');
 const TOOLS_SRC = fs.readFileSync(path.join(ROOT, 'tools.js'), 'utf8');
+const ADLOG_CORE_SRC = fs.readFileSync(path.join(ROOT, 'adlog-core.js'), 'utf8');
 const OPS_OVERVIEW_SRC = fs.readFileSync(path.join(ROOT, 'ops-overview.js'), 'utf8');
 const OPS_PERIOD_CORE_SRC = fs.readFileSync(path.join(ROOT, 'ops-period-core.js'), 'utf8');
 const ADLOG_META_SRC = fs.readFileSync(path.join(ROOT, 'adlog-meta.js'), 'utf8');
@@ -343,6 +344,7 @@ async function boot(opts){
   vm.runInContext(APP_SRC, sandbox, { filename: 'app.js' });
   vm.runInContext(MARGIN_CALC_SRC, sandbox, { filename: 'margin-calc.js' });
   vm.runInContext(PLANS_CORE_SRC, sandbox, { filename: 'plans-core.js' });
+  vm.runInContext(ADLOG_CORE_SRC, sandbox, { filename: 'adlog-core.js' });
   vm.runInContext(TOOLS_SRC, sandbox, { filename: 'tools.js' });
   // stores.js(내 쇼핑몰 화면)는 쇼핑몰 삭제 · 연결 해제 시나리오에서만 싣는다
   // (기존 테스트의 stores 조회 횟수 기대값을 바꾸지 않기 위함). 실제 순서도 ops-overview.js 앞이다.
@@ -1847,4 +1849,21 @@ test('쇼핑몰 목록을 아직 모르거나 조회에 실패하면 store_id가
   env.sandbox.launchdeskAdlog.render();
   assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().storeIds, null);
   assert.doesNotMatch(env.doc.getElementById('adlogTbody').innerHTML, /삭제된 쇼핑몰 기록/);
+});
+
+test('광고 기록(메인): 변경 · 결과 기록은 ₩NaN 없이 —로 보이고 합계에서 빠지며, 같은 날 Meta 자동 기록과 겹치는 직접 입력은 합계에서 뺀다', async () => {
+  const env = await boot(periodFixture());
+  await settle();
+  const store = env.sandbox.launchdeskStore;
+  store.addAdlogRecord({ id: 21, date: '2026-09-20', name: '직접 입력', spend: 10000, revenue: 30000, channel: '메타', store_id: '1' });
+  store.addAdlogRecord({ id: 22, source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-20', date: '2026-09-20', name: 'Meta 캠페인 전체 합계', spend: 12000, revenue: 36000, channel: '메타', store_id: '1', currency: 'KRW' });
+  store.addAdlogRecord({ id: 23, source: 'change', action_id: 'a1', date: '2026-09-21', name: '본문 첫 줄 변경', channel: '메타', store_id: '1' });
+  store.addAdlogRecord({ id: 24, source: 'change_result', action_id: 'a1', date: '2026-09-28', name: '결과', channel: '메타', store_id: '1' });
+  env.sandbox.launchdeskAdlog.render();
+  const tbody = env.doc.getElementById('adlogTbody').innerHTML;
+  assert.doesNotMatch(tbody, /NaN/);
+  assert.match(tbody, /본문 첫 줄 변경 <span class="adlog-tag">변경 기록 · 결과 1건<\/span>/);
+  assert.match(tbody, /직접 입력 <span class="adlog-tag">같은 날 Meta 자동 기록과 중복 가능 · 합계 제외<\/span>/);
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩12,000');
+  assert.equal(env.doc.getElementById('adlogSumRoas').textContent, '3.0x');
 });
