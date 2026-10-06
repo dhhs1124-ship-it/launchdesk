@@ -15,6 +15,8 @@
 
   var ELEMENTS = ['문구', '이미지', '영상 첫 장면', '영상 자막', '타깃', '예산', '랜딩 페이지', '기타'];
   var CONCURRENT = ['예산', '할인', '상품', '타깃', '게재 위치', '기타'];
+  // 결과 판정 버전 — 이 버전의 신호(improved · worse)만 '구매당 광고비 신호'로 집계한다. 버전이 없는 예전 결과는 이전 기준
+  var JUDGEMENT_VERSION = 'adlog-compare-v2: 정확 이항검정(단측 0.05) · 광고비당 구매';
   var PROFIT_FORMULA = 'ad-profit-reference-v1: 연결 상품 주문당 광고 전 잔액 × Meta 귀속 구매 수 − 광고비(원화) · 참고 계산';
   var DAY = 864e5;
 
@@ -122,7 +124,7 @@
 
   // 관찰(실제 수치)과 확인(개선 · 악화 판정)을 나눈다.
   // - observations: 구매 · 광고비 · 구매당 광고비의 전후와 방향 — 항상 계산 가능한 만큼 보여 준다
-  // - status(확인): improved(개선 확인) · worse(악화 확인) · inconclusive(판단 보류) · unknown(비교 불가)
+  // - status(확인): improved(구매당 광고비 개선 신호) · worse(구매당 광고비 악화 신호) · inconclusive(판단 보류) · unknown(비교 불가)
   //   확인은 비교 조건이 맞고(잠정 아님 · 함께 바뀐 조건 없음) 같은 광고비당 구매 비율 차이가 우연 범위(단측 p < 0.05)를 벗어날 때만.
   //   구매가 줄었으면 효율이 좋아져도 개선으로 확인하지 않는다. 광고비만 줄어든 것은 개선이 아니다.
   //   가정: 광고비 1원당 구매가 독립적으로 일어난다고 보는 단순 모형(포아송) — 귀속 변동 · 시즌 영향은 반영하지 못한다.
@@ -131,7 +133,7 @@
     var res = { status: 'unknown', reasons: reasons, warnings: w, provisional: false, separable: !(change.concurrent && change.concurrent.length), blockers: [] };
     if(after.until >= today){ reasons.push('비교 기간이 아직 끝나지 않았어요(' + after.until + '까지)'); res.blockers.push('period_open'); return res; }
     if(after.days !== b.days){ reasons.push('전후 기간 길이가 달라 비교하지 않아요'); res.blockers.push('condition_mismatch'); return res; }
-    if(after.missing_days || b.missing_days){ reasons.push('지표를 조회하지 못한 날이 있어 비교하지 않아요'); res.blockers.push('condition_mismatch'); return res; }
+    if(after.missing_days || b.missing_days){ reasons.push('지표를 조회하지 못한 날이 있어 비교하지 않아요(조회 실패)'); res.blockers.push('fetch_failed'); return res; }
     if(ab.currency && ab.currency !== basis.currency){ reasons.push('광고계정 통화가 바뀌어 비교하지 않아요'); res.blockers.push('condition_mismatch'); return res; }
     if(ab.attribution && ab.attribution !== basis.attribution){ reasons.push('귀속 기준이 바뀌어 비교하지 않아요'); res.blockers.push('condition_mismatch'); return res; }
     if(daysBetween(after.until, today) <= 3){ res.provisional = true; res.blockers.push('provisional'); w.push('최근 3일 안의 구매는 귀속 지연으로 늘어날 수 있어 잠정 결과예요'); }
@@ -171,8 +173,9 @@
       if(after.spend < b.spend) w.push('광고비 감소는 지출 변화로만 기록해요 · 개선 성공이 아니에요');
       return res;
     }
-    if(better && buy1.value >= buy0.value){ res.status = 'improved'; reasons.push('같은 광고비당 구매가 늘었고 우연한 변동으로 보기 어려운 차이예요(단측 p=' + res.test.p_better + ')'); }
-    else if(worse){ res.status = 'worse'; reasons.push('같은 광고비당 구매가 줄었고 우연한 변동으로 보기 어려운 차이예요(단측 p=' + res.test.p_worse + ')'); }
+    // 신호의 범위: 광고비당 구매(구매당 광고비)뿐 — 매출 · 이익 증가나 AI 제안의 인과 효과를 확인한 것이 아니다
+    if(better && buy1.value >= buy0.value){ res.status = 'improved'; reasons.push('구매당 광고비 개선 신호 — 같은 광고비당 구매가 우연한 변동으로 보기 어려울 만큼 늘었어요(단측 p=' + res.test.p_better + ' · 매출 · 이익 · 제안의 인과 효과는 확인하지 않음)'); }
+    else if(worse){ res.status = 'worse'; reasons.push('구매당 광고비 악화 신호 — 같은 광고비당 구매가 우연한 변동으로 보기 어려울 만큼 줄었어요(단측 p=' + res.test.p_worse + ' · 매출 · 이익 · 원인은 확인하지 않음)'); }
     else if(better){ res.status = 'inconclusive'; reasons.push('구매당 광고비는 낮아졌지만 구매가 줄어 개선으로 확인하지 않아요'); }
     else { res.status = 'inconclusive'; reasons.push('관찰된 차이가 우연한 변동 범위 안이에요(변경 후 예상 ' + res.test.expected_after + '건 · 실제 ' + buy1.value + '건)'); }
     if(after.spend < b.spend && res.status !== 'improved') w.push('광고비 감소는 지출 변화로만 기록해요 · 개선 성공이 아니에요');
@@ -200,10 +203,22 @@
   }
 
   // 성과 집계(운영 · 홍보 근거용) — records: ad_log 기록(변경 · 결과 섞여도 됨)
-  // - 실행(action_id)별 최신 유효 결과 1건만 센다(판단 불가 결과는 유효 결과가 없을 때만). 이전 결과는 history_results로 남긴다
-  // - 확정(개선 확인 · 악화 확인)과 판단 보류 · 판단 불가를 나눠 세고, 보류 이유(잠정 · 효과 분리 불가 · 비교 조건 불일치 · 표본 불확실)를 따로 센다
-  // - 지출 변화는 같은 광고 · 겹치는 변경 후 기간이면 가장 최근 실행 1건만 더한다. 이 합계는 전후 관찰값이며 서비스가 만든 절감액이 아니다
+  // - 실행(action_id)의 현재 상태는 '최신 결과' 기준. 이전 결과는 history_results로만 남긴다
+  //   · 최신이 판단 불가이고 이유가 조회 실패(fetch_failed)뿐이면: 마지막 유효 결과를 '갱신 실패 · 이전 결과'(stale)로 보여 주되 신호로 세지 않는다
+  //   · 최신이 비교 조건 불일치 · 기간 미종료 등 판단 불가면: 현재 상태는 판단 불가 · 이전 신호는 이력으로만
+  // - 신호(구매당 광고비 개선 · 악화)는 현재 판정 버전(JUDGEMENT_VERSION)으로 저장된 결과만. 버전 없는 예전 결과는 legacy로 따로
+  // - 지출 변화는 같은 광고 · 겹치는 변경 후 기간이면 가장 최근 실행 1건만. 전후 관찰 합계이며 서비스가 만든 절감액이 아니다
   // - 참고 계산 · 계산 보류 이익은 검증된 이익에서 뺀다
+  function currentOf(list){
+    var sorted = list.slice().sort(function(a, b){ return String(a.measured_at || '').localeCompare(String(b.measured_at || '')); });
+    var latest = sorted[sorted.length - 1], s = latest.result;
+    var onlyFetch = s.status === 'unknown' && (s.blockers || []).length > 0 && (s.blockers || []).every(function(k){ return k === 'fetch_failed'; });
+    if(onlyFetch){
+      var prev = sorted.slice(0, -1).filter(function(r){ return r.result.status !== 'unknown'; }).pop();
+      if(prev) return { record: prev, state: 'stale', latest: latest, history: sorted.length - 1 };
+    }
+    return { record: latest, state: s.status === 'unknown' ? 'unknown' : 'current', latest: latest, history: sorted.length - 1 };
+  }
   function outcomeSummary(records){
     var changes = {}, results = {};
     (records || []).forEach(function(r){
@@ -211,37 +226,42 @@
       if(r.source === 'change' && r.action_id) changes[r.action_id] = r;
       else if(r.source === 'change_result' && r.action_id && r.result) (results[r.action_id] = results[r.action_id] || []).push(r);
     });
-    var out = { actions: 0, results_total: 0, history_results: 0,
-      confirmed: { improved: 0, worse: 0 }, inconclusive: 0, unknown: 0,
-      hold_reasons: { provisional: 0, not_separable: 0, condition_mismatch: 0, sample_uncertain: 0 },
+    var out = { actions: 0, results_total: 0, history_results: 0, judgement_version: JUDGEMENT_VERSION,
+      signals: { cpa_better: 0, cpa_worse: 0 }, signal_scope: '광고비당 구매(구매당 광고비) 변화 신호 · 매출 · 이익 · 제안의 인과 효과는 확인하지 않음',
+      inconclusive: 0, unknown: 0, stale_previous: 0, legacy_results: 0,
+      hold_reasons: { provisional: 0, not_separable: 0, condition_mismatch: 0, sample_uncertain: 0, fetch_failed: 0, period_open: 0 },
       observed_spend_change_krw: 0, observed_spend_note: '전후 광고비 변화의 관찰 합계 · 서비스가 만든 절감액이 아님',
       spend_overlap_excluded: 0, spend_missing: 0,
-      verified_profit_change: 0, verified_profit_count: 0, reference_excluded: 0, withheld: 0 };
+      verified_profit_change: 0, verified_profit_count: 0, reference_excluded: 0, withheld: 0, actions_detail: [] };
     var picked = [];
     Object.keys(results).forEach(function(id){
-      var list = results[id].slice().sort(function(a, b){ return String(a.measured_at || '').localeCompare(String(b.measured_at || '')); });
-      out.results_total += list.length;
-      var valid = list.filter(function(r){ return r.result.status !== 'unknown'; });
-      var latest = (valid.length ? valid : list)[(valid.length ? valid : list).length - 1];
-      out.history_results += list.length - 1;
-      picked.push({ id: id, r: latest, change: changes[id] || null });
+      var cur = currentOf(results[id]);
+      out.results_total += results[id].length; out.history_results += cur.history;
+      picked.push({ id: id, cur: cur, change: changes[id] || null });
     });
     out.actions = picked.length;
     picked.forEach(function(x){
-      var s = x.r.result;
-      if(s.status === 'improved' || s.status === 'worse') out.confirmed[s.status]++;
-      else if(s.status === 'unknown') out.unknown++;
+      var s = x.cur.record.result, latest = x.cur.latest.result;
+      (latest.blockers || []).forEach(function(k){ if(out.hold_reasons[k] !== undefined) out.hold_reasons[k]++; }); // 보류 이유는 최신 결과 기준
+      var detail = { action_id: x.id, state: x.cur.state, status: s.status, judgement_version: s.judgement_version || null };
+      if(x.cur.state === 'stale'){ out.stale_previous++; detail.label = '갱신 실패 · 이전 결과'; }
+      else if(x.cur.state === 'unknown') out.unknown++;
+      else if(s.status === 'improved' || s.status === 'worse'){
+        if(s.judgement_version === JUDGEMENT_VERSION) out.signals[s.status === 'improved' ? 'cpa_better' : 'cpa_worse']++;
+        else { out.legacy_results++; detail.label = '이전 판정 기준 결과 · 신호로 세지 않음'; }
+      }
       else out.inconclusive++; // inconclusive · 이전 기준 small 포함
-      (s.blockers || []).forEach(function(k){ if(out.hold_reasons[k] !== undefined) out.hold_reasons[k]++; });
+      out.actions_detail.push(detail);
+      if(x.cur.state !== 'current') return; // 갱신 실패 · 판단 불가는 이익 · 지출 집계에서도 뺀다
       var p = s.profit;
       if(p && p.kind === 'actual'){ out.verified_profit_change += p.diff; out.verified_profit_count++; }
       else if(p && p.kind === 'reference') out.reference_excluded++;
       else out.withheld++;
     });
-    // 지출 변화 — 같은 대상 광고 · 겹치는 변경 후 기간은 최근 실행만
+    // 지출 변화 — 현재 상태가 유효한 실행만, 같은 대상 광고 · 겹치는 변경 후 기간은 최근 실행만
     var used = [];
-    picked.slice().sort(function(a, b){ return String(b.r.measured_at || '').localeCompare(String(a.r.measured_at || '')); }).forEach(function(x){
-      var s = x.r.result, c = x.change;
+    picked.filter(function(x){ return x.cur.state === 'current'; }).sort(function(a, b){ return String(b.cur.record.measured_at || '').localeCompare(String(a.cur.record.measured_at || '')); }).forEach(function(x){
+      var s = x.cur.record.result, c = x.change;
       if(!s.spend || s.spend.krw_diff === null || s.spend.krw_diff === undefined || !c){ out.spend_missing++; return; }
       var target = c.change && c.change.method === 'new_ad' && c.ad.new_ad_id ? c.ad.new_ad_id : c.ad.ad_id, per = c.compare.after;
       var overlap = used.some(function(u){ return u.target === target && !(per.until < u.since || per.since > u.until); });
@@ -252,18 +272,18 @@
     return out;
   }
 
-  var STATUS_TEXT = { improved: '개선 확인', worse: '악화 확인', inconclusive: '판단 보류', small: '차이 작음(이전 기준)', unknown: '판단 불가' };
+  var STATUS_TEXT = { improved: '구매당 광고비 개선 신호', worse: '구매당 광고비 악화 신호', inconclusive: '판단 보류', small: '차이 작음(이전 기준)', unknown: '판단 불가' };
 
   function buildResultRecord(change, after, cmp, now, memo){
     var t = now || Date.now();
     return { id: newId(t), source: 'change_result', action_id: change.action_id, store_id: change.store_id, date: new Date(t + 9 * 3600e3).toISOString().slice(0, 10),
       name: (change.ad && change.ad.ad_name || '광고') + ' · 결과 ' + STATUS_TEXT[cmp.status], channel: '메타', measured_at: new Date(t).toISOString(),
-      after: after, result: { status: cmp.status, reasons: cmp.reasons, warnings: cmp.warnings, provisional: cmp.provisional, separable: cmp.separable,
+      after: after, result: { judgement_version: JUDGEMENT_VERSION, status: cmp.status, reasons: cmp.reasons, warnings: cmp.warnings, provisional: cmp.provisional, separable: cmp.separable,
         blockers: cmp.blockers || [], observations: cmp.observations || [], test: cmp.test || null,
         spend: cmp.spend || null, purchases: cmp.purchases || null, cpa: cmp.cpa || null, roas: cmp.roas || null, profit: cmp.profit || null,
         margin_change: cmp.marginChange || null, missing_cost: cmp.missingCost || null }, memo: String(memo || '') };
   }
 
   return { ELEMENTS: ELEMENTS, CONCURRENT: CONCURRENT, PROFIT_FORMULA: PROFIT_FORMULA, STATUS_TEXT: STATUS_TEXT,
-    addDays: addDays, periods: periods, aggregate: aggregate, buildChangeRecord: buildChangeRecord, compare: compare, buildResultRecord: buildResultRecord, estProfit: estProfit, outcomeSummary: outcomeSummary };
+    addDays: addDays, periods: periods, aggregate: aggregate, buildChangeRecord: buildChangeRecord, compare: compare, buildResultRecord: buildResultRecord, estProfit: estProfit, outcomeSummary: outcomeSummary, currentOf: currentOf, JUDGEMENT_VERSION: JUDGEMENT_VERSION };
 });

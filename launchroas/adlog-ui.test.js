@@ -109,7 +109,7 @@ test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준
   const card2 = byClass(s.ids.adlogChanges, 'adlog-change')[0];
   const t = text(card2);
   assert.match(t, /판단 보류 · 저장 전/);
-  assert.match(t, /구매 증가 관찰 · 구매당 광고비 -50% \(효율 개선 관찰\) · 광고비 변화 없음 · 개선 판단 보류/);
+  assert.match(t, /구매 증가 관찰 · 구매당 광고비 -50% \(효율 개선 관찰\) · 광고비 변화 없음 · 판단 보류/);
   assert.match(t, /함께 바뀐 조건이 있어 개선 여부를 확정하지 않아요/);
   assert.match(t, /구매 7 → 14건/); assert.match(t, /광고비 변화 없음/);
   assert.match(t, /이익\(참고 계산\) \+₩140,000 연결 상품 기준 가정 · 성과 집계 제외/);
@@ -141,4 +141,23 @@ test('선택 조회 실패: 저장된 선택이 없던 경우와 구분해 합�
   const n = setup({ flag: false, rows: [manual, auto] });
   await settle();
   assert.equal(n.ids.adlogTotalSpend.textContent, '₩22,000');
+});
+
+test('저장된 결과: 최신이 조회 실패뿐이면 갱신 실패 · 이전 결과로, 판정 버전 없는 예전 결과는 이전 판정 기준으로 표시한다', async () => {
+  const CH = require('./adlog-change-core.js');
+  const day = (d, s, b) => ({ date: d, metrics: { spend: s, impressions: s * 10, link_clicks: s / 100, purchase: { value: b, observed: true }, purchase_value: { value: b * 30000, observed: true } } });
+  const span = (st, tot, b) => Array.from({ length: 7 }, (_, i) => day(CH.addDays(st, i), tot / 7, i === 0 ? b : 0));
+  const p = CH.periods('2026-09-08', 7);
+  const mk = (id) => CH.buildChangeRecord({ storeId: '4', ad: { ad_id: '111', adset_id: '222', ad_name: '광고' + id }, element: '문구', after: 'x', startDate: '2026-09-08', compareDays: 7,
+    baseline: { metrics: CH.aggregate(span(p.before.since, 100000, 10), p.before.since, p.before.until) }, basis: { currency: 'KRW', attribution: 'A', margin: null } }, Date.now() + id).record;
+  const c1 = mk(1), c2 = mk(2);
+  const good = CH.aggregate(span(p.after.since, 100000, 30), p.after.since, p.after.until), bad = CH.aggregate(span(p.after.since, 100000, 30).slice(0, 6), p.after.since, p.after.until);
+  const r1 = CH.buildResultRecord(c1, good, CH.compare(c1, good, null, '2026-09-30'), Date.parse('2026-09-30T00:00:00Z'), '');
+  const r2 = CH.buildResultRecord(c1, bad, CH.compare(c1, bad, null, '2026-10-03'), Date.parse('2026-10-03T00:00:00Z'), '');
+  const legacy = { id: 9, source: 'change_result', action_id: c2.action_id, store_id: '4', measured_at: '2026-09-20T00:00:00Z', after: good, result: { status: 'improved', reasons: ['예전 규칙'], warnings: [] } };
+  const s = setup({ flag: false, rows: [c1, r1, r2, c2, legacy] });
+  await settle();
+  const t = text(s.ids.adlogChanges);
+  assert.match(t, /갱신 실패 · 이전 결과 · 구매당 광고비 개선 신호/);
+  assert.match(t, /구매당 광고비 개선 신호 · 이전 판정 기준/);
 });

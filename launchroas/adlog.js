@@ -89,12 +89,14 @@
   // 기본 카드: 결과 상태 · 구매 변화 · 광고비 변화 · 이익(실제 / 참고 / 보류) · 바꾼 요소 한 줄. 나머지는 '비교 근거'에서 펼친다.
   function changeCard(g){
     var c=g.change,cur=c.basis&&c.basis.currency||'KRW',card=el('article','adlog-change'),latest=g.latest,live=results[c.action_id];
-    var shown=live&&live.cmp?{after:live.after,cmp:live.cmp,saved:false}:latest?{after:latest.after,cmp:latest.result,saved:true}:null;
+    // 저장된 결과는 최신 기준. 최신이 조회 실패뿐이면 마지막 유효 결과를 '갱신 실패 · 이전 결과'로 보여 준다
+    var cur=g.results.length?CH.currentOf(g.results):null;
+    var shown=live&&live.cmp?{after:live.after,cmp:live.cmp,saved:false}:cur?{after:cur.record.after,cmp:cur.record.result,saved:true,stale:cur.state==='stale',legacy:!cur.record.result.judgement_version}:null;
     var r=shown&&shown.cmp;
     var h=el('div','adlog-change-head');
-    h.append(el('strong','',c.ad&&c.ad.ad_name||c.name),el('span','adlog-tag adlog-status-'+(r?r.status:'wait'),r?CH.STATUS_TEXT[r.status]+(r.provisional?' · 잠정':'')+(shown.saved?'':' · 저장 전'):'결과 대기'));
+    h.append(el('strong','',c.ad&&c.ad.ad_name||c.name),el('span','adlog-tag adlog-status-'+(r?r.status:'wait'),r?(shown.stale?'갱신 실패 · 이전 결과 · ':'')+CH.STATUS_TEXT[r.status]+(shown.legacy?' · 이전 판정 기준':'')+(r.provisional?' · 잠정':'')+(shown.saved?'':' · 저장 전'):'결과 대기'));
     card.appendChild(h);
-    if(r&&r.observations&&r.observations.length)card.appendChild(el('p','adlog-change-obs',r.observations.join(' · ')+' · '+(r.status==='improved'||r.status==='worse'?CH.STATUS_TEXT[r.status]:r.status==='unknown'?'판단 불가':'개선 판단 보류')));
+    if(r&&r.observations&&r.observations.length)card.appendChild(el('p','adlog-change-obs',r.observations.join(' · ')+' · '+(r.status==='improved'||r.status==='worse'?CH.STATUS_TEXT[r.status]:r.status==='unknown'?'판단 불가':'판단 보류')));
     card.appendChild(el('p','adlog-change-line','바꾼 것 · '+c.change.element+(c.change.method==='new_ad'?' (새 광고 추가)':' (기존 광고 수정)')+' — '+String(c.change.after).slice(0,60)+(String(c.change.after).length>60?'…':'')));
     if(live&&live.error)card.appendChild(el('p','small',live.error));
     if(r){
