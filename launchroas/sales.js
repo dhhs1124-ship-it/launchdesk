@@ -57,7 +57,6 @@
     var figures=byId('salesFigures'),msg=byId('salesMessage'),fxBox=byId('salesFx');
     figures.replaceChildren();
     var range=state.range;
-    byId('salesPeriod').textContent=range?('Cafe24 주문일 '+range.since+(range.until!==range.since?' ~ '+range.until:'')+' (한국 시간)'):'';
     if(!ctx.userId||!ctx.storeId){msg.textContent='쇼핑몰을 선택하면 볼 수 있어요.';fxBox.hidden=true;renderHero(null,null,null,false,[]);
       renderGuide(setupSteps(ctx,null,null,null,metaState(ctx),null),!!ctx.userId&&!(ctx.stores||[]).length);renderSpend(null,metaState(ctx),'',null,null);
       window.dispatchEvent(new CustomEvent('launchroas:sales-state',{detail:{ready:!!ctx.userId&&!!ctx.connectionsLoaded,loading:false,error:'',summary:null,profit:null,partial:false,spendKrw:null,meta:null,metaIssue:'',steps:setupSteps(ctx,null,null,null,metaState(ctx),null).map(function(x){return {title:x.title,done:x.done,text:x.text};})}}));return;}
@@ -216,7 +215,7 @@
     else{
       value=currency==='KRW'?won(mp.spend):spendKrw!=null?won(spendKrw):money(mp.spend,currency);
       if(currency!=='KRW')notes.push(money(mp.spend,currency)+(spendKrw!=null?' · 1 '+currency+' = '+Number(fx.krw_per_unit).toLocaleString('ko-KR')+'원':' · 환율을 저장하면 원화로 보여요'));
-      notes.push(mp.purchase_value_observed&&mp.roas!=null?'ROAS '+Math.round(Number(mp.roas)*100).toLocaleString('ko-KR')+'% · Meta 구매 '+count(mp.purchase_count,'건'):'구매금액 측정 안 됨 · ROAS 표시 안 함');
+      notes.push(mp.purchase_value_observed&&mp.roas!=null?'ROAS '+Math.round(Number(mp.roas)*100).toLocaleString('ko-KR')+'% · Meta 구매 '+count(mp.purchase_count,'건'):'Meta 구매 기록 없음 · ROAS 계산 안 함');
     }
     byId('adSpend').textContent=value;byId('adNote').textContent=notes.filter(Boolean).join(' · ');
   }
