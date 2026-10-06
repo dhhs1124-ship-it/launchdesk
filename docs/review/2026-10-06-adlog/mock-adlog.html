@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>광고 기록 모의 상태</title>
+<link rel="stylesheet" href="../../../launchroas/styles.css">
+<style>.mock-banner{position:sticky;top:0;z-index:5;margin:0;padding:10px 16px;background:#ffd166;color:#1d1d1d;font:700 13px/1.4 sans-serif}main{max-width:1180px;margin:0 auto;padding:16px}</style>
+</head><body>
+<p class="mock-banner">모의 상태 화면 — 로컬 테스트 데이터 · 실제 DB · Meta 조회 아님 · 실행 기록 저장 스위치를 이 페이지에서만 켬</p>
+<main id="host"></main>
+<script>
+// 검수용: 실제 화면 마크업(launchroas/index.html의 #recordsView)을 그대로 가져와 가짜 앱 · 가짜 DB(메모리)로 그린다
+window.LAUNCHROAS_FLAGS = { adlogChangeRecords: true };
+var db = { ad_log: [], ad_log_decision: [] };
+function add(type, data){ db[type].unshift({ data: data }); }
+var base = { store_id: '4', channel: '메타' };
+add('ad_log', Object.assign({ id: 101, date: '2026-09-28', name: '직접 입력 · 니트 캠페인', spend: 84000, revenue: 210000 }, base));
+add('ad_log', Object.assign({ id: 102, source: 'meta_auto', meta_auto_key: '4|act_9|2026-09-28', date: '2026-09-28', name: 'Meta 캠페인 전체 합계', spend: 152000, revenue: 418000, currency: 'KRW' }, base));
+add('ad_log', Object.assign({ id: 103, date: '2026-09-29', name: '직접 입력 · 같은 금액', spend: 131000, revenue: 300000 }, base));
+add('ad_log', Object.assign({ id: 104, source: 'meta_auto', meta_auto_key: '4|act_9|2026-09-29', date: '2026-09-29', name: 'Meta 캠페인 전체 합계', spend: 131000, revenue: 302000, currency: 'KRW' }, base));
+add('ad_log', Object.assign({}, base, { id: 105, date: '2026-09-30', name: '해외 계정 테스트 광고', spend: 48.5, revenue: 120, currency: 'USD', channel: '인스타' }));
+add('ad_log', Object.assign({}, base, { id: 106, date: '2026-09-30', name: '네이버 검색', spend: 30000, revenue: 96000, channel: '네이버' }));
+function mk(days, spend, buy){ return { since: '', until: '', days: days, missing_days: 0, spend: spend, impressions: spend * 12, link_clicks: spend / 90, purchases: { value: buy, observed: true }, purchase_value: { value: buy * 32000, observed: true }, link_ctr: 0.9, link_cpc: 90, roas: buy * 32000 / spend }; }
+var change1 = Object.assign({ id: 201, action_id: 'act_demo1', source: 'change', date: '2026-09-08', name: '니트 가디건 광고 · 문구 변경', ad: { ad_id: '1201', adset_id: '2201', ad_name: '니트 가디건 광고', new_ad_id: null },
+  suggestion: { week: '2026-09-01', ad_id: '1201', verdict: '개선 필요', proposed: '첫 줄을 확인된 소재 정보로' }, change: { element: '문구', before: '가을 신상 10% 할인', after: '울 50% · 가벼운 두께', method: 'edit' },
+  compare: { days: 7, before: { since: '2026-09-01', until: '2026-09-07' }, after: { since: '2026-09-08', until: '2026-09-14' } }, baseline: { metrics: mk(7, 70000, 7) },
+  basis: { currency: 'KRW', attribution: 'API 기본(클릭 후 7일 · 조회 후 1일)', margin: { product_label: '니트 가디건', pre_ad: 20000, source_saved_at: 's1' } }, concurrent: ['할인'], concurrent_note: '9/10~9/12 전 품목 10%', memo: '' }, base);
+add('ad_log', change1);
+add('ad_log', Object.assign({ id: 202, source: 'change_result', action_id: 'act_demo1', date: '2026-09-16', name: '니트 가디건 광고 · 결과 악화', measured_at: '2026-09-16T01:00:00Z', after: mk(7, 42000, 3),
+  result: { status: 'worse', reasons: ['같은 계산 범위의 예상 이익이 줄었어요'], warnings: ['같은 기간에 함께 바뀐 조건(할인)이 있어 이 변경의 효과만 따로 볼 수 없어요', '광고비 감소는 ①지출 변화로만 기록해요 · 개선 성공이 아니에요'], provisional: false, separable: false,
+    spend: { before: 70000, after: 42000, diff: -28000, currency: 'KRW' }, profit: { before: 70000, after: 18000, diff: -52000, basis: '변경 기록 당시 상품 마진 · 환율 기준' },
+    missing_cost: { before_per_order: 20000, now_per_order: 17500, per_order: 2500, note: '빠졌던 비용을 계산에 넣은 것 · 절약액이 아니며 ①②와 더하지 않아요' } } }, base));
+var change2 = JSON.parse(JSON.stringify(change1));
+Object.assign(change2, { id: 203, action_id: 'act_demo2', date: '2026-09-22', name: '데님 팬츠 광고 · 영상 첫 장면 변경', ad: { ad_id: '1301', adset_id: '2301', ad_name: '데님 팬츠 광고', new_ad_id: '1302' },
+  change: { element: '영상 첫 장면', before: '0~2초 실물 펼친 장면', after: '0초 착용 전신 + 밑단 스냅 시연', method: 'new_ad' }, compare: { days: 7, before: { since: '2026-09-15', until: '2026-09-21' }, after: { since: '2026-09-22', until: '2026-09-28' } },
+  concurrent: [], concurrent_note: '', baseline: { metrics: mk(7, 63000, 4) }, basis: { currency: 'KRW', attribution: 'API 기본(클릭 후 7일 · 조회 후 1일)', margin: { product_label: '데님 팬츠', pre_ad: 21000, source_saved_at: 's1' } } });
+add('ad_log', change2);
+var client = { from: function(table){ var f = {}; var q = { select: function(){ return q; }, order: function(){ return q; }, eq: function(k, v){ f[k] = v; return q; },
+  insert: function(row){ if(table === 'tool_records') (db[row.tool_type] = db[row.tool_type] || []).unshift({ data: row.data }); return Promise.resolve({ error: null }); },
+  then: function(ok, fail){ return Promise.resolve(table === 'ad_margin_links' ? { data: [{ meta_adset_id: '2301', product_label: '데님 팬츠', pre_ad: 21000, source_saved_at: 's1' }], error: null } : { data: (db[f.tool_type] || []).slice(), error: null }).then(ok, fail); } }; return q; },
+  functions: { invoke: function(name, o){ return Promise.resolve({ data: { ok: true, account: { currency: 'KRW' }, ads: [{ ad_id: '1302', metrics: { spend: 9000, impressions: 120000, link_clicks: 1300, purchase: { value: 1, observed: true }, purchase_value: { value: 34000, observed: true } } }] } }); } } };
+var ctx = { client: client, userId: 'mock', storeId: '4', stores: [{ id: '4' }], metaAccount: { id: 'm', status: 'connected', external_account_id: 'act_9' }, fx: null };
+window.LaunchRoasApp = { getContext: function(){ return ctx; }, subscribe: function(fn){ fn(ctx); }, showView: function(){} };
+window.launchdeskAdlogMeta = { buildMetaAdlogRecord: function(){ return { ok: false, message: '모의 화면' }; } };
+fetch('../../../launchroas/index.html').then(function(r){ return r.text(); }).then(function(html){
+  var sec = new DOMParser().parseFromString(html, 'text/html').getElementById('recordsView'); sec.hidden = false;
+  document.getElementById('host').appendChild(document.importNode(sec, true));
+  return ['adlog-core.js', 'adlog-change-core.js', 'adlog.js'].reduce(function(p, f){ return p.then(function(){ return new Promise(function(res){ var s = document.createElement('script'); s.src = '../../../launchroas/' + f; s.onload = res; document.body.appendChild(s); }); }); }, Promise.resolve());
+}).then(function(){
+  if(location.hash === '#form') window.LaunchRoasAdlog.startChange({ ad: { ad_id: '1201', ad_name: '니트 가디건 광고', adset_id: '2201' }, before: '가을 신상 10% 할인', after: '울 50% · 가벼운 두께', suggestion: { week: '2026-09-29', ad_id: '1201', verdict: '개선 필요', proposed: '본문 첫 줄을 확인된 소재 정보로 바꾼 새 광고 추가' } });
+  document.title = 'mock ready';
+});
+</script>
+</body></html>

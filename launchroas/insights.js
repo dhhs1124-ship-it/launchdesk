@@ -66,7 +66,7 @@
     if(key==='frequency')return v+'회';
     return Number(v).toLocaleString('ko-KR');
   }
-  var VERDICT={'개선 필요':{label:'우선 확인',tone:'check',rank:0},'판단 보류':{label:'판단 보류',tone:'hold',rank:1},'유지':{label:'유지',tone:'keep',rank:2}};
+  var VERDICT={'개선 필요':{label:'우선 확인',tone:'check',rank:0},'추가 확인':{label:'확인 필요',tone:'hold',rank:1},'판단 보류':{label:'판단 보류',tone:'hold',rank:1},'유지':{label:'유지',tone:'keep',rank:2}};
   function verdictView(v){return VERDICT[v]||{label:'분석 없음',tone:'none',rank:3};}
   // 핵심 변화 한 줄 — 실제 지표로만(구매 · ROAS, 부족하면 광고비)
   function changeLine(a,cur){
@@ -219,6 +219,8 @@
     h.append(el('h3','',list.length?'점검 결과 '+list.length+'개':'분석한 광고가 없어요'));
     if(list.length)h.appendChild(el('span','wk-need'+(need?' is-warn':''),need?'우선 확인 '+need+'개':'우선 확인할 광고 없음'));
     if(status==='partial')h.appendChild(el('span','wk-partial','일부만 분석됨'));
+    // 분석 기준 버전 — 사례 연결 전 결과는 '이전 기준'으로 표시(새 기준으로 다시 분석한 것처럼 보이지 않게)
+    h.appendChild(el('span','wk-partial',r.policy_version?'분석 기준 '+r.policy_version:'이전 기준 결과'));
     frag.appendChild(h);
     var ol=el('ul','wk-ads');shown.forEach(function(a){ol.appendChild(renderAd(a,cur));});frag.appendChild(ol);
     if(list.length>3){var more=el('button','wk-all',ui.all?'접기 ↑':'점검 결과 전체 '+list.length+'개 보기 ↓');more.type='button';more.addEventListener('click',function(){ui.all=!ui.all;render();});frag.appendChild(more);}
@@ -245,7 +247,7 @@
       tab('why','판단 근거');if(usable)tab('improve',v.tone==='keep'?'광고 개선안 (선택)':'광고 개선안');
       li.appendChild(tabs);
       if(open==='why')li.appendChild(renderWhy(a,an,cur));
-      if(open==='improve'&&usable)li.appendChild(renderImprove(an,v));
+      if(open==='improve'&&usable)li.appendChild(renderImprove(an,v,a));
     }
     return li;
   }
@@ -274,7 +276,7 @@
     return box;
   }
   // 광고 개선안 — 무엇을 바꿀지 → 수정 예시 → 비교 방법을 먼저, 세부 지표 · 판단 기준은 더 펼쳐서
-  function renderImprove(an,v){
+  function renderImprove(an,v,a){
     var rec=an.recommendation,t=rec.test||{},box=el('div','wk-panel wk-improve'),g=el('dl','wk-rec');
     var add=function(dl,k,txt){if(txt){dl.append(el('dt','',k),el('dd','',I.koText(txt)));}};
     if(v.tone==='keep')box.appendChild(el('p','wk-sub wk-optional','지금 광고는 바꿀 필요가 없다는 판단이에요. 아래는 새 광고로 비교해 볼 수 있는 선택적 개선안이에요.'));
@@ -290,6 +292,19 @@
     if(t.compare_metrics&&t.compare_metrics.length)add(m,'비교 지표',t.compare_metrics.map(function(x){return /^[a-z_]+$/.test(x)?I.metricName(x):x;}).join(', '));
     add(m,'판단 기준',[t.decision_rule,t.sample_note].filter(Boolean).join(' '));
     more.appendChild(m);box.appendChild(more);
+    // 실행 기록 — 광고 기록 화면의 입력 양식을 이 제안으로 채워 연다(광고 자체는 바꾸지 않음)
+    if(a&&window.LaunchRoasAdlog&&window.LaunchRoasAdlog.startChange){
+      var acts=el('div','wk-actions'),go=el('button','secondary','실행 기록');go.type='button';
+      go.addEventListener('click',function(){
+        var d=wk.data||{},r=d.result||{},cr=a.creative||{};
+        window.LaunchRoasAdlog.startChange({ad:{ad_id:a.ad_id,ad_name:a.ad_name},element:rec.element||'문구',
+          before:cr.body?String(cr.body).split(/\n/)[0]:'',after:rec.example||'',
+          suggestion:{week:d.quota&&d.quota.week||null,ad_id:a.ad_id,verdict:an.verdict||null,proposed:rec.proposed||null,example:rec.example||null,
+            model:r.model||null,effort:r.effort||null,policy_version:r.policy_version||null,case_ids:an.case_ids||[]},
+          creative:{format:cr.format||null,title:cr.title||null,body:cr.body||null,headline_display:cr.headline||null,checked_week:d.quota&&d.quota.week||null,image_refs:null}});
+      });
+      acts.appendChild(go);box.appendChild(acts);
+    }
     return box;
   }
   // AI 점검 전 — 광고 세트별 규칙 기반 확인 신호만 짧게(AI 분석과 구분)

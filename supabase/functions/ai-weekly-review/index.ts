@@ -6,6 +6,7 @@ import {
   config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
   batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT,
 } from "../_shared/ai-weekly-core.mjs";
+import { POLICY_VERSION, PLAYBOOK_VERSION, POLICY_ADDENDUM, policyOn, selectCases } from "../_shared/ai-policy.mjs";
 
 // LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
 // 계정당 주 1회(한국 시간 월요일 00시 갱신) · 여러 광고를 묶어 전체 점검 1회로 계산.
@@ -68,12 +69,18 @@ async function downloadImage(url: string) {
   }
 }
 
+// 분석 기준(정책 MD · 사례) — 시크릿 AI_POLICY_VERSION=${POLICY_VERSION}일 때만 켜진다. 기본은 기존 지시문 그대로.
+const POLICY = policyOn(env);
+const SYSTEM = POLICY ? SYSTEM_PROMPT + POLICY_ADDENDUM : SYSTEM_PROMPT;
+const policyMeta = () => POLICY ? { policy_version: POLICY_VERSION, playbook_version: PLAYBOOK_VERSION } : { policy_version: null, playbook_version: null };
+const casesFor = (ads: any[], peers: any) => { if (!POLICY) return null; const m: Record<string, string[]> = {}; for (const a of ads) m[a.ad_id] = selectCases(a, peers); return m; };
+
 async function claude(key: string, model: string, maxTokens: number, content: unknown[], effort?: string) {
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: maxTokens, system: SYSTEM_PROMPT, messages: [{ role: "user", content }], ...(effort ? { output_config: { effort } } : {}) }),
+      body: JSON.stringify({ model, max_tokens: maxTokens, system: SYSTEM, messages: [{ role: "user", content }], ...(effort ? { output_config: { effort } } : {}) }),
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data) return { ok: false as const, status: res.status, usage: data?.usage };
@@ -187,6 +194,7 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
   for (const a of snap.ads) adsById[a.ad_id] = a;
   const peers = peerGroups(snap.ads);
   const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency };
+  const casesById = casesFor(snap.ads, peers);
   // 입력은 한 번만 만든다(이미지 포함) — 두 effort가 바이트 단위로 같은 입력을 받는다
   const prepared = await Promise.all(batches.map(async (b: any) => {
     const images: Record<string, any[]> = {};
@@ -194,7 +202,7 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
       images[id] = [];
       for (const im of adsById[id].imagePlan || []) { const got = await downloadImage(im.url); im.sent = !!got; if (got) images[id].push({ ...got, label: im.label }); }
     }
-    return { b, content: batchContent(b, adsById, peers, context, images), images: Object.values(images).reduce((t, l) => t + l.length, 0) };
+    return { b, content: batchContent(b, adsById, peers, context, images, casesById), images: Object.values(images).reduce((t, l) => t + l.length, 0) };
   }));
   const label = String(body?.label || "verify").slice(0, 60);
   const runs = await Promise.all(efforts.map(async (effort: string) => {
@@ -205,13 +213,13 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
       usage.calls++; usage.images += p.images;
       if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
       if (res.ok) usage.stop_reasons.push(res.stop);
-      const parsed = res.ok ? parseBatch(res.text, p.b, adsById, peers) : null;
+      const parsed = res.ok ? parseBatch(res.text, p.b, adsById, peers, casesById) : null;
       if (parsed) Object.assign(results, parsed);
       failed.push(...p.b.ad_ids.filter((id: string) => !parsed || !parsed[id]));
     }
     const row = { user_id: userId, store_id: storeId, label, effort, model: cfg.model, status: failed.length ? "failed" : "completed",
       usage, cost_usd: Math.round(cost * 10000) / 10000, duration_ms: Date.now() - t0,
-      result: { ads_by_id: results, failed_ads: failed, period: snap.period,
+      result: { ...policyMeta(), ads_by_id: results, failed_ads: failed, period: snap.period,
         inputs: snap.ads.map((a: any) => ({ ad_id: a.ad_id, placement: a.placement, title: a.creative?.title ?? null, images_sent: (a.imagePlan || []).filter((im: any) => im.sent).length })) } };
     const ins = await admin.from("ai_weekly_verifications").insert(row).select("id").single();
     if (ins.error) console.error("ai-weekly-review verify save:", ins.error.message);
@@ -304,6 +312,7 @@ export default {
       for (const a of snap.ads) adsById[a.ad_id] = a;
       const peers = peerGroups(snap.ads);
       const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency };
+      const casesById = casesFor(snap.ads, peers);
       const results: Record<string, any> = { ...(row?.result?.ads_by_id || {}) };
       const usage = { ...(row?.usage || {}) } as any;
       usage.calls = usage.calls || 0; usage.input_tokens = usage.input_tokens || 0; usage.output_tokens = usage.output_tokens || 0; usage.images = usage.images || 0;
@@ -327,12 +336,12 @@ export default {
             if (got) images[id].push({ ...got, label: im.label });
           }
         }
-        const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images), cfg.effort);
+        const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images, casesById), cfg.effort);
         usage.calls++;
         if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
         usage.images += Object.values(images).reduce((t, l) => t + l.length, 0);
         if (res.ok && res.stop !== "end_turn") (usage.stop_reasons = usage.stop_reasons || []).push(res.stop); // max_tokens = 답변 잘림 · refusal = 거절
-        const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, b, adsById, peers) : null;
+        const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, b, adsById, peers, casesById) : null;
         const missing = b.ad_ids.filter((id: string) => !parsed || !parsed[id]);
         if (parsed) Object.assign(results, parsed);
         b.status = !parsed || missing.length === b.ad_ids.length ? "failed" : "done";
@@ -360,7 +369,7 @@ export default {
           creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, notes: a.creative?.notes, headline: a.placement?.headline || "unknown" } })),
         coverage: { total: snap.counts.total, analyzed: Object.keys(results).length, requested: snap.counts.analyzed,
           skipped: snap.skipped, failed_ads: batches.flatMap((b: any) => b.status === "done" ? b.missing || [] : b.ad_ids) },
-        notes: budgetHit ? snap.notes.concat(["이번 달 AI 운영 한도에 도달해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"]) : snap.notes, model: cfg.model, effort: cfg.effort,
+        notes: budgetHit ? snap.notes.concat(["이번 달 AI 운영 한도에 도달해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"]) : snap.notes, model: cfg.model, effort: cfg.effort, ...policyMeta(),
       };
       return await finish({ status, batches, result, usage, cost_usd: Math.round(cost * 10000) / 10000,
         retry_count: (row?.retry_count || 0) + (retried ? 1 : 0), period: snap.period,

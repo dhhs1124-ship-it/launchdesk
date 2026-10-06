@@ -55,6 +55,14 @@
 - `docs/ai/ad-improvement-loop-design.md` — 실행 기록 ↔ 광고 기록 연결, 절감 · 성과 기준, 구현 순서
 - 기본 effort는 medium으로 배포됨(`AI_EFFORT`로 변경 가능).
 
+## 광고 기록 확장 · 영상 분석 준비 (2026-10-06 · 미리보기 브랜치 · 미배포)
+
+- 설계 · 구현 상태: `docs/ai/ad-improvement-loop-design.md` 5-4~5-7 · 7-3 · 8~11장
+- 운영 메인 최소 호환: 로컬 브랜치 `compat/main-adlog-nan`(master 기준 · 푸시 안 함) — 배포 전까지 실행 기록 저장 스위치(`window.LAUNCHROAS_FLAGS.adlogChangeRecords`)를 켜지 않는다
+- 경쟁사 영상 8개 표본 프레임 관찰: `docs/ai/research/2026-10-06-competitor-video-notes.md`
+- 정책 · 사례 서버 연결: `_shared/ai-policy.mjs`(시크릿 `AI_POLICY_VERSION` 없으면 꺼짐)
+- 영상 원본 확인 함수 초안: `supabase/functions/ad-video-source`(미배포)
+
 ## 관련 파일
 
 | 파일 | 내용 |

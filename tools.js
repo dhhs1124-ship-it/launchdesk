@@ -862,7 +862,6 @@
   function hasRevenue(r){ return typeof r.revenue === 'number' && isFinite(r.revenue); }
   function adlogRoas(r){ return (hasRevenue(r) && r.spend > 0) ? r.revenue / r.spend : null; }
   function renderAdlog(){
-    var AC = window.launchdeskAdlogCore || null; // 광고 기록 공통 계산 규칙(adlog-core.js) — 없으면 예전 계산
     if(!adlogTbody) return;
     // 합계는 지금 쇼핑몰의 기록만(store_id 일치). 쇼핑몰이 없으면(비회원 · 쇼핑몰 0개)
     // 쇼핑몰 미지정 기록끼리. 합계에 넣지 않는 기록도 지울 수 있게 목록에는 남긴다:
@@ -876,41 +875,40 @@
     var all = getAdlogRecords();
     var inScope = function(r){ return String(r.store_id || '') === storeId; };
     var isOrphan = function(r){ return !!r.store_id && !!existing && existing.indexOf(String(r.store_id)) === -1; };
+    // 금액이 없는 기록(LaunchROAS 실행 기록 source='change' · 결과 기록 'change_result')은 목록에만 두고 합계에서 뺀다
+    var isNoAmount = function(r){ return r.source === 'change' || r.source === 'change_result'; };
     var list = all.filter(function(r){ return inScope(r) || !r.store_id || isOrphan(r); });
-    var scoped = all.filter(function(r){ return inScope(r) && !isOrphan(r); });
+    var scoped = all.filter(function(r){ return inScope(r) && !isOrphan(r) && !isNoAmount(r); });
     if(!list.length){
       adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">아직 기록이 없어요 — "+ 기록 추가"나 "Meta 성과 기록하기"로 첫 광고 성과를 남겨보세요.</div></td></tr>';
     } else {
-      // 공통 계산 규칙(adlog-core.js): 같은 날 Meta 자동 기록과 겹치는 직접 입력 · 원화 아닌 기록 · 변경/결과 기록 표시
-      var dup = AC ? AC.summarize(scoped).duplicates : {}, links = AC ? AC.linkChanges(all) : null;
       adlogTbody.innerHTML = list.map(function(r){
-        var roas = AC && !AC.isAmount(r) ? null : adlogRoas(r);
+        var roas = adlogRoas(r);
         var chanColor = {메타:'var(--badge-a)', 네이버:'var(--badge-c)', 카카오:'var(--badge-b)', 인스타:'var(--badge-d)'}[r.channel] || 'var(--ink-faint)';
-        var tags = (AC ? AC.rowLabel(r, dup, links) : (r.source === 'meta_auto' ? ['Meta 자동 · 귀속 구매금액'] : []))
-          .map(function(t){ return ' <span class="adlog-tag">' + escapeHtml(t) + '</span>'; }).join('') +
+        var auto = r.source === 'meta_auto';
+        var tags = (auto ? ' <span class="adlog-tag">Meta 자동 · 귀속 구매금액</span>' : '') +
+          (isNoAmount(r) ? ' <span class="adlog-tag">' + (r.source === 'change' ? '변경 기록' : '결과 기록') + ' · 합계 제외</span>' : '') +
           ((storeId && !r.store_id) ? ' <span class="adlog-tag">쇼핑몰 미지정 · 합계 제외</span>' : '') +
           (isOrphan(r) ? ' <span class="adlog-tag">삭제된 쇼핑몰 기록 · 현재 합계 제외</span>' : '');
         return '<tr>' +
           '<td>' + escapeHtml(r.date) + '</td>' +
           '<td><span class="adlog-channel" style="background:' + chanColor + '">' + escapeHtml(r.channel) + '</span></td>' +
           '<td>' + escapeHtml(r.name) + tags + '</td>' +
-          '<td class="num">' + (AC ? AC.moneyText(r, r.spend) : '₩' + Math.round(r.spend).toLocaleString('ko-KR')) + '</td>' +
-          '<td class="num">' + (AC ? AC.moneyText(r, r.revenue) : (hasRevenue(r) ? '₩' + Math.round(r.revenue).toLocaleString('ko-KR') : '—')) + '</td>' +
+          '<td class="num">' + (isNoAmount(r) || typeof r.spend !== 'number' ? '—' : '₩' + Math.round(r.spend).toLocaleString('ko-KR')) + '</td>' +
+          '<td class="num">' + (hasRevenue(r) ? '₩' + Math.round(r.revenue).toLocaleString('ko-KR') : '—') + '</td>' +
           '<td class="num ' + (roas === null ? '' : roasClass(roas)) + '">' + (roas === null ? '—' : roas.toFixed(1) + 'x') + '</td>' +
           '<td><button type="button" class="adlog-del" data-id="' + escapeHtml(r.id) + '">✕</button></td>' +
         '</tr>';
       }).join('');
     }
-    // 합계: 공통 규칙(변경/결과 기록 · 중복 직접 입력 · 환율 없는 외화 기록 제외). adlog-core.js가 없으면 예전 계산.
-    var sum = AC ? AC.summarize(scoped) : (function(){
-      var withRevenue = scoped.filter(function(r){ return hasRevenue(r) && r.spend > 0; });
-      var revSpend = withRevenue.reduce(function(s, r){ return s + r.spend; }, 0), revTotal = withRevenue.reduce(function(s, r){ return s + r.revenue; }, 0);
-      return { totalSpend: scoped.reduce(function(s, r){ return s + (Number(r.spend) || 0); }, 0), averageRoas: revSpend > 0 ? revTotal / revSpend : null,
-        best: withRevenue.slice().sort(function(a, b){ return adlogRoas(b) - adlogRoas(a); })[0] || null };
-    })();
-    document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(sum.totalSpend).toLocaleString('ko-KR');
-    document.getElementById('adlogSumRoas').textContent = sum.averageRoas != null ? sum.averageRoas.toFixed(1) + 'x' : '—';
-    document.getElementById('adlogSumBest').textContent = sum.best ? (sum.best.name + ' (' + sum.best.date + ')') : '—';
+    var totalSpend = scoped.reduce(function(s, r){ return s + (Number(r.spend) || 0); }, 0);
+    var withRevenue = scoped.filter(function(r){ return hasRevenue(r) && r.spend > 0; });
+    var revSpend = withRevenue.reduce(function(s, r){ return s + r.spend; }, 0);
+    var revTotal = withRevenue.reduce(function(s, r){ return s + r.revenue; }, 0);
+    var best = withRevenue.slice().sort(function(a, b){ return adlogRoas(b) - adlogRoas(a); })[0];
+    document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(totalSpend).toLocaleString('ko-KR');
+    document.getElementById('adlogSumRoas').textContent = revSpend > 0 ? (revTotal / revSpend).toFixed(1) + 'x' : '—';
+    document.getElementById('adlogSumBest').textContent = best ? (best.name + ' (' + best.date + ')') : '—';
   }
   window.launchdeskAdlog = { render: renderAdlog };
   if(adlogTbody){

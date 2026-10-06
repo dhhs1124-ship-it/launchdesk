@@ -1,3 +1,4 @@
+import { casesBlock } from "./ai-policy.mjs";
 // 주간 AI 광고 점검 — 순수 함수(기간 · 광고 정리 · 소재 추출 · 묶음 · 프롬프트 · 출력 검증 · 이용 횟수 판단 · 비용).
 // 네트워크 · DB는 index.ts에서만 다룬다. 이 파일은 node --test로 검증한다.
 
@@ -256,11 +257,13 @@ export function adPayload(a, peers) {
 }
 function safeHost(u) { try { return new URL(u).hostname; } catch { return null; } }
 
-export function batchContent(batch, adsById, peers, context, images) {
+// casesById(선택): 광고별 참고 사례 ID — 분석 기준(ai-policy.mjs)이 켜졌을 때만 넘긴다
+export function batchContent(batch, adsById, peers, context, images, casesById) {
   const blocks = [{ type: "text", text: "기간 · 계산 기준:\n" + JSON.stringify(context) }];
   for (const id of batch.ad_ids) {
     const a = adsById[id];
     blocks.push({ type: "text", text: `<ad_data ad_id="${id}">\n${JSON.stringify(adPayload(a, peers))}\n</ad_data>` });
+    if (casesById && casesById[id] && casesById[id].length) blocks.push(casesBlock(id, casesById[id]));
     for (const im of images[id] || []) {
       blocks.push({ type: "text", text: `광고 ${id} — ${im.label}` });
       blocks.push({ type: "image", source: { type: "base64", media_type: im.media_type, data: im.data } });
@@ -280,10 +283,11 @@ export function lookup(obj, path) {
   }
   return cur;
 }
-const VERDICTS = ["개선 필요", "판단 보류", "유지"];
+// '추가 확인'은 분석 기준(ai-policy.mjs POLICY_ADDENDUM)을 켰을 때만 나온다 — 기존 지시문은 세 가지
+const VERDICTS = ["개선 필요", "판단 보류", "유지", "추가 확인"];
 const t = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 const list = (v, n, m) => (Array.isArray(v) ? v.map((x) => t(x, m)).filter(Boolean).slice(0, n) : []);
-export function parseBatch(raw, batch, adsById, peers) {
+export function parseBatch(raw, batch, adsById, peers, casesById) {
   if (typeof raw !== "string") return null;
   const s = raw.indexOf("["), e = raw.lastIndexOf("]");
   if (s < 0 || e <= s) return null;
@@ -304,6 +308,7 @@ export function parseBatch(raw, batch, adsById, peers) {
     let rec = r.recommendation && typeof r.recommendation === "object" ? r.recommendation : null;
     // 실제 지표 근거가 없으면 개선안을 인정하지 않는다(판단 보류)
     if (!evidence.length && verdict !== "판단 보류") { verdict = "판단 보류"; rec = null; }
+    if (verdict === "추가 확인") rec = null; // 데이터 확인이 먼저 — 변경안 · 예산을 내지 않는다
     const test = rec && rec.test && typeof rec.test === "object" ? rec.test : {};
     results[id] = {
       ad_id: id, verdict, headline: t(r.headline, 160), next_action: t(r.next_action, 160),
@@ -317,7 +322,8 @@ export function parseBatch(raw, batch, adsById, peers) {
         example_is_provisional: rec.example_is_provisional === true, needs_info: list(rec.needs_info, 5, 200),
         test: { method: t(test.method, 400), compare_metrics: list(test.compare_metrics, 6, 80), decision_rule: t(test.decision_rule, 300), sample_note: t(test.sample_note, 300) },
       } : null,
-      budget_note: t(r.budget_note, 400) || null,
+      budget_note: verdict === "추가 확인" ? null : t(r.budget_note, 400) || null,
+      case_ids: casesById && casesById[id] ? casesById[id].slice() : [],
       limits: list(r.limits, 6, 300),
     };
   }

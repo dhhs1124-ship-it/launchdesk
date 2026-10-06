@@ -271,3 +271,24 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .wk-improve .wk-rec dt{color:#ffbd92}
 .wk-improve .wk-full{padding-top:2px}
 .wk-held{color:#aab3b5}
+/* 광고 기록 확장 — 중복 선택 · 실행 기록 · 결과 비교 */
+.adlog-tag{display:inline-block;margin:4px 0 0 6px;padding:2px 7px;border-radius:999px;background:#2a3133;color:#c9d0d1;font-size:11px;line-height:1.5}
+.adlog-decision{display:flex;align-items:center;gap:6px;margin-top:6px;color:#aeb5b7;font-size:11px}.adlog-decision select{height:30px;border:1px solid #41494d;border-radius:7px;background:#111618;color:#f5f5f3;padding:0 8px;color-scheme:dark}
+.adlog-account{grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}.adlog-account small{grid-column:1/-1;color:#8f999b;font-size:11px}.adlog-account select{height:42px;border:1px solid #41494d;border-radius:8px;background:#111618;color:#f5f5f3;padding:0 12px;color-scheme:dark}.adlog-account[hidden]{display:none}
+.adlog-total-note{color:#c9b38f;font-size:11px;line-height:1.5}
+.adlog-change-form,.adlog-changes{margin-top:26px;padding:22px;border:1px solid #41494d;border-radius:12px;background:#1d2224}.adlog-change-form h2,.adlog-sub-head h2{margin:0;font-size:17px;letter-spacing:-.03em}
+.chg-target{margin:10px 0 4px;color:#fff;font-weight:600}.chg-flag{margin:12px 0;padding:10px 12px;border-left:3px solid #ff9a61;background:#2a2421;color:#f1d9c8;font-size:12px}.chg-flag[hidden]{display:none}
+.chg-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:14px}.chg-grid label,.chg-grid fieldset{display:flex;flex-direction:column;gap:7px;color:#ccd1d1;font-size:12px;min-width:0}.chg-wide{grid-column:1/-1}
+.chg-grid input,.chg-grid select,.chg-grid textarea{min-width:0;border:1px solid #41494d;border-radius:8px;background:#111618;color:#f5f5f3;padding:10px 12px;color-scheme:dark;font:inherit}.chg-grid input,.chg-grid select{height:42px;padding:0 12px}
+.chg-grid fieldset{border:1px solid #2f3639;border-radius:8px;padding:10px 12px}.chg-grid legend{padding:0 4px}.chg-checks{display:flex;flex-wrap:wrap;gap:6px 14px}.adlog-check{display:flex;align-items:center;gap:6px;flex-direction:row!important}
+.adlog-change-form .form-actions,.adlog-change .form-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.adlog-sub-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.adlog-sub-head .small{color:#9ca5a7}
+.adlog-change{margin-top:12px;padding:16px;border:1px solid #2f3639;border-radius:10px;background:#191d1f}.adlog-change-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.adlog-change-head strong{color:#fff}
+.adlog-change-dl{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;margin:12px 0 0;font-size:12px}.adlog-change-dl dt{color:#8f999b}.adlog-change-dl dd{margin:0;color:#d6dbdb;overflow-wrap:anywhere}
+.adlog-result{margin-top:14px;padding-top:12px;border-top:1px solid #ffffff14}.adlog-result-verdict{margin:0 0 10px;color:#fff;font-size:13px;font-weight:600}
+.adlog-result-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.adlog-result-grid>div{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:9px;background:#252b2d;font-size:11px;color:#aeb8b9}.adlog-result-grid strong{color:#fff;font-size:15px}.adlog-result-grid small{color:#8f999b;line-height:1.5}
+.adlog-warn{margin:10px 0 0;padding-left:18px;color:#c9b38f;font-size:11px;line-height:1.7}
+.wk-actions{display:flex;gap:8px;margin-top:10px}
+@media(max-width:1100px){.chg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.chg-grid,.adlog-account,.adlog-result-grid{grid-template-columns:1fr}.adlog-account{grid-column:auto}.adlog-change-dl{grid-template-columns:1fr}.adlog-change-dl dd{margin-bottom:6px}.adlog-change-form,.adlog-changes{padding:16px}}
+.adlog-change .primary,.adlog-change-form .primary{margin:0;padding:0 18px;height:42px}

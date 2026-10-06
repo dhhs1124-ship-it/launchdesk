@@ -141,9 +141,28 @@
         <section class="operations-panel adlog-panel">
           <div class="adlog-head"><button id="adlogAdd" type="button" class="secondary">+ 기록 추가</button></div>
           <div class="adlog-toolbar"><label for="adlogMetaDate">Meta 기록할 날짜</label><input id="adlogMetaDate" type="date"><button id="adlogMetaSave" type="button" class="secondary">Meta 성과 기록하기 (어제)</button><span id="adlogMessage" class="small" role="status"></span></div>
-          <form id="adlogForm" class="adlog-form" hidden><label>날짜<input id="adlogDate" type="date" required></label><label>소재명<input id="adlogName" maxlength="100" required></label><label>광고비 (원)<input id="adlogSpend" type="number" min="0" required></label><label>전환 매출 (원)<input id="adlogRevenue" type="number" min="0" required></label><label>채널<select id="adlogChannel"><option>메타</option><option>네이버</option><option>카카오</option><option>인스타</option></select></label><div class="form-actions"><button type="submit" class="primary">저장하기</button><button type="button" id="adlogCancel" class="secondary">취소</button></div></form>
+          <form id="adlogForm" class="adlog-form" hidden><label>날짜<input id="adlogDate" type="date" required></label><label>소재명<input id="adlogName" maxlength="100" required></label><label>광고비 (원)<input id="adlogSpend" type="number" min="0" required></label><label>전환 매출 (원)<input id="adlogRevenue" type="number" min="0" required></label><label>채널<select id="adlogChannel"><option>메타</option><option>네이버</option><option>카카오</option><option>인스타</option></select></label><div id="adlogAccountWrap" class="adlog-account"><label>광고계정<select id="adlogAccount"><option value="">모름</option><option value="connected">이 쇼핑몰에 연결한 Meta 광고계정</option><option value="other">다른 광고계정</option></select></label><label>집계 범위<select id="adlogScope"><option value="">모름</option><option value="account_total">광고계정 하루 전체</option><option value="partial">일부 캠페인 · 광고</option></select></label><small>같은 날 Meta 하루 합계와 중복인지 판단할 때 써요</small></div><div class="form-actions"><button type="submit" class="primary">저장하기</button><button type="button" id="adlogCancel" class="secondary">취소</button></div></form>
           <div class="adlog-table-wrap"><table><thead><tr><th>날짜</th><th>채널</th><th>기록 내용</th><th>광고비</th><th>전환 매출</th><th>ROAS</th><th></th></tr></thead><tbody id="adlogRows"></tbody></table></div>
-          <div class="adlog-totals"><div>총 광고비 <strong id="adlogTotalSpend">—</strong></div><div>평균 ROAS <strong id="adlogAverageRoas">—</strong></div><div>최고 기록 <strong id="adlogBest">—</strong></div></div>
+          <div class="adlog-totals"><div>총 광고비 <strong id="adlogTotalSpend">—</strong><small id="adlogTotalNote" class="adlog-total-note"></small></div><div>평균 ROAS <strong id="adlogAverageRoas">—</strong></div><div>최고 기록 <strong id="adlogBest">—</strong></div></div>
+          <form id="adlogChangeForm" class="adlog-change-form" hidden aria-labelledby="chgTitle">
+            <h2 id="chgTitle">실행 기록</h2>
+            <p id="chgTarget" class="chg-target"></p><p id="chgSuggest" class="small"></p>
+            <p id="chgFlag" class="chg-flag" role="note">운영 화면 호환 수정이 배포되기 전이라 저장을 꺼 두었어요. 입력해 볼 수는 있지만 저장되지 않아요.</p>
+            <div class="chg-grid">
+              <label>바꾼 요소<select id="chgElement"></select></label>
+              <label>방식<select id="chgMethod"><option value="new_ad">새 광고 추가</option><option value="edit">기존 광고 수정</option></select></label>
+              <label>새 광고 ID<input id="chgNewAd" inputmode="numeric" placeholder="새 광고를 추가했다면"></label>
+              <label>시작일<input id="chgStart" type="date" required></label>
+              <label>비교 기간(일)<input id="chgDays" type="number" min="3" max="28" value="7" required></label>
+              <label class="chg-wide">바꾸기 전<textarea id="chgBefore" rows="2" maxlength="500"></textarea></label>
+              <label class="chg-wide">실제로 바꾼 내용<textarea id="chgAfter" rows="2" maxlength="500" required placeholder="제안과 다르게 바꿨다면 실제 내용을 적어 주세요"></textarea></label>
+              <fieldset class="chg-wide"><legend>같은 기간에 함께 바뀐 조건</legend><div id="chgConcurrentBox" class="chg-checks"></div><input id="chgConcurrentNote" maxlength="200" placeholder="예: 10/10~10/12 전 품목 10% 할인"></fieldset>
+              <label class="chg-wide">메모<input id="chgMemo" maxlength="300"></label>
+            </div>
+            <p class="small">저장할 때 변경 전 같은 길이 기간의 광고 지표와 당시 계산 기준(통화 · 환율 · 귀속 기준 · 연결 상품 마진)을 함께 남겨요. 광고 자체는 바꾸지 않아요.</p>
+            <div class="form-actions"><button id="chgSave" type="submit" class="primary">실행 기록 저장</button><button id="chgCancel" type="button" class="secondary">닫기</button><span id="chgStatus" class="small" role="status"></span></div>
+          </form>
+          <section id="adlogChanges" class="adlog-changes" aria-label="실행 기록과 결과 비교"></section>
         </section>
       </section>
       <section id="connectionsView" hidden aria-labelledby="connectionsTitle">
@@ -229,6 +248,7 @@
   <script src="./sales.js"></script>
   <script src="./ad-performance.js"></script>
   <script src="./adlog-core.js"></script>
+  <script src="./adlog-change-core.js"></script>
   <script src="./adlog.js"></script>
   <script src="./tour.js"></script>
 </body>
