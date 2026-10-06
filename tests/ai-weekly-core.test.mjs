@@ -160,8 +160,44 @@ test("예약 최악 비용은 실제 입력의 상한 — 텍스트는 UTF-8 바
   assert.doesNotMatch(v, /input_tokens: 20000/);
   assert.ok(v.indexOf("worstCallUsd(price, v.system, batchContent(") > -1 && v.indexOf("worstCallUsd(") < v.indexOf("reserveBudget("), "내용 기준 최악 비용 → 예약 순서");
   assert.ok(v.indexOf("downloadImage(") < v.indexOf("reserveBudget("), "이미지를 받은 뒤 예약");
-  // 주간 실행(예약 없음): 사용량 미확인 호출은 0이 아니라 최악 비용으로 · 중간 예외로 끝나도 그때까지의 비용을 기록
+  // 주간 실행: 사용량 미확인 호출은 0이 아니라 최악 비용으로 · 중간 예외로 끝나도 그때까지의 비용을 기록
   const run = src.slice(src.indexOf("let runCost"));
-  assert.match(run, /usage\.unconfirmed_calls = \(usage\.unconfirmed_calls \|\| 0\) \+ 1;\s*cost \+= worstCallUsd\(priceOf\(cfg\.model\), SYSTEM, content, cfg\.maxOutputTokens\)/);
+  assert.match(run, /usage\.unconfirmed_calls = \(usage\.unconfirmed_calls \|\| 0\) \+ 1;\s*callCost = worstCallUsd\(priceOf\(cfg\.model\), SYSTEM, content, cfg\.maxOutputTokens\)/);
   assert.match(run, /catch \(e\)[\s\S]*cost_usd: Math\.round\(runCost \* 10000\) \/ 10000/);
+  assert.match(run, /catch \(e\)[\s\S]*reserved_cost_usd: Math\.round\(runReserved \* 10000\) \/ 10000/, "예외로 끝나도 예약에 들어간 비용 표시를 남긴다");
+});
+
+import { worstGroupUsd } from "../supabase/functions/_shared/ai-weekly-core.mjs";
+test("주간 실행 그룹 최악 비용 — 호출별 최악 비용 합(올림) · 계산 불가면 null(예약 · 호출 안 함)", () => {
+  const price = priceOf("claude-sonnet-5-5");
+  const a = [{ type: "text", text: "가" }], b = [{ type: "text", text: "b".repeat(500) }];
+  const sum = worstCallUsd(price, "s", a, 16000) + worstCallUsd(price, "s", b, 16000);
+  assert.equal(worstGroupUsd(price, "s", [a, b], 16000), Math.ceil(sum * 10000) / 10000);
+  assert.ok(worstGroupUsd(price, "s", [a, b], 16000) >= sum, "내림하지 않는다");
+  assert.equal(worstGroupUsd(null, "s", [a], 16000), null, "가격 없음");
+  assert.equal(worstGroupUsd(price, "s", [], 16000), null, "빈 그룹");
+});
+
+test("주간 실행도 그룹마다 원자적 예약 → 호출 → 정산(예외여도) · 예약 비용은 reserved_cost_usd로 남겨 이중 집계하지 않는다", () => {
+  const src = readFileSync(new URL("../supabase/functions/ai-weekly-review/index.ts", import.meta.url), "utf8");
+  const run = src.slice(src.indexOf("let runCost"), src.indexOf("const done = batches.filter"));
+  const at = (s) => { const i = run.indexOf(s); assert.ok(i > -1, "없음: " + s); return i; };
+  // 순서: 이미지 받기 → 내용 기준 그룹 최악 비용 → 예약(kind run) → 호출 → finally 정산
+  assert.ok(at("downloadImage(") < at("worstGroupUsd(priceOf(cfg.model), SYSTEM, prepared.map"));
+  assert.ok(at("worstGroupUsd(") < at('reserveBudget(admin, userId, storeId, "run", cfg.model, groupWorst, cfg.monthlyBudgetUsd'));
+  assert.ok(at("reserveBudget(") < at("await claude(key"));
+  assert.ok(at("await claude(key") < at("} finally {") && at("} finally {") < at("settleBudget(admin, rsv.id, cfg.model, groupCalls"));
+  assert.match(run, /if \(groupCalls\.length < prepared\.length\) groupCalls\.push\(\{ usage: undefined \}\)/, "중단되면 미확인 → 예약 금액 유지");
+  // 예약 거절 · 확인 실패면 그 그룹과 남은 그룹을 호출하지 않는다(차감 없음)
+  assert.match(run, /if \(!rsv\) \{[^}]*budgetCheckFailed = true; continue; \}/);
+  assert.match(run, /if \(!rsv\.ok \|\| !rsv\.id\) \{[^}]*budgetHit = true; continue; \}/);
+  assert.match(run, /if \(budgetHit \|\| budgetCheckFailed \|\|/);
+  // 월 합계 직접 비교(잠금 없는 검사)는 그룹 루프에서 없어졌다
+  assert.doesNotMatch(run, /spent \+ \(cost - startCost\) >= cfg\.monthlyBudgetUsd/);
+  assert.match(run, /cost \+= callCost; reservedCost \+= callCost;/);
+  assert.match(src, /reserved_cost_usd: Math\.round\(reservedCost \* 10000\) \/ 10000/);
+  // DB: kind run 허용 · 월 합계는 주간 기록에서 예약분을 뺀다
+  const sql = readFileSync(new URL("../supabase/migrations/20261007100000_ai_budget_run_reservations.sql", import.meta.url), "utf8");
+  assert.match(sql, /check \(kind in \('verify', 'verify_video', 'run'\)\)/);
+  assert.match(sql, /sum\(greatest\(cost_usd - reserved_cost_usd, 0\)\) from public\.ai_weekly_reviews/);
 });

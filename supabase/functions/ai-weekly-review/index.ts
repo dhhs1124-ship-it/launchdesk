@@ -4,7 +4,7 @@ import { getValidMetaAccessToken } from "../_shared/meta-token.ts";
 import { GRAPH_API_VERSION, buildInsightsUrl, fetchAllInsightsRows } from "../_shared/meta-adset-normalize.mjs";
 import {
   config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
-  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks, priceOf, settleTotals, DECISION_INPUTS, worstCallUsd,
+  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks, priceOf, settleTotals, DECISION_INPUTS, worstCallUsd, worstGroupUsd,
 } from "../_shared/ai-weekly-core.mjs";
 import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases, policyVariants, casesForAds, forcedCases } from "../_shared/ai-policy.mjs";
 import { VIDEO_SYSTEM_PROMPT, VIDEO_PROMPT_VERSION, VIDEO_LIMITS, prepareVideoVerify, finishVideoVerify } from "../_shared/ai-video-core.mjs";
@@ -430,7 +430,7 @@ export default {
     };
 
     // 이번 실행에서 쓴 비용(누적) — 중간 예외로 끝나도 호출 비용을 기록에서 빠뜨리지 않는다
-    let runCost: number | null = null;
+    let runCost: number | null = null, runReserved: number | null = null;
     try {
       // ---- 데이터: 이어서 하기면 저장한 스냅샷, 아니면 새로 조회 ----
       let snap = decision.kind === "continue" ? row.result?.snapshot : null;
@@ -451,44 +451,61 @@ export default {
       const usage = { ...(row?.usage || {}) } as any;
       usage.calls = usage.calls || 0; usage.input_tokens = usage.input_tokens || 0; usage.output_tokens = usage.output_tokens || 0; usage.images = usage.images || 0;
       const startCost = Number(row?.cost_usd || 0);
-      let cost = startCost, retried = false, budgetHit = false;
+      let cost = startCost, reservedCost = Number(row?.reserved_cost_usd || 0), retried = false, budgetHit = false, budgetCheckFailed = false;
       // 묶음을 concurrency개씩 동시에 — 2026-10-06 실측 광고 1개(이미지 포함) 호출이 약 1분이라 순서대로면 함수 시간 제한(무료 150초)을 넘는다
       const todo = batches.filter((b: any) => b.status !== "done");
       if (todo.some((b: any) => b.status === "failed")) retried = true;
       for (let i = 0; i < todo.length; i += cfg.concurrency) {
         const group = todo.slice(i, i + cfg.concurrency);
-        if (Date.now() - started > cfg.timeBudgetMs - 70000) { group.forEach((b: any) => (b.status = "pending")); continue; }
-        // 묶음 그룹마다 월 예산 다시 확인 — 넘는 폭은 최대 그룹 1개 비용
-        if (spent + (cost - startCost) >= cfg.monthlyBudgetUsd) { group.forEach((b: any) => (b.status = "pending")); budgetHit = true; continue; }
-        await Promise.all(group.map(async (b: any) => {
-        const images: Record<string, any[]> = {};
-        for (const id of b.ad_ids) {
-          images[id] = [];
-          for (const im of adsById[id].imagePlan || []) {
-            const got = await downloadImage(im.url);
-            im.sent = !!got;
-            if (got) images[id].push({ ...got, label: im.label });
+        if (budgetHit || budgetCheckFailed || Date.now() - started > cfg.timeBudgetMs - 70000) { group.forEach((b: any) => (b.status = "pending")); continue; }
+        // 이미지(무료 다운로드)를 먼저 받아 실제로 보낼 내용으로 그룹 최악 비용을 잡는다
+        const prepared = await Promise.all(group.map(async (b: any) => {
+          const images: Record<string, any[]> = {};
+          for (const id of b.ad_ids) {
+            images[id] = [];
+            for (const im of adsById[id].imagePlan || []) {
+              const got = await downloadImage(im.url);
+              im.sent = !!got;
+              if (got) images[id].push({ ...got, label: im.label });
+            }
           }
-        }
-        const content = batchContent(b, adsById, peers, context, images, casesById);
-        const res = await claude(key, cfg.model, cfg.maxOutputTokens, content, cfg.effort);
-        usage.calls++;
-        if (res.usage && typeof res.usage.input_tokens === "number" && typeof res.usage.output_tokens === "number") {
-          usage.input_tokens += res.usage.input_tokens; usage.output_tokens += res.usage.output_tokens; cost += costUsd(cfg.model, res.usage) || 0;
-        } else {
-          // 사용량 미확인(시간 초과 · 응답 실패) — 0으로 보지 않고 이 호출의 최악 비용으로 월 합계에 남긴다(운영자가 Anthropic 사용량 확인 후 정정)
-          usage.unconfirmed_calls = (usage.unconfirmed_calls || 0) + 1;
-          cost += worstCallUsd(priceOf(cfg.model), SYSTEM, content, cfg.maxOutputTokens) || 0;
-        }
-        runCost = cost;
-        usage.images += Object.values(images).reduce((t, l) => t + l.length, 0);
-        if (res.ok && res.stop !== "end_turn") (usage.stop_reasons = usage.stop_reasons || []).push(res.stop); // max_tokens = 답변 잘림 · refusal = 거절
-        const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: POLICY, decisionInputs: DECISION_INPUTS }) : null;
-        const missing = b.ad_ids.filter((id: string) => !parsed || !parsed[id]);
-        if (parsed) Object.assign(results, parsed);
-        b.status = !parsed || missing.length === b.ad_ids.length ? "failed" : "done";
-        b.missing = missing;
+          return { b, images, content: batchContent(b, adsById, peers, context, images, casesById) };
         }));
+        // 그룹마다 최악 비용을 원자적으로 예약(합계 · 한도 검사 · 예약 삽입을 DB 잠금 하나로) — 동시 요청 · 운영자 검증과 함께 한도를 넘지 않는다
+        const groupWorst = worstGroupUsd(priceOf(cfg.model), SYSTEM, prepared.map((p) => p.content), cfg.maxOutputTokens);
+        const rsv = groupWorst == null ? null : await reserveBudget(admin, userId, storeId, "run", cfg.model, groupWorst, cfg.monthlyBudgetUsd, `review:${claimed.id}`);
+        if (!rsv) { group.forEach((b: any) => (b.status = "pending")); budgetCheckFailed = true; continue; }
+        if (!rsv.ok || !rsv.id) { group.forEach((b: any) => (b.status = "pending")); budgetHit = true; continue; }
+        const groupCalls: any[] = [];
+        try {
+          await Promise.all(prepared.map(async ({ b, images, content }: any) => {
+            const res = await claude(key, cfg.model, cfg.maxOutputTokens, content, cfg.effort, SYSTEM, callTimeout(deadline));
+            groupCalls.push(res);
+            usage.calls++;
+            let callCost: number;
+            if (res.usage && typeof res.usage.input_tokens === "number" && typeof res.usage.output_tokens === "number") {
+              usage.input_tokens += res.usage.input_tokens; usage.output_tokens += res.usage.output_tokens; callCost = costUsd(cfg.model, res.usage) || 0;
+            } else {
+              // 사용량 미확인(시간 초과 · 응답 실패) — 0으로 보지 않고 이 호출의 최악 비용으로(예약도 미확인으로 남아 예약 금액 유지)
+              usage.unconfirmed_calls = (usage.unconfirmed_calls || 0) + 1;
+              callCost = worstCallUsd(priceOf(cfg.model), SYSTEM, content, cfg.maxOutputTokens) || 0;
+            }
+            // 예약으로 월 합계에 들어간 비용 — 주간 기록에는 운영자용으로 남기되 월 합계에서는 reserved_cost_usd만큼 빼서 이중 집계하지 않는다
+            cost += callCost; reservedCost += callCost;
+            runCost = cost; runReserved = reservedCost;
+            usage.images += Object.values(images).reduce((t: number, l: any) => t + l.length, 0);
+            if (res.ok && res.stop !== "end_turn") (usage.stop_reasons = usage.stop_reasons || []).push(res.stop); // max_tokens = 답변 잘림 · refusal = 거절
+            const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: POLICY, decisionInputs: DECISION_INPUTS }) : null;
+            const missing = b.ad_ids.filter((id: string) => !parsed || !parsed[id]);
+            if (parsed) Object.assign(results, parsed);
+            b.status = !parsed || missing.length === b.ad_ids.length ? "failed" : "done";
+            b.missing = missing;
+          }));
+        } finally {
+          // 예외로 중단돼 호출 기록이 모자라면 known=false → 예약 금액 유지. 정산이 실패해도 예약은 reserved로 남아 예약 금액으로 집계된다
+          if (groupCalls.length < prepared.length) groupCalls.push({ usage: undefined });
+          await settleBudget(admin, rsv.id, cfg.model, groupCalls, `run:${claimed.id}`);
+        }
       }
 
       const done = batches.filter((b: any) => b.status === "done").length;
@@ -511,15 +528,19 @@ export default {
           creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, notes: a.creative?.notes, headline: a.placement?.headline || "unknown" } })),
         coverage: { total: snap.counts.total, analyzed: Object.keys(results).length, requested: snap.counts.analyzed,
           skipped: snap.skipped, failed_ads: batches.flatMap((b: any) => b.status === "done" ? b.missing || [] : b.ad_ids) },
-        notes: budgetHit ? snap.notes.concat(["이번 달 AI 운영 한도에 도달해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"]) : snap.notes, model: cfg.model, effort: cfg.effort, ...policyMeta(),
+        notes: budgetHit ? snap.notes.concat(["이번 달 AI 운영 한도에 도달해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"])
+          : budgetCheckFailed ? snap.notes.concat(["운영 한도를 확인하지 못해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"]) : snap.notes,
+        model: cfg.model, effort: cfg.effort, ...policyMeta(),
       };
-      return await finish({ status, batches, result, usage, cost_usd: Math.round(cost * 10000) / 10000,
+      return await finish({ status, batches, result, usage, cost_usd: Math.round(cost * 10000) / 10000, reserved_cost_usd: Math.round(reservedCost * 10000) / 10000,
         retry_count: (row?.retry_count || 0) + (retried ? 1 : 0), period: snap.period,
-        error: status !== "failed" ? null : budgetHit ? "이번 달 AI 점검 운영 한도에 도달했어요. 이용 횟수는 차감되지 않았어요." : "AI 분석에 실패했어요. 이용 횟수는 차감되지 않았어요." });
+        error: status !== "failed" ? null : budgetHit ? "이번 달 AI 점검 운영 한도에 도달했어요. 이용 횟수는 차감되지 않았어요."
+          : budgetCheckFailed ? "운영 한도를 확인하지 못해 점검을 마치지 못했어요. 이용 횟수는 차감되지 않았어요." : "AI 분석에 실패했어요. 이용 횟수는 차감되지 않았어요." });
     } catch (e) {
       console.error("ai-weekly-review error:", e instanceof Error ? e.message : e);
       return await finish({ status: row?.status === "partial" ? "partial" : "failed", error: "점검 중 오류가 발생했어요. 이용 횟수는 차감되지 않았어요.",
-        ...(runCost != null ? { cost_usd: Math.round(runCost * 10000) / 10000 } : {}) });
+        ...(runCost != null ? { cost_usd: Math.round(runCost * 10000) / 10000 } : {}),
+        ...(runReserved != null ? { reserved_cost_usd: Math.round(runReserved * 10000) / 10000 } : {}) });
     }
   }),
 };

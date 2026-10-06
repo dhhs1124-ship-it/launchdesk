@@ -427,6 +427,17 @@ export function worstCallUsd(price, system, content, maxOutputTokens) {
   if (!price || !(price.inPerM > 0) || !(price.outPerM > 0)) return null;
   return Math.ceil(((inputTokensUpperBound(system, content) * price.inPerM + maxOutputTokens * price.outPerM) / 1e6) * 10000) / 10000;
 }
+// 주간 실행 묶음 그룹 1개(동시에 보내는 호출들)의 최악 비용 합 — 그룹마다 이만큼 예약한다. 하나라도 계산할 수 없으면 null(예약 · 호출하지 않음)
+export function worstGroupUsd(price, system, contents, maxOutputTokens) {
+  if (!Array.isArray(contents) || !contents.length) return null;
+  let sum = 0;
+  for (const c of contents) {
+    const w = worstCallUsd(price, system, c, maxOutputTokens);
+    if (w == null) return null;
+    sum += w;
+  }
+  return Math.ceil(sum * 10000) / 10000;
+}
 // 예약 정산값 — 모든 호출의 사용량(usage)을 확인했을 때만 known=true. 하나라도 없으면(시간 초과 · 응답 실패) 예약 금액을 유지한다
 export function settleTotals(model, calls) {
   let actual = 0, known = calls.length > 0;
