@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { prepareVideoVerify, finishVideoVerify, estimateVideoCost, VIDEO_PROMPT_VERSION } from "../supabase/functions/_shared/ai-video-core.mjs";
+import { priceOf } from "../supabase/functions/_shared/ai-weekly-core.mjs";
 
 const args = process.argv.slice(2), opt = (k) => (args.find((a) => a.startsWith("--" + k + "=")) || "").split("=").slice(1).join("=") || null;
 const dir = args.find((a) => !a.startsWith("--"));
@@ -16,7 +17,7 @@ const frames = files.map((f) => ({ t: parseFloat(f), mediaType: "image/jpeg", ba
 const transcript = opt("transcript") ? fs.readFileSync(opt("transcript"), "utf8") : null;
 const body = { ad_id: opt("ad") || "100000000000000", ad_name: "드라이런", frames, transcript, metrics: opt("metrics") ? JSON.parse(fs.readFileSync(opt("metrics"), "utf8")) : null, dry_run: true };
 
-const prep = prepareVideoVerify(body, { model: "claude-sonnet-5-5" });
+const prep = prepareVideoVerify(body, { model: "claude-sonnet-5-5", price: priceOf("claude-sonnet-5-5") });
 if (!prep.ok) { console.log(JSON.stringify({ ok: false, errors: prep.errors }, null, 2)); process.exit(1); }
 // JPEG 크기(SOF0/SOF2)
 function size(buf) { for (let i = 2; i < buf.length - 9;) { if (buf[i] !== 0xff) { i++; continue; } const m = buf[i + 1], len = buf.readUInt16BE(i + 2); if (m === 0xc0 || m === 0xc2) return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) }; i += 2 + len; } return { w: 0, h: 0 }; }

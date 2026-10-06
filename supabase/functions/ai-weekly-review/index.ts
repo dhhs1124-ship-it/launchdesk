@@ -4,7 +4,7 @@ import { getValidMetaAccessToken } from "../_shared/meta-token.ts";
 import { GRAPH_API_VERSION, buildInsightsUrl, fetchAllInsightsRows } from "../_shared/meta-adset-normalize.mjs";
 import {
   config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
-  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks,
+  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks, priceOf, settleTotals,
 } from "../_shared/ai-weekly-core.mjs";
 import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases, policyVariants, casesForAds } from "../_shared/ai-policy.mjs";
 import { VIDEO_SYSTEM_PROMPT, VIDEO_PROMPT_VERSION, VIDEO_LIMITS, prepareVideoVerify, finishVideoVerify } from "../_shared/ai-video-core.mjs";
@@ -76,10 +76,11 @@ const SYSTEM = POLICY ? policySystemPrompt(SYSTEM_PROMPT) : SYSTEM_PROMPT;
 const policyMeta = () => POLICY ? { policy_version: POLICY_VERSION, playbook_version: PLAYBOOK_VERSION } : { policy_version: null, playbook_version: null };
 const casesFor = (ads: any[], peers: any) => { if (!POLICY) return null; const m: Record<string, string[]> = {}; for (const a of ads) m[a.ad_id] = selectCases(a, peers); return m; };
 
-async function claude(key: string, model: string, maxTokens: number, content: unknown[], effort?: string, system: string = SYSTEM) {
+async function claude(key: string, model: string, maxTokens: number, content: unknown[], effort?: string, system: string = SYSTEM, timeoutMs?: number) {
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
+      ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: "user", content }], ...(effort ? { output_config: { effort } } : {}) }),
     });
@@ -87,8 +88,8 @@ async function claude(key: string, model: string, maxTokens: number, content: un
     if (!res.ok || !data) return { ok: false as const, status: res.status, usage: data?.usage };
     const text = (data.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
     return { ok: true as const, text, usage: data.usage || {}, stop: data.stop_reason as string };
-  } catch {
-    return { ok: false as const, status: 0 };
+  } catch (e) {
+    return { ok: false as const, status: 0, aborted: e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError") };
   }
 }
 
@@ -161,21 +162,34 @@ async function buildSnapshot(ctx: any, admin: Admin, storeId: unknown, body: any
     return { ok: true as const, snap, batches: replanned.batches };
 }
 
-// 이번 달(한국 시간 1일 00시부터) AI 비용 — 주간 점검 + 운영자 검증. 조회 오류면 null(예산 검사를 통과시키지 않음)
+// 이번 달(한국 시간 1일 00시부터) AI 비용 — 주간 점검 + 운영자 검증(예약 포함, DB 함수 ai_month_spent). 조회 오류면 null(예산 검사를 통과시키지 않음)
 async function monthSpent(admin: Admin): Promise<number | null> {
-  const monthStart = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 8) + "01T00:00:00+09:00";
-  const [a, b] = await Promise.all([
-    admin.from("ai_weekly_reviews").select("cost_usd").gte("updated_at", monthStart),
-    admin.from("ai_weekly_verifications").select("cost_usd").gte("created_at", monthStart),
-  ]);
-  if (a.error || b.error) { console.error("ai-weekly-review budget:", (a.error || b.error).message); return null; }
-  return [...(a.data || []), ...(b.data || [])].reduce((t: number, r: any) => t + Number(r.cost_usd || 0), 0);
+  const { data, error } = await admin.rpc("ai_month_spent");
+  if (error || data == null || !Number.isFinite(Number(data))) { console.error("ai-weekly-review budget:", error?.message || "no data"); return null; }
+  return Number(data);
 }
+
+// 운영자 검증 비용 예약 — 합계 · 한도 검사 · 예약 삽입을 DB 함수 하나(advisory lock)로. 동시 요청이 함께 통과하지 않는다
+async function reserveBudget(admin: Admin, userId: string, storeId: unknown, kind: string, model: string, amount: number, limit: number) {
+  const { data, error } = await admin.rpc("ai_budget_reserve", { p_user: userId, p_store: Number(storeId), p_kind: kind, p_model: model, p_amount: amount, p_limit: limit });
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) { console.error("ai-weekly-review reserve:", error?.message || "no row"); return null; }
+  return { ok: !!row.ok, id: row.reservation_id as number | null, spent: Number(row.spent_usd) };
+}
+// 정산 — 사용량을 모두 확인했으면 실제 비용, 아니면 예약 금액 유지(unsettled). 실패하면 예약은 reserved로 남아 예약 금액으로 집계된다
+async function settleBudget(admin: Admin, id: number, model: string, calls: any[], note: string) {
+  const t = settleTotals(model, calls);
+  const { error } = await admin.rpc("ai_budget_settle", { p_id: id, p_actual: t.actual_usd, p_known: t.known, p_note: note });
+  if (error) console.error("ai-weekly-review settle:", id, error.message);
+  return { ...t, settled: !error };
+}
+// 함수 시간 안에 정산할 수 있게 호출마다 시간 제한(남은 시간 − 여유 15초, 최소 20초)
+const callTimeout = (deadline: number) => Math.max(20000, deadline - Date.now() - 15000);
 
 // 운영자 검증 — 사용자 화면에 없는 경로. 주간 기록 · 이용 횟수는 건드리지 않고 ai_weekly_verifications에 따로 남긴다.
 // 같은 스냅샷 · 같은 이미지 · 같은 프롬프트로 effort만 바꿔 동시에 1회씩 호출한다(최대 2개). 최악 비용이 상한을 넘으면 호출하지 않는다.
 const VERIFY_CAP_USD = 0.5;
-async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, body: any, weeks: ReturnType<typeof weekRanges>, cfg: ReturnType<typeof config>) {
+async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, body: any, weeks: ReturnType<typeof weekRanges>, cfg: ReturnType<typeof config>, deadline: number) {
   const allowed = env("AI_VERIFY_USER_IDS").split(",").map((s) => s.trim()).filter(Boolean);
   if (!allowed.includes(userId)) return json({ ok: false, code: "FORBIDDEN" }, 403);
   const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");
@@ -196,15 +210,18 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
     useWeeks = pin.weeks as ReturnType<typeof weekRanges>;
   }
   const cap = Math.min(VERIFY_CAP_USD, Number(body?.budget_usd) > 0 ? Number(body.budget_usd) : VERIFY_CAP_USD);
-  const spent = await monthSpent(admin);
-  if (spent == null) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
   const built = await buildSnapshot(ctx, admin, storeId, body, useWeeks, cfg);
   if (!built.ok) return json({ ok: false, code: "NO_SNAPSHOT", error: built.error });
   const { snap, batches } = built;
   const calls = batches.length * efforts.length * variants.length;
-  const worst = calls * (costUsd(cfg.model, { input_tokens: 20000, output_tokens: cfg.maxOutputTokens }) || 0);
+  const perCall = costUsd(cfg.model, { input_tokens: 20000, output_tokens: cfg.maxOutputTokens });
+  if (!(perCall && perCall > 0)) return json({ ok: false, code: "AI_MODEL_UNPRICED" }, 500);
+  const worst = Math.round(calls * perCall * 10000) / 10000;
   if (worst > cap) return json({ ok: false, code: "OVER_VERIFY_BUDGET", calls, worst_usd: worst, cap_usd: cap });
-  if (spent + worst > cfg.monthlyBudgetUsd) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: spent });
+  const rsv = await reserveBudget(admin, userId, storeId, "verify", cfg.model, worst, cfg.monthlyBudgetUsd);
+  if (!rsv) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
+  if (!rsv.ok || !rsv.id) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: rsv.spent });
+  const reservationId = rsv.id, allCalls: any[] = [];
   const adsById: Record<string, any> = {};
   for (const a of snap.ads) adsById[a.ad_id] = a;
   const peers = peerGroups(snap.ads);
@@ -225,21 +242,23 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
   const label = String(body?.label || (comparePolicy ? "policy-compare" : "verify")).slice(0, 48);
   const jobs: any[] = [];
   for (const effort of efforts) for (const v of variants) jobs.push({ effort, v });
-  const runs = await Promise.all(jobs.map(async ({ effort, v }: any) => {
+  let runs: any[] = [];
+  try {
+  runs = await Promise.all(jobs.map(async ({ effort, v }: any) => {
     const t0 = Date.now(), usage: any = { calls: 0, input_tokens: 0, output_tokens: 0, images: 0, stop_reasons: [] }, results: Record<string, any> = {}, failed: string[] = [];
     const casesById = v.withCases ? cases : null;
     let cost = 0;
     for (let i = 0; i < batches.length; i++) {
       const b = batches[i], images = imagesByBatch[i];
-      const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images, casesById), effort, v.system);
-      usage.calls++; usage.images += Object.values(images).reduce((t: number, l: any) => t + l.length, 0);
+      const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images, casesById), effort, v.system, callTimeout(deadline));
+      allCalls.push(res); usage.calls++; usage.images += Object.values(images).reduce((t: number, l: any) => t + l.length, 0);
       if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
       if (res.ok) usage.stop_reasons.push(res.stop);
       const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, b, adsById, peers, casesById) : null;
       if (parsed) Object.assign(results, parsed);
       failed.push(...b.ad_ids.filter((id: string) => !parsed || !parsed[id]));
     }
-    const row = { user_id: userId, store_id: storeId, label: comparePolicy ? label + ":" + v.key : label, effort, model: cfg.model, status: failed.length ? "failed" : "completed",
+    const row = { user_id: userId, store_id: storeId, reservation_id: reservationId, label: comparePolicy ? label + ":" + v.key : label, effort, model: cfg.model, status: failed.length ? "failed" : "completed",
       usage, cost_usd: Math.round(cost * 10000) / 10000, duration_ms: Date.now() - t0,
       result: { ...v.meta, variant: v.key, input_fingerprint: fingerprint, ads_by_id: results, failed_ads: failed, period: snap.period,
         inputs: snap.ads.map((a: any) => ({ ad_id: a.ad_id, placement: a.placement, title: a.creative?.title ?? null, images_sent: (a.imagePlan || []).filter((im: any) => im.sent).length })) } };
@@ -247,7 +266,12 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
     if (ins.error) console.error("ai-weekly-review verify save:", ins.error.message);
     return { id: ins.data?.id ?? null, saved: !ins.error, ...row };
   }));
-  return json({ ok: true, compare_policy: comparePolicy, input_fingerprint: fingerprint, runs });
+  } finally {
+    // 예외 · 일부 실패여도 정산을 시도한다. 호출 기록이 모자라면(예외로 중단) known=false → 예약 금액 유지
+    if (allCalls.length < calls) allCalls.push({ usage: undefined });
+    var budget = await settleBudget(admin, reservationId, cfg.model, allCalls, comparePolicy ? "policy-compare" : "verify");
+  }
+  return json({ ok: true, compare_policy: comparePolicy, input_fingerprint: fingerprint, reservation: { id: reservationId, reserved_usd: worst, ...budget }, runs });
 }
 
 function num(v: unknown) { const n = Number(v); return Number.isFinite(n) ? n : null; }
@@ -260,30 +284,32 @@ function salesBlock(s: any) {
 // 운영자 영상 검증 — 허용 사용자(AI_VERIFY_USER_IDS)만 · 월 예산 · 1회 상한 검사 후 1회 호출 · 결과는 ai_weekly_verifications에
 // 프레임은 운영자 브라우저(화면에 보이는 탭)가 뽑아 보낸다. 영상 파일은 받지도 저장하지도 않는다. 음성 전사가 없으면 '음성 미확인'.
 // dry_run=true면 요청 검사 · 구성 · 비용 추정만 돌려주고 AI를 부르지 않으며 저장하지 않는다.
-async function verifyVideo(admin: Admin, userId: string, storeId: unknown, body: any, cfg: ReturnType<typeof config>) {
+async function verifyVideo(admin: Admin, userId: string, storeId: unknown, body: any, cfg: ReturnType<typeof config>, deadline: number) {
   const allowed = env("AI_VERIFY_USER_IDS").split(",").map((s) => s.trim()).filter(Boolean);
   if (!allowed.includes(userId)) return json({ ok: false, code: "FORBIDDEN" }, 403);
-  const prep: any = prepareVideoVerify(body, { model: cfg.model } as any);
+  const prep: any = prepareVideoVerify(body, { model: cfg.model, price: priceOf(cfg.model) } as any);
   if (!prep.ok) return json({ ok: false, code: "BAD_REQUEST", errors: prep.errors }, 400);
   const summary = { prompt_version: VIDEO_PROMPT_VERSION, frames_seen: prep.frames_seen, transcript_provided: prep.transcript_provided, request_bytes: prep.request_bytes, worst_usd: prep.worst_usd };
   if (body?.dry_run === true) return json({ ok: true, dry_run: true, called_ai: false, ...summary });
   const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");
   if (!key) return json({ ok: false, code: "AI_NOT_CONFIGURED" });
   if (prep.worst_usd > VERIFY_CAP_USD) return json({ ok: false, code: "OVER_VERIFY_BUDGET", worst_usd: prep.worst_usd, cap_usd: VERIFY_CAP_USD });
-  const spent = await monthSpent(admin);
-  if (spent == null) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
-  if (spent + prep.worst_usd > cfg.monthlyBudgetUsd) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: spent });
+  const rsv = await reserveBudget(admin, userId, storeId, "verify_video", cfg.model, prep.worst_usd, cfg.monthlyBudgetUsd);
+  if (!rsv) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
+  if (!rsv.ok || !rsv.id) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: rsv.spent });
   const effort = ["low", "medium", "high"].includes(body?.effort) ? body.effort : "medium";
   const t0 = Date.now();
-  const res = await claude(key, cfg.model, VIDEO_LIMITS.maxOutputTokens, prep.content, effort, VIDEO_SYSTEM_PROMPT);
+  let res: any = { ok: false, status: 0 };
+  try { res = await claude(key, cfg.model, VIDEO_LIMITS.maxOutputTokens, prep.content, effort, VIDEO_SYSTEM_PROMPT, callTimeout(deadline)); }
+  finally { var budget = await settleBudget(admin, rsv.id, cfg.model, [res], "verify_video"); }
   const usage = { calls: 1, input_tokens: res.usage?.input_tokens || 0, output_tokens: res.usage?.output_tokens || 0, frames: prep.frames_seen.length, stop_reasons: res.ok ? [res.stop] : [] };
   const fin = res.ok ? finishVideoVerify(res.text, prep.frames_seen, prep.transcript_provided) : { ok: false, output: null, validation: { ok: false, errors: ["AI 호출 실패"] } };
-  const row = { user_id: userId, store_id: storeId, label: String(body?.label || "video").slice(0, 60), effort, model: cfg.model, status: fin.ok ? "completed" : "failed",
+  const row = { user_id: userId, store_id: storeId, reservation_id: rsv.id, label: String(body?.label || "video").slice(0, 60), effort, model: cfg.model, status: fin.ok ? "completed" : "failed",
     usage, cost_usd: Math.round((costUsd(cfg.model, res.usage || {}) || 0) * 10000) / 10000, duration_ms: Date.now() - t0,
     result: { kind: "video", ad_id: String(body.ad_id), ...summary, output: fin.output, validation: fin.validation } };
   const ins = await admin.from("ai_weekly_verifications").insert(row).select("id").single();
   if (ins.error) console.error("ai-weekly-review verify_video save:", ins.error.message);
-  return json({ ok: true, id: ins.data?.id ?? null, saved: !ins.error, ...row });
+  return json({ ok: true, id: ins.data?.id ?? null, saved: !ins.error, reservation: { id: rsv.id, reserved_usd: prep.worst_usd, ...budget }, ...row });
 }
 
 export default {
@@ -307,8 +333,11 @@ export default {
       return json({ ok: false, code: "DB_ERROR", message: "점검 기록을 확인하지 못했어요. 잠시 후 다시 시도해 주세요." }, 500);
     }
     if (action === "status") return json({ ok: true, enabled: cfg.enabled, ...publicView(row, weeks) });
-    if (action === "verify") return await verify(ctx, admin, userId, storeId, body, weeks, cfg);
-    if (action === "verify_video") return await verifyVideo(admin, userId, storeId, body, cfg);
+    // 가격표에 없는 모델은 비용 · 예산을 계산할 수 없다 — 호출하지 않는다(비용 0으로 보지 않음)
+    if (!priceOf(cfg.model)) { console.error("ai-weekly-review: unpriced model", cfg.model); return json({ ok: false, code: "AI_MODEL_UNPRICED", message: "AI 설정을 확인하지 못해 점검을 시작하지 않았어요." }, 500); }
+    const deadline = started + cfg.timeBudgetMs;
+    if (action === "verify") return await verify(ctx, admin, userId, storeId, body, weeks, cfg, deadline);
+    if (action === "verify_video") return await verifyVideo(admin, userId, storeId, body, cfg, deadline);
 
     // ---- 실행 ----
     const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");

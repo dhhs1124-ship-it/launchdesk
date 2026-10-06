@@ -127,3 +127,13 @@ test("영상 소재는 video_id를 함께 남기고, ID가 없는 VIDEO 형식�
   assert.equal(extractCreativeV({ object_story_spec: { video_data: { video_id: "987" } } }).video_id, "987");
   assert.equal(extractCreativeV({ object_type: "VIDEO" }).video_id, null);
 });
+
+import { priceOf, settleTotals } from "../supabase/functions/_shared/ai-weekly-core.mjs";
+test("가격표에 없는 모델은 null · 정산은 모든 호출의 사용량을 확인했을 때만", () => {
+  assert.deepEqual(priceOf("claude-sonnet-5-5"), { inPerM: 2, outPerM: 10 });
+  assert.equal(priceOf("claude-haiku-4-5-20251001"), null, "가격표에 없는 정식 ID");
+  assert.equal(priceOf(""), null);
+  assert.deepEqual(settleTotals("claude-sonnet-5-5", [{ usage: { input_tokens: 1000, output_tokens: 1000 } }]), { known: true, actual_usd: 0.012 });
+  assert.equal(settleTotals("claude-sonnet-5-5", [{ usage: { input_tokens: 1000, output_tokens: 1000 } }, { usage: undefined }]).known, false, "응답 실패 · 시간 초과");
+  assert.equal(settleTotals("claude-sonnet-5-5", []).known, false, "호출 기록 없음");
+});

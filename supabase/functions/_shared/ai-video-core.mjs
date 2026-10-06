@@ -81,8 +81,11 @@ export function validateVideoOutput(out, framesSeen, hasTranscript) {
 // ---- 운영자 검증 호출 경로(ai-weekly-review action: "verify_video")가 쓰는 순수 함수 ----
 // 요청 검사 · 구성: 프레임은 클라이언트(화면에 보이는 탭)가 뽑아 보낸다. 서버는 영상을 받거나 저장하지 않는다.
 export const VIDEO_LIMITS = { maxFrames: 24, maxFrameBase64: 400000, maxTranscript: 4000, maxOutputTokens: 4000 };
-export function prepareVideoVerify(body, { model, inPerM = 2, outPerM = 10 } = {}) {
+// price: 실제 선택 모델의 가격(priceOf) — 없으면 거절한다(기본 가격으로 추정하지 않음)
+export function prepareVideoVerify(body, { model, price } = {}) {
   const errors = [], b = body || {};
+  const inPerM = price && price.inPerM, outPerM = price && price.outPerM;
+  if (!(inPerM > 0 && outPerM > 0)) errors.push("모델 가격 없음");
   const frames = Array.isArray(b.frames) ? b.frames : [];
   if (!/^\d{5,25}$/.test(String(b.ad_id || ""))) errors.push("ad_id");
   if (!frames.length) errors.push("frames 없음");

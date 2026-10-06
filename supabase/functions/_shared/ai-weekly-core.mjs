@@ -376,3 +376,19 @@ export function pinnedWeeks(input, base) {
   if (day(c.until) > day(base.current.until)) return { ok: false, error: "끝나지 않은 주는 고정할 수 없음" };
   return { ok: true, weeks: { ...base, current: { since: c.since, until: c.until }, previous: { since: p.since, until: p.until } } };
 }
+
+// 가격표에 있는 모델만 — 없으면 null(호출 전에 거절한다. 비용을 0으로 보지 않는다)
+export function priceOf(model) {
+  const p = PRICES[model];
+  return p ? { inPerM: p[0], outPerM: p[1] } : null;
+}
+// 예약 정산값 — 모든 호출의 사용량(usage)을 확인했을 때만 known=true. 하나라도 없으면(시간 초과 · 응답 실패) 예약 금액을 유지한다
+export function settleTotals(model, calls) {
+  let actual = 0, known = calls.length > 0;
+  for (const c of calls) {
+    const u = c && c.usage;
+    if (!u || typeof u.input_tokens !== "number" || typeof u.output_tokens !== "number") { known = false; continue; }
+    actual += costUsd(model, u) || 0;
+  }
+  return { known, actual_usd: Math.round(actual * 10000) / 10000 };
+}
