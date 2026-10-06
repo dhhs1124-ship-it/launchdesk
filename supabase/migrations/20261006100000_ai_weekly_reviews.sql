@@ -26,5 +26,7 @@ create index if not exists ai_weekly_reviews_created_at_idx on public.ai_weekly_
 
 alter table public.ai_weekly_reviews enable row level security;
 revoke all on public.ai_weekly_reviews from anon, authenticated;
+-- 이 프로젝트는 기본 권한을 줄여 둬서 service_role도 GRANT가 있어야 읽고 쓸 수 있다(RLS 우회 ≠ GRANT 우회).
+grant select, insert, update, delete on public.ai_weekly_reviews to service_role;
 
 -- 되돌리기: drop table if exists public.ai_weekly_reviews;

@@ -9,17 +9,22 @@ export const PRICES = { "claude-sonnet-5-5": [2, 10], "claude-haiku-4-5": [1, 5]
 
 export function config(env) {
   const int = (k, d, min, max) => {
-    const n = Number(env(k));
+    const raw = String(env(k) ?? "").trim();
+    if (!raw) return d; // 미설정 · 빈 값은 기본값(Number("")는 0이라 이미지 0장이 됐었다)
+    const n = Number(raw);
     return Number.isFinite(n) && n >= min ? Math.min(max, Math.floor(n)) : d;
   };
   return {
     enabled: env("AI_WEEKLY_ENABLED") === "true",
     model: env("AI_MODEL") || MODEL_DEFAULT,
     maxAds: int("AI_MAX_ADS", 50, 1, 200),
-    adsPerBatch: int("AI_ADS_PER_BATCH", 6, 1, 15),
+    // 2026-10-06 실측: 광고 1개(문구 + 썸네일 + 개선안)에 출력 5,774토큰(생각 토큰 포함, Sonnet 5.5 기본 effort high) · 약 1분
+    // → 묶음 1개 = 광고 1개, 여러 묶음을 동시에. 6개 · 8,000이면 잘린다
+    adsPerBatch: int("AI_ADS_PER_BATCH", 1, 1, 15),
+    concurrency: int("AI_CONCURRENCY", 5, 1, 10),
     maxImages: int("AI_MAX_IMAGES", 40, 0, 200),
     imagesPerAd: int("AI_IMAGES_PER_AD", 3, 0, 10),
-    maxOutputTokens: int("AI_MAX_OUTPUT_TOKENS", 8000, 1000, 32000),
+    maxOutputTokens: int("AI_MAX_OUTPUT_TOKENS", 16000, 1000, 32000),
     maxRetries: int("AI_MAX_RETRIES", 2, 0, 10),
     monthlyBudgetUsd: Number(env("AI_MONTHLY_BUDGET_USD")) > 0 ? Number(env("AI_MONTHLY_BUDGET_USD")) : 30,
     timeBudgetMs: int("AI_TIME_BUDGET_MS", 110000, 20000, 380000),
@@ -195,6 +200,7 @@ export const SYSTEM_PROMPT = `너는 한국 쇼핑몰의 Meta 광고를 점검�
 - new_ad가 true면 증감률을 말하지 마라. 미측정(null)은 0이 아니다.
 - 보편적인 CTR 기준 하나로 좋고 나쁨을 단정하지 마라. 비교는 peers(같은 목적 · 최적화 목표)가 있을 때만 하고, 조건이 다른 광고끼리 순위를 매기지 마라.
 - 표본이 작으면(예: 노출 수천 회 미만, 구매 3건 미만) verdict를 "판단 보류"로 두고 recommendation은 null로 둔다. 모든 광고에 억지로 개선안을 만들지 마라.
+- verdict가 "유지"이고 문구나 이미지를 봤다면, 현재 광고는 그대로 두고 새 광고(같은 광고 세트)로 비교할 테스트 후보 1개를 recommendation에 쓴다. proposed 첫머리에 "현재 광고는 유지 · 새 광고로 비교"라고 쓰고, current에는 실제 문구를 인용해 무엇이 그 요소인지 적는다. "더 매력적인 문구" 같은 일반론 대신 입력에 있는 사실(문구 · 형식 · CTA · 지표)에서 바꿀 지점 하나를 고른다.
 - 영상은 썸네일만 봤다. 영상 장면 · 음성 · 자막 수정안은 쓰지 마라. 상세페이지는 보지 않았다 — 페이지 내용 문제나 수정안은 쓰지 말고 "상세페이지 확인 필요"로만 쓴다.
 - 캐러셀 · 동적 소재는 카드 · 조합별 성과가 없다. 광고 전체 지표를 특정 카드나 문구의 성과로 단정하지 마라.
 - Meta 귀속 구매 · 매출은 Cafe24 실제 매출과 다르다. 광고별 순익 · 손익분기는 판단하지 마라(상품 원가와 광고 연결이 확인되지 않음).

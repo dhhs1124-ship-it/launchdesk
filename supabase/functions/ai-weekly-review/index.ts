@@ -39,16 +39,15 @@ async function adInsights(accountId: string, token: string, range: { since: stri
   }, { maxPages: 30, maxRows: 2000 });
 }
 
-// ids로 여러 객체를 한 번에(50개씩)
+// 객체별 조회(10개씩 동시에) — Meta가 ids 파라미터를 더 이상 받지 않는다("The ids query parameter is deprecated in v26.0+", 2026-10-06 실제 응답)
 async function byIds(ids: string[], fields: string, token: string) {
   const out: Record<string, any> = {}, failed: string[] = [];
-  for (let i = 0; i < ids.length; i += 50) {
-    const chunk = ids.slice(i, i + 50);
-    const url = new URL(`https://graph.facebook.com/${GRAPH_API_VERSION}/`);
-    url.searchParams.set("ids", chunk.join(","));
-    url.searchParams.set("fields", fields);
-    const r = await meta(url.toString(), token);
-    if (r.ok) Object.assign(out, r.data); else failed.push(...chunk);
+  for (let i = 0; i < ids.length; i += 10) {
+    await Promise.all(ids.slice(i, i + 10).map(async (id) => {
+      const r = await meta(`https://graph.facebook.com/${GRAPH_API_VERSION}/${id}?fields=${encodeURIComponent(fields)}`, token);
+      if (r.ok) out[id] = r.data;
+      else { failed.push(id); console.error("ai-weekly-review meta:", r.status, r.data?.error?.message); }
+    }));
   }
   return { out, failed };
 }
@@ -79,7 +78,7 @@ async function claude(key: string, model: string, maxTokens: number, content: un
     const data = await res.json().catch(() => null);
     if (!res.ok || !data) return { ok: false as const, status: res.status, usage: data?.usage };
     const text = (data.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("");
-    return { ok: true as const, text, usage: data.usage || {} };
+    return { ok: true as const, text, usage: data.usage || {}, stop: data.stop_reason as string };
   } catch {
     return { ok: false as const, status: 0 };
   }
@@ -117,7 +116,12 @@ export default {
 
     const admin: Admin = ctx.supabaseAdmin;
     const weeks = weekRanges(new Date());
-    const { data: row } = await admin.from("ai_weekly_reviews").select("*").eq("user_id", userId).eq("quota_week", weeks.quotaWeek).maybeSingle();
+    // DB 오류를 "기록 없음"으로 보면 이용 횟수 · 예산 검사가 통과돼 버린다 — 오류면 멈춘다
+    const { data: row, error: rowErr } = await admin.from("ai_weekly_reviews").select("*").eq("user_id", userId).eq("quota_week", weeks.quotaWeek).maybeSingle();
+    if (rowErr) {
+      console.error("ai-weekly-review db:", rowErr.message);
+      return json({ ok: false, code: "DB_ERROR", message: "점검 기록을 확인하지 못했어요. 잠시 후 다시 시도해 주세요." }, 500);
+    }
     if (action === "status") return json({ ok: true, enabled: cfg.enabled, ...publicView(row, weeks) });
 
     // ---- 실행 ----
@@ -132,8 +136,12 @@ export default {
     if (decision.kind === "retries_exhausted") return json({ ok: false, code: "RETRIES_EXHAUSTED", message: "이번 주 재시도 횟수를 모두 썼어요.", ...publicView(row, weeks) });
 
     // 서비스 전체 월 예산
-    const monthStart = new Date().toISOString().slice(0, 8) + "01";
-    const { data: spentRows } = await admin.from("ai_weekly_reviews").select("cost_usd").gte("updated_at", monthStart);
+    const monthStart = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 8) + "01T00:00:00+09:00"; // 한국 시간 1일 00시
+    const { data: spentRows, error: spentErr } = await admin.from("ai_weekly_reviews").select("cost_usd").gte("updated_at", monthStart);
+    if (spentErr) {
+      console.error("ai-weekly-review budget:", spentErr.message);
+      return json({ ok: false, code: "BUDGET_CHECK_FAILED", message: "운영 한도를 확인하지 못해 점검을 시작하지 않았어요.", ...publicView(row, weeks) }, 500);
+    }
     const spent = (spentRows || []).reduce((t: number, r: any) => t + Number(r.cost_usd || 0), 0);
     if (spent >= cfg.monthlyBudgetUsd) return json({ ok: false, code: "BUDGET_EXCEEDED", message: "이번 달 AI 점검 운영 한도에 도달했어요.", ...publicView(row, weeks) });
 
@@ -142,6 +150,11 @@ export default {
     let claimed: any = null;
     if (decision.kind === "new") {
       const ins = await admin.from("ai_weekly_reviews").insert({ user_id: userId, quota_week: weeks.quotaWeek, store_id: storeId, status: "running", updated_at: nowIso }).select("*").single();
+      // 고유 제약 위반(23505)만 "다른 요청이 먼저 시작"이고, 그 밖의 오류는 진행 중으로 보이지 않게 한다
+      if (ins.error && ins.error.code !== "23505") {
+        console.error("ai-weekly-review claim:", ins.error.message);
+        return json({ ok: false, code: "DB_ERROR", message: "점검을 시작하지 못했어요. 이용 횟수는 차감되지 않았어요." }, 500);
+      }
       claimed = ins.data;
     } else {
       const upd = await admin.from("ai_weekly_reviews").update({ status: "running", updated_at: nowIso, store_id: decision.kind === "continue" ? row.store_id : storeId })
@@ -187,7 +200,10 @@ export default {
         const plan = planBatches(ads, cfg);
         const creativeFields = "creative.thumbnail_width(800).thumbnail_height(800){title,body,call_to_action_type,object_type,image_url,thumbnail_url,video_id,link_url,object_story_spec,asset_feed_spec}";
         let cr = await byIds(plan.analyzed.map((a: any) => a.ad_id), creativeFields, token);
-        if (cr.failed.length === plan.analyzed.length) cr = await byIds(plan.analyzed.map((a: any) => a.ad_id), creativeFields.replace(".thumbnail_width(800).thumbnail_height(800)", ""), token);
+        if (cr.failed.length) { // 크기 지정 문법이 거절된 광고만 크기 없이 다시
+          const again = await byIds(cr.failed, creativeFields.replace(".thumbnail_width(800).thumbnail_height(800)", ""), token);
+          cr = { out: { ...cr.out, ...again.out }, failed: again.failed };
+        }
         for (const a of plan.analyzed) a.creative = extractCreative(cr.out[a.ad_id]?.creative);
         const replanned = planBatches(plan.analyzed, cfg); // 소재 이미지 수를 반영해 이미지 예산 다시 배분
 
@@ -197,6 +213,7 @@ export default {
         if (cur.truncated) notes.push("Meta 광고 행이 조회 상한을 넘어 일부가 빠졌어요 — 전체 분석이 아니에요");
         if (!prev.ok) notes.push("그 전주 Meta 성과를 불러오지 못해 전주 비교가 없어요");
         if (cr.failed.length) notes.push(`소재를 불러오지 못한 광고 ${cr.failed.length}개 — 지표만 분석`);
+        if (adsets.failed.length) notes.push(`광고 세트 설정(최적화 목표 · 귀속 기간)을 불러오지 못한 광고 세트 ${adsets.failed.length}개`);
         notes.push("귀속: 광고 세트 귀속 설정 기준(use_unified_attribution_setting). 최근 날짜의 구매는 귀속 지연으로 늘어날 수 있어요");
         notes.push("상세페이지 내용은 가져오지 않았어요 — 페이지 수정안은 제공하지 않아요");
 
@@ -218,11 +235,17 @@ export default {
       const results: Record<string, any> = { ...(row?.result?.ads_by_id || {}) };
       const usage = { ...(row?.usage || {}) } as any;
       usage.calls = usage.calls || 0; usage.input_tokens = usage.input_tokens || 0; usage.output_tokens = usage.output_tokens || 0; usage.images = usage.images || 0;
-      let cost = Number(row?.cost_usd || 0), retried = false;
-      for (const b of batches) {
-        if (b.status === "done") continue;
-        if (b.status === "failed") retried = true;
-        if (Date.now() - started > cfg.timeBudgetMs - 45000) { b.status = "pending"; continue; }
+      const startCost = Number(row?.cost_usd || 0);
+      let cost = startCost, retried = false, budgetHit = false;
+      // 묶음을 concurrency개씩 동시에 — 2026-10-06 실측 광고 1개(이미지 포함) 호출이 약 1분이라 순서대로면 함수 시간 제한(무료 150초)을 넘는다
+      const todo = batches.filter((b: any) => b.status !== "done");
+      if (todo.some((b: any) => b.status === "failed")) retried = true;
+      for (let i = 0; i < todo.length; i += cfg.concurrency) {
+        const group = todo.slice(i, i + cfg.concurrency);
+        if (Date.now() - started > cfg.timeBudgetMs - 70000) { group.forEach((b: any) => (b.status = "pending")); continue; }
+        // 묶음 그룹마다 월 예산 다시 확인 — 넘는 폭은 최대 그룹 1개 비용
+        if (spent + (cost - startCost) >= cfg.monthlyBudgetUsd) { group.forEach((b: any) => (b.status = "pending")); budgetHit = true; continue; }
+        await Promise.all(group.map(async (b: any) => {
         const images: Record<string, any[]> = {};
         for (const id of b.ad_ids) {
           images[id] = [];
@@ -236,11 +259,13 @@ export default {
         usage.calls++;
         if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
         usage.images += Object.values(images).reduce((t, l) => t + l.length, 0);
+        if (res.ok && res.stop !== "end_turn") (usage.stop_reasons = usage.stop_reasons || []).push(res.stop); // max_tokens = 답변 잘림 · refusal = 거절
         const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, b, adsById, peers) : null;
         const missing = b.ad_ids.filter((id: string) => !parsed || !parsed[id]);
         if (parsed) Object.assign(results, parsed);
         b.status = !parsed || missing.length === b.ad_ids.length ? "failed" : "done";
         b.missing = missing;
+        }));
       }
 
       const done = batches.filter((b: any) => b.status === "done").length;
@@ -263,11 +288,11 @@ export default {
           creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, notes: a.creative?.notes } })),
         coverage: { total: snap.counts.total, analyzed: Object.keys(results).length, requested: snap.counts.analyzed,
           skipped: snap.skipped, failed_ads: batches.flatMap((b: any) => b.status === "done" ? b.missing || [] : b.ad_ids) },
-        notes: snap.notes, model: cfg.model,
+        notes: budgetHit ? snap.notes.concat(["이번 달 AI 운영 한도에 도달해 남은 광고는 분석하지 않았어요(이용 횟수 차감 없음)"]) : snap.notes, model: cfg.model,
       };
       return await finish({ status, batches, result, usage, cost_usd: Math.round(cost * 10000) / 10000,
         retry_count: (row?.retry_count || 0) + (retried ? 1 : 0), period: snap.period,
-        error: status === "failed" ? "AI 분석에 실패했어요. 이용 횟수는 차감되지 않았어요." : null });
+        error: status !== "failed" ? null : budgetHit ? "이번 달 AI 점검 운영 한도에 도달했어요. 이용 횟수는 차감되지 않았어요." : "AI 분석에 실패했어요. 이용 횟수는 차감되지 않았어요." });
     } catch (e) {
       console.error("ai-weekly-review error:", e instanceof Error ? e.message : e);
       return await finish({ status: row?.status === "partial" ? "partial" : "failed", error: "점검 중 오류가 발생했어요. 이용 횟수는 차감되지 않았어요." });

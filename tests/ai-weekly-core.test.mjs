@@ -95,3 +95,14 @@ test("분석 범위 표시 · 비용 계산", () => {
   assert.equal(scopeOf({ creative: { format: "unknown" }, imagePlan: [] }).label, "지표 확인");
   assert.equal(costUsd("claude-sonnet-5-5", { input_tokens: 1e6, output_tokens: 1e5 }), 3);
 });
+
+test("기본값: 묶음당 광고 1개 · 동시 5묶음 · 출력 16000(실측 광고당 약 5.8k 토큰 — 잘림 방지)", () => {
+  const d = config(() => "");
+  assert.equal(d.adsPerBatch, 1);
+  assert.equal(d.concurrency, 5);
+  assert.equal(d.maxOutputTokens, 16000);
+  // 미설정이면 이미지 기본값(실제 실행에서 0장으로 읽혀 썸네일이 빠졌던 버그)
+  assert.equal(d.imagesPerAd, 3);
+  assert.equal(d.maxImages, 40);
+  assert.equal(config((k) => ({ AI_IMAGES_PER_AD: "0" })[k] || "").imagesPerAd, 0, "명시한 0은 그대로");
+});
