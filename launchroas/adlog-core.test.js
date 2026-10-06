@@ -111,64 +111,99 @@ test('변경 기록: 필수값 검증 · 금액 칸 없음 · 같은 길이 비�
   assert.equal(AC.summarize([c]).totalSpend, 0);
 });
 
-test('결과: 광고비가 줄었어도 구매가 줄면 개선이 아니고, 지출 감소로만 기록 · 이익은 참고 계산으로만', () => {
-  const c = makeChange(week('2026-09-01', 10000, 2, 60000));
-  const after = CH.aggregate(week('2026-09-08', 6000, 1, 30000), '2026-09-08', '2026-09-14');
+// 기간 합계 광고비 · 구매(첫날에 몰아 둠 — 합계만 비교에 쓰인다)
+const span = (start, spendTotal, buys) => Array.from({ length: 7 }, (_, i) => day(CH.addDays(start, i), spendTotal / 7, i === 0 ? buys : 0, i === 0 ? buys * 30000 : 0));
+const caseOf = (bs, bb, as, ab, opts = {}) => {
+  const c = makeChange(span('2026-09-01', bs, bb), opts);
+  return { c, after: CH.aggregate(span('2026-09-08', as, ab), '2026-09-08', '2026-09-14') };
+};
+
+test('재현 1: 구매 1→2건 · 광고비 같음 — 증가는 관찰로 보여 주되 개선으로 확정 · 집계하지 않는다', () => {
+  const { c, after } = caseOf(70000, 1, 70000, 2);
   const r = CH.compare(c, after, basis(20000), '2026-09-30');
-  assert.equal(r.status, 'worse');
-  assert.equal(r.spend.diff, -28000);
-  assert.deepEqual({ ...r.purchases }, { before: 14, after: 7, diff: -7 });
-  assert.equal(r.profit.kind, 'reference');
-  assert.match(r.profit.basis, /참고 계산 .*가정 · 검증된 이익이 아님/);
-  assert.ok(r.warnings.some((x) => x.includes('개선 성공이 아니에요')));
+  assert.equal(r.status, 'inconclusive');
+  assert.deepEqual([...r.observations], ['구매 증가 관찰', '구매당 광고비 -50% (효율 개선 관찰)', '광고비 변화 없음']);
+  assert.match(r.reasons[0], /우연한 변동 범위 안/);
+  assert.ok(r.blockers.includes('sample_uncertain'));
+  const rr = CH.buildResultRecord(c, after, r, Date.parse('2026-09-30T00:00:00Z'), '');
+  const sum = CH.outcomeSummary([c, rr]);
+  assert.equal(sum.confirmed.improved, 0); assert.equal(sum.inconclusive, 1); assert.equal(sum.hold_reasons.sample_uncertain, 1);
 });
 
-test('결과: 판정은 구매 · 구매당 광고비로만(참고 이익은 판정에 쓰지 않음) · 함께 바뀐 조건은 효과 분리 불가', () => {
-  const c = makeChange(week('2026-09-01', 10000, 1, 30000), { concurrent: ['할인'] });
-  const after = CH.aggregate(week('2026-09-08', 10000, 2, 60000), '2026-09-08', '2026-09-14');
+test('재현 2: 구매 10→20건 · 광고비 100,000→250,000 — 구매 증가와 구매당 광고비 +25%를 각각 표시하고 실제 계산과 다른 설명을 내지 않는다', () => {
+  const { c, after } = caseOf(100000, 10, 250000, 20);
   const r = CH.compare(c, after, basis(20000), '2026-09-30');
-  assert.equal(r.status, 'improved');
-  assert.match(r.reasons[0], /구매당 광고비가 낮아졌어요/);
-  assert.equal(Math.round(r.cpa.before), 10000); assert.equal(Math.round(r.cpa.after), 5000);
-  assert.equal(r.separable, false);
-  // 연결 상품이 없어도 같은 판정 · 이익은 계산 보류
-  const r2 = CH.compare(makeChange(week('2026-09-01', 10000, 1, 30000), { basis: { currency: 'KRW', attribution: 'API 기본(클릭 후 7일 · 조회 후 1일)', margin: null } }), after, null, '2026-09-30');
-  assert.equal(r2.status, 'improved');
-  assert.deepEqual({ ...r2.profit }, { kind: 'withheld', reason: '이익 변화 계산 보류 · 연결 상품 마진 없음' });
+  assert.equal(Math.round(r.cpa.before), 10000); assert.equal(Math.round(r.cpa.after), 12500); assert.equal(r.cpa.pct, 25);
+  assert.deepEqual([...r.observations], ['구매 증가 관찰', '구매당 광고비 +25% (효율 저하 관찰)', '광고비 +150%']);
+  assert.ok(!r.reasons.join(' ').includes('10% 미만'));
+  assert.equal(r.status, 'inconclusive');
 });
 
-test('결과: 연결 마진이 낮아지면 비용 누락 발견으로 따로 표시하고 참고 계산에는 당시 마진을 쓴다(합산 안 함)', () => {
-  const c = makeChange(week('2026-09-01', 10000, 1, 30000));
-  const after = CH.aggregate(week('2026-09-08', 10000, 2, 60000), '2026-09-08', '2026-09-14');
-  const r = CH.compare(c, after, Object.assign(basis(15000), { margin: { pre_ad: 15000, source_saved_at: 's2' } }), '2026-09-30');
-  assert.equal(r.missingCost.per_order, 5000);
-  assert.equal(r.profit.after, 20000 * 14 - 70000, '참고 계산은 변경 당시 마진(20000)');
+test('개선 · 악화 확인은 같은 광고비당 구매 차이가 우연 범위를 벗어날 때만(정확 이항검정 · 단측 0.05)', () => {
+  let x = caseOf(100000, 10, 100000, 30); assert.equal(CH.compare(x.c, x.after, basis(20000), '2026-09-30').status, 'improved');
+  x = caseOf(100000, 30, 100000, 10); assert.equal(CH.compare(x.c, x.after, basis(20000), '2026-09-30').status, 'worse');
+  x = caseOf(100000, 20, 20000, 15);
+  const r = CH.compare(x.c, x.after, basis(20000), '2026-09-30');
+  assert.equal(r.status, 'inconclusive'); assert.match(r.reasons[0], /구매가 줄어 개선으로 확인하지 않아요/);
+  assert.ok(r.warnings.some((w) => w.includes('개선 성공이 아니에요')));
 });
 
-test('결과: 기간 미종료 · 조회 실패 · 통화 변경 · 구매 미측정은 판단 불가 · 표본이 작으면 판정은 하되 주의 표시(고정 기준으로 막지 않음) · 최근 3일은 잠정', () => {
-  const c = makeChange(week('2026-09-01', 10000, 1, 30000));
-  const full = CH.aggregate(week('2026-09-08', 10000, 2, 60000), '2026-09-08', '2026-09-14');
-  assert.equal(CH.compare(c, full, basis(20000), '2026-09-14').status, 'unknown');
-  assert.equal(CH.compare(c, CH.aggregate(week('2026-09-08', 10000, 2, 60000).slice(0, 6), '2026-09-08', '2026-09-14'), basis(20000), '2026-09-30').status, 'unknown');
-  assert.equal(CH.compare(c, full, Object.assign(basis(20000), { currency: 'USD' }), '2026-09-30').status, 'unknown');
-  const tiny = makeChange(week('2026-09-01', 10000, 0, 0));
-  const t = CH.compare(tiny, CH.aggregate(week('2026-09-08', 10000, 0, 0).map((d, i) => i === 0 ? day(d.date, 10000, 1, 30000) : d), '2026-09-08', '2026-09-14'), basis(20000), '2026-09-30');
-  assert.equal(t.status, 'improved');
-  assert.ok(t.warnings.some((x) => x.includes('합쳐 1건') && x.includes('참고 기준')));
-  const unobserved = CH.aggregate(week('2026-09-08', 10000, 2, 60000).map((d) => ({ date: d.date, metrics: { ...d.metrics, purchase: { value: 0, observed: false } } })), '2026-09-08', '2026-09-14');
-  const u = CH.compare(c, unobserved, basis(20000), '2026-09-30');
-  assert.equal(u.status, 'unknown'); assert.equal(u.spend.diff, 0, '이익 · 판정이 없어도 지출 변화는 보인다');
-  assert.equal(CH.compare(c, full, basis(20000), '2026-09-16').provisional, true);
+test('잠정 · 함께 바뀐 조건이 있으면 차이가 커도 확정하지 않고 보류 이유를 남긴다', () => {
+  let x = caseOf(100000, 10, 100000, 30, { concurrent: ['할인'] });
+  let r = CH.compare(x.c, x.after, basis(20000), '2026-09-30');
+  assert.equal(r.status, 'inconclusive'); assert.ok(r.blockers.includes('not_separable'));
+  x = caseOf(100000, 10, 100000, 30);
+  r = CH.compare(x.c, x.after, basis(20000), '2026-09-16');
+  assert.equal(r.status, 'inconclusive'); assert.ok(r.blockers.includes('provisional'));
 });
 
-test('성과 집계: 참고 계산 · 계산 보류는 검증된 이익에서 빼고, 지출 변화만 실제 값으로 더한다', () => {
-  const c = makeChange(week('2026-09-01', 10000, 1, 30000));
-  const after = CH.aggregate(week('2026-09-08', 8000, 2, 60000), '2026-09-08', '2026-09-14');
-  const rr = CH.buildResultRecord(c, after, CH.compare(c, after, basis(20000), '2026-09-30'), Date.now(), '');
-  const sum = CH.outcomeSummary([rr, { result: { status: 'unknown', spend: null, profit: { kind: 'withheld' } } }]);
-  assert.equal(sum.verified_profit_change, 0); assert.equal(sum.verified_profit_count, 0);
-  assert.equal(sum.reference_excluded, 1); assert.equal(sum.withheld, 1);
-  assert.equal(sum.spend_change_krw, -14000); assert.equal(sum.spend_change_missing, 1);
+test('비교 불가(기간 미종료 · 조회 실패 · 통화 변경 · 구매 미측정)는 판단 불가 · 관찰 가능한 지출 변화는 보인다', () => {
+  const { c, after } = caseOf(70000, 1, 70000, 2);
+  assert.equal(CH.compare(c, after, basis(20000), '2026-09-14').status, 'unknown');
+  assert.equal(CH.compare(c, CH.aggregate(span('2026-09-08', 70000, 2).slice(0, 6), '2026-09-08', '2026-09-14'), basis(20000), '2026-09-30').status, 'unknown');
+  assert.equal(CH.compare(c, after, Object.assign(basis(20000), { currency: 'USD' }), '2026-09-30').blockers[0], 'condition_mismatch');
+  const unobs = CH.aggregate(span('2026-09-08', 70000, 2).map((d) => ({ date: d.date, metrics: { ...d.metrics, purchase: { value: 0, observed: false } } })), '2026-09-08', '2026-09-14');
+  const u = CH.compare(c, unobs, basis(20000), '2026-09-30');
+  assert.equal(u.status, 'unknown'); assert.equal(u.spend.diff, 0);
+});
+
+test('이익은 참고 계산 / 계산 보류로만 — 판정에 쓰지 않는다', () => {
+  const { c, after } = caseOf(100000, 10, 100000, 30);
+  const r = CH.compare(c, after, basis(20000), '2026-09-30');
+  assert.equal(r.profit.kind, 'reference'); assert.match(r.profit.basis, /검증된 이익이 아님/);
+  const n = caseOf(100000, 10, 100000, 30, { basis: { currency: 'KRW', attribution: 'API 기본(클릭 후 7일 · 조회 후 1일)', margin: null } });
+  const r2 = CH.compare(n.c, n.after, null, '2026-09-30');
+  assert.equal(r2.status, 'improved'); assert.equal(r2.profit.kind, 'withheld');
+});
+
+test('마진이 낮아져도 기본은 상품 마진 변경 — 누락 비용은 사용자 확인 또는 비용 항목 비교로 입증될 때만', () => {
+  const { c, after } = caseOf(70000, 1, 70000, 2);
+  const lower = Object.assign(basis(15000), { margin: { pre_ad: 15000, source_saved_at: 's2' } });
+  let r = CH.compare(c, after, lower, '2026-09-30');
+  assert.equal(r.missingCost, null);
+  assert.equal(r.marginChange.diff_per_order, -5000); assert.match(r.marginChange.note, /이유 미확인/);
+  r = CH.compare(c, after, lower, '2026-09-30', { confirmedMissingCost: { item: '포장비', per_order: 500 } });
+  assert.equal(r.missingCost.source, 'user_confirmed'); assert.equal(r.missingCost.per_order, 500);
+  assert.equal(CH.compare(c, after, lower, '2026-09-30', { confirmedMissingCost: { item: '', per_order: 500 } }).missingCost, null, '항목 없으면 기록 안 함');
+  const ci = makeChange(span('2026-09-01', 70000, 1), { basis: Object.assign(basis(20000), { margin: { pre_ad: 20000, source_saved_at: 's1', cost_items: { 원가: 9000, 포장비: 0 } } }) });
+  r = CH.compare(ci, after, Object.assign(basis(19500), { margin: { pre_ad: 19500, source_saved_at: 's2', cost_items: { 원가: 9000, 포장비: 500 } } }), '2026-09-30');
+  assert.equal(r.missingCost.source, 'cost_items'); assert.deepEqual(r.missingCost.items.map((x) => x.item), ['포장비']);
+});
+
+test('성과 집계: 같은 실행의 결과는 최신 유효 1건만 · 이전 결과는 이력 · 겹치는 기간의 같은 광고 지출은 한 번만 · 절감액이라고 하지 않는다', () => {
+  const x = caseOf(100000, 10, 100000, 30);
+  const r1 = CH.buildResultRecord(x.c, x.after, CH.compare(x.c, x.after, basis(20000), '2026-09-16'), Date.parse('2026-09-16T00:00:00Z'), '');
+  const r2 = CH.buildResultRecord(x.c, x.after, CH.compare(x.c, x.after, basis(20000), '2026-09-30'), Date.parse('2026-09-30T00:00:00Z'), '');
+  const r3 = CH.buildResultRecord(x.c, x.after, { status: 'unknown', reasons: [], warnings: [], blockers: ['condition_mismatch'] }, Date.parse('2026-10-02T00:00:00Z'), '');
+  const y = caseOf(100000, 10, 80000, 10); y.c.action_id = 'act_other';
+  const ry = CH.buildResultRecord(y.c, y.after, CH.compare(y.c, y.after, basis(20000), '2026-09-30'), Date.parse('2026-09-29T00:00:00Z'), '');
+  const s = CH.outcomeSummary([x.c, r1, r2, r3, y.c, ry]);
+  assert.equal(s.actions, 2); assert.equal(s.results_total, 4); assert.equal(s.history_results, 2);
+  assert.equal(s.confirmed.improved, 1, '최신 유효 결과(확정 개선)만 센다');
+  assert.equal(s.observed_spend_change_krw, 0, '겹치는 실행의 지출 변화는 최근 실행 1건만');
+  assert.equal(s.spend_overlap_excluded, 1);
+  assert.match(s.observed_spend_note, /절감액이 아님/);
+  assert.equal(s.verified_profit_count, 0); assert.equal(s.reference_excluded, 2);
 });
 
 test('결과 기록은 action_id로 변경 기록을 가리키고 금액 칸이 없다', () => {

@@ -15,7 +15,8 @@ const all = (n) => [n, ...(n.children || []).flatMap(all)];
 const text = (n) => all(n).map((x) => x.textContent || '').join(' ');
 const byClass = (n, cls) => all(n).filter((x) => String(x.className || '').split(' ').includes(cls));
 
-function setup({ flag, rows, decisions }){
+function setup({ flag, rows, decisions, failDecisions }){
+  const control = { failDecisions: !!failDecisions };
   const db = { ad_log: rows.map((data) => ({ data })), ad_log_decision: (decisions || []).map((data) => ({ data })) }, inserts = [], calls = [];
   const ids = {};
   const document = {
@@ -31,6 +32,7 @@ function setup({ flag, rows, decisions }){
     const q = { select: () => q, order: () => q, eq: (k, v) => { f[k] = v; return q; },
       insert: (row) => { inserts.push({ table, row }); if(table === 'tool_records') (db[row.tool_type] = db[row.tool_type] || []).unshift({ data: row.data }); return Promise.resolve({ error: null }); },
       then: (ok, fail) => Promise.resolve(table === 'ad_margin_links' ? { data: [{ meta_adset_id: '222', product_label: '니트', pre_ad: 20000, source_saved_at: 's1' }], error: null }
+        : f.tool_type === 'ad_log_decision' && control.failDecisions ? { data: null, error: { message: '조회 실패(테스트)' } }
         : { data: (db[f.tool_type] || []).slice(), error: null }).then(ok, fail) };
     return q;
   }
@@ -49,7 +51,7 @@ function setup({ flag, rows, decisions }){
   vm.createContext(sandbox);
   for(const f of ['adlog-core.js', 'adlog-change-core.js']) vm.runInContext(fs.readFileSync(__dirname + '/' + f, 'utf8'), sandbox);
   vm.runInContext(fs.readFileSync(__dirname + '/adlog.js', 'utf8'), sandbox);
-  return { ids, inserts, calls, views, window, db };
+  return { ids, inserts, calls, views, window, db, control };
 }
 
 const manual = { id: 1, store_id: '4', date: '2026-10-01', name: '직접 입력 메타', spend: 10000, revenue: 30000, channel: '메타' };
@@ -106,7 +108,9 @@ test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준
   await cmpBtn.events.click(); await settle(); await settle();
   const card2 = byClass(s.ids.adlogChanges, 'adlog-change')[0];
   const t = text(card2);
-  assert.match(t, /개선 · 저장 전/);
+  assert.match(t, /판단 보류 · 저장 전/);
+  assert.match(t, /구매 증가 관찰 · 구매당 광고비 -50% \(효율 개선 관찰\) · 광고비 변화 없음 · 개선 판단 보류/);
+  assert.match(t, /함께 바뀐 조건이 있어 개선 여부를 확정하지 않아요/);
   assert.match(t, /구매 7 → 14건/); assert.match(t, /광고비 변화 없음/);
   assert.match(t, /이익\(참고 계산\) \+₩140,000 연결 상품 기준 가정 · 성과 집계 제외/);
   assert.match(t, /비교 근거/); assert.match(t, /함께 바뀐 조건\(할인\)/);
@@ -118,5 +122,23 @@ test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준
   assert.equal(result.result.profit.kind, 'reference');
   assert.equal(result.result.profit.diff, (20000 * 14 - 70000) - (20000 * 7 - 70000));
   assert.doesNotMatch(text(s.ids.adlogChanges), /저장 전/);
-  assert.match(text(s.ids.adlogChanges), /개선/);
+  assert.equal(result.result.status, 'inconclusive');
+  assert.match(text(s.ids.adlogChanges), /판단 보류/);
+});
+
+test('선택 조회 실패: 저장된 선택이 없던 경우와 구분해 합계 미확정 · 다시 불러오기 → 성공하면 선택을 반영한다', async () => {
+  const s = setup({ flag: false, rows: [manual, auto], decisions: [{ record_id: 1, store_id: '4', include: false, decided_at: '2026-10-06T00:00:00Z' }], failDecisions: true });
+  await settle();
+  assert.equal(s.ids.adlogTotalSpend.textContent, '₩22,000 (미확정)');
+  assert.match(s.ids.adlogTotalNote.textContent, /선택을 불러오지 못해 합계 미확정/);
+  const retry = all(s.ids.adlogTotalNote).find((x) => x.textContent === '다시 불러오기');
+  assert.ok(retry);
+  s.control.failDecisions = false;
+  await retry.events.click(); await settle();
+  assert.equal(s.ids.adlogTotalSpend.textContent, '₩12,000');
+  assert.doesNotMatch(s.ids.adlogTotalNote.textContent, /미확정/);
+  // 저장된 선택이 원래 없던 경우는 미확정이 아니다
+  const n = setup({ flag: false, rows: [manual, auto] });
+  await settle();
+  assert.equal(n.ids.adlogTotalSpend.textContent, '₩22,000');
 });

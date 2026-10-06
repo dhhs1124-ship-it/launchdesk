@@ -7,7 +7,7 @@
   var CHANGE_ON=!!(window.LAUNCHROAS_FLAGS&&window.LAUNCHROAS_FLAGS.adlogChangeRecords===true);
   var ATTRIBUTION='API 기본(클릭 후 7일 · 조회 후 1일)'; // meta-adset-insights는 귀속 기간을 지정하지 않음(Meta 인사이트 레퍼런스 기본값)
   var byId=function(id){return document.getElementById(id);};
-  var records=[], decisions=[], currentUser=null, currentStore=null, epoch=0, busy=false, draft=null, results={};
+  var records=[], decisions=[], decisionsFailed=false, currentUser=null, currentStore=null, epoch=0, busy=false, draft=null, results={};
   var money=function(n){return '₩'+Math.round(Number(n)||0).toLocaleString('ko-KR');};
   function status(text){byId('adlogMessage').textContent=text||'';}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -39,8 +39,10 @@
     if(ex.chosen)notes.push('선택으로 제외 '+ex.chosen+'건');
     if(ex.currency)notes.push('환율 없는 외화 '+ex.currency+'건 제외');
     if(sum.pending.count)notes.push('중복 가능 '+sum.pending.count+'건('+money(sum.pending.krw)+') 포함 · 선택 필요');
-    byId('adlogTotalSpend').textContent=money(sum.totalSpend);
-    byId('adlogTotalNote').textContent=notes.join(' · ');
+    // 선택 조회 실패: 저장된 선택이 없던 경우와 구분 — 합계는 기본 판정으로 계산하되 미확정으로 표시하고 다시 불러오기를 둔다
+    byId('adlogTotalSpend').textContent=money(sum.totalSpend)+(decisionsFailed?' (미확정)':'');
+    var tn=byId('adlogTotalNote');tn.textContent=(decisionsFailed?'포함 · 제외 선택을 불러오지 못해 합계 미확정(기본 판정으로 계산) · ':'')+notes.join(' · ');
+    if(decisionsFailed){var rb=el('button','secondary adlog-retry','다시 불러오기');rb.type='button';rb.addEventListener('click',function(){loadDecisions(app.getContext());});tn.appendChild(rb);}
     byId('adlogAverageRoas').textContent=sum.averageRoas!=null?sum.averageRoas.toFixed(1)+'x':'—';
     byId('adlogBest').textContent=sum.best?sum.best.name+' ('+sum.best.date+')':'—';
     byId('adlogMetaSave').disabled=busy || !ctx.userId || !ctx.storeId || !ctx.metaAccount || ctx.metaAccount.status!=='connected';
@@ -92,6 +94,7 @@
     var h=el('div','adlog-change-head');
     h.append(el('strong','',c.ad&&c.ad.ad_name||c.name),el('span','adlog-tag adlog-status-'+(r?r.status:'wait'),r?CH.STATUS_TEXT[r.status]+(r.provisional?' · 잠정':'')+(shown.saved?'':' · 저장 전'):'결과 대기'));
     card.appendChild(h);
+    if(r&&r.observations&&r.observations.length)card.appendChild(el('p','adlog-change-obs',r.observations.join(' · ')+' · '+(r.status==='improved'||r.status==='worse'?CH.STATUS_TEXT[r.status]:r.status==='unknown'?'판단 불가':'개선 판단 보류')));
     card.appendChild(el('p','adlog-change-line','바꾼 것 · '+c.change.element+(c.change.method==='new_ad'?' (새 광고 추가)':' (기존 광고 수정)')+' — '+String(c.change.after).slice(0,60)+(String(c.change.after).length>60?'…':'')));
     if(live&&live.error)card.appendChild(el('p','small',live.error));
     if(r){
@@ -119,12 +122,22 @@
     add('통화 · 환율',cur+(c.basis.fx_krw_per_unit?' · 1 '+cur+' = '+c.basis.fx_krw_per_unit+'원(당시 저장값)':''));
     add('연결 상품 마진',c.basis.margin?c.basis.margin.product_label+' 주문당 '+money(c.basis.margin.pre_ad)+' — 귀속 구매가 이 상품이라는 근거 없음':'없음');
     if(r&&r.profit&&r.profit.kind==='reference')add('참고 계산',r.profit.basis);
-    var mc=r&&(r.missingCost||r.missing_cost);if(mc)add('비용 누락 발견','주문당 '+money(mc.per_order)+' — '+mc.note);
+    var mg=r&&(r.marginChange||r.margin_change);if(mg)add('상품 마진 변경','주문당 '+money(mg.before_per_order)+' → '+money(mg.now_per_order)+' — '+mg.note);
+    var mc=r&&(r.missingCost||r.missing_cost);if(mc)add('누락 비용 발견',mc.items.map(function(x){return x.item+' 주문당 '+money(x.per_order);}).join(', ')+' — '+mc.note);
+    if(r&&r.test)add('개선 확인 방법',r.test.method+' · 변경 후 예상 '+r.test.expected_after+'건 · 단측 p(개선) '+r.test.p_better+' · p(악화) '+r.test.p_worse+' · 기준 '+r.test.alpha);
     add('함께 바뀐 조건',c.concurrent.length?c.concurrent.join(' · ')+(c.concurrent_note?' — '+c.concurrent_note:''):'없음(사용자 입력)');
     if(r&&r.warnings&&r.warnings.length)add('주의',r.warnings.join(' / '));
     if(r&&r.reasons&&r.reasons.length>1)add('판정 이유',r.reasons.join(' / '));
     if(c.memo)add('메모',c.memo);
-    more.appendChild(dl);card.appendChild(more);
+    more.appendChild(dl);
+    // 마진이 낮아졌을 때 누락 비용으로 기록하려면 사용자가 항목 · 금액을 확인한다(자동 처리하지 않음) — 저장 전 결과에서만
+    if(live&&live.cmp&&mg&&mg.diff_per_order<0&&!mc){
+      var mf=el('div','adlog-missing'),it=document.createElement('input'),am=document.createElement('input'),ok=el('button','secondary','누락 비용으로 기록');
+      it.placeholder='누락됐던 비용 항목(예: 포장비)';it.setAttribute('aria-label','누락 비용 항목');am.type='number';am.min='1';am.placeholder='주문당 금액';am.setAttribute('aria-label','누락 비용 주문당 금액');ok.type='button';
+      ok.addEventListener('click',function(){live.confirm={item:it.value,per_order:Number(am.value)};runCompare(c);});
+      mf.append(el('span','small','마진이 낮아진 이유가 빠졌던 비용 때문이라면 항목과 금액을 확인해 기록하세요'),it,am,ok);more.appendChild(mf);
+    }
+    card.appendChild(more);
     var ended=c.compare.after.until<today();
     var btn=el('button','secondary',live&&live.loading?'불러오는 중…':ended?'결과 비교하기':'비교 기간이 '+c.compare.after.until+'에 끝나요');
     btn.type='button';btn.disabled=!ended||!!(live&&live.loading);btn.addEventListener('click',function(){runCompare(c);});
@@ -164,14 +177,14 @@
     return {currency:currency||'KRW',fx_krw_per_unit:fx?Number(fx.krw_per_unit):null,fx_saved_at:fx?fx.saved_at:null,attribution:ATTRIBUTION,margin:margin};
   }
   async function runCompare(c){
-    var ctx=app.getContext();results[c.action_id]={loading:true};render();
+    var ctx=app.getContext(),prev=results[c.action_id],confirm=prev&&prev.confirm||null;results[c.action_id]={loading:true,confirm:confirm};render();
     try{
       var target=c.change.method==='new_ad'?c.ad.new_ad_id:c.ad.ad_id;
       var got=await dailyAds(ctx,c.ad.adset_id,target,c.compare.after.since,c.compare.after.until);
       var basis=basisFor(ctx,got.currency,await marginFor(ctx,c.ad.adset_id));
-      var cmp=CH.compare(c,got.agg,basis,today());
+      var cmp=CH.compare(c,got.agg,basis,today(),{confirmedMissingCost:confirm});
       if(c.change.method==='new_ad')cmp.warnings.push('새 광고의 변경 후 기간을 기존 광고의 변경 전 기간과 비교했어요 · 같은 기간 두 광고 비교는 광고 성과 화면에서 확인하세요');
-      results[c.action_id]={after:got.agg,cmp:cmp};
+      results[c.action_id]={after:got.agg,cmp:cmp,confirm:confirm};
     }catch(e){results[c.action_id]={error:'결과 지표를 불러오지 못했어요.'};}
     render();
   }
@@ -223,15 +236,23 @@
   }
 
   async function load(ctx){
-    records=[];decisions=[];results={};render();var stamp=++epoch;
+    records=[];decisions=[];decisionsFailed=false;results={};render();var stamp=++epoch;
     if(!ctx.userId) return;
     var q=function(type){return ctx.client.from('tool_records').select('data,created_at').eq('user_id',ctx.userId).eq('tool_type',type).order('created_at',{ascending:false});};
     var both=await Promise.all([q('ad_log'),q('ad_log_decision')]);
     if(stamp!==epoch)return;
     if(both[0].error){status('광고 기록을 불러오지 못했어요.');return;}
     records=(both[0].data||[]).map(function(row){return row.data;}).filter(function(row){return !!row;});
-    decisions=both[1].error?[]:(both[1].data||[]).map(function(row){return row.data;}).filter(Boolean);
-    status(both[1].error?'합계 포함 선택을 불러오지 못해 기본 판정으로 계산했어요.':'');render();
+    decisionsFailed=!!both[1].error;
+    decisions=decisionsFailed?[]:(both[1].data||[]).map(function(row){return row.data;}).filter(Boolean);
+    status('');render();
+  }
+  async function loadDecisions(ctx){
+    if(!ctx.userId)return;var stamp=epoch;
+    var res=await ctx.client.from('tool_records').select('data,created_at').eq('user_id',ctx.userId).eq('tool_type','ad_log_decision').order('created_at',{ascending:false});
+    if(stamp!==epoch)return;
+    decisionsFailed=!!res.error;if(!res.error)decisions=(res.data||[]).map(function(row){return row.data;}).filter(Boolean);
+    status(res.error?'포함 · 제외 선택을 다시 불러오지 못했어요.':'포함 · 제외 선택을 불러왔어요.');render();
   }
   window.LaunchRoasAdlog={refresh:function(){return load(app.getContext());},startChange:startChange,changeEnabled:CHANGE_ON};
   async function insert(record){
