@@ -59,7 +59,7 @@
     var range=state.range;
     byId('salesPeriod').textContent=range?('Cafe24 주문일 '+range.since+(range.until!==range.since?' ~ '+range.until:'')+' (한국 시간)'):'';
     if(!ctx.userId||!ctx.storeId){msg.textContent='쇼핑몰을 선택하면 볼 수 있어요.';fxBox.hidden=true;renderHero(null,null,null,false,[]);
-      renderGuide(setupSteps(ctx,null,null,null,metaState(ctx),null),!!ctx.userId&&!(ctx.stores||[]).length);byId('statusSummary').hidden=true;
+      renderGuide(setupSteps(ctx,null,null,null,metaState(ctx),null),!!ctx.userId&&!(ctx.stores||[]).length);renderSpend(null,metaState(ctx),'',null,null);
       window.dispatchEvent(new CustomEvent('launchroas:sales-state',{detail:{ready:!!ctx.userId&&!!ctx.connectionsLoaded,loading:false,error:'',summary:null,profit:null,partial:false,spendKrw:null,meta:null,metaIssue:'',steps:setupSteps(ctx,null,null,null,metaState(ctx),null).map(function(x){return {title:x.title,done:x.done,text:x.text};})}}));return;}
     msg.textContent=state.orders||state.error?'':'불러오는 중…';
 
@@ -116,17 +116,15 @@
     else if(mp){
       spendKrw=S.adSpendKrw(mp.spend,currency,ctx.fx);
       if(currency!=='KRW'){
-        // 환율 입력칸은 환율이 필요할 때나 '환율 변경'을 눌렀을 때만 연다.
-        fxBox.hidden=!(spendKrw==null||state.fxEdit);byId('salesFxCurrency').textContent=currency||'외화';
+        fxBox.hidden=false;byId('salesFxCurrency').textContent=currency||'외화';
         if(!byId('salesFxRate').matches(':focus'))byId('salesFxRate').value=ctx.fx&&ctx.fx.currency===currency?ctx.fx.krw_per_unit:'';
         spendNotes.push('원본 '+currency+' '+Number(mp.spend||0).toLocaleString('en-US',{maximumFractionDigits:2}));
         spendNotes.push(spendKrw==null?'환율을 입력·저장하면 원화로 바꿔 계산해요.':'적용 환율 1 '+currency+' = '+Number(ctx.fx.krw_per_unit).toLocaleString('ko-KR')+'원 (직접 저장한 값 · 일별 환율 아님)');
       }
       spendNotes.push('Meta 광고계정 시간대'+(tz?' '+tz:'')+' 기준 같은 날짜 범위'+(tz&&tz!=='Asia/Seoul'?' — 한국 시간과 달라 날짜 경계가 몇 시간 어긋날 수 있어요.':''));
     }
-    var spendRow=row('원화 광고비',ms?ms.text:spendKrw==null?'환율 입력 필요':won(spendKrw),spendNotes);
-    if(!ms&&mp&&currency!=='KRW'&&spendKrw!=null){var edit=el('button','inline-button','환율 변경');edit.type='button';edit.addEventListener('click',function(){state.fxEdit=true;byId('salesFx').hidden=false;byId('salesFxRate').focus();});spendRow.appendChild(edit);}
-    figures.appendChild(spendRow);
+    figures.appendChild(row('원화 광고비',ms?ms.text:spendKrw==null?'환율 입력 필요':won(spendKrw),spendNotes));
+    renderSpend(mp,ms,currency,spendKrw,ctx.fx);
 
     // 5. 광고비 빼고 남은 금액 — 필요한 값이 없으면 0원으로 표시하지 않는다.
     var base=margin,profitNotes=[],profit=null;
@@ -157,13 +155,14 @@
     var ready=!!ctx.connectionsLoaded;
     renderGuide(setupSteps(ctx,s,profit,spendKrw,ms,mp),ready);
     // 개선 점검 패널 · 사용법 안내가 같은 상태를 쓰도록 알린다(조회 중이면 loading — 0원으로 보지 않게).
-    window.dispatchEvent(new CustomEvent('launchroas:sales-state',{detail:{ready:ready,loading:!s&&!state.error,error:state.error||'',summary:s,links:links,profit:profit,partial:partial,spendKrw:spendKrw,meta:mp||null,metaIssue:ms?ms.text:'',steps:setupSteps(ctx,s,profit,spendKrw,ms,mp).map(function(x){return {title:x.title,done:x.done,text:x.text};}),range:state.range}}));
-    renderStatus(ctx,s,profit,spendKrw,ms,mp,partial,ready&&!!(s||state.error));
+    window.dispatchEvent(new CustomEvent('launchroas:sales-state',{detail:{ready:ready,loading:!s&&!state.error,error:state.error||'',summary:s,links:links,profit:profit,partial:partial,spendKrw:spendKrw,meta:mp||null,metaIssue:ms?ms.text:'',currency:currency||'',fx:ctx.fx||null,steps:setupSteps(ctx,s,profit,spendKrw,ms,mp).map(function(x){return {title:x.title,done:x.done,text:x.text};}),range:state.range}}));
   }
 
   // ---- 처음 설정 안내 · 현재 상황 한 줄 — 둘 다 실제 저장 상태로만 판단한다(버튼을 눌렀다고 완료로 보지 않음) ----
   function openProducts(productNo){app.showView('calculator');window.dispatchEvent(new CustomEvent('launchroas:open-product-picker',{detail:{product_no:typeof productNo==='number'||typeof productNo==='string'?productNo:null}}));}
-  function goResult(){var p=document.querySelector('.sales-profit');if(p)p.scrollIntoView({block:'start',behavior:'smooth'});}
+  function openFx(){app.showView('calculator');var f=byId('salesFxRate');if(f){f.scrollIntoView({block:'center'});f.focus({preventScroll:true});}}
+  window.LaunchRoasOpenFx=openFx;
+  function goResult(){app.showView('overview');var p=document.querySelector('.key-profit');if(p)p.scrollIntoView({block:'start',behavior:'smooth'});}
   function setupSteps(ctx,s,profit,spendKrw,ms,mp){
     var cafeOk=!!(ctx.cafeAccount&&ctx.cafeAccount.status==='connected'),metaOk=!!(ctx.metaAccount&&ctx.metaAccount.status==='connected');
     var conn={title:'쇼핑몰 · 광고 계정 연결',done:cafeOk&&metaOk,
@@ -182,7 +181,7 @@
     var result={title:'광고비 빼고 남은 금액 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};
     result.text=profit!=null?(partialResult?'지금은 일부 상품 기준(판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')이에요':'전체 판매 상품 기준으로 확인할 수 있어요')
       :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
-    if(profit==null&&mp&&spendKrw==null&&!ms)result.button={label:'환율 입력',run:function(){goResult();byId('salesFxRate').focus();}};
+    if(profit==null&&mp&&spendKrw==null&&!ms)result.button={label:'환율 입력',run:openFx};
     return [conn,cost,result];
   }
   function renderGuide(steps,ready){
@@ -208,16 +207,18 @@
       list.appendChild(li);
     });
   }
-  function renderStatus(ctx,s,profit,spendKrw,ms,mp,partial,ready){
-    var box=byId('statusSummary');box.hidden=!ready;if(!ready)return;
-    var range=state.range,label=range?range.label:'',parts=[];
-    if(profit!=null){
-      box.replaceChildren(el('span','',label+' 광고비를 빼고 남은 금액은 '),el('strong',profit<0?'deficit':'',won(profit)),el('span','',(partial?' (판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+' 기준)':'')+'이에요.'));
-    }else box.replaceChildren(el('span','',label+' 남은 금액은 아직 계산할 수 없어요.'));
-    if(!ms&&mp&&mp.roas!=null)parts.push('Meta ROAS '+Math.round(Number(mp.roas)*100).toLocaleString('ko-KR')+'%');
-    if(spendKrw!=null)parts.push('광고비 '+won(spendKrw));
-    if(s)parts.push('판매 '+count(s.soldQty));
-    if(parts.length)box.appendChild(el('small','',' '+parts.join(' · ')));
+  // 광고비 카드 — 외화면 저장한 환율로 원화, 구매금액을 측정하지 못했으면 ROAS를 0%로 보이지 않게 한다.
+  function money(v,cur){try{return new Intl.NumberFormat('en-US',{style:'currency',currency:cur||'USD',maximumFractionDigits:2}).format(Number(v)||0);}catch(e){return (cur||'')+' '+Number(v||0).toLocaleString('en-US');}}
+  function renderSpend(mp,ms,currency,spendKrw,fx){
+    var value,notes=[];
+    if(ms){value=ms.text==='미연동'?'미연결':ms.text;notes.push(ms.note);}
+    else if(!mp){value='—';notes.push('Meta 광고비를 불러오는 중이에요');}
+    else{
+      value=currency==='KRW'?won(mp.spend):spendKrw!=null?won(spendKrw):money(mp.spend,currency);
+      if(currency!=='KRW')notes.push(money(mp.spend,currency)+(spendKrw!=null?' · 1 '+currency+' = '+Number(fx.krw_per_unit).toLocaleString('ko-KR')+'원':' · 환율을 저장하면 원화로 보여요'));
+      notes.push(mp.purchase_value_observed&&mp.roas!=null?'ROAS '+Math.round(Number(mp.roas)*100).toLocaleString('ko-KR')+'% · Meta 구매 '+count(mp.purchase_count,'건'):'구매금액 측정 안 됨 · ROAS 표시 안 함');
+    }
+    byId('adSpend').textContent=value;byId('adNote').textContent=notes.filter(Boolean).join(' · ');
   }
 
   var revealKey='';
@@ -227,20 +228,20 @@
     amount.textContent=text;
     amount.classList.toggle('deficit',profit!=null&&profit<0);
     byId('salesScope').hidden=!(partial&&profit!=null);
-    // 금액(부호 · 단위)과 '일부 상품 기준' 표시는 한 덩어리(.sales-hero-amount)로 함께 움직인다. 조회 중('—')에는 연출하지 않는다.
+    // 금액(부호 · 단위)과 '일부 상품 기준' 표시는 한 덩어리(.key-amount)로 함께 움직인다. 조회 중('—')에는 연출하지 않는다.
     if(M&&profit!=null){
       var key=app.getContext().storeId+'|'+(state.range?state.range.since+'~'+state.range.until:'');
-      if(key!==revealKey){revealKey=key;M.stagger([document.querySelector('.sales-hero-amount'),byId('salesFormula'),byId('statusSummary'),byId('insights')]);}
-      else if(changed)M.play(document.querySelector('.sales-hero-amount'),'fx-kinetic');
+      if(key!==revealKey){revealKey=key;M.stagger([document.querySelector('.key-amount'),byId('salesFormula')]);}
+      else if(changed)M.play(document.querySelector('.key-amount'),'fx-kinetic');
     }
     // 일부 상품만 계산됐으면 마진이 판매 몇 개분인지, 광고비는 전체인지를 계산식 줄에 바로 붙인다.
-    byId('salesFormula').textContent='상품 마진 '+(base==null?'?':won(base))+(partial&&s?' (판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')':'')+' − 실제 광고비 '+(spendKrw==null?'?':won(spendKrw))+(partial?' (전체)':'');
+    byId('salesFormula').textContent=profit==null?'상품 마진 − 광고비로 계산해요':'상품 마진 '+won(base)+(partial&&s?' (판매 '+count(s.soldQty)+'개 중 '+count(s.linkedQty)+'개)':'')+' − 광고비 '+won(spendKrw);
     var box=byId('salesChips');box.replaceChildren();
     chips.forEach(function(c){
       var chip=el(c.action?'button':'span','sales-chip'+(c.tone?' '+c.tone:''),c.text);
       if(c.action){chip.type='button';chip.addEventListener('click',function(){
         if(c.action==='products')openProducts();
-        else byId('salesFxRate').focus();
+        else openFx();
       });}
       box.appendChild(chip);
     });
@@ -272,7 +273,7 @@
     this.disabled=false;
     if(res.error){byId('salesFxNote').textContent='환율을 저장하지 못했어요.';return;}
     state.fxRecord={id:res.data.id,data:data};
-    byId('salesFxNote').textContent='';state.fxEdit=false;
+    byId('salesFxNote').textContent='환율을 저장했어요.';
     app.setFx({currency:currency,krw_per_unit:rate,saved_at:data.saved_at});
   });
 

@@ -49,7 +49,7 @@
   }
   function params(ctx,scope,adsetId){var body={store_id:ctx.storeId,scope:scope,period:ctx.period.kind};if(ctx.period.kind==='date')body.date=ctx.period.date;if(adsetId)body.adset_id=adsetId;return body;}
   function valid(ctx,key){var latest=app.getContext();return key===currentKey && latest.userId===ctx.userId && latest.storeId===ctx.storeId && latest.period.kind===ctx.period.kind && latest.period.date===ctx.period.date;}
-  function purchases(m){return m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'0건';}
+  function purchases(m){return m.purchase&&m.purchase.observed?number(m.purchase.value)+'건':'미측정';}
   function verdictOf(link,m){return window.LaunchRoasSales?window.LaunchRoasSales.adVerdict(link,m):{label:'판단 보류',tone:'hold',reason:''};}
   function verdictBadge(v){
     var box=element('div','ad-verdict-box');box.appendChild(element('span','ad-verdict '+v.tone,v.label));

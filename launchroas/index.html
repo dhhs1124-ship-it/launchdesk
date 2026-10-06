@@ -77,84 +77,77 @@
 
     <section id="dashboard" class="dashboard" hidden>
       <aside class="sidebar" aria-label="서비스 메뉴">
-        <p class="sidebar-label">WORKSPACE</p>
         <button class="sidebar-current" type="button" data-view="overview"><span class="nav-icon" aria-hidden="true">◫</span> 운영 현황</button>
-        <button class="sidebar-link" type="button" data-view="calculator"><span class="nav-icon" aria-hidden="true">▦</span> 마진 계산기</button>
-        <a class="sidebar-link" href="https://launchdesk.co.kr/#/services/setup"><span class="nav-icon" aria-hidden="true">◈</span> 세팅 대행 <span class="external" aria-hidden="true">↗</span></a>
+        <button class="sidebar-link" type="button" data-view="ads"><span class="nav-icon" aria-hidden="true">▤</span> 광고 성과</button>
+        <button class="sidebar-link" type="button" data-view="calculator"><span class="nav-icon" aria-hidden="true">▦</span> 상품 비용 · 환율</button>
+        <button class="sidebar-link" type="button" data-view="records"><span class="nav-icon" aria-hidden="true">≡</span> 광고 기록</button>
         <button class="sidebar-link" type="button" data-view="connections"><span class="nav-icon" aria-hidden="true">⌘</span> 연결 관리</button>
+        <a class="sidebar-link" href="https://launchdesk.co.kr/#/services/setup"><span class="nav-icon" aria-hidden="true">◈</span> 세팅 대행 <span class="external" aria-hidden="true">↗</span></a>
         <button class="sidebar-link" type="button" data-tour-open><span class="nav-icon" aria-hidden="true">?</span> 사용법 다시 보기</button>
         <div class="sidebar-bottom"><span class="caption-dot"></span> LAUNCHROAS <span class="version">EARLY ACCESS</span></div>
       </aside>
       <div class="workspace">
-      <nav class="mobile-nav" aria-label="LaunchROAS 메뉴"><button type="button" data-view="overview" aria-current="page">운영 현황</button><button type="button" data-view="calculator">마진 계산기</button><button type="button" data-view="connections">연결 관리</button><button type="button" data-tour-open>사용법</button></nav>
+      <nav class="mobile-nav" aria-label="LaunchROAS 메뉴"><button type="button" data-view="overview" aria-current="page">운영 현황</button><button type="button" data-view="ads">광고 성과</button><button type="button" data-view="calculator">상품 비용</button><button type="button" data-view="records">광고 기록</button><button type="button" data-view="connections">연결 관리</button><button type="button" data-tour-open>사용법</button></nav>
       <div id="overviewView">
-      <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>운영 현황</strong></div>
-      <div class="dashboard-head">
-        <div><p class="eyebrow"><span class="eyebrow-line"></span> TODAY'S OVERVIEW</p><h1>운영 현황<span class="title-period">.</span></h1><p class="intro">주문과 광고의 오늘을 살펴보세요.</p></div>
-        <div class="controls"><label for="storeSelect">쇼핑몰</label><select id="storeSelect"></select><button id="refresh" type="button" class="secondary">주문 동기화 · 다시 조회 <span aria-hidden="true">↻</span></button></div>
+      <div class="ov-head">
+        <div class="ov-title"><h1>운영 현황</h1><p id="ovPeriodLabel" class="ov-period">오늘 기준</p></div>
+        <div class="ov-controls">
+          <div class="period-controls" role="group" aria-label="운영 현황 조회 기간"><button type="button" data-period="today" aria-pressed="true">오늘</button><button type="button" data-period="yesterday" aria-pressed="false">어제</button><button type="button" data-period="month" aria-pressed="false">이번 달</button><label class="sr-only" for="periodDate">날짜 선택</label><input id="periodDate" type="date" aria-label="날짜 선택"></div>
+          <label class="sr-only" for="storeSelect">쇼핑몰</label><select id="storeSelect" aria-label="쇼핑몰"></select>
+          <button id="refresh" type="button" class="secondary">주문 동기화 <span aria-hidden="true">↻</span></button>
+        </div>
       </div>
-      <p id="statusSummary" class="status-summary" role="status" hidden></p>
+      <p id="pageMessage" class="message page-message" role="status"></p>
+      <div class="key-grid">
+        <article class="key-card">
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 7h11l-.8 9.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8L4.5 7Z"/><path d="M7.5 7V5.5a2.5 2.5 0 0 1 5 0V7"/></svg>주문금액</span>
+          <strong id="orderAmount" class="key-value">—</strong>
+          <small id="orderNote" class="key-note">연결 상태 확인 전</small>
+        </article>
+        <article class="key-card">
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 8.5v3h2.5l6 3.5v-10l-6 3.5H3.5Z"/><path d="M14.5 7.5a3.5 3.5 0 0 1 0 5"/></svg>광고비</span>
+          <strong id="adSpend" class="key-value">—</strong>
+          <small id="adNote" class="key-note">광고계정 상태 확인 전</small>
+        </article>
+        <article class="key-card key-profit">
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="5.5" rx="5.5" ry="2.2"/><path d="M4.5 5.5v4.5c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V5.5"/><path d="M4.5 10v4.5c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V10"/></svg>예상 남은 금액<span class="key-tag">예상</span></span>
+          <div class="key-amount"><strong id="salesAmount" class="key-value">—</strong><span id="salesScope" class="sales-scope" hidden>일부 상품 기준</span></div>
+          <small id="salesFormula" class="key-note"></small>
+          <div id="salesChips" class="sales-chips"></div>
+          <small id="salesMessage" class="key-note" role="status"></small>
+        </article>
+      </div>
+      <div class="ov-main">
+        <section id="insights" class="weekly-panel" aria-label="주간 AI 점검"><div id="insightsBody"></div></section>
+        <aside class="ov-side" aria-label="광고 · 비용 요약">
+          <section class="side-card" aria-labelledby="sideAdsTitle"><h2 id="sideAdsTitle">광고 현황</h2><dl id="sideAds" class="side-list"></dl><button type="button" class="secondary side-btn" data-view="ads">광고 성과 전체 보기 →</button></section>
+          <section class="side-card" aria-labelledby="sideCostTitle"><h2 id="sideCostTitle">비용 설정</h2><dl id="sideCost" class="side-list"></dl><div class="side-actions"><button type="button" class="secondary" data-view="calculator">상품 비용 관리</button><button type="button" id="sideFx" class="secondary">환율 설정</button></div></section>
+        </aside>
+      </div>
       <section id="setupGuide" class="setup-guide" hidden aria-labelledby="setupGuideTitle">
         <div class="setup-head"><h2 id="setupGuideTitle">처음 설정</h2><span id="setupProgress" class="small"></span></div>
         <ol id="setupSteps" class="setup-steps"></ol>
       </section>
-      <div class="period-controls" role="group" aria-label="운영 현황 조회 기간"><button type="button" data-period="today" aria-pressed="true">오늘</button><button type="button" data-period="yesterday" aria-pressed="false">어제</button><button type="button" data-period="month" aria-pressed="false">이번 달</button><label for="periodDate">날짜 선택</label><input id="periodDate" type="date"></div>
-      <p id="pageMessage" class="message page-message" role="status"></p>
-      <div class="section-heading"><div><p class="section-kicker">PERFORMANCE</p><h2>오늘의 숫자</h2></div><span>각 서비스의 집계 기준</span></div>
-      <div class="metric-grid">
-        <article class="metric"><span id="ordersLabel">Cafe24 오늘 주문</span><strong id="orderCount">—</strong><small id="orderNote">연결 상태 확인 전</small></article>
-        <article class="metric"><span id="amountLabel">Cafe24 오늘 주문금액</span><strong id="orderAmount">—</strong><small>취소·환불·미입금 미차감</small></article>
-        <article class="metric"><span id="spendLabel">Meta 오늘 광고비</span><strong id="adSpend">—</strong><small id="adNote">광고계정 상태 확인 전</small></article>
-        <article class="metric"><span id="roasLabel">Meta 오늘 ROAS</span><strong id="adRoas">—</strong><small>Meta 귀속 구매금액 ÷ 광고비</small></article>
+      <p class="footnote">주문금액은 Cafe24 주문 기준(취소·환불 미차감), 광고비 · ROAS는 Meta 귀속 기준이라 서로 합산하지 않아요. 예상 남은 금액은 비용을 저장한 상품 기준 추정이에요.</p>
       </div>
-      <section class="operations-panel sales-profit" aria-labelledby="salesProfitTitle">
-        <div class="sales-hero">
-          <div class="sales-hero-head"><h2 id="salesProfitTitle">광고비 빼고 남은 금액</h2><span class="sales-estimate">예상</span><span id="salesPeriod" class="sales-period"></span></div>
-          <div class="sales-hero-amount"><strong id="salesAmount">—</strong><span id="salesScope" class="sales-scope" hidden>일부 상품 기준</span></div>
-          <p id="salesFormula" class="sales-formula"></p>
-          <div id="salesChips" class="sales-chips"></div>
-          <p id="salesMessage" class="small" role="status"></p>
-        </div>
-        <div id="salesFx" class="sales-fx" hidden><label for="salesFxRate"><span>광고비 환율 · 1 <b id="salesFxCurrency">USD</b>당 원화</span><input id="salesFxRate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="예: 1390"></label><button id="salesFxSave" type="button" class="secondary">환율 저장</button><small id="salesFxNote" role="status"></small></div>
-        <details id="salesBasis" class="sales-basis"><summary>계산 기준 보기</summary>
-          <div id="salesFigures" class="sales-figures"></div>
-          <details class="sales-breakdown" hidden><summary>실제 결제 기준 계산 내역</summary><div id="salesBreakdown"></div></details>
-        </details>
+      <section id="adsView" hidden aria-labelledby="adPerformanceTitle">
+        <div class="view-head"><h1 id="adPerformanceTitle">광고 성과</h1><p id="adsPeriodLabel" class="ov-period">운영 현황에서 선택한 기간 · Meta 귀속 기준</p></div>
+        <section class="ad-performance">
+          <p id="adPerformanceMessage" class="small" role="status">Meta 연결을 확인하고 있어요.</p>
+          <div id="adPerformanceList" class="ad-performance-list"></div>
+          <button id="adPerformanceMore" type="button" class="ad-performance-more" hidden aria-expanded="false">광고 세트 전체 보기 ↓</button>
+        </section>
       </section>
-      <section id="insights" class="operations-panel insights" aria-labelledby="insightsTitle">
-        <div class="insights-head"><h2 id="insightsTitle">개선 점검</h2></div>
-        <p class="small insights-note">연결된 Cafe24 · Meta 지표만 써요. 광고 소재 · 상세페이지는 보지 않아 원인은 가설로 표시해요.</p>
-        <div id="insightsBody"></div>
+      <section id="recordsView" hidden aria-labelledby="adlogTitle">
+        <div class="view-head"><h1 id="adlogTitle">광고 기록</h1><p class="ov-period">직접 입력한 기록과 Meta 하루 합계 · Meta 귀속 구매금액은 Cafe24 주문금액과 합산하지 않아요</p></div>
+        <section class="operations-panel adlog-panel">
+          <div class="adlog-head"><button id="adlogAdd" type="button" class="secondary">+ 기록 추가</button></div>
+          <div class="adlog-toolbar"><label for="adlogMetaDate">Meta 기록할 날짜</label><input id="adlogMetaDate" type="date"><button id="adlogMetaSave" type="button" class="secondary">Meta 성과 기록하기 (어제)</button><span id="adlogMessage" class="small" role="status"></span></div>
+          <form id="adlogForm" class="adlog-form" hidden><label>날짜<input id="adlogDate" type="date" required></label><label>소재명<input id="adlogName" maxlength="100" required></label><label>광고비 (원)<input id="adlogSpend" type="number" min="0" required></label><label>전환 매출 (원)<input id="adlogRevenue" type="number" min="0" required></label><label>채널<select id="adlogChannel"><option>메타</option><option>네이버</option><option>카카오</option><option>인스타</option></select></label><div class="form-actions"><button type="submit" class="primary">저장하기</button><button type="button" id="adlogCancel" class="secondary">취소</button></div></form>
+          <div class="adlog-table-wrap"><table><thead><tr><th>날짜</th><th>채널</th><th>기록 내용</th><th>광고비</th><th>전환 매출</th><th>ROAS</th><th></th></tr></thead><tbody id="adlogRows"></tbody></table></div>
+          <div class="adlog-totals"><div>총 광고비 <strong id="adlogTotalSpend">—</strong></div><div>평균 ROAS <strong id="adlogAverageRoas">—</strong></div><div>최고 기록 <strong id="adlogBest">—</strong></div></div>
+        </section>
       </section>
-      <div class="overview-main-grid">
-      <div class="overview-ad-column">
-      <section class="ad-performance" aria-labelledby="adPerformanceTitle">
-        <div class="section-heading"><div><p class="section-kicker">AD PERFORMANCE</p><h2 id="adPerformanceTitle">광고별 성과</h2></div><span>선택한 기간 · Meta 귀속 기준</span></div>
-        <p id="adPerformanceMessage" class="small" role="status">Meta 연결을 확인하고 있어요.</p>
-        <div id="adPerformanceList" class="ad-performance-list"></div>
-        <button id="adPerformanceMore" type="button" class="ad-performance-more" hidden aria-expanded="false">광고 세트 전체 보기 ↓</button>
-      </section>
-      </div>
-      <div class="overview-ops-column">
-      <div class="section-heading"><div><p class="section-kicker">OPERATIONS</p><h2>쇼핑몰 운영 현황</h2></div></div>
-      <section class="operations-panel" aria-label="쇼핑몰 운영 현황">
-        <div class="operations-columns"><div><h3>오늘의 운영 브리핑</h3><div id="briefList" class="brief-list"></div></div><div><h3>광고 상태</h3><div id="adState" class="status-list"></div></div></div>
-        <div class="month-panel"><h3>이번 달 운영 현황</h3><div id="monthSummary" class="month-summary"></div></div>
-      </section>
-      </div>
-      </div>
-      <details class="adlog-disclosure" open><summary><span>광고 기록 <small>기록 추가·Meta 성과 저장·지난 기록 보기</small></span><span class="disclosure-action">펼치기 ↓</span></summary>
-      <section class="operations-panel adlog-panel" aria-labelledby="adlogTitle">
-        <div class="adlog-head"><div><p class="section-kicker">AD RECORDS</p><h2 id="adlogTitle">광고 기록</h2><p class="small">직접 입력한 기록과 Meta 하루 합계를 함께 볼 수 있어요. Meta 귀속 구매금액은 Cafe24 주문금액과 합산하지 않습니다.</p></div><button id="adlogAdd" type="button" class="secondary">+ 기록 추가</button></div>
-        <div class="adlog-toolbar"><label for="adlogMetaDate">Meta 기록할 날짜</label><input id="adlogMetaDate" type="date"><button id="adlogMetaSave" type="button" class="secondary">Meta 성과 기록하기 (어제)</button><span id="adlogMessage" class="small" role="status"></span></div>
-        <form id="adlogForm" class="adlog-form" hidden><label>날짜<input id="adlogDate" type="date" required></label><label>소재명<input id="adlogName" maxlength="100" required></label><label>광고비 (원)<input id="adlogSpend" type="number" min="0" required></label><label>전환 매출 (원)<input id="adlogRevenue" type="number" min="0" required></label><label>채널<select id="adlogChannel"><option>메타</option><option>네이버</option><option>카카오</option><option>인스타</option></select></label><div class="form-actions"><button type="submit" class="primary">저장하기</button><button type="button" id="adlogCancel" class="secondary">취소</button></div></form>
-        <div class="adlog-table-wrap"><table><thead><tr><th>날짜</th><th>채널</th><th>기록 내용</th><th>광고비</th><th>전환 매출</th><th>ROAS</th><th></th></tr></thead><tbody id="adlogRows"></tbody></table></div>
-        <div class="adlog-totals"><div>총 광고비 <strong id="adlogTotalSpend">—</strong></div><div>평균 ROAS <strong id="adlogAverageRoas">—</strong></div><div>최고 기록 <strong id="adlogBest">—</strong></div></div>
-      </section>
-      </details>
-      <p class="footnote">Cafe24 주문금액과 Meta 귀속 구매금액은 집계 기준이 달라 합산하지 않습니다. 주문 데이터는 마지막 동기화 시각 이후의 주문을 포함하지 않을 수 있습니다.</p>
-      <button type="button" data-view="connections" class="manage-link connection-inline">쇼핑몰·광고계정 연결 관리 →</button>
-      </div>
       <section id="connectionsView" hidden aria-labelledby="connectionsTitle">
         <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>연결 관리</strong></div>
         <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> CONNECTIONS</p><h1 id="connectionsTitle">연결 관리<span class="title-period">.</span></h1><p class="intro">쇼핑몰과 Meta 광고계정을 이곳에서 연결하세요.</p></div></div>
@@ -162,8 +155,15 @@
         <section class="calc-card connection-card"><h2>새 쇼핑몰 등록</h2><p class="small">현재 쇼핑몰의 연결 상태는 아래에서 확인하세요. 다른 쇼핑몰을 추가할 때만 사용합니다.</p><form id="storeCreateForm" class="connection-form"><label>쇼핑몰 이름<input id="newStoreName" required maxlength="80" placeholder="내 쇼핑몰"></label><label>쇼핑몰 주소<input id="newStoreUrl" type="url" required placeholder="https://myshop.cafe24.com"></label><button type="submit" class="secondary">쇼핑몰 등록</button></form></section>
       </section>
       <section id="calculatorView" hidden aria-labelledby="calculatorTitle">
-        <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>마진 계산기</strong></div>
-        <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> PRODUCT MARGIN</p><h1 id="calculatorTitle">마진 계산기<span class="title-period">.</span></h1><p class="intro">상품을 고르고 비용을 저장하세요. 광고비는 운영 현황에서 실제 금액으로 뺍니다.</p></div></div>
+        <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>상품 비용 · 환율</strong></div>
+        <div class="view-head"><h1 id="calculatorTitle">상품 비용 · 환율</h1><p class="ov-period">상품을 고르고 비용을 저장하세요. 광고비는 운영 현황에서 실제 금액으로 뺍니다.</p></div>
+        <section id="costSettings" class="calc-card cost-settings" aria-labelledby="costSettingsTitle"><h2 id="costSettingsTitle">광고비 환율 · 계산 기준</h2>
+          <div id="salesFx" class="sales-fx" hidden><label for="salesFxRate"><span>광고비 환율 · 1 <b id="salesFxCurrency">USD</b>당 원화</span><input id="salesFxRate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="예: 1390"></label><button id="salesFxSave" type="button" class="secondary">환율 저장</button><small id="salesFxNote" role="status"></small></div>
+          <details id="salesBasis" class="sales-basis"><summary>운영 현황 계산 기준 보기 (선택한 기간)</summary>
+            <div id="salesFigures" class="sales-figures"></div>
+            <details class="sales-breakdown" hidden><summary>실제 결제 기준 계산 내역</summary><div id="salesBreakdown"></div></details>
+          </details>
+        </section>
         <div class="pm-bar"><button id="pmPick" type="button" class="primary pm-pick">상품 선택하기</button><span id="pmSelected" class="small" role="status"></span></div>
         <div id="pmPicker" class="calc-card pm-picker" hidden>
           <div class="pm-picker-head"><input id="pmSearch" type="search" placeholder="상품 이름 검색" aria-label="상품 이름 검색"><button id="pmClose" type="button" class="inline-button">닫기</button></div>

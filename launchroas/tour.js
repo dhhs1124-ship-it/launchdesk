@@ -27,10 +27,10 @@
       {target:'.sidebar [data-view="calculator"], .mobile-nav [data-view="calculator"]',title:'2. 상품 선택 · 비용 저장',
        text:'상품을 고르고 원가 · 수수료 · 배송비를 저장하면 계산에 들어가요.',state:status(1),done:st[1]&&st[1].done,
        action:{label:'상품 비용 입력하기',run:openProducts}},
-      {target:'.sales-hero',view:'overview',title:'3. 광고비 빼고 남은 금액',
+      {target:'.key-profit',view:'overview',title:'3. 예상 남은 금액',
        text:'판매 마진에서 실제 광고비를 뺀 금액이에요. 일부 상품만 저장했으면 \'일부 상품 기준\'으로 표시돼요.',state:status(2),done:st[2]&&st[2].done},
-      {target:'#insights .ai-card, #insights',view:'overview',title:'4. 개선 점검',
-       text:'주간 AI 점검(주 1회)을 누르면 지난주 광고 지표와 소재를 함께 보고 우선 점검할 광고와 변경안을 알려줘요. 아래 규칙 기반 점검은 데이터 확인용이에요.',state:'',done:false}
+      {target:'#insights',view:'overview',title:'4. 주간 AI 점검',
+       text:'주간 AI 점검(주 1회)을 누르면 지난주 광고 지표와 소재를 함께 보고 우선 점검할 광고와 변경안을 알려줘요. 판단 이유 · 지금 할 일 · 변경 예시는 광고를 눌러 펼쳐 봐요.',state:'',done:false}
     ];
   }
 
@@ -82,7 +82,7 @@
     var first=idx<0;idx=i;var s=steps[idx];
     if(s.view)app.showView(s.view);
     if(target)target.classList.remove('tour-target');
-    target=visible(s.target)||visible('.sales-hero');
+    target=visible(s.target)||visible('.key-profit');
     render();
     if(M)M.play(card,first?'fx-whip':'fx-swap'); // 첫 장면만 휩팬, 이후는 짧은 전환
     if(target){target.classList.add('tour-target');if(M)M.play(target,'fx-punch');scrollTo(target);}

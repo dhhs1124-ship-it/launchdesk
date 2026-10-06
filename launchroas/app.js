@@ -27,18 +27,13 @@
   }
   function message(id, value){ byId(id).textContent = value || ''; }
   function won(n){ return Math.round(Number(n) || 0).toLocaleString('ko-KR') + '원'; }
-  function metaMoney(n, currency){
-    try{ return new Intl.NumberFormat('en-US', {style:'currency', currency:currency || 'USD', maximumFractionDigits:2}).format(Number(n) || 0); }
-    catch(e){ return (currency || 'USD') + ' ' + (Number(n) || 0).toLocaleString('en-US'); }
-  }
   function time(iso){
     if(!iso || !Number.isFinite(Date.parse(iso))) return '';
     return new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul', dateStyle:'short', timeStyle:'short'}).format(new Date(iso));
   }
   function resetCards(){
-    ['orderCount','orderAmount','adSpend','adRoas'].forEach(function(id){ message(id, '—'); });
+    ['orderAmount','adSpend'].forEach(function(id){ message(id, '—'); });
     message('orderNote', '연결 상태 확인 전'); message('adNote', '광고계정 상태 확인 전');
-    ['briefList','adState','monthSummary'].forEach(function(id){byId(id).replaceChildren();});
     setConnection('cafeConnection','Cafe24 확인 중','loading');setConnection('metaConnection','Meta 확인 중','loading');
     viewState = {cafe:null,meta:null}; selectedCafe = null; selectedMeta = null; connectionsLoaded = false; fxRate = null;
   }
@@ -147,72 +142,36 @@
     setConnection('metaConnection',meta&&meta.status==='connected'?'Meta 연결됨':'Meta 미연결',meta&&meta.status==='connected'?'on':'off');
     await Promise.all([loadOrders(storeId, cafe, id), loadMeta(meta, id)]);
   }
-  function addLine(id, text){var p = document.createElement('p');p.textContent = text;byId(id).appendChild(p);}
-  function addSummary(id,label,value,note){var row=document.createElement('div');row.className='summary-row';var title=document.createElement('span');title.textContent=label;var strong=document.createElement('strong');strong.textContent=value;row.append(title,strong);if(note){var small=document.createElement('small');small.textContent=note;row.appendChild(small);}byId(id).appendChild(row);}
-  function showOverview(){
-    ['briefList','adState','monthSummary'].forEach(function(id){byId(id).replaceChildren();});
-    var cafe = viewState.cafe, meta = viewState.meta;
-    if(cafe && cafe.connected){
-      if(cafe.selected && cafe.coverage !== 'none' && cafe.coverage !== 'unknown'){
-        addSummary('briefList',periods.resolve(period.kind,period.date,Date.now()).label+' Cafe24 주문',cafe.selected.count+'건 · '+won(cafe.selected.amount),'취소·환불·미입금 미차감'+(cafe.syncedAt?' · '+time(cafe.syncedAt)+' 동기화':''));
-      } else addLine('briefList','선택 기간 주문은 동기화 범위를 확인할 수 없어요. 주문 동기화 · 다시 조회를 눌러 주세요.');
-      if(cafe.month && cafe.monthCoverage !== 'none' && cafe.monthCoverage !== 'unknown')
-        addSummary('monthSummary','Cafe24 이번 달 주문',cafe.month.count+'건 · '+won(cafe.month.amount));
-      else addLine('monthSummary','Cafe24 · 이번 달 주문 동기화 범위를 확인해 주세요.');
-    } else {
-      addLine('briefList',cafe && cafe.error ? 'Cafe24 주문 조회에 실패했어요.' : 'Cafe24 연결 후 주문을 확인할 수 있어요.');
-      addLine('monthSummary','Cafe24 · 연결 후 확인 가능');
-    }
-    if(meta && (meta.today||meta.selected||meta.month)){
-      var t = period.kind==='month'?meta.month:period.kind==='today'?meta.today:meta.selected, m = meta.month || {}, currency = meta.account && meta.account.currency;
-      var label=periods.resolve(period.kind,period.date,Date.now()).label;
-      t=t||{};
-      addSummary('adState',label+' ROAS',t.roas == null ? '—' : Math.round(t.roas*100).toLocaleString('ko-KR')+'%','Meta 귀속 구매금액 ÷ 광고비');
-      addSummary('adState','이번 달 ROAS',m.roas == null ? '—' : Math.round(m.roas*100).toLocaleString('ko-KR')+'%');
-      if(Number(t.spend)>0 && Number(t.purchase_count)===0) addLine('adState',label+' 광고비가 사용되고 있지만 Meta 귀속 구매는 없습니다.');
-      else if(t.roas != null && m.roas != null) addLine('adState',t.roas>m.roas?label+' 광고 효율이 이번 달 평균보다 높습니다.':t.roas<m.roas?label+' 광고 효율이 이번 달 평균보다 낮습니다.':label+' 광고 효율이 이번 달 평균과 비슷합니다.');
-      addSummary('briefList',label+' Meta 광고비',metaMoney(t.spend,currency),'귀속 구매금액 '+(t.purchase_value_observed?metaMoney(t.purchase_value,currency):'측정되지 않음'));
-      addSummary('monthSummary','Meta 이번 달 광고비',metaMoney(m.spend,currency),'귀속 구매금액 '+(m.purchase_value_observed?metaMoney(m.purchase_value,currency):'측정되지 않음')+' · 구매 '+(Number(m.purchase_count)||0)+'건');
-    } else {
-      addLine('adState',meta && meta.error ? 'Meta 성과 조회에 실패했어요.' : 'Meta 광고계정 연결 후 확인 가능');
-      addLine('monthSummary','Meta · 연결 후 확인 가능');
-    }
-  }
   async function loadOrders(storeId, account, id){
     if(!account || account.status !== 'connected'){
-      message('orderNote', '연결 전');
-      viewState.cafe = {connected:false}; showOverview();
+      message('orderAmount','미연결');message('orderNote', 'Cafe24를 연결하면 주문금액이 보여요');
+      viewState.cafe = {connected:false}; 
       return;
     }
     var now = Date.now();
-    var range = periods.resolve(period.kind,period.date,now), month = periods.resolve('month',null,now);
-    var bounds = periods.queryBounds(range), monthBounds = periods.queryBounds(month);
+    var range = periods.resolve(period.kind,period.date,now), bounds = periods.queryBounds(range);
     var result = await sb.from('orders').select('ordered_at,payment_amount')
-      .eq('store_id',storeId).gte('ordered_at',monthBounds.gte < bounds.gte ? monthBounds.gte : bounds.gte)
-      .lt('ordered_at',monthBounds.lt > bounds.lt ? monthBounds.lt : bounds.lt).limit(5001);
+      .eq('store_id',storeId).gte('ordered_at',bounds.gte).lt('ordered_at',bounds.lt).limit(5001);
     if(id !== requestId) return;
-    if(result.error){ message('orderNote','조회 실패'); viewState.cafe={error:true};showOverview();return; }
+    if(result.error){ message('orderAmount','조회 실패');message('orderNote','Cafe24 주문을 불러오지 못했어요 · 0원이 아니에요'); viewState.cafe={error:true};return; }
     if((result.data || []).length > 5000){
-      message('orderNote','집계 한도 초과');viewState.cafe={error:true};showOverview();return;
+      message('orderAmount','계산 안 함');message('orderNote','주문이 5,000건을 넘어 이 기간은 집계하지 않았어요');viewState.cafe={error:true};return;
     }
-    function total(start,end){return core.summarizeOrders((result.data||[]).filter(function(row){return row.ordered_at >= start && row.ordered_at < end;}));}
-    var selected = total(bounds.gte,bounds.lt), monthTotal=total(monthBounds.gte,monthBounds.lt);
+    var selected = core.summarizeOrders(result.data || []);
     var coverage=periods.coverage(range,account.last_synced_at,account.orders_synced_from);
-    var monthCoverage=periods.coverage(month,account.last_synced_at,account.orders_synced_from);
-    viewState.cafe={connected:true,selected:selected,month:monthTotal,coverage:coverage,monthCoverage:monthCoverage,syncedAt:account.last_synced_at};
+    viewState.cafe={connected:true,selected:selected,coverage:coverage,syncedAt:account.last_synced_at};
     if(coverage==='none'||coverage==='unknown'){
-      message('orderNote','동기화 범위 확인 전');
+      message('orderNote','이 기간은 주문 동기화 범위 밖이에요 · 주문 동기화를 눌러 주세요');
     } else {
-      message('orderCount',selected.count.toLocaleString('ko-KR')+'건');
       message('orderAmount',won(selected.amount));
-      message('orderNote',range.label+' · 마지막 동기화 기준');
+      message('orderNote','주문 '+selected.count.toLocaleString('ko-KR')+'건 · 취소·환불 미차감'+(account.last_synced_at?' · '+time(account.last_synced_at)+' 동기화':''));
     }
-    showOverview();
+    
   }
   async function loadMeta(account, id){
-    if(!account){ message('adNote','연결 전');viewState.meta=null;showOverview();return; }
+    if(!account){ viewState.meta=null;return; }
     if(account.status !== 'connected'){
-      message('adNote','연결 확인 필요');viewState.meta=null;showOverview();return;
+      viewState.meta=null;return;
     }
     var body={connected_account_id:account.id};
     if(period.kind==='yesterday'||period.kind==='date'){body.period=period.kind;if(period.date)body.date=period.date;}
@@ -220,15 +179,10 @@
     if(id !== requestId) return;
     var data = result.data;
     if(result.error || !data || data.ok !== true){
-      message('adNote','조회 실패');viewState.meta={error:true};showOverview();publish();return;
+      viewState.meta={error:true};publish();return;
     }
     viewState.meta=data;
-    var today = period.kind==='month' ? data.month || {} : period.kind==='today' ? data.today || {} : data.selected || {};
-    var currency = data.account && data.account.currency;
-    message('adSpend',metaMoney(today.spend,currency));
-    message('adRoas',today.roas == null ? '—' : Math.round(today.roas * 100).toLocaleString('ko-KR')+'%');
-    message('adNote','Meta 구매 '+(Number(today.purchase_count)||0).toLocaleString('ko-KR')+'건 · 광고계정 시간대'+(data.account&&data.account.timezone_name?' ('+data.account.timezone_name+')':'')+' 기준');
-    showOverview();publish();
+    publish();
   }
   byId('authMode').addEventListener('click', function(){
     signupMode = !signupMode;
@@ -291,9 +245,7 @@
     var id = ++requestId; resetCards();publish();loadSelected(this.value,id);
   });
   function switchView(view){
-    var calculator = view === 'calculator';
-    byId('overviewView').hidden = view !== 'overview'; byId('calculatorView').hidden = !calculator;
-    byId('connectionsView').hidden = view !== 'connections';
+    ['overview','ads','calculator','records','connections'].forEach(function(v){ byId(v+'View').hidden = view !== v; });
     document.querySelectorAll('[data-view]').forEach(function(btn){
       var active = btn.getAttribute('data-view') === view;
       btn.setAttribute('aria-current',active?'page':'false');
@@ -305,17 +257,23 @@
   document.querySelectorAll('[data-period]').forEach(function(btn){btn.addEventListener('click',function(){
     period={kind:btn.getAttribute('data-period'),date:null}; byId('periodDate').value='';
     document.querySelectorAll('[data-period]').forEach(function(b){b.setAttribute('aria-pressed',b===btn?'true':'false');});
-    var label=periods.resolve(period.kind,null,Date.now()).label;
-    message('ordersLabel','Cafe24 '+label+' 주문');message('amountLabel','Cafe24 '+label+' 주문금액');
-    message('spendLabel','Meta '+label+' 광고비');message('roasLabel','Meta '+label+' ROAS');
+    periodLabel();
     if(dashboardReady && byId('storeSelect').value)loadSelected(byId('storeSelect').value,++requestId);
   });});
+  // 핵심 금액 카드의 기간(주간 AI 점검은 지난주 고정 — 그 카드에 따로 표시)
+  function periodLabel(){
+    var r=periods.resolve(period.kind,period.date,Date.now());if(!r)return;
+    var d=function(x){var p=x.split('-');return Number(p[1])+'월 '+Number(p[2])+'일';};
+    var text=(period.kind==='date'?'':r.label+' · ')+d(r.since)+(r.until!==r.since?' ~ '+d(r.until):'')+' 기준 · 한국 시간';
+    message('ovPeriodLabel',text);message('adsPeriodLabel',text+' · Meta 귀속 기준 · 기간은 운영 현황에서 바꿔요');
+  }
+  periodLabel();
   byId('periodDate').max=periods.kstDate(Date.now());
   byId('periodDate').addEventListener('change',function(){
     if(!periods.resolve('date',this.value,Date.now())){this.value='';return;}
     period={kind:'date',date:this.value};
     document.querySelectorAll('[data-period]').forEach(function(b){b.setAttribute('aria-pressed','false');});
-    ['ordersLabel','amountLabel','spendLabel','roasLabel'].forEach(function(id){var original={ordersLabel:'Cafe24 주문',amountLabel:'Cafe24 주문금액',spendLabel:'Meta 광고비',roasLabel:'Meta ROAS'}[id];message(id,original+' · '+period.date);});
+    periodLabel();
     if(dashboardReady && byId('storeSelect').value)loadSelected(byId('storeSelect').value,++requestId);
   });
   byId('refresh').addEventListener('click',async function(){

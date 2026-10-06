@@ -185,7 +185,7 @@
   byId('pmSearch').addEventListener('input',renderList);
   byId('pmSave').addEventListener('click',save);
   byId('pmNextProduct').addEventListener('click',function(){var next=(st.products||[]).find(needsSetup);if(next)select(next,'');});
-  byId('pmGoResult').addEventListener('click',function(){app.showView('overview');var p=document.querySelector('.sales-profit');if(p)p.scrollIntoView({block:'start'});});
+  byId('pmGoResult').addEventListener('click',function(){app.showView('overview');var p=document.querySelector('.key-profit');if(p)p.scrollIntoView({block:'center'});});
   byId('calcForm').addEventListener('submit',function(e){e.preventDefault();});
   byId('calcForm').addEventListener('input',render);
   byId('calcForm').addEventListener('change',function(){updateControls();render();});
