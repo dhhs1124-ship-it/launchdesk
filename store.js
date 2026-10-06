@@ -28,7 +28,8 @@
     calcHistory: [],  // 최근 것이 배열 앞쪽 — 화면엔 최대 5개까지만
     adlogRecords: [],  // 최근 것이 배열 앞쪽
     adlogDecisions: [], // LaunchROAS 광고 기록에서 고른 합계 포함 · 제외(tool_type='ad_log_decision') — 메인은 읽기만
-    adlogDecisionsFailed: false // 선택 조회 실패(저장된 선택이 없던 경우와 구분 — 합계 미확정 표시용)
+    adlogDecisionsFailed: false, // 선택 조회 실패(저장된 선택이 없던 경우와 구분 — 합계 미확정 표시용)
+    adlogFailed: false // 광고 기록 조회 실패(기록 0건과 구분 — 합계를 내지 않고 다시 불러오기)
   };
   var listeners = [];
 
@@ -99,6 +100,20 @@
   function getAdlogRecords(){ return state.adlogRecords.slice(); }
   function getAdlogDecisions(){ return state.adlogDecisions.slice(); }
   function isAdlogDecisionsFailed(){ return !!state.adlogDecisionsFailed; }
+  function isAdlogFailed(){ return !!state.adlogFailed; }
+  // 광고 기록만 다시 불러오기(조회 실패 상태의 '다시 불러오기')
+  function reloadAdlogRecords(){
+    var sb = client();
+    if(!sb || !state.userId) return Promise.resolve(false);
+    var uid = state.userId;
+    return sb.from('tool_records').select('data, created_at').eq('user_id', uid).eq('tool_type', 'ad_log').order('created_at', { ascending: false }).then(function(res){
+      if(uid !== state.userId) return false;
+      state.adlogFailed = !!(!res || res.error);
+      if(!state.adlogFailed) state.adlogRecords = (res.data || []).map(function(row){ return row.data; });
+      notifyChange();
+      return !state.adlogFailed;
+    }, function(){ if(uid === state.userId){ state.adlogFailed = true; notifyChange(); } return false; });
+  }
   // 선택만 다시 불러오기(합계 미확정 상태의 '다시 불러오기')
   function reloadAdlogDecisions(){
     var sb = client();
@@ -375,7 +390,7 @@
   function resetState(){
     state.steps = {};
     state.calcHistory = [];
-    state.adlogRecords = []; state.adlogDecisions = []; state.adlogDecisionsFailed = false;
+    state.adlogRecords = []; state.adlogDecisions = []; state.adlogDecisionsFailed = false; state.adlogFailed = false;
   }
   function hydrate(userId){
     var sb = client();
@@ -412,6 +427,7 @@
       if(adlogRes && !adlogRes.error && adlogRes.data){
         state.adlogRecords = adlogRes.data.map(function(row){ return row.data; });
       } else if(adlogRes && adlogRes.error){
+        state.adlogFailed = true;
         console.warn('[launchdesk] 광고기록 조회 실패(정렬 컬럼 확인 필요):', adlogRes.error.message);
       }
 
@@ -423,6 +439,7 @@
       notifyChange();
     }).catch(function(err){
       console.warn('[launchdesk] 데이터 불러오기 중 오류:', err && err.message);
+      state.adlogFailed = true; // 광고 기록도 못 불러왔다 — 기록 없음으로 보이지 않게
       state.authed = true; // 일부 조회 실패로 로그인 자체를 무효화하지 않는다
       notifyChange();
     });
@@ -454,6 +471,8 @@
     getAdlogDecisions: getAdlogDecisions,
     isAdlogDecisionsFailed: isAdlogDecisionsFailed,
     reloadAdlogDecisions: reloadAdlogDecisions,
+    isAdlogFailed: isAdlogFailed,
+    reloadAdlogRecords: reloadAdlogRecords,
     addAdlogRecord: addAdlogRecord,
     addAutoAdlogRecord: addAutoAdlogRecord,
     countAutoAdlogRecordsForStore: countAutoAdlogRecordsForStore,

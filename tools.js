@@ -885,7 +885,11 @@
     var decisions = (window.launchdeskStore && window.launchdeskStore.getAdlogDecisions ? window.launchdeskStore.getAdlogDecisions() : []).filter(function(d){ return String(d.store_id || '') === storeId; });
     var coreSum = AC ? AC.summarize(inStore, decisions) : null, coreLinks = AC ? AC.linkChanges(all) : null;
     var scoped = all.filter(function(r){ return inScope(r) && !isOrphan(r) && !isNoAmount(r); });
-    if(!list.length){
+    // 기록 조회 실패 — '기록 없음(₩0)'과 구분: 빈 안내 대신 실패 안내, 합계는 내지 않는다
+    var recordsFailed = !!(window.launchdeskStore && window.launchdeskStore.isAdlogFailed && window.launchdeskStore.isAdlogFailed());
+    if(!list.length && recordsFailed){
+      adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">광고 기록을 불러오지 못했어요 — 기록이 없는 것이 아니에요. 아래 “다시 불러오기”를 눌러 주세요.</div></td></tr>';
+    } else if(!list.length){
       adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">아직 기록이 없어요 — "+ 기록 추가"나 "Meta 성과 기록하기"로 첫 광고 성과를 남겨보세요.</div></td></tr>';
     } else {
       adlogTbody.innerHTML = list.map(function(r){
@@ -933,6 +937,18 @@
         retry.type = 'button'; retry.className = 'btn btn-sm'; retry.id = 'adlogDecisionRetry'; retry.textContent = '다시 불러오기';
         retry.addEventListener('click', function(){ window.launchdeskStore.reloadAdlogDecisions(); });
         noteEl.appendChild(retry);
+      }
+    }
+    if(recordsFailed){
+      document.getElementById('adlogSumSpend').textContent = '—';
+      document.getElementById('adlogSumRoas').textContent = '—';
+      document.getElementById('adlogSumBest').textContent = '—';
+      if(noteEl){
+        noteEl.textContent = '광고 기록을 불러오지 못했어요 · 합계를 계산하지 않았어요 ';
+        var reload = document.createElement('button');
+        reload.type = 'button'; reload.className = 'btn btn-sm'; reload.id = 'adlogRecordsRetry'; reload.textContent = '다시 불러오기';
+        reload.addEventListener('click', function(){ window.launchdeskStore.reloadAdlogRecords(); });
+        noteEl.appendChild(reload);
       }
     }
   }

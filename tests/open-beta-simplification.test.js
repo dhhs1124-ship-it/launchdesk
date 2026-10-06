@@ -265,6 +265,9 @@ function makeSupabase(opts){
       if (tableName === 'tool_records' && filters.tool_type === 'ad_log_decision' && opts.failDecisions) {
         return { data: null, error: { message: '선택 조회 실패(테스트)' } };
       }
+      if (tableName === 'tool_records' && filters.tool_type === 'ad_log' && opts.failAdlog) {
+        return { data: null, error: { message: '광고 기록 조회 실패(테스트)' } };
+      }
       if (opts.errorTables && opts.errorTables.includes(tableName)) {
         return { data: null, error: { message: '강제 조회 오류(테스트)' } };
       }
@@ -1920,4 +1923,28 @@ test('광고 기록(운영 메인): 선택 조회 실패는 저장된 선택 없
   const none = await boot(parityFixture([]));
   await settle(); none.sandbox.launchdeskAdlog.render();
   assert.equal(none.doc.getElementById('adlogSumSpend').textContent, '₩34,000', '저장된 선택이 없던 경우는 미확정이 아니다');
+});
+
+test('광고 기록(운영 메인): 기록 조회 실패는 기록 없음과 구분 — 합계 — · 불러오지 못함 · 다시 불러오기 → 성공하면 기록 · 합계 반영', async () => {
+  const fx = parityFixture([]);
+  fx.failAdlog = true;
+  const env = await boot(fx);
+  await settle(); env.sandbox.launchdeskAdlog.render();
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '—');
+  assert.match(env.doc.getElementById('adlogSumNote').textContent, /광고 기록을 불러오지 못했어요/);
+  assert.match(env.doc.getElementById('adlogTbody').innerHTML, /기록이 없는 것이 아니에요/);
+  assert.doesNotMatch(env.doc.getElementById('adlogTbody').innerHTML, /아직 기록이 없어요/);
+  const note = env.doc.getElementById('adlogSumNote');
+  const retry = (note.children || note.childNodes || []).find((x) => x && x.textContent === '다시 불러오기');
+  assert.ok(retry, '다시 불러오기 버튼');
+  fx.failAdlog = false;
+  retry.click ? retry.click() : retry.dispatchEvent({ type: 'click' });
+  await settle(); await settle(); env.sandbox.launchdeskAdlog.render();
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩34,000');
+  assert.doesNotMatch(env.doc.getElementById('adlogSumNote').textContent, /불러오지 못했어요/);
+  // 기록이 정말 없는 경우는 실패 안내가 아니다
+  const empty = await boot(Object.assign(periodFixture(), { toolRecords: [] }));
+  await settle(); empty.sandbox.launchdeskAdlog.render();
+  assert.match(empty.doc.getElementById('adlogTbody').innerHTML, /아직 기록이 없어요/);
+  assert.equal(empty.doc.getElementById('adlogSumSpend').textContent, '₩0');
 });
