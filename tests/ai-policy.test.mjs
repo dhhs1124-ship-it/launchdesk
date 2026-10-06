@@ -101,3 +101,39 @@ test("기간 고정: 7일씩 연속 · 끝난 주만 허용", () => {
   assert.equal(pinnedWeeks(null, base).ok, false);
   assert.equal(pinnedWeeks({ current: { since: "2026-09-21", until: "2026-09-27" }, previous: { since: "2026-09-14", until: "2026-09-20" } }, base).weeks.quotaWeek, "2026-10-05", "이용 주(quotaWeek)는 바꾸지 않는다");
 });
+
+import { POLICY_FORBIDDEN, forcedCases } from "../supabase/functions/_shared/ai-policy.mjs";
+import { SYSTEM_PROMPT as BASE_PROMPT, DECISION_INPUTS } from "../supabase/functions/_shared/ai-weekly-core.mjs";
+test("정책을 켠 최종 지시문: 충돌 문장 없음 · 출력 스키마에 추가 확인 · keep_basis · assessments · scope", () => {
+  const p = policySystemPrompt(BASE_PROMPT);
+  assert.deepEqual(POLICY_FORBIDDEN.filter((f) => p.includes(f)), []);
+  for (const k of ['"verdict":"개선 필요|판단 보류|유지|추가 확인"', '"keep_basis"', '"assessments"', '"hold_scope"', '"scope":"creative_test|change"', "decision_inputs"]) assert.ok(p.includes(k), k);
+  assert.ok(!BASE_PROMPT.includes("decision_inputs"), "기존 지시문은 그대로");
+});
+test("서버 검증(정책 켜짐): 근거 없는 유지 · 예산 의견 · 목표/손익 판단을 고치고, 소재 테스트는 남긴다", () => {
+  const a = ad("1", 0.8, "single_image", { link_ctr_pct: 0.8 }), adsById = { 1: a }, peers = peerGroups([a]), batch = { ad_ids: ["1"] };
+  const out = JSON.stringify([{ ad_id: "1", verdict: "유지", keep_basis: "profit", assessments: { change: "구매 2→7", goal: "목표 달성", profit: "흑자" },
+    evidence: [{ metric: "metrics_current.link_ctr_pct", note: "x" }], budget_note: "예산 20% 증액 검토",
+    recommendation: { scope: "creative_test", element: "문구", basis: "본문 첫 줄", current: "a", proposed: "b", test: {} } }]);
+  const r = parseBatch(out, batch, adsById, peers, null, { policy: true, decisionInputs: DECISION_INPUTS })["1"];
+  assert.equal(r.verdict, "판단 보류");
+  assert.equal(r.hold_scope[0], "목표·손익 근거 없음");
+  assert.equal(r.budget_note, null);
+  assert.equal(r.assessments.goal, "판단 불가(목표 입력 없음)");
+  assert.equal(r.assessments.profit, "판단 불가(광고별 손익 근거 없음)");
+  assert.equal(r.assessments.change, "구매 2→7", "현재 입력으로 판단 가능한 성과 변화는 그대로");
+  assert.equal(r.recommendation.scope, "creative_test", "목표 · 마진이 없어도 소재 테스트는 막지 않음");
+  assert.ok(r.server_adjusted.length >= 3);
+  const change = JSON.parse(out); change[0].recommendation.scope = "change";
+  assert.equal(parseBatch(JSON.stringify(change), batch, adsById, peers, null, { policy: true })["1"].recommendation, null, "근거 없는 유지의 변경안은 제외");
+  const withGoal = parseBatch(out, batch, adsById, peers, null, { policy: true, decisionInputs: { goal: "ROAS 300%", ad_profit_basis: null, user_constraints: null } })["1"];
+  assert.equal(withGoal.verdict, "판단 보류", "keep_basis=profit인데 손익 근거 없음");
+  const off = parseBatch(out, batch, adsById, peers, null)["1"];
+  assert.equal(off.verdict, "유지", "정책 꺼짐(기존 동작)은 그대로"); assert.equal(off.budget_note, "예산 20% 증액 검토");
+});
+test("운영자 사례 지정: 허용 ID만 · 최대 2개", () => {
+  assert.deepEqual(forcedCases(["H-first3s", "V-28300268669664652"]), { ok: true, ids: ["H-first3s", "V-28300268669664652"] });
+  assert.equal(forcedCases(["X-1"]).ok, false);
+  assert.equal(forcedCases(["H-first3s", "H-price-in-creative", "V-28300268669664652"]).ok, false);
+  assert.equal(forcedCases([]).ok, false);
+});

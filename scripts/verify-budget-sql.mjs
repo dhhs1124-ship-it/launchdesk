@@ -41,9 +41,15 @@ ok("미확인 예약은 수동 정산 가능", async () => { assert.equal(await 
 ok("정산 안 된(함수 강제 종료) 예약은 예약 금액으로 계속 집계", async () => { await reserve(0.2, 1); assert.equal(await spent(), 0.5962); });
 ok("예약에 연결된 검증 기록의 비용은 중복 집계하지 않음", async () => { await db.query("insert into public.ai_weekly_verifications (cost_usd, reservation_id) values (0.034, $1)", [globalThis.r1]); assert.equal(await spent(), 0.5962); });
 ok("연속 예약 두 건이 함께 한도를 넘지 않음(같은 잠금 경로)", async () => { const a = await reserve(0.3, 1), b = await reserve(0.3, 1); assert.equal(a.ok, true); assert.equal(b.ok, false); });
+ok("같은 대상(ref) 하루 시도 상한 — 상한에 닿으면 reason=attempts · 예약 없음", async () => {
+  const q = (ref) => db.query("select * from public.ai_budget_reserve($1, 4, 'verify_video', 'claude-sonnet-5-5', 0.01, 100, $2, 2)", [U, ref]).then((r) => r.rows[0]);
+  assert.equal((await q("h1")).ok, true); assert.equal((await q("h1")).ok, true);
+  const third = await q("h1"); assert.equal(third.ok, false); assert.equal(third.reason, "attempts");
+  assert.equal((await q("h2")).ok, true, "다른 프레임 묶음은 별도"); });
+ok("한도 초과 이유는 budget", async () => { const r = await reserve(1000, 1); assert.equal(r.reason, "budget"); });
 ok("금액 0 · 음수 예약은 오류", async () => { await assert.rejects(reserve(0, 1)); });
 ok("anon · authenticated는 함수 실행 권한 없음", async () => {
-  const r = (await db.query("select has_function_privilege('authenticated', 'public.ai_budget_reserve(uuid,bigint,text,text,numeric,numeric)', 'execute') a, has_function_privilege('anon', 'public.ai_month_spent()', 'execute') b, has_function_privilege('service_role', 'public.ai_budget_settle(bigint,numeric,boolean,text)', 'execute') c")).rows[0];
+  const r = (await db.query("select has_function_privilege('authenticated', 'public.ai_budget_reserve(uuid,bigint,text,text,numeric,numeric,text,integer)', 'execute') a, has_function_privilege('anon', 'public.ai_month_spent()', 'execute') b, has_function_privilege('service_role', 'public.ai_budget_settle(bigint,numeric,boolean,text)', 'execute') c")).rows[0];
   assert.deepEqual([r.a, r.b, r.c], [false, false, true]); });
 
 let failed = 0;

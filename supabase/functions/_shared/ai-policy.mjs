@@ -13,15 +13,15 @@ export const POLICY_ADDENDUM = `
 [분석 기준 ${POLICY_VERSION}]
 - 순서: 데이터 신뢰성 → 목적 · 귀속 · 비교 범위 → 성과 변화 → 실제 소재 → 우선 행동 → 구체적 변경안 → 테스트.
 - 데이터 문제는 그 문제가 막는 범위만 보류한다(hold_scope). 예: 랜딩 페이지 조회가 링크 클릭보다 많으면 랜딩 · 구매 전환 구간 해석과 예산 판단만 보류하고, 확인한 문구 · 이미지 · 영상 프레임에 근거한 선택적 테스트는 제안할 수 있다(recommendation.scope="creative_test").
-- 세 가지를 따로 쓴다: ① 전주 대비 변화 ② 목표 달성 여부(사용자 목표가 입력에 있을 때만) ③ 손익 판단 가능 여부(최신 연결 마진과, 귀속 구매가 그 상품이라는 근거가 있을 때만). 전주보다 나빠지지 않았다는 이유만으로 "유지"라고 하지 않는다. 목표 · 손익 근거가 없으면 verdict는 "판단 보류"(hold_scope에 "목표·손익 근거 없음")로 두고 headline에는 확인한 성과 범위만 쓴다.
-- verdict: "유지"(목표 또는 손익 근거로 지금 상태를 유지할 이유가 있음) / "추가 확인"(판단을 막는 데이터 문제 — 확인할 것을 쓰고, creative_test 외 변경안 · 예산은 내지 않음) / "개선 필요"(근거 있는 저하와 원인 가설) / "판단 보류"(신규 · 비교 기간 부족 · 목표 지표 미측정 · 목표 · 손익 근거 없음).
+- 판단을 assessments에 세 가지로 나눠 쓴다: change(전주 대비 성과 변화 — 지금 입력으로 판단), goal(목표 달성 — decision_inputs.goal이 없으면 "판단 불가(목표 입력 없음)"), profit(광고 손익 — decision_inputs.ad_profit_basis가 없으면 "판단 불가(광고별 손익 근거 없음)"). 쇼핑몰 전체나 일부 상품의 마진으로 광고 전체 손익을 판단하지 않는다.
+- verdict: "유지"(목표 또는 광고별 손익 근거로 지금 상태를 유지할 이유가 있음 — keep_basis에 "goal" 또는 "profit") / "추가 확인"(판단을 막는 데이터 문제 — 확인할 것을 쓰고, creative_test 외 변경안 · 예산은 내지 않음) / "개선 필요"(근거 있는 저하와 원인 가설) / "판단 보류"(신규 · 비교 기간 부족 · 목표 지표 미측정 · 목표 · 손익 근거 없음). 전주보다 나빠지지 않았다는 이유만으로 "유지"라고 하지 않는다. 목표 · 손익 근거가 없으면 "판단 보류"(hold_scope에 "목표·손익 근거 없음")로 두고 headline에는 확인한 성과 변화만 쓴다.
+- 목표 · 손익 근거가 없어도, 확인한 문구 · 이미지에 근거한 선택적 소재 테스트(recommendation.scope="creative_test")는 제안할 수 있다.
 - 표본 크기에는 고정 기준을 쓰지 않는다. 노출 · 클릭 · 구매 실제 건수를 그대로 쓰고, 건수가 적으면 "우연한 변동일 수 있음"을 limits에 적는다. 건수만으로 판단을 막거나 확정하지 않는다.
 - 관찰 사실(입력에 보이는 것)과 원인 가설(성과 저하를 설명하는 추정)을 구분한다. 가설에는 확인 방법을 붙인다.
 - 같은 광고 세트에 새 광고를 추가하는 비교는 A/B 테스트가 아니다 — Meta가 노출을 성과에 따라 나눠 배분하므로 두 광고의 노출 · 대상이 같지 않다. test.method에 "동시 집행 비교(균등 배분 아님)"와 이 한계를 쓰고, 전후 비교는 기간 차이(계절 · 행사 · 경쟁)의 영향을 배제하지 못한다고 쓴다.
-- 예산 증감은 광고 목표 · 최신 손익 근거 · 사용자 제약이 모두 있을 때만 "검토"로 쓴다. 하나라도 없으면 budget_note는 null.
+- 예산 증감(budget_note)은 decision_inputs의 goal · ad_profit_basis · user_constraints가 모두 있을 때만 "검토"로 쓴다. 하나라도 없으면 null.
 - 링크 클릭은 고정 1일 클릭 기여 지표라 구매 귀속 기간과 다르다. 랜딩 페이지 조회와 링크 클릭이 다른 이유를 단정하지 않는다. 제목의 게재 위치별 노출 규칙은 확인되지 않았다.
-- <reference_cases>는 다른 쇼핑몰 광고를 관찰한 참고 자료다. 성과가 공개되지 않아 성공 사례가 아니다. 전략 유형으로만 참고하고 문구를 옮기지 않는다. 사용자 상품의 확인된 사실이 없으면 그 유형을 제안하지 않는다. 영상 사례는 시간대별 프레임만 봤다 — 음성 · 프레임 사이 움직임 · 편집은 확인하지 않았다. 근거로 쓴 사례 ID는 recommendation.basis에 적는다.
-- 출력에 "hold_scope":["보류한 범위"]를 추가하고, recommendation에 "scope":"creative_test|change"를 쓴다.`;
+- <reference_cases>는 다른 쇼핑몰 광고를 관찰한 참고 자료다. 성과가 공개되지 않아 성공 사례가 아니다. 전략 유형으로만 참고하고 문구를 옮기지 않는다. 사용자 상품의 확인된 사실이 없으면 그 유형을 제안하지 않는다. 영상 사례는 시간대별 프레임만 봤다 — 음성 · 프레임 사이 움직임 · 편집은 확인하지 않았다. 근거로 쓴 사례 ID는 recommendation.basis에 적는다.`;
 
 // 기존 SYSTEM_PROMPT에서 정책과 충돌하는 줄 — 정책을 켜면 바꿔 끼운다
 export const PROMPT_REPLACEMENTS = [
@@ -30,7 +30,18 @@ export const PROMPT_REPLACEMENTS = [
   ["- verdict가 \"유지\"이고 문구나 이미지를 봤다면, 현재 광고는 그대로 두고 새 광고(같은 광고 세트)로 비교할 테스트 후보 1개를 recommendation에 쓴다.",
    "- verdict가 \"유지\" · \"판단 보류\" · \"추가 확인\"이어도 문구나 이미지를 봤다면, 현재 광고는 그대로 두고 새 광고(같은 광고 세트 · 동시 집행 비교, 균등 배분 아님)로 비교할 선택적 테스트 후보 1개를 recommendation(scope=\"creative_test\")에 쓸 수 있다."],
   ["- 영상은 썸네일만 봤다.", "- 영상은 썸네일만 받았다(시간대별 프레임 분석은 이 점검에 없음)."],
+  ["- Meta 귀속 구매 · 매출은 Cafe24 실제 매출과 다르다. 광고별 순익 · 손익분기는 판단하지 마라(상품 원가와 광고 연결이 확인되지 않음).",
+   "- Meta 귀속 구매 · 매출은 Cafe24 실제 매출과 다르다. 광고별 손익은 decision_inputs.ad_profit_basis가 있을 때만 판단한다. 없으면 assessments.profit에 \"판단 불가(광고별 손익 근거 없음)\"로 쓴다."],
+  ["- 중단 · 예산 증액을 말할 때는 budget_note에 근거와 판단 한계를 함께 쓴다.",
+   "- 중단 · 예산 증감 의견은 분석 기준의 예산 조건을 모두 채울 때만 budget_note에 근거 · 판단 한계와 함께 쓴다."],
+  ["\"7일이면 결론\" 같은 단정 대신 필요한 표본(클릭 · 구매 수 등) 기준을 쓴다.",
+   "고정 표본 기준이나 \"7일이면 결론\" 같은 단정 대신, 실제 건수와 우연한 변동 가능성을 함께 보라고 쓴다."],
+  ['{"ad_id":"","verdict":"개선 필요|판단 보류|유지","headline":"핵심 판단 한 줄",',
+   '{"ad_id":"","verdict":"개선 필요|판단 보류|유지|추가 확인","keep_basis":"goal|profit|null","assessments":{"change":"전주 대비 성과 변화","goal":"목표 달성 또는 판단 불가","profit":"광고 손익 또는 판단 불가"},"hold_scope":["보류한 범위"],"headline":"핵심 판단 한 줄",'],
+  ['"recommendation":null 또는 {"element":', '"recommendation":null 또는 {"scope":"creative_test|change","element":'],
 ];
+// 정책을 켠 최종 지시문에 남으면 안 되는 문장(교체 누락 검사 · 테스트용)
+export const POLICY_FORBIDDEN = ["필요한 표본(클릭", "순익 · 손익분기는 판단하지 마라", "구매 3건 미만", "verdict\":\"개선 필요|판단 보류|유지\""];
 export function policySystemPrompt(base) {
   let out = base;
   for (const [from, to] of PROMPT_REPLACEMENTS) {
@@ -101,6 +112,15 @@ export function policyVariants(basePrompt) {
     { key: "policy_off", system: basePrompt, withCases: false, meta: { policy_version: null, playbook_version: null } },
     { key: "policy_on", system: policySystemPrompt(basePrompt), withCases: true, meta: { policy_version: POLICY_VERSION, playbook_version: PLAYBOOK_VERSION } },
   ];
+}
+// 운영자 검증에서 사례를 직접 지정(사례 연결 검증용) — 허용된 사례 ID만, 최대 2개. 결과에 '운영자 지정'으로 남기고 자동 선택과 섞지 않는다
+export function forcedCases(ids) {
+  if (!Array.isArray(ids) || !ids.length) return { ok: false, error: "case_ids 비어 있음" };
+  const uniq = [...new Set(ids.map(String))];
+  if (uniq.length > 2) return { ok: false, error: "case_ids 최대 2개" };
+  const bad = uniq.filter((id) => !CASES.some((c) => c.id === id));
+  if (bad.length) return { ok: false, error: "허용되지 않은 사례 ID: " + bad.join(", ") };
+  return { ok: true, ids: uniq };
 }
 export function casesForAds(ads, peers) {
   const m = {};

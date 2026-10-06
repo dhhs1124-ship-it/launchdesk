@@ -21,10 +21,10 @@
 <body>
 <main class="vv">
   <h1>광고 영상 검증 (운영자 전용)</h1>
-  <p class="note">영상 파일은 이 브라우저 안에서만 열어 프레임을 뽑고, 서버에는 프레임 이미지만 보냅니다. 영상 파일은 저장하지 않습니다. 허용된 운영자 계정만 호출할 수 있습니다. 음성 전사를 넣지 않으면 결과는 ‘음성 미확인’으로 남습니다.</p>
+  <p class="note">이 화면의 분석 대상은 <strong>사용자가 제공한 영상</strong>입니다(Meta에서 받은 원본이 아님). 영상 파일은 이 브라우저 안에서만 열어 프레임을 뽑고, 서버에는 프레임 이미지만 보냅니다. 영상 파일은 저장하지 않습니다. 허용된 운영자 계정만 호출할 수 있습니다. 음성 전사를 넣지 않으면 결과는 ‘음성 미확인’으로 남습니다.</p>
   <p class="note" id="who">로그인 확인 중…</p>
   <label>매장 ID <input type="number" id="store" min="1"></label>
-  <label>광고 ID (Meta 광고 ID — 이 영상이 쓰인 광고) <input type="text" id="ad" inputmode="numeric" placeholder="숫자만"></label>
+  <label>연결할 Meta 광고 ID (선택 — 입력하면 서버가 이 쇼핑몰 연결 광고계정의 광고인지 확인합니다) <input type="text" id="ad" inputmode="numeric" placeholder="숫자만 · 비워 두면 연결 안 함"></label>
   <label>영상 파일 (직접 제공한 원본 · MP4 권장) <input type="file" id="file" accept="video/*"></label>
   <label>음성 전사 (선택 · 직접 확인한 내용만) <textarea id="transcript" rows="3" maxlength="4000"></textarea></label>
   <div class="row"><button type="button" id="extract" disabled>프레임 뽑기</button><span class="note" id="extractInfo"></span></div>
@@ -45,7 +45,7 @@
   var $ = function(id){ return document.getElementById(id); };
   var frames = null;
   function show(x){ $('out').textContent = typeof x === 'string' ? x : JSON.stringify(x, null, 2); }
-  function ready(){ var ok = !!frames && /^\d{5,25}$/.test($('ad').value.trim()) && Number($('store').value) > 0; $('dry').disabled = !ok; $('paid').disabled = !ok || !$('confirmPaid').checked; }
+  function ready(){ var ad = $('ad').value.trim(), ok = !!frames && (!ad || /^\d{5,25}$/.test(ad)) && Number($('store').value) > 0; $('dry').disabled = !ok; $('paid').disabled = !ok || !$('confirmPaid').checked; }
   sb.auth.getSession().then(function(r){
     var u = r.data && r.data.session && r.data.session.user;
     $('who').textContent = u ? '로그인됨 — 허용 목록에 없는 계정이면 서버가 거절합니다.' : '로그인되어 있지 않아요. 같은 주소의 LaunchROAS에서 먼저 로그인해 주세요.';
@@ -67,7 +67,7 @@
     this.disabled = false; ready();
   });
   async function call(dryRun){
-    var body = { action: 'verify_video', store_id: Number($('store').value), ad_id: $('ad').value.trim(), ad_name: ($('file').files[0] || {}).name || null,
+    var body = { action: 'verify_video', store_id: Number($('store').value), meta_ad_id: $('ad').value.trim() || null, file_name: ($('file').files[0] || {}).name || null,
       frames: frames, transcript: $('transcript').value.trim() || null, label: 'video-upload', dry_run: dryRun };
     show(dryRun ? '드라이런 요청 중…' : '분석 중…');
     var res = await sb.functions.invoke('ai-weekly-review', { body: body });

@@ -20,11 +20,13 @@ create table if not exists public.ai_budget_reservations (
   reserved_usd numeric(10, 4) not null check (reserved_usd > 0),
   actual_usd numeric(10, 4) check (actual_usd is null or actual_usd >= 0),
   status text not null default 'reserved' check (status in ('reserved', 'settled', 'unsettled')),
+  ref text, -- 같은 대상 재시도 상한용(영상: 프레임 묶음 해시)
   note text,
   created_at timestamptz not null default now(),
   settled_at timestamptz
 );
 create index if not exists ai_budget_reservations_created_at_idx on public.ai_budget_reservations (created_at);
+create index if not exists ai_budget_reservations_ref_idx on public.ai_budget_reservations (kind, ref, created_at);
 
 alter table public.ai_weekly_verifications add column if not exists reservation_id bigint references public.ai_budget_reservations(id) on delete set null;
 
@@ -46,9 +48,10 @@ as $$
        + coalesce((select sum(case when status = 'settled' then actual_usd else reserved_usd end) from public.ai_budget_reservations, m where created_at >= m.start), 0);
 $$;
 
--- 예약: 한도 안이면 예약 행을 만들고 id를 돌려준다. 한도를 넘으면 ok=false(예약 없음)
-create or replace function public.ai_budget_reserve(p_user uuid, p_store bigint, p_kind text, p_model text, p_amount numeric, p_limit numeric)
-returns table (ok boolean, reservation_id bigint, spent_usd numeric)
+-- 예약: 한도 안이면 예약 행을 만들고 id를 돌려준다. 한도를 넘으면 ok=false, reason='budget'(예약 없음)
+-- p_ref · p_max_ref_per_day(선택): 같은 대상(ref)의 최근 24시간 예약이 상한 이상이면 ok=false, reason='attempts' — 같은 잠금 안에서 센다
+create or replace function public.ai_budget_reserve(p_user uuid, p_store bigint, p_kind text, p_model text, p_amount numeric, p_limit numeric, p_ref text default null, p_max_ref_per_day integer default null)
+returns table (ok boolean, reservation_id bigint, spent_usd numeric, reason text)
 language plpgsql
 security definer
 set search_path = public
@@ -62,14 +65,19 @@ begin
   end if;
   perform pg_advisory_xact_lock(hashtext('launchroas_ai_budget'));
   v_spent := public.ai_month_spent();
-  if v_spent + p_amount > p_limit then
-    return query select false, null::bigint, v_spent;
+  if p_ref is not null and p_max_ref_per_day is not null and (
+    select count(*) from public.ai_budget_reservations where kind = p_kind and ref = p_ref and created_at > now() - interval '24 hours') >= p_max_ref_per_day then
+    return query select false, null::bigint, v_spent, 'attempts'::text;
     return;
   end if;
-  insert into public.ai_budget_reservations (user_id, store_id, kind, model, reserved_usd)
-  values (p_user, p_store, p_kind, p_model, round(p_amount, 4))
+  if v_spent + p_amount > p_limit then
+    return query select false, null::bigint, v_spent, 'budget'::text;
+    return;
+  end if;
+  insert into public.ai_budget_reservations (user_id, store_id, kind, model, reserved_usd, ref)
+  values (p_user, p_store, p_kind, p_model, round(p_amount, 4), p_ref)
   returning id into v_id;
-  return query select true, v_id, v_spent;
+  return query select true, v_id, v_spent, null::text;
 end;
 $$;
 
@@ -92,16 +100,16 @@ end;
 $$;
 
 revoke all on function public.ai_month_spent() from public, anon, authenticated;
-revoke all on function public.ai_budget_reserve(uuid, bigint, text, text, numeric, numeric) from public, anon, authenticated;
+revoke all on function public.ai_budget_reserve(uuid, bigint, text, text, numeric, numeric, text, integer) from public, anon, authenticated;
 revoke all on function public.ai_budget_settle(bigint, numeric, boolean, text) from public, anon, authenticated;
 grant execute on function public.ai_month_spent() to service_role;
-grant execute on function public.ai_budget_reserve(uuid, bigint, text, text, numeric, numeric) to service_role;
+grant execute on function public.ai_budget_reserve(uuid, bigint, text, text, numeric, numeric, text, integer) to service_role;
 grant execute on function public.ai_budget_settle(bigint, numeric, boolean, text) to service_role;
 
 -- 되돌리기(예약 기록도 지워짐 — 먼저 미정산 예약을 확인):
 --   alter table public.ai_weekly_verifications drop column if exists reservation_id;
 --   drop function if exists public.ai_budget_settle(bigint, numeric, boolean, text);
---   drop function if exists public.ai_budget_reserve(uuid, bigint, text, text, numeric, numeric);
+--   drop function if exists public.ai_budget_reserve(uuid, bigint, text, text, numeric, numeric, text, integer);
 --   drop function if exists public.ai_month_spent();
 --   drop table if exists public.ai_budget_reservations;
 -- 되돌린 뒤에는 이 마이그레이션 이전 ai-weekly-review(테이블 직접 합산)로 함께 되돌려야 한다.

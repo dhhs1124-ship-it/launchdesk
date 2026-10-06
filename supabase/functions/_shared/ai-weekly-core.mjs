@@ -288,7 +288,15 @@ export function lookup(obj, path) {
 const VERDICTS = ["개선 필요", "판단 보류", "유지", "추가 확인"];
 const t = (v, n) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 const list = (v, n, m) => (Array.isArray(v) ? v.map((x) => t(x, m)).filter(Boolean).slice(0, n) : []);
-export function parseBatch(raw, batch, adsById, peers, casesById) {
+// 판단 입력 — 지금은 목표 · 광고별 손익 근거 · 사용자 제약을 받는 화면이 없어 모두 null.
+// Cafe24 연결 상품 마진(sales)은 일부 상품 기준이라 광고 전체 손익 근거(ad_profit_basis)로 쓰지 않는다.
+export const DECISION_INPUTS = Object.freeze({ goal: null, ad_profit_basis: null, user_constraints: null,
+  note: "목표 · 광고별 손익 근거 · 사용자 제약 입력 없음 — 목표 달성 · 손익 · 예산 판단은 할 수 없고, 성과 변화와 확인한 소재에 근거한 테스트만 판단할 수 있음" });
+const UNKNOWN_GOAL = "판단 불가(목표 입력 없음)", UNKNOWN_PROFIT = "판단 불가(광고별 손익 근거 없음)";
+// opts.policy=true(분석 기준 켜짐)일 때 서버가 강제하는 규칙: 유지는 목표 · 손익 근거(keep_basis + 실제 입력) 필수,
+// 예산 의견은 목표 · 손익 · 제약 모두 필수, 근거가 없는 목표 · 손익 판단은 '판단 불가'로. 고친 내용은 server_adjusted에 남긴다.
+export function parseBatch(raw, batch, adsById, peers, casesById, opts) {
+  const policy = !!(opts && opts.policy), di = (opts && opts.decisionInputs) || DECISION_INPUTS;
   if (typeof raw !== "string") return null;
   const s = raw.indexOf("["), e = raw.lastIndexOf("]");
   if (s < 0 || e <= s) return null;
@@ -311,6 +319,21 @@ export function parseBatch(raw, batch, adsById, peers, casesById) {
     if (!evidence.length && verdict !== "판단 보류") { verdict = "판단 보류"; rec = null; }
     // '추가 확인'은 데이터 확인이 먼저 — 확인한 소재에 근거한 선택적 테스트(scope=creative_test)만 남기고 예산 · 다른 변경안은 내지 않는다
     if (verdict === "추가 확인" && !(rec && rec.scope === "creative_test")) rec = null;
+    const adjusted = [], hold = list(r.hold_scope, 4, 80);
+    let assessments = null, budget = verdict === "추가 확인" ? null : t(r.budget_note, 400) || null;
+    if (policy) {
+      const a = r.assessments && typeof r.assessments === "object" ? r.assessments : {};
+      assessments = { change: t(a.change, 300), goal: t(a.goal, 200), profit: t(a.profit, 200) };
+      if (!di.goal && !assessments.goal.startsWith("판단 불가")) { if (assessments.goal) adjusted.push("목표 판단 → 판단 불가(목표 입력 없음)"); assessments.goal = UNKNOWN_GOAL; }
+      if (!di.ad_profit_basis && !assessments.profit.startsWith("판단 불가")) { if (assessments.profit) adjusted.push("손익 판단 → 판단 불가(광고별 손익 근거 없음)"); assessments.profit = UNKNOWN_PROFIT; }
+      const keep = r.keep_basis === "goal" ? di.goal : r.keep_basis === "profit" ? di.ad_profit_basis : null;
+      if (verdict === "유지" && !keep) {
+        verdict = "판단 보류"; adjusted.push("유지 → 판단 보류(목표 · 손익 근거 없음)");
+        if (!hold.includes("목표·손익 근거 없음")) hold.unshift("목표·손익 근거 없음");
+        if (rec && rec.scope !== "creative_test") { rec = null; adjusted.push("변경안 제외(소재 테스트만 유지)"); }
+      }
+      if (budget && !(di.goal && di.ad_profit_basis && di.user_constraints)) { budget = null; adjusted.push("예산 의견 제외(목표 · 손익 · 제약 입력 없음)"); }
+    }
     const test = rec && rec.test && typeof rec.test === "object" ? rec.test : {};
     results[id] = {
       ad_id: id, verdict, headline: t(r.headline, 160), next_action: t(r.next_action, 160),
@@ -319,14 +342,15 @@ export function parseBatch(raw, batch, adsById, peers, casesById) {
       funnel: { stage: t(r.funnel && r.funnel.stage, 20) || "판단 불가", evidence: t(r.funnel && r.funnel.evidence, 300) },
       peers: t(r.peers, 300), evidence, dropped_evidence: dropped,
       hypotheses: (Array.isArray(r.hypotheses) ? r.hypotheses : []).slice(0, 4).map((h) => ({ text: t(h && h.text, 300), basis: t(h && h.basis, 300), check: t(h && h.check, 300) })).filter((h) => h.text),
-      hold_scope: list(r.hold_scope, 4, 80),
+      hold_scope: hold.slice(0, 4),
+      ...(policy ? { assessments, keep_basis: verdict === "유지" ? r.keep_basis : null, server_adjusted: adjusted } : {}),
       recommendation: rec ? {
         scope: rec.scope === "creative_test" ? "creative_test" : "change",
         element: t(rec.element, 20), basis: t(rec.basis, 300), current: t(rec.current, 400), proposed: t(rec.proposed, 400), example: t(rec.example, 800),
         example_is_provisional: rec.example_is_provisional === true, needs_info: list(rec.needs_info, 5, 200),
         test: { method: t(test.method, 400), compare_metrics: list(test.compare_metrics, 6, 80), decision_rule: t(test.decision_rule, 300), sample_note: t(test.sample_note, 300) },
       } : null,
-      budget_note: verdict === "추가 확인" ? null : t(r.budget_note, 400) || null,
+      budget_note: budget,
       case_ids: casesById && casesById[id] ? casesById[id].slice() : [],
       limits: list(r.limits, 6, 300),
     };

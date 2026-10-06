@@ -4,9 +4,9 @@ import { getValidMetaAccessToken } from "../_shared/meta-token.ts";
 import { GRAPH_API_VERSION, buildInsightsUrl, fetchAllInsightsRows } from "../_shared/meta-adset-normalize.mjs";
 import {
   config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
-  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks, priceOf, settleTotals,
+  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks, priceOf, settleTotals, DECISION_INPUTS,
 } from "../_shared/ai-weekly-core.mjs";
-import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases, policyVariants, casesForAds } from "../_shared/ai-policy.mjs";
+import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases, policyVariants, casesForAds, forcedCases } from "../_shared/ai-policy.mjs";
 import { VIDEO_SYSTEM_PROMPT, VIDEO_PROMPT_VERSION, VIDEO_LIMITS, prepareVideoVerify, finishVideoVerify } from "../_shared/ai-video-core.mjs";
 
 // LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
@@ -170,11 +170,11 @@ async function monthSpent(admin: Admin): Promise<number | null> {
 }
 
 // 운영자 검증 비용 예약 — 합계 · 한도 검사 · 예약 삽입을 DB 함수 하나(advisory lock)로. 동시 요청이 함께 통과하지 않는다
-async function reserveBudget(admin: Admin, userId: string, storeId: unknown, kind: string, model: string, amount: number, limit: number) {
-  const { data, error } = await admin.rpc("ai_budget_reserve", { p_user: userId, p_store: Number(storeId), p_kind: kind, p_model: model, p_amount: amount, p_limit: limit });
+async function reserveBudget(admin: Admin, userId: string, storeId: unknown, kind: string, model: string, amount: number, limit: number, ref: string | null = null, maxRefPerDay: number | null = null) {
+  const { data, error } = await admin.rpc("ai_budget_reserve", { p_user: userId, p_store: Number(storeId), p_kind: kind, p_model: model, p_amount: amount, p_limit: limit, p_ref: ref, p_max_ref_per_day: maxRefPerDay });
   const row = Array.isArray(data) ? data[0] : data;
   if (error || !row) { console.error("ai-weekly-review reserve:", error?.message || "no row"); return null; }
-  return { ok: !!row.ok, id: row.reservation_id as number | null, spent: Number(row.spent_usd) };
+  return { ok: !!row.ok, id: row.reservation_id as number | null, spent: Number(row.spent_usd), reason: row.reason as string | null };
 }
 // 정산 — 사용량을 모두 확인했으면 실제 비용, 아니면 예약 금액 유지(unsettled). 실패하면 예약은 reserved로 남아 예약 금액으로 집계된다
 async function settleBudget(admin: Admin, id: number, model: string, calls: any[], note: string) {
@@ -182,6 +182,10 @@ async function settleBudget(admin: Admin, id: number, model: string, calls: any[
   const { error } = await admin.rpc("ai_budget_settle", { p_id: id, p_actual: t.actual_usd, p_known: t.known, p_note: note });
   if (error) console.error("ai-weekly-review settle:", id, error.message);
   return { ...t, settled: !error };
+}
+async function sha256(text: string) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 // 함수 시간 안에 정산할 수 있게 호출마다 시간 제한(남은 시간 − 여유 15초, 최소 20초)
 const callTimeout = (deadline: number) => Math.max(20000, deadline - Date.now() - 15000);
@@ -210,9 +214,25 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
     useWeeks = pin.weeks as ReturnType<typeof weekRanges>;
   }
   const cap = Math.min(VERIFY_CAP_USD, Number(body?.budget_usd) > 0 ? Number(body.budget_usd) : VERIFY_CAP_USD);
+  // 대상 광고 1개(선택) — 정책 비교를 같은 광고로 고정. 비교 광고(peers)는 그 주 전체 광고 기준 그대로
+  const targetAd = body?.ad_id == null || body.ad_id === "" ? null : String(body.ad_id);
+  if (targetAd !== null && !/^\d{5,25}$/.test(targetAd)) return json({ ok: false, code: "BAD_REQUEST", error: "ad_id" }, 400);
+  // 사례 지정(선택, 사례 연결 검증용) — 새 지시문 변형에만 · 결과에 '운영자 지정'으로 남긴다
+  let forced: string[] | null = null;
+  if (body?.case_ids != null) {
+    const fc = forcedCases(body.case_ids);
+    if (!fc.ok) return json({ ok: false, code: "BAD_REQUEST", error: fc.error }, 400);
+    if (!variants.some((v: any) => v.withCases)) return json({ ok: false, code: "BAD_REQUEST", error: "사례 지정은 compare_policy(또는 분석 기준 켜짐)에서만" }, 400);
+    forced = fc.ids as string[];
+  }
   const built = await buildSnapshot(ctx, admin, storeId, body, useWeeks, cfg);
   if (!built.ok) return json({ ok: false, code: "NO_SNAPSHOT", error: built.error });
-  const { snap, batches } = built;
+  const snap = built.snap;
+  let batches = built.batches;
+  if (targetAd) {
+    if (!snap.ads.some((a: any) => a.ad_id === targetAd)) return json({ ok: false, code: "AD_NOT_IN_PERIOD", error: "지정한 광고가 이 기간 분석 대상(광고비 집행)에 없어요" }, 400);
+    batches = [{ index: 0, ad_ids: [targetAd], status: "pending" }];
+  }
   const calls = batches.length * efforts.length * variants.length;
   const perCall = costUsd(cfg.model, { input_tokens: 20000, output_tokens: cfg.maxOutputTokens });
   if (!(perCall && perCall > 0)) return json({ ok: false, code: "AI_MODEL_UNPRICED" }, 500);
@@ -225,12 +245,9 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
   const adsById: Record<string, any> = {};
   for (const a of snap.ads) adsById[a.ad_id] = a;
   const peers = peerGroups(snap.ads);
-  const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency };
-  const cases = casesForAds(snap.ads, peers);
-  // 입력 지문 — 두 변형이 같은 기간 · 지표 · 소재를 받았는지 확인용(이미지는 아래에서 한 번만 받아 공유)
-  const inputs = JSON.stringify({ period: snap.period, ads: snap.ads.map((a: any) => ({ ad_id: a.ad_id, current: a.current, previous: a.previous, creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, video_id: a.creative?.video_id ?? null }, placement: a.placement })) });
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(inputs));
-  const fingerprint = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency, decision_inputs: DECISION_INPUTS };
+  const autoCases = casesForAds(snap.ads, peers);
+  const casesOf = (v: any) => !v.withCases ? null : forced ? Object.fromEntries(batches.flatMap((b: any) => b.ad_ids).map((id: string) => [id, forced as string[]])) : autoCases;
   const imagesByBatch = await Promise.all(batches.map(async (b: any) => {
     const images: Record<string, any[]> = {};
     for (const id of b.ad_ids) {
@@ -239,28 +256,37 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
     }
     return images;
   }));
-  const label = String(body?.label || (comparePolicy ? "policy-compare" : "verify")).slice(0, 48);
+  // 입력 지문 — 실제로 모델에 보내는 내용 그대로(지표 · 문구 · 이미지 데이터 · 귀속 · 목적 · 비교 광고 · 판단 입력 · 메모)
+  // shared: 사례 블록을 뺀 공통 입력(두 변형이 같아야 함) / 실행별 full: 지시문 + 사례 포함 전체 입력
+  const sharedFingerprint = await sha256(JSON.stringify(batches.map((b: any, i: number) => batchContent(b, adsById, peers, context, imagesByBatch[i], null))));
+  const label = String(body?.label || (comparePolicy ? "policy-compare" : "verify")).slice(0, 48) + (forced ? ":forced-cases" : "");
   const jobs: any[] = [];
   for (const effort of efforts) for (const v of variants) jobs.push({ effort, v });
   let runs: any[] = [];
   try {
   runs = await Promise.all(jobs.map(async ({ effort, v }: any) => {
     const t0 = Date.now(), usage: any = { calls: 0, input_tokens: 0, output_tokens: 0, images: 0, stop_reasons: [] }, results: Record<string, any> = {}, failed: string[] = [];
-    const casesById = v.withCases ? cases : null;
+    const casesById = casesOf(v), sent: unknown[] = [];
     let cost = 0;
     for (let i = 0; i < batches.length; i++) {
       const b = batches[i], images = imagesByBatch[i];
-      const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images, casesById), effort, v.system, callTimeout(deadline));
+      const content = batchContent(b, adsById, peers, context, images, casesById);
+      sent.push(content);
+      const res = await claude(key, cfg.model, cfg.maxOutputTokens, content, effort, v.system, callTimeout(deadline));
       allCalls.push(res); usage.calls++; usage.images += Object.values(images).reduce((t: number, l: any) => t + l.length, 0);
       if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
       if (res.ok) usage.stop_reasons.push(res.stop);
-      const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, b, adsById, peers, casesById) : null;
+      // 잘림(max_tokens)은 해석하지 않고 실패로(자동 재시도 없음)
+      const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: v.key === "policy_on", decisionInputs: DECISION_INPUTS }) : null;
       if (parsed) Object.assign(results, parsed);
       failed.push(...b.ad_ids.filter((id: string) => !parsed || !parsed[id]));
     }
     const row = { user_id: userId, store_id: storeId, reservation_id: reservationId, label: comparePolicy ? label + ":" + v.key : label, effort, model: cfg.model, status: failed.length ? "failed" : "completed",
       usage, cost_usd: Math.round(cost * 10000) / 10000, duration_ms: Date.now() - t0,
-      result: { ...v.meta, variant: v.key, input_fingerprint: fingerprint, ads_by_id: results, failed_ads: failed, period: snap.period,
+      result: { ...v.meta, variant: v.key, shared_input_fingerprint: sharedFingerprint, full_input_fingerprint: await sha256(v.system + JSON.stringify(sent)),
+        target_ad_id: targetAd, case_selection: !v.withCases ? "none" : forced ? "operator_forced" : "auto",
+        case_ids: casesById ? Object.fromEntries(batches.flatMap((b: any) => b.ad_ids).map((id: string) => [id, (casesById as Record<string, string[]>)[id] || []])) : {},
+        truncated: usage.stop_reasons.includes("max_tokens"), ads_by_id: results, failed_ads: failed, period: snap.period,
         inputs: snap.ads.map((a: any) => ({ ad_id: a.ad_id, placement: a.placement, title: a.creative?.title ?? null, images_sent: (a.imagePlan || []).filter((im: any) => im.sent).length })) } };
     const ins = await admin.from("ai_weekly_verifications").insert(row).select("id").single();
     if (ins.error) console.error("ai-weekly-review verify save:", ins.error.message);
@@ -271,7 +297,7 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
     if (allCalls.length < calls) allCalls.push({ usage: undefined });
     var budget = await settleBudget(admin, reservationId, cfg.model, allCalls, comparePolicy ? "policy-compare" : "verify");
   }
-  return json({ ok: true, compare_policy: comparePolicy, input_fingerprint: fingerprint, reservation: { id: reservationId, reserved_usd: worst, ...budget }, runs });
+  return json({ ok: true, compare_policy: comparePolicy, shared_input_fingerprint: sharedFingerprint, reservation: { id: reservationId, reserved_usd: worst, ...budget }, runs });
 }
 
 function num(v: unknown) { const n = Number(v); return Number.isFinite(n) ? n : null; }
@@ -284,29 +310,49 @@ function salesBlock(s: any) {
 // 운영자 영상 검증 — 허용 사용자(AI_VERIFY_USER_IDS)만 · 월 예산 · 1회 상한 검사 후 1회 호출 · 결과는 ai_weekly_verifications에
 // 프레임은 운영자 브라우저(화면에 보이는 탭)가 뽑아 보낸다. 영상 파일은 받지도 저장하지도 않는다. 음성 전사가 없으면 '음성 미확인'.
 // dry_run=true면 요청 검사 · 구성 · 비용 추정만 돌려주고 AI를 부르지 않으며 저장하지 않는다.
-async function verifyVideo(admin: Admin, userId: string, storeId: unknown, body: any, cfg: ReturnType<typeof config>, deadline: number) {
+// 연결할 Meta 광고가 이 쇼핑몰의 연결 광고계정 광고인지(무료 조회 1회)
+async function adInStoreAccount(ctx: any, admin: Admin, storeId: unknown, adId: string) {
+  const { data: account }: { data: any } = await ctx.supabase.from("connected_accounts").select("id, status, external_account_id").eq("provider", "meta").eq("store_id", storeId).maybeSingle();
+  if (!account || account.status !== "connected" || !account.external_account_id) return { ok: false as const, code: "META_NOT_CONNECTED" };
+  const tok = await getValidMetaAccessToken(admin, account.id);
+  if (!tok.ok) return { ok: false as const, code: "META_TOKEN_INVALID" };
+  const r = await meta(`https://graph.facebook.com/${GRAPH_API_VERSION}/${adId}?fields=account_id,name`, tok.accessToken);
+  if (!r.ok) return { ok: false as const, code: r.status === 400 || r.status === 404 ? "AD_NOT_FOUND_OR_NO_ACCESS" : "AD_CHECK_FAILED" };
+  const acct = "act_" + String(r.data?.account_id || "").replace(/^act_/, "");
+  if (acct !== account.external_account_id) return { ok: false as const, code: "AD_NOT_IN_STORE_ACCOUNT" };
+  return { ok: true as const, ad_name: r.data?.name ?? null };
+}
+async function verifyVideo(ctx: any, admin: Admin, userId: string, storeId: unknown, body: any, cfg: ReturnType<typeof config>, deadline: number) {
   const allowed = env("AI_VERIFY_USER_IDS").split(",").map((s) => s.trim()).filter(Boolean);
   if (!allowed.includes(userId)) return json({ ok: false, code: "FORBIDDEN" }, 403);
   const prep: any = prepareVideoVerify(body, { model: cfg.model, price: priceOf(cfg.model) } as any);
   if (!prep.ok) return json({ ok: false, code: "BAD_REQUEST", errors: prep.errors }, 400);
-  const summary = { prompt_version: VIDEO_PROMPT_VERSION, frames_seen: prep.frames_seen, transcript_provided: prep.transcript_provided, request_bytes: prep.request_bytes, worst_usd: prep.worst_usd };
+  if (prep.source.meta_ad_id) {
+    const own = await adInStoreAccount(ctx, admin, storeId, prep.source.meta_ad_id);
+    if (!own.ok) return json({ ok: false, code: own.code }, own.code === "AD_NOT_IN_STORE_ACCOUNT" ? 403 : 400);
+    prep.source.meta_ad_check = "verified";
+  }
+  const framesHash = await sha256(JSON.stringify(prep.frames_seen) + "|" + body.frames.map((f: any) => String(f.base64 || f.data || "")).join("|"));
+  const summary = { prompt_version: VIDEO_PROMPT_VERSION, source: prep.source, frames_seen: prep.frames_seen, frames_hash: framesHash, transcript_provided: prep.transcript_provided,
+    request_bytes: prep.request_bytes, max_output_tokens: prep.max_output_tokens, worst_usd: prep.worst_usd, attempts_per_day_limit: VIDEO_LIMITS.maxAttemptsPerVideoPerDay };
   if (body?.dry_run === true) return json({ ok: true, dry_run: true, called_ai: false, ...summary });
   const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");
   if (!key) return json({ ok: false, code: "AI_NOT_CONFIGURED" });
   if (prep.worst_usd > VERIFY_CAP_USD) return json({ ok: false, code: "OVER_VERIFY_BUDGET", worst_usd: prep.worst_usd, cap_usd: VERIFY_CAP_USD });
-  const rsv = await reserveBudget(admin, userId, storeId, "verify_video", cfg.model, prep.worst_usd, cfg.monthlyBudgetUsd);
+  // 같은 프레임 묶음은 하루 최대 N회(예약과 같은 잠금 안에서 셈) — 자동 재시도는 하지 않는다
+  const rsv = await reserveBudget(admin, userId, storeId, "verify_video", cfg.model, prep.worst_usd, cfg.monthlyBudgetUsd, framesHash, VIDEO_LIMITS.maxAttemptsPerVideoPerDay);
   if (!rsv) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
-  if (!rsv.ok || !rsv.id) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: rsv.spent });
+  if (!rsv.ok || !rsv.id) return json({ ok: false, code: rsv.reason === "attempts" ? "VIDEO_ATTEMPTS_EXCEEDED" : "BUDGET_EXCEEDED", spent_usd: rsv.spent }, rsv.reason === "attempts" ? 429 : 200);
   const effort = ["low", "medium", "high"].includes(body?.effort) ? body.effort : "medium";
   const t0 = Date.now();
   let res: any = { ok: false, status: 0 };
   try { res = await claude(key, cfg.model, VIDEO_LIMITS.maxOutputTokens, prep.content, effort, VIDEO_SYSTEM_PROMPT, callTimeout(deadline)); }
   finally { var budget = await settleBudget(admin, rsv.id, cfg.model, [res], "verify_video"); }
   const usage = { calls: 1, input_tokens: res.usage?.input_tokens || 0, output_tokens: res.usage?.output_tokens || 0, frames: prep.frames_seen.length, stop_reasons: res.ok ? [res.stop] : [] };
-  const fin = res.ok ? finishVideoVerify(res.text, prep.frames_seen, prep.transcript_provided) : { ok: false, output: null, validation: { ok: false, errors: ["AI 호출 실패"] } };
+  const fin: any = res.ok ? finishVideoVerify(res.text, prep.frames_seen, prep.transcript, res.stop) : { ok: false, output: null, validation: { ok: false, errors: [res.aborted ? "시간 초과 — 사용량 미확인(예약 금액 유지)" : "AI 호출 실패"] } };
   const row = { user_id: userId, store_id: storeId, reservation_id: rsv.id, label: String(body?.label || "video").slice(0, 60), effort, model: cfg.model, status: fin.ok ? "completed" : "failed",
     usage, cost_usd: Math.round((costUsd(cfg.model, res.usage || {}) || 0) * 10000) / 10000, duration_ms: Date.now() - t0,
-    result: { kind: "video", ad_id: String(body.ad_id), ...summary, output: fin.output, validation: fin.validation } };
+    result: { kind: "video", ...summary, truncated: !!fin.truncated, output: fin.output, validation: fin.validation } };
   const ins = await admin.from("ai_weekly_verifications").insert(row).select("id").single();
   if (ins.error) console.error("ai-weekly-review verify_video save:", ins.error.message);
   return json({ ok: true, id: ins.data?.id ?? null, saved: !ins.error, reservation: { id: rsv.id, reserved_usd: prep.worst_usd, ...budget }, ...row });
@@ -337,7 +383,7 @@ export default {
     if (!priceOf(cfg.model)) { console.error("ai-weekly-review: unpriced model", cfg.model); return json({ ok: false, code: "AI_MODEL_UNPRICED", message: "AI 설정을 확인하지 못해 점검을 시작하지 않았어요." }, 500); }
     const deadline = started + cfg.timeBudgetMs;
     if (action === "verify") return await verify(ctx, admin, userId, storeId, body, weeks, cfg, deadline);
-    if (action === "verify_video") return await verifyVideo(admin, userId, storeId, body, cfg, deadline);
+    if (action === "verify_video") return await verifyVideo(ctx, admin, userId, storeId, body, cfg, deadline);
 
     // ---- 실행 ----
     const key = env("LAUNCHROAS_ANTHROPIC_API_KEY");
@@ -392,7 +438,7 @@ export default {
       const adsById: Record<string, any> = {};
       for (const a of snap.ads) adsById[a.ad_id] = a;
       const peers = peerGroups(snap.ads);
-      const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency };
+      const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency, decision_inputs: DECISION_INPUTS };
       const casesById = casesFor(snap.ads, peers);
       const results: Record<string, any> = { ...(row?.result?.ads_by_id || {}) };
       const usage = { ...(row?.usage || {}) } as any;
@@ -422,7 +468,7 @@ export default {
         if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
         usage.images += Object.values(images).reduce((t, l) => t + l.length, 0);
         if (res.ok && res.stop !== "end_turn") (usage.stop_reasons = usage.stop_reasons || []).push(res.stop); // max_tokens = 답변 잘림 · refusal = 거절
-        const parsed: Record<string, any> | null = res.ok ? parseBatch(res.text, b, adsById, peers, casesById) : null;
+        const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: POLICY, decisionInputs: DECISION_INPUTS }) : null;
         const missing = b.ad_ids.filter((id: string) => !parsed || !parsed[id]);
         if (parsed) Object.assign(results, parsed);
         b.status = !parsed || missing.length === b.ad_ids.length ? "failed" : "done";
