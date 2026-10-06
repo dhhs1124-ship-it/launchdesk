@@ -111,15 +111,18 @@ const freshDb = async (migs) => {
 const runBlock = async (d, k) => { const r = await d.exec(blocks[k]); return r[r.length - 1].rows; };
 const M1 = "20261007090000_ai_budget_reservations", M2 = "20261007100000_ai_budget_run_reservations";
 ok("확인 쿼리: 읽기 전용(SELECT만) · 개인정보 컬럼을 고르지 않음", async () => {
-  const code = RO.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").toLowerCase();
+  const code = RO.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").replace(/'[^']*'/g, "''").toLowerCase(); // 주석 · 문자열 값(권한 이름 등) 제외
   assert.doesNotMatch(code, /\b(insert|update|delete|create|alter|drop|grant|revoke|truncate|perform|begin|commit|set)\b/);
   assert.doesNotMatch(code, /select[^;]*\b(ref|note|result|batches|period)\b(?![_a-z])/, "자유 텍스트 · 결과 본문 제외");
   assert.doesNotMatch(code.replace(/count\(distinct user_id\)/g, ""), /\buser_id\b|\bstore_id\b/, "사용자 · 쇼핑몰 식별자는 건수만");
-  assert.deepEqual(Object.keys(blocks).sort(), ["1", "2", "3", "4", "5", "6", "7", "8", "8-1", "8-2", "9"]); });
+  assert.deepEqual(Object.keys(blocks).sort(), ["1", "2", "3", "4", "4-1", "5", "6", "7", "8", "8-1", "8-2", "9"]); });
 for (const [label, migs] of [["미적용", []], ["090000만", [M1]], ["둘 다 적용", [M1, M2]]]) {
   ok("확인 쿼리 · " + label + ": 항상 실행 블록(1~5 · 8 · 8-1)은 오류 없음 · 블록 2가 상태와 일치 · 조건부 블록은 객체가 있을 때만", async () => {
     const d = await freshDb(migs);
-    for (const k of ["1", "3", "4", "5", "8", "8-1"]) await runBlock(d, k);
+    for (const k of ["1", "3", "4", "4-1", "5", "8", "8-1"]) await runBlock(d, k);
+    const gr = await runBlock(d, "4-1");
+    assert.ok(gr.every((r) => r.granted === false), "일반 사용자 쓰기 · 실행 권한 없음: " + JSON.stringify(gr.filter((r) => r.granted)));
+    if (migs.length) assert.ok(gr.some((r) => r.object === "function ai_budget_reserve" && r.role === "PUBLIC"), "PUBLIC 경유 실행도 검사");
     const mig = (await runBlock(d, "1")).map((r) => r.version);
     assert.equal(mig.includes("20261007090000"), migs.includes(M1)); assert.equal(mig.includes("20261007100000"), migs.includes(M2));
     const f = (await runBlock(d, "2"))[0], one = migs.length >= 1, two = migs.length === 2;

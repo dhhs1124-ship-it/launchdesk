@@ -4,8 +4,8 @@
 -- ============================================================================
 -- 실행 방법 (Supabase Studio SQL 편집기)
 --   - 편집기는 마지막 문장의 결과만 보여 준다 → [블록 N]을 하나씩 선택해 실행한다(전체 실행 X).
---   - 블록 1~5는 예약 테이블 · 컬럼 · 함수가 없어도 오류가 나지 않는다(카탈로그만 조회).
---   - 블록 6~9는 블록 2 결과를 보고 해당 객체가 있을 때만 실행한다(없으면 "relation does not exist" 오류 — 변경은 없음).
+--   - 블록 1~5 · 4-1 · 8 · 8-1은 예약 테이블 · 컬럼 · 함수가 없어도 오류가 나지 않는다(카탈로그 · 기존 테이블만 조회).
+--   - 블록 6 · 7 · 8-2 · 9는 블록 2 결과를 보고 해당 객체가 있을 때만 실행한다(없으면 "relation does not exist" 오류 — 변경은 없음).
 --   - 어떤 블록도 데이터 · 스키마를 바꾸지 않는다(insert · update · delete · create · alter · grant 없음).
 --     예외: 블록 9는 ai_month_spent()를 호출한다 — stable SQL 함수로 합계만 읽는다.
 --   - 개인정보 · 키는 조회하지 않는다: user_id · store_id · result · batches · period · ref · note · error 본문은 고르지 않는다.
@@ -72,6 +72,33 @@ select 'table_select_privilege', r.rolname || ' → ' || t.relname, has_table_pr
 from pg_class t join pg_namespace n on n.oid = t.relnamespace cross join pg_roles r
 where n.nspname = 'public' and t.relname = 'ai_budget_reservations' and r.rolname in ('anon', 'authenticated', 'service_role')
 order by 1, 2;
+
+
+-- [블록 4-1] 일반 사용자(anon · authenticated) 쓰기 · 실행 권한 — 기대: granted 전부 false · policies 0
+-- 예약 테이블 모든 권한 · 예약 함수 실행(역할 직접 + PUBLIC 경유) · 월 합계에 쓰이는 컬럼(reserved_cost_usd · reservation_id · cost_usd) 쓰기
+-- RLS가 켜져 있고 정책이 0개면 권한이 있어도 행은 안 보이지만, 권한 자체가 없어야 한다(이중 차단)
+select r.rolname as role, 'table ai_budget_reservations' as object, pr.priv as privilege, has_table_privilege(r.oid, t.oid, pr.priv) as granted
+from pg_class t join pg_namespace n on n.oid = t.relnamespace cross join pg_roles r
+  cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) as pr(priv)
+where n.nspname = 'public' and t.relname = 'ai_budget_reservations' and r.rolname in ('anon', 'authenticated')
+union all
+select r.rolname, 'function ' || p.proname, 'EXECUTE', has_function_privilege(r.oid, p.oid, 'EXECUTE')
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace cross join pg_roles r
+where n.nspname = 'public' and p.proname in ('ai_month_spent', 'ai_budget_reserve', 'ai_budget_settle') and r.rolname in ('anon', 'authenticated')
+union all
+select 'PUBLIC', 'function ' || p.proname, 'EXECUTE', exists (select 1 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a where a.grantee = 0 and a.privilege_type = 'EXECUTE')
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname in ('ai_month_spent', 'ai_budget_reserve', 'ai_budget_settle')
+union all
+select r.rolname, 'column ' || c.table_name || '.' || c.column_name, pr.priv, has_column_privilege(r.oid, ('public.' || c.table_name)::regclass, c.column_name, pr.priv)
+from information_schema.columns c cross join pg_roles r cross join unnest(array['INSERT', 'UPDATE']) as pr(priv)
+where c.table_schema = 'public' and r.rolname in ('anon', 'authenticated')
+  and ((c.table_name = 'ai_weekly_reviews' and c.column_name in ('cost_usd', 'reserved_cost_usd'))
+    or (c.table_name = 'ai_weekly_verifications' and c.column_name in ('cost_usd', 'reservation_id')))
+union all
+select 'policies', 'table ' || tablename, 'count', (count(*) > 0)
+from pg_policies where schemaname = 'public' and tablename = 'ai_budget_reservations' group by tablename
+order by 1, 2, 3;
 
 
 -- [블록 5] 함수 정의 · 실행 권한 — 예약 함수 3개(없으면 0행)
