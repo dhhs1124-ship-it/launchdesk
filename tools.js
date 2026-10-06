@@ -875,8 +875,10 @@
     var all = getAdlogRecords();
     var inScope = function(r){ return String(r.store_id || '') === storeId; };
     var isOrphan = function(r){ return !!r.store_id && !!existing && existing.indexOf(String(r.store_id)) === -1; };
+    // 금액이 없는 기록(LaunchROAS 실행 기록 source='change' · 결과 기록 'change_result')은 목록에만 두고 합계에서 뺀다
+    var isNoAmount = function(r){ return r.source === 'change' || r.source === 'change_result'; };
     var list = all.filter(function(r){ return inScope(r) || !r.store_id || isOrphan(r); });
-    var scoped = all.filter(function(r){ return inScope(r) && !isOrphan(r); });
+    var scoped = all.filter(function(r){ return inScope(r) && !isOrphan(r) && !isNoAmount(r); });
     if(!list.length){
       adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">아직 기록이 없어요 — "+ 기록 추가"나 "Meta 성과 기록하기"로 첫 광고 성과를 남겨보세요.</div></td></tr>';
     } else {
@@ -885,13 +887,14 @@
         var chanColor = {메타:'var(--badge-a)', 네이버:'var(--badge-c)', 카카오:'var(--badge-b)', 인스타:'var(--badge-d)'}[r.channel] || 'var(--ink-faint)';
         var auto = r.source === 'meta_auto';
         var tags = (auto ? ' <span class="adlog-tag">Meta 자동 · 귀속 구매금액</span>' : '') +
+          (isNoAmount(r) ? ' <span class="adlog-tag">' + (r.source === 'change' ? '변경 기록' : '결과 기록') + ' · 합계 제외</span>' : '') +
           ((storeId && !r.store_id) ? ' <span class="adlog-tag">쇼핑몰 미지정 · 합계 제외</span>' : '') +
           (isOrphan(r) ? ' <span class="adlog-tag">삭제된 쇼핑몰 기록 · 현재 합계 제외</span>' : '');
         return '<tr>' +
           '<td>' + escapeHtml(r.date) + '</td>' +
           '<td><span class="adlog-channel" style="background:' + chanColor + '">' + escapeHtml(r.channel) + '</span></td>' +
           '<td>' + escapeHtml(r.name) + tags + '</td>' +
-          '<td class="num">₩' + Math.round(r.spend).toLocaleString('ko-KR') + '</td>' +
+          '<td class="num">' + (isNoAmount(r) || typeof r.spend !== 'number' ? '—' : '₩' + Math.round(r.spend).toLocaleString('ko-KR')) + '</td>' +
           '<td class="num">' + (hasRevenue(r) ? '₩' + Math.round(r.revenue).toLocaleString('ko-KR') : '—') + '</td>' +
           '<td class="num ' + (roas === null ? '' : roasClass(roas)) + '">' + (roas === null ? '—' : roas.toFixed(1) + 'x') + '</td>' +
           '<td><button type="button" class="adlog-del" data-id="' + escapeHtml(r.id) + '">✕</button></td>' +

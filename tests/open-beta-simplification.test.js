@@ -1848,3 +1848,20 @@ test('쇼핑몰 목록을 아직 모르거나 조회에 실패하면 store_id가
   assert.equal(env.sandbox.launchdeskOpsSnapshot.getLatest().storeIds, null);
   assert.doesNotMatch(env.doc.getElementById('adlogTbody').innerHTML, /삭제된 쇼핑몰 기록/);
 });
+
+test('광고 기록(메인 호환): LaunchROAS 변경 · 결과 기록은 ₩NaN 없이 —로 보이고 합계에서 빠진다(기존 기록 합계는 그대로)', async () => {
+  const env = await boot(periodFixture());
+  await settle();
+  const store = env.sandbox.launchdeskStore;
+  store.addAdlogRecord({ id: 21, date: '2026-09-20', name: '직접 입력', spend: 10000, revenue: 30000, channel: '메타', store_id: '1' });
+  store.addAdlogRecord({ id: 22, source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-20', date: '2026-09-20', name: 'Meta 캠페인 전체 합계', spend: 12000, revenue: 36000, channel: '메타', store_id: '1', currency: 'KRW' });
+  store.addAdlogRecord({ id: 23, source: 'change', action_id: 'a1', date: '2026-09-21', name: '본문 첫 줄 변경', channel: '메타', store_id: '1' });
+  store.addAdlogRecord({ id: 24, source: 'change_result', action_id: 'a1', date: '2026-09-28', name: '결과', channel: '메타', store_id: '1' });
+  env.sandbox.launchdeskAdlog.render();
+  const tbody = env.doc.getElementById('adlogTbody').innerHTML;
+  assert.doesNotMatch(tbody, /NaN/);
+  assert.match(tbody, /본문 첫 줄 변경 <span class="adlog-tag">변경 기록 · 합계 제외<\/span>/);
+  assert.match(tbody, /결과 <span class="adlog-tag">결과 기록 · 합계 제외<\/span>/);
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩22,000');
+  assert.equal(env.doc.getElementById('adlogSumRoas').textContent, '3.0x');
+});
