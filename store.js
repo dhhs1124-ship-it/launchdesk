@@ -26,7 +26,8 @@
     userId: null,
     steps: {},        // { [step_path]: { data: array|object|null, isCompleted: boolean } }
     calcHistory: [],  // 최근 것이 배열 앞쪽 — 화면엔 최대 5개까지만
-    adlogRecords: []  // 최근 것이 배열 앞쪽
+    adlogRecords: [],  // 최근 것이 배열 앞쪽
+    adlogDecisions: [] // LaunchROAS 광고 기록에서 고른 합계 포함 · 제외(tool_type='ad_log_decision') — 메인은 읽기만
   };
   var listeners = [];
 
@@ -95,6 +96,7 @@
   }
   function getCalcHistory(){ return state.calcHistory.slice(); }
   function getAdlogRecords(){ return state.adlogRecords.slice(); }
+  function getAdlogDecisions(){ return state.adlogDecisions.slice(); }
   // 로그인 직전 "게스트 메모리" 상태를 통째로 떠간다(얕은 복사) — hydrate()가
   // 이 state를 서버 값으로 덮어쓰기 전에, app.js가 로그인 시 병합 여부를
   // 물어보는 데 쓴다. 여기서 리턴한 객체는 이후 이 store의 state와 완전히
@@ -358,7 +360,7 @@
   function resetState(){
     state.steps = {};
     state.calcHistory = [];
-    state.adlogRecords = [];
+    state.adlogRecords = []; state.adlogDecisions = [];
   }
   function hydrate(userId){
     var sb = client();
@@ -372,9 +374,10 @@
     var stepsQ = sb.from('user_step_progress').select('step_path, data, is_completed, completed_at').eq('user_id', userId);
     var calcQ = sb.from('tool_records').select('data, created_at').eq('user_id', userId).eq('tool_type', 'margin_calc').order('created_at', { ascending: false }).limit(5);
     var adlogQ = sb.from('tool_records').select('data, created_at').eq('user_id', userId).eq('tool_type', 'ad_log').order('created_at', { ascending: false });
+    var decisionQ = sb.from('tool_records').select('data, created_at').eq('user_id', userId).eq('tool_type', 'ad_log_decision');
 
-    return Promise.all([stepsQ, calcQ, adlogQ]).then(function(results){
-      var stepsRes = results[0], calcRes = results[1], adlogRes = results[2];
+    return Promise.all([stepsQ, calcQ, adlogQ, decisionQ]).then(function(results){
+      var stepsRes = results[0], calcRes = results[1], adlogRes = results[2], decisionRes = results[3];
       resetState();
 
       if(stepsRes && !stepsRes.error && stepsRes.data){
@@ -396,6 +399,9 @@
       } else if(adlogRes && adlogRes.error){
         console.warn('[launchdesk] 광고기록 조회 실패(정렬 컬럼 확인 필요):', adlogRes.error.message);
       }
+
+      // 선택을 못 불러오면 빈 목록 — 공통 규칙의 기본 판정(확정 중복 제외 · 중복 가능 포함)으로 계산된다
+      state.adlogDecisions = decisionRes && !decisionRes.error && decisionRes.data ? decisionRes.data.map(function(row){ return row.data; }).filter(Boolean) : [];
 
       state.authed = true;
       notifyChange();
@@ -429,6 +435,7 @@
     addCalcRecord: addCalcRecord,
     clearCalcHistory: clearCalcHistory,
     getAdlogRecords: getAdlogRecords,
+    getAdlogDecisions: getAdlogDecisions,
     addAdlogRecord: addAdlogRecord,
     addAutoAdlogRecord: addAutoAdlogRecord,
     countAutoAdlogRecordsForStore: countAutoAdlogRecordsForStore,

@@ -863,6 +863,9 @@
   function adlogRoas(r){ return (hasRevenue(r) && r.spend > 0) ? r.revenue / r.spend : null; }
   function renderAdlog(){
     if(!adlogTbody) return;
+    // 공통 계산 규칙(adlog-core.js — LaunchROAS 미리보기와 같은 파일) + LaunchROAS에서 고른 합계 포함 · 제외(읽기만).
+    // 같은 쇼핑몰 · 기록 · 기록별 환율 · 사용자 선택이면 두 화면의 합계가 같다. 파일이 없으면 아래 최소 호환 계산.
+    var AC = window.launchdeskAdlogCore || null;
     // 합계는 지금 쇼핑몰의 기록만(store_id 일치). 쇼핑몰이 없으면(비회원 · 쇼핑몰 0개)
     // 쇼핑몰 미지정 기록끼리. 합계에 넣지 않는 기록도 지울 수 있게 목록에는 남긴다:
     //   - 쇼핑몰을 알 수 없는 예전 기록 → "쇼핑몰 미지정 · 합계 제외"
@@ -878,6 +881,9 @@
     // 금액이 없는 기록(LaunchROAS 실행 기록 source='change' · 결과 기록 'change_result')은 목록에만 두고 합계에서 뺀다
     var isNoAmount = function(r){ return r.source === 'change' || r.source === 'change_result'; };
     var list = all.filter(function(r){ return inScope(r) || !r.store_id || isOrphan(r); });
+    var inStore = all.filter(function(r){ return inScope(r) && !isOrphan(r); });
+    var decisions = (window.launchdeskStore && window.launchdeskStore.getAdlogDecisions ? window.launchdeskStore.getAdlogDecisions() : []).filter(function(d){ return String(d.store_id || '') === storeId; });
+    var coreSum = AC ? AC.summarize(inStore, decisions) : null, coreLinks = AC ? AC.linkChanges(all) : null;
     var scoped = all.filter(function(r){ return inScope(r) && !isOrphan(r) && !isNoAmount(r); });
     if(!list.length){
       adlogTbody.innerHTML = '<tr><td colspan="7"><div class="adlog-empty">아직 기록이 없어요 — "+ 기록 추가"나 "Meta 성과 기록하기"로 첫 광고 성과를 남겨보세요.</div></td></tr>';
@@ -886,29 +892,42 @@
         var roas = adlogRoas(r);
         var chanColor = {메타:'var(--badge-a)', 네이버:'var(--badge-c)', 카카오:'var(--badge-b)', 인스타:'var(--badge-d)'}[r.channel] || 'var(--ink-faint)';
         var auto = r.source === 'meta_auto';
-        var tags = (auto ? ' <span class="adlog-tag">Meta 자동 · 귀속 구매금액</span>' : '') +
-          (isNoAmount(r) ? ' <span class="adlog-tag">' + (r.source === 'change' ? '변경 기록' : '결과 기록') + ' · 합계 제외</span>' : '') +
+        var coreTags = AC && inScope(r) && !isOrphan(r) ? AC.rowLabel(r, coreSum.duplicates, coreLinks).map(function(t){ return t.replace('선택 필요', '선택은 LaunchROAS 광고 기록에서'); }) : null;
+        var tags = (coreTags ? coreTags.map(function(t){ return ' <span class="adlog-tag">' + escapeHtml(t) + '</span>'; }).join('') :
+          (auto ? ' <span class="adlog-tag">Meta 자동 · 귀속 구매금액</span>' : '') +
+          (isNoAmount(r) ? ' <span class="adlog-tag">' + (r.source === 'change' ? '변경 기록' : '결과 기록') + ' · 합계 제외</span>' : '')) +
           ((storeId && !r.store_id) ? ' <span class="adlog-tag">쇼핑몰 미지정 · 합계 제외</span>' : '') +
           (isOrphan(r) ? ' <span class="adlog-tag">삭제된 쇼핑몰 기록 · 현재 합계 제외</span>' : '');
         return '<tr>' +
           '<td>' + escapeHtml(r.date) + '</td>' +
           '<td><span class="adlog-channel" style="background:' + chanColor + '">' + escapeHtml(r.channel) + '</span></td>' +
           '<td>' + escapeHtml(r.name) + tags + '</td>' +
-          '<td class="num">' + (isNoAmount(r) || typeof r.spend !== 'number' ? '—' : '₩' + Math.round(r.spend).toLocaleString('ko-KR')) + '</td>' +
-          '<td class="num">' + (hasRevenue(r) ? '₩' + Math.round(r.revenue).toLocaleString('ko-KR') : '—') + '</td>' +
+          '<td class="num">' + (AC ? escapeHtml(AC.moneyText(r, r.spend)) : (isNoAmount(r) || typeof r.spend !== 'number' ? '—' : '₩' + Math.round(r.spend).toLocaleString('ko-KR'))) + '</td>' +
+          '<td class="num">' + (AC ? escapeHtml(AC.moneyText(r, r.revenue)) : (hasRevenue(r) ? '₩' + Math.round(r.revenue).toLocaleString('ko-KR') : '—')) + '</td>' +
           '<td class="num ' + (roas === null ? '' : roasClass(roas)) + '">' + (roas === null ? '—' : roas.toFixed(1) + 'x') + '</td>' +
           '<td><button type="button" class="adlog-del" data-id="' + escapeHtml(r.id) + '">✕</button></td>' +
         '</tr>';
       }).join('');
     }
-    var totalSpend = scoped.reduce(function(s, r){ return s + (Number(r.spend) || 0); }, 0);
-    var withRevenue = scoped.filter(function(r){ return hasRevenue(r) && r.spend > 0; });
-    var revSpend = withRevenue.reduce(function(s, r){ return s + r.spend; }, 0);
-    var revTotal = withRevenue.reduce(function(s, r){ return s + r.revenue; }, 0);
-    var best = withRevenue.slice().sort(function(a, b){ return adlogRoas(b) - adlogRoas(a); })[0];
-    document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(totalSpend).toLocaleString('ko-KR');
-    document.getElementById('adlogSumRoas').textContent = revSpend > 0 ? (revTotal / revSpend).toFixed(1) + 'x' : '—';
-    document.getElementById('adlogSumBest').textContent = best ? (best.name + ' (' + best.date + ')') : '—';
+    var sum = coreSum || (function(){
+      var withRevenue = scoped.filter(function(r){ return hasRevenue(r) && r.spend > 0; });
+      var revSpend = withRevenue.reduce(function(s, r){ return s + r.spend; }, 0), revTotal = withRevenue.reduce(function(s, r){ return s + r.revenue; }, 0);
+      return { totalSpend: scoped.reduce(function(s, r){ return s + (Number(r.spend) || 0); }, 0), averageRoas: revSpend > 0 ? revTotal / revSpend : null,
+        best: withRevenue.slice().sort(function(a, b){ return adlogRoas(b) - adlogRoas(a); })[0] || null };
+    })();
+    document.getElementById('adlogSumSpend').textContent = '₩' + Math.round(sum.totalSpend).toLocaleString('ko-KR');
+    document.getElementById('adlogSumRoas').textContent = sum.averageRoas != null ? sum.averageRoas.toFixed(1) + 'x' : '—';
+    document.getElementById('adlogSumBest').textContent = sum.best ? (sum.best.name + ' (' + sum.best.date + ')') : '—';
+    // 합계 상태 — 미결 중복 · 환율 없는 외화 · 확정 중복/선택 제외 건수(선택 UI는 LaunchROAS 광고 기록)
+    var noteEl = document.getElementById('adlogSumNote');
+    if(noteEl){
+      var ex = coreSum ? coreSum.excluded : null, notes = [];
+      if(coreSum && coreSum.pending.count) notes.push('중복 가능 ' + coreSum.pending.count + '건 포함 · 선택 필요');
+      if(ex && ex.duplicate) notes.push('확정 중복 ' + ex.duplicate + '건 제외');
+      if(ex && ex.chosen) notes.push('선택으로 제외 ' + ex.chosen + '건');
+      if(ex && ex.currency) notes.push('환율 없는 외화 ' + ex.currency + '건 제외');
+      noteEl.textContent = notes.join(' · ');
+    }
   }
   window.launchdeskAdlog = { render: renderAdlog };
   if(adlogTbody){

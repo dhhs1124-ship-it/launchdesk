@@ -20,6 +20,7 @@ const APP_SRC = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 const MARGIN_CALC_SRC = fs.readFileSync(path.join(ROOT, 'margin-calc.js'), 'utf8');
 const PLANS_CORE_SRC = fs.readFileSync(path.join(ROOT, 'plans-core.js'), 'utf8');
 const TOOLS_SRC = fs.readFileSync(path.join(ROOT, 'tools.js'), 'utf8');
+const ADLOG_CORE_SRC = fs.readFileSync(path.join(ROOT, 'adlog-core.js'), 'utf8');
 const OPS_OVERVIEW_SRC = fs.readFileSync(path.join(ROOT, 'ops-overview.js'), 'utf8');
 const OPS_PERIOD_CORE_SRC = fs.readFileSync(path.join(ROOT, 'ops-period-core.js'), 'utf8');
 const ADLOG_META_SRC = fs.readFileSync(path.join(ROOT, 'adlog-meta.js'), 'utf8');
@@ -286,6 +287,8 @@ function makeSupabase(opts){
       if (table === 'orders') return filterChain(orders, 'orders');
       if (table === 'plans') return filterChain(plansRows, 'plans');
       if (table === 'ad_margin_links') return filterChain(adMarginLinks, 'ad_margin_links');
+      // 광고 기록 합계 일치 테스트 전용 — 지정했을 때만 tool_records 조회에 행을 돌려준다(쓰기 시나리오에는 쓰지 않음)
+      if (table === 'tool_records' && opts.toolRecords) return filterChain(opts.toolRecords, 'tool_records');
       return genericChain(table);
     },
     auth: {
@@ -343,6 +346,7 @@ async function boot(opts){
   vm.runInContext(APP_SRC, sandbox, { filename: 'app.js' });
   vm.runInContext(MARGIN_CALC_SRC, sandbox, { filename: 'margin-calc.js' });
   vm.runInContext(PLANS_CORE_SRC, sandbox, { filename: 'plans-core.js' });
+  vm.runInContext(ADLOG_CORE_SRC, sandbox, { filename: 'adlog-core.js' });
   vm.runInContext(TOOLS_SRC, sandbox, { filename: 'tools.js' });
   // stores.js(내 쇼핑몰 화면)는 쇼핑몰 삭제 · 연결 해제 시나리오에서만 싣는다
   // (기존 테스트의 stores 조회 횟수 기대값을 바꾸지 않기 위함). 실제 순서도 ops-overview.js 앞이다.
@@ -1860,8 +1864,37 @@ test('광고 기록(메인 호환): LaunchROAS 변경 · 결과 기록은 ₩NaN
   env.sandbox.launchdeskAdlog.render();
   const tbody = env.doc.getElementById('adlogTbody').innerHTML;
   assert.doesNotMatch(tbody, /NaN/);
-  assert.match(tbody, /본문 첫 줄 변경 <span class="adlog-tag">변경 기록 · 합계 제외<\/span>/);
-  assert.match(tbody, /결과 <span class="adlog-tag">결과 기록 · 합계 제외<\/span>/);
-  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩22,000');
+  assert.match(tbody, /본문 첫 줄 변경 <span class="adlog-tag">변경 기록 · 합계 제외/);
+  assert.match(tbody, /결과 <span class="adlog-tag">결과 기록 · 합계 제외/);
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩22,000', '중복 가능(직접 입력)은 선택 전까지 포함');
   assert.equal(env.doc.getElementById('adlogSumRoas').textContent, '3.0x');
+});
+
+// 미리보기(launchroas/adlog-core.test.js '운영과 같은 기록 세트')와 같은 기록 · 선택으로 합계가 같은지 — 선택은 store가 tool_records에서 읽는다
+const PARITY_ROWS = [
+  { id: 31, date: '2026-09-20', name: 'A 직접', spend: 10000, revenue: 30000, channel: '메타', store_id: '1' },
+  { id: 32, source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-20', date: '2026-09-20', name: 'B 자동', spend: 12000, revenue: 36000, channel: '메타', store_id: '1', currency: 'KRW' },
+  { id: 33, date: '2026-09-21', name: 'C 직접', spend: 12000, revenue: 30000, channel: '메타', store_id: '1', meta_account_id: 'act_1', scope: 'account_total', currency: 'KRW' },
+  { id: 34, source: 'meta_auto', meta_auto_key: '1|act_1|2026-09-21', date: '2026-09-21', name: 'D 자동', spend: 12000, revenue: 30000, channel: '메타', store_id: '1', currency: 'KRW' },
+  { id: 35, date: '2026-09-22', name: 'E 외화', spend: 10, revenue: 30, channel: '인스타', store_id: '1', currency: 'USD' },
+  { id: 36, source: 'change', action_id: 'a1', date: '2026-09-22', name: 'F 변경', channel: '메타', store_id: '1' },
+];
+function parityFixture(decisions){
+  return Object.assign(periodFixture(), { toolRecords: PARITY_ROWS.map((data) => ({ user_id: 'u1', tool_type: 'ad_log', data }))
+    .concat((decisions || []).map((data) => ({ user_id: 'u1', tool_type: 'ad_log_decision', data }))) });
+}
+test('광고 기록(운영 · 미리보기 합계 일치): 저장된 선택이 있으면 ₩24,000, 없으면 ₩34,000 — 미리보기와 같은 값 · 상태 표시', async () => {
+  let env = await boot(parityFixture([{ record_id: 31, store_id: '1', include: false, decided_at: '2026-10-06T00:00:00Z' }]));
+  await settle(); env.sandbox.launchdeskAdlog.render();
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩24,000');
+  assert.equal(env.doc.getElementById('adlogSumNote').textContent, '확정 중복 1건 제외 · 선택으로 제외 1건 · 환율 없는 외화 1건 제외');
+  const tbody = env.doc.getElementById('adlogTbody').innerHTML;
+  assert.match(tbody, /USD 10 · 환율 없음/); assert.match(tbody, /USD 기록 · 적용 환율 없음 · 합계 제외/);
+  assert.match(tbody, /중복 확인 · 사용자가 합계 제외 선택/);
+  assert.doesNotMatch(tbody, /NaN/);
+  env = await boot(parityFixture([]));
+  await settle(); env.sandbox.launchdeskAdlog.render();
+  assert.equal(env.doc.getElementById('adlogSumSpend').textContent, '₩34,000');
+  assert.match(env.doc.getElementById('adlogSumNote').textContent, /중복 가능 1건 포함 · 선택 필요/);
+  assert.match(env.doc.getElementById('adlogTbody').innerHTML, /중복 가능 · 합계 포함 중 · 선택은 LaunchROAS 광고 기록에서/);
 });
