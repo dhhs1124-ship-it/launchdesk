@@ -82,47 +82,56 @@
     if(!list.length){box.appendChild(el('p','small','아직 실행 기록이 없어요. 운영 현황의 광고 개선안에서 “실행 기록”을 눌러 시작하세요.'));return;}
     list.forEach(function(g){box.appendChild(changeCard(g));});
   }
+  function amt(v,cur){return cur==='KRW'?money(v):cur+' '+Number(v).toFixed(2);}
+  function signed(v,cur){return v===0?'변화 없음':(v<0?'−':'+')+amt(Math.abs(v),cur);}
+  // 기본 카드: 결과 상태 · 구매 변화 · 광고비 변화 · 이익(실제 / 참고 / 보류) · 바꾼 요소 한 줄. 나머지는 '비교 근거'에서 펼친다.
   function changeCard(g){
     var c=g.change,cur=c.basis&&c.basis.currency||'KRW',card=el('article','adlog-change'),latest=g.latest,live=results[c.action_id];
-    var h=el('div','adlog-change-head');h.append(el('strong','',c.name),el('span','adlog-tag',latest?CH.STATUS_TEXT[latest.result.status]:'결과 대기'));card.appendChild(h);
-    var dl=el('dl','adlog-change-dl');
-    var add=function(k,v){if(v){dl.append(el('dt','',k),el('dd','',v));}};
-    add('바꾼 것',c.change.element+' · '+(c.change.method==='new_ad'?'새 광고 추가 (ID '+c.ad.new_ad_id+')':'기존 광고 수정'));
-    add('바꾼 내용',(c.change.before?c.change.before+' → ':'')+c.change.after);
+    var shown=live&&live.cmp?{after:live.after,cmp:live.cmp,saved:false}:latest?{after:latest.after,cmp:latest.result,saved:true}:null;
+    var r=shown&&shown.cmp;
+    var h=el('div','adlog-change-head');
+    h.append(el('strong','',c.ad&&c.ad.ad_name||c.name),el('span','adlog-tag adlog-status-'+(r?r.status:'wait'),r?CH.STATUS_TEXT[r.status]+(r.provisional?' · 잠정':'')+(shown.saved?'':' · 저장 전'):'결과 대기'));
+    card.appendChild(h);
+    card.appendChild(el('p','adlog-change-line','바꾼 것 · '+c.change.element+(c.change.method==='new_ad'?' (새 광고 추가)':' (기존 광고 수정)')+' — '+String(c.change.after).slice(0,60)+(String(c.change.after).length>60?'…':'')));
+    if(live&&live.error)card.appendChild(el('p','small',live.error));
+    if(r){
+      var g2=el('div','adlog-result-grid');
+      var tile=function(k,v,n){var t=el('div','');t.append(el('span','',k),el('strong','',v));if(n)t.appendChild(el('small','',n));g2.appendChild(t);};
+      tile('구매',r.purchases?r.purchases.before+' → '+r.purchases.after+'건':'미측정');
+      tile('광고비',r.spend?signed(r.spend.diff,cur):'—');
+      var p=r.profit;
+      if(p&&p.kind==='actual')tile('광고비 차감 후 예상 이익',signed(p.diff,'KRW'),'실제 주문 상품 · 비용 기준');
+      else if(p&&p.kind==='reference')tile('이익(참고 계산)',signed(p.diff,'KRW'),'연결 상품 기준 가정 · 성과 집계 제외');
+      else tile('이익','계산 보류',p&&p.reason?p.reason.replace('이익 변화 계산 보류 · ',''):'계산 범위 확인 불가');
+      card.appendChild(g2);
+      if(r.reasons&&r.reasons.length)card.appendChild(el('p','adlog-result-verdict',r.reasons[0]));
+    } else if(!(live&&live.error)) card.appendChild(el('p','small','비교 기간 '+c.compare.after.since+' ~ '+c.compare.after.until+' 이후 결과를 비교해요'));
+    // 비교 근거(펼침)
+    var more=el('details','adlog-basis');more.appendChild(el('summary','','비교 근거'));
+    var dl=el('dl','adlog-change-dl'),add=function(k,v){if(v){dl.append(el('dt','',k),el('dd','',v));}};
+    add('바꾼 내용',(c.change.before?c.change.before+' → ':'')+c.change.after+(c.change.method==='new_ad'?' (새 광고 ID '+c.ad.new_ad_id+')':''));
     add('연결된 제안',c.suggestion?(c.suggestion.week+' 주간 점검 · '+(c.suggestion.verdict||'')+(c.suggestion.policy_version?' · 기준 '+c.suggestion.policy_version:' · 이전 기준 결과')):'직접 입력');
-    add('비교 기간','변경 전 '+c.compare.before.since+' ~ '+c.compare.before.until+' / 변경 후 '+c.compare.after.since+' ~ '+c.compare.after.until+' ('+c.compare.days+'일씩)');
+    add('비교 기간','변경 전 '+c.compare.before.since+' ~ '+c.compare.before.until+' / 변경 후 '+c.compare.after.since+' ~ '+c.compare.after.until+' ('+c.compare.days+'일씩 · 전후 비교)');
     add('변경 전 지표',metricLine(c.baseline.metrics,cur));
-    add('당시 계산 기준',[cur+(c.basis.fx_krw_per_unit?' · 1 '+cur+' = '+c.basis.fx_krw_per_unit+'원':''),c.basis.attribution,c.basis.margin?'연결 상품 '+c.basis.margin.product_label+' 주문당 '+money(c.basis.margin.pre_ad):'연결 상품 마진 없음 · 이익 계산 안 함'].join(' · '));
+    if(shown&&shown.after)add('변경 후 지표',metricLine(shown.after,cur));
+    if(r&&r.cpa)add('구매당 광고비',(r.cpa.before==null?'—':amt(r.cpa.before,cur))+' → '+(r.cpa.after==null?'—':amt(r.cpa.after,cur)));
+    add('귀속 기준',c.basis.attribution);
+    add('통화 · 환율',cur+(c.basis.fx_krw_per_unit?' · 1 '+cur+' = '+c.basis.fx_krw_per_unit+'원(당시 저장값)':''));
+    add('연결 상품 마진',c.basis.margin?c.basis.margin.product_label+' 주문당 '+money(c.basis.margin.pre_ad)+' — 귀속 구매가 이 상품이라는 근거 없음':'없음');
+    if(r&&r.profit&&r.profit.kind==='reference')add('참고 계산',r.profit.basis);
+    var mc=r&&(r.missingCost||r.missing_cost);if(mc)add('비용 누락 발견','주문당 '+money(mc.per_order)+' — '+mc.note);
     add('함께 바뀐 조건',c.concurrent.length?c.concurrent.join(' · ')+(c.concurrent_note?' — '+c.concurrent_note:''):'없음(사용자 입력)');
+    if(r&&r.warnings&&r.warnings.length)add('주의',r.warnings.join(' / '));
+    if(r&&r.reasons&&r.reasons.length>1)add('판정 이유',r.reasons.join(' / '));
     if(c.memo)add('메모',c.memo);
-    card.appendChild(dl);
-    var shown=live||latest&&{after:latest.after,cmp:latest.result,saved:true};
-    if(shown)card.appendChild(resultView(shown,cur));
+    more.appendChild(dl);card.appendChild(more);
     var ended=c.compare.after.until<today();
     var btn=el('button','secondary',live&&live.loading?'불러오는 중…':ended?'결과 비교하기':'비교 기간이 '+c.compare.after.until+'에 끝나요');
     btn.type='button';btn.disabled=!ended||!!(live&&live.loading);btn.addEventListener('click',function(){runCompare(c);});
     var act=el('div','form-actions');act.appendChild(btn);
-    if(live&&live.cmp&&!live.saved){var sv=el('button','primary','결과 저장');sv.type='button';sv.disabled=!CHANGE_ON;sv.title=CHANGE_ON?'':'운영 화면 호환 수정 배포 전이라 저장을 꺼 두었어요';sv.addEventListener('click',function(){saveResult(c,live);});act.appendChild(sv);}
+    if(live&&live.cmp){var sv=el('button','primary','결과 저장');sv.type='button';sv.disabled=!CHANGE_ON;sv.title=CHANGE_ON?'':'운영 화면 호환 수정 배포 전이라 저장을 꺼 두었어요';sv.addEventListener('click',function(){saveResult(c,live);});act.appendChild(sv);}
     card.appendChild(act);
     return card;
-  }
-  function resultView(x,cur){
-    var r=x.cmp,box=el('div','adlog-result');
-    if(x.error){box.appendChild(el('p','small',x.error));return box;}
-    if(!r)return box;
-    box.appendChild(el('p','adlog-result-verdict',(x.saved?'저장된 결과 · ':'')+CH.STATUS_TEXT[r.status]+(r.provisional?' (잠정)':'')+' — '+r.reasons.join(' · ')));
-    var g=el('div','adlog-result-grid');
-    var tile=function(k,v,n){var t=el('div','');t.append(el('span','',k),el('strong','',v));if(n)t.appendChild(el('small','',n));g.appendChild(t);};
-    var sp=r.spend;
-    tile('① 실제 지출 변화',!sp?'—':sp.diff===0?'변화 없음':(sp.diff<0?'−':'+')+(cur==='KRW'?money(Math.abs(sp.diff)):cur+' '+Math.abs(sp.diff).toFixed(2)),sp&&sp.diff<0?'지출 감소 · 개선 판단과 별개':'같은 길이 기간 · 같은 통화');
-    var pf=r.profit;
-    tile('② 같은 계산 범위 예상 이익',pf?(pf.diff<0?'−':'+')+money(Math.abs(pf.diff)):'계산 안 함',pf?pf.basis:'연결 상품 마진 · 구매 측정이 필요해요');
-    var mc=r.missingCost||r.missing_cost;
-    tile('③ 비용 누락 발견',mc?'주문당 '+money(mc.per_order):'없음',mc?mc.note:'①②와 더하지 않아요');
-    box.appendChild(g);
-    if(x.after)box.appendChild(el('p','small','변경 후 지표: '+metricLine(x.after,cur)));
-    if(r.warnings&&r.warnings.length){var ul=el('ul','adlog-warn');r.warnings.forEach(function(w){ul.appendChild(el('li','',w));});box.appendChild(ul);}
-    return box;
   }
 
   // meta-adset-insights(scope=ads)를 하루씩 불러 기간 합산 — 서버 변경 없이 쓰는 기존 함수

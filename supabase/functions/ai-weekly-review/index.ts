@@ -6,7 +6,7 @@ import {
   config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
   batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT,
 } from "../_shared/ai-weekly-core.mjs";
-import { POLICY_VERSION, PLAYBOOK_VERSION, POLICY_ADDENDUM, policyOn, selectCases } from "../_shared/ai-policy.mjs";
+import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases } from "../_shared/ai-policy.mjs";
 
 // LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
 // 계정당 주 1회(한국 시간 월요일 00시 갱신) · 여러 광고를 묶어 전체 점검 1회로 계산.
@@ -71,7 +71,7 @@ async function downloadImage(url: string) {
 
 // 분석 기준(정책 MD · 사례) — 시크릿 AI_POLICY_VERSION=${POLICY_VERSION}일 때만 켜진다. 기본은 기존 지시문 그대로.
 const POLICY = policyOn(env);
-const SYSTEM = POLICY ? SYSTEM_PROMPT + POLICY_ADDENDUM : SYSTEM_PROMPT;
+const SYSTEM = POLICY ? policySystemPrompt(SYSTEM_PROMPT) : SYSTEM_PROMPT;
 const policyMeta = () => POLICY ? { policy_version: POLICY_VERSION, playbook_version: PLAYBOOK_VERSION } : { policy_version: null, playbook_version: null };
 const casesFor = (ads: any[], peers: any) => { if (!POLICY) return null; const m: Record<string, string[]> = {}; for (const a of ads) m[a.ad_id] = selectCases(a, peers); return m; };
 

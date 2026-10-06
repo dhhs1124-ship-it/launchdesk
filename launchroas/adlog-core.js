@@ -133,9 +133,9 @@
     var k = kind(r), tags = [];
     if(k === CHANGE){
       var g = links && links.changes[String(r.action_id)];
-      tags.push('변경 기록' + (g && g.results.length ? ' · 결과 ' + g.results.length + '건' : ' · 결과 대기'));
+      tags.push('변경 기록 · 합계 제외' + (g && g.results.length ? ' · 결과 ' + g.results.length + '건' : ' · 결과 대기'));
     } else if(k === RESULT){
-      tags.push(links && links.changes[String(r.action_id)] ? '결과 기록' : '결과 기록 · 연결된 변경 기록 없음');
+      tags.push(links && links.changes[String(r.action_id)] ? '결과 기록 · 합계 제외' : '결과 기록 · 합계 제외 · 연결된 변경 기록 없음');
     } else {
       if(r.source === AUTO) tags.push('Meta 자동 · 귀속 구매금액');
       var d = dup && dup[String(r.id)];
@@ -143,7 +143,7 @@
         if(d.decision === true) tags.push('중복 확인 · 사용자가 합계 포함 선택');
         else if(d.decision === false) tags.push('중복 확인 · 사용자가 합계 제외 선택');
         else if(d.status === 'confirmed') tags.push('확정 중복 · 합계 제외 (' + d.reason + ')');
-        else tags.push('중복 가능 · 합계 포함 중 · 선택 필요');
+        else { var miss = String(d.reason || '').split('확인 안 된 근거: ')[1]; tags.push('중복 가능 · 합계 포함 중 · 선택 필요' + (miss ? ' (확인 안 된 근거: ' + miss + ')' : '')); }
       }
       if(currencyOf(r) !== 'KRW' && toKrw(r, num(r.spend)) === null) tags.push(currencyOf(r) + ' 기록 · 적용 환율 없음 · 합계 제외');
     }

@@ -56,3 +56,28 @@ test("출력 검증: '추가 확인'은 개선안 · 예산을 지우고, 결과
   const old = parseBatch(raw.replace("추가 확인", "유지"), { ad_ids: ["1"] }, byId, peers)["1"];
   assert.deepEqual(old.case_ids, [], "사례를 넘기지 않으면 빈 목록");
 });
+
+import { SYSTEM_PROMPT } from "../supabase/functions/_shared/ai-weekly-core.mjs";
+import { policySystemPrompt } from "../supabase/functions/_shared/ai-policy.mjs";
+
+test("정책 지시문: 기존 고정 표본 기준 · '유지'일 때만 테스트 문장을 바꿔 끼우고 모순을 남기지 않는다", () => {
+  const sys = policySystemPrompt(SYSTEM_PROMPT);
+  assert.doesNotMatch(sys, /구매 3건 미만/);
+  assert.doesNotMatch(sys, /노출 수천 회 미만/);
+  assert.match(sys, /표본 크기에 고정 기준을 쓰지 마라/);
+  assert.match(sys, /동시 집행 비교, 균등 배분 아님/);
+  assert.match(sys, /A\/B 테스트가 아니다/);
+  assert.match(sys, /전주보다 나빠지지 않았다는 이유만으로 "유지"라고 하지 않는다/);
+  assert.match(sys, /hold_scope/);
+  assert.match(SYSTEM_PROMPT, /구매 3건 미만/, "기본(정책 꺼짐) 지시문은 바꾸지 않는다");
+});
+
+test("출력 검증: '추가 확인'이어도 확인한 소재 근거의 선택적 테스트(creative_test)는 남기고, 보류 범위를 기록한다", () => {
+  const a = ad("1", 0.5, "single_image"), byId = { 1: a }, peers = peerGroups([a]);
+  const raw = JSON.stringify([{ ad_id: "1", verdict: "추가 확인", hold_scope: ["랜딩 · 구매 전환 구간", "예산"], evidence: [{ metric: "metrics_current.link_ctr_pct", note: "x" }], budget_note: "증액",
+    recommendation: { scope: "creative_test", element: "문구", proposed: "첫 줄 비교", test: { method: "동시 집행 비교(균등 배분 아님)" } } }]);
+  const r = parseBatch(raw, { ad_ids: ["1"] }, byId, peers)["1"];
+  assert.equal(r.recommendation.scope, "creative_test");
+  assert.deepEqual([...r.hold_scope], ["랜딩 · 구매 전환 구간", "예산"]);
+  assert.equal(r.budget_note, null);
+});

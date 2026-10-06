@@ -25,14 +25,18 @@ var change1 = Object.assign({ id: 201, action_id: 'act_demo1', source: 'change',
   basis: { currency: 'KRW', attribution: 'API 기본(클릭 후 7일 · 조회 후 1일)', margin: { product_label: '니트 가디건', pre_ad: 20000, source_saved_at: 's1' } }, concurrent: ['할인'], concurrent_note: '9/10~9/12 전 품목 10%', memo: '' }, base);
 add('ad_log', change1);
 add('ad_log', Object.assign({ id: 202, source: 'change_result', action_id: 'act_demo1', date: '2026-09-16', name: '니트 가디건 광고 · 결과 악화', measured_at: '2026-09-16T01:00:00Z', after: mk(7, 42000, 3),
-  result: { status: 'worse', reasons: ['같은 계산 범위의 예상 이익이 줄었어요'], warnings: ['같은 기간에 함께 바뀐 조건(할인)이 있어 이 변경의 효과만 따로 볼 수 없어요', '광고비 감소는 ①지출 변화로만 기록해요 · 개선 성공이 아니에요'], provisional: false, separable: false,
-    spend: { before: 70000, after: 42000, diff: -28000, currency: 'KRW' }, profit: { before: 70000, after: 18000, diff: -52000, basis: '변경 기록 당시 상품 마진 · 환율 기준' },
-    missing_cost: { before_per_order: 20000, now_per_order: 17500, per_order: 2500, note: '빠졌던 비용을 계산에 넣은 것 · 절약액이 아니며 ①②와 더하지 않아요' } } }, base));
+  result: { status: 'worse', reasons: ['구매당 광고비가 높아졌어요'], warnings: ['같은 기간에 함께 바뀐 조건(할인)이 있어 이 변경의 효과만 따로 볼 수 없어요', '전후 비교라 다른 요인(계절 · 행사 · 경쟁 · 노출 배분 등)의 영향을 배제하지 못해요', '광고비 감소는 지출 변화로만 기록해요 · 개선 성공이 아니에요'], provisional: false, separable: false,
+    spend: { before: 70000, after: 42000, diff: -28000, currency: 'KRW', krw_diff: -28000 }, purchases: { before: 7, after: 3, diff: -4 }, cpa: { before: 10000, after: 14000, currency: 'KRW' }, roas: { before: 3.2, after: 2.29 },
+    profit: { kind: 'reference', before: 70000, after: 18000, diff: -52000, basis: '연결 상품 기준 참고 계산 — 귀속 구매가 모두 연결 상품(주문당 20000원)이라고 가정 · 검증된 이익이 아님' },
+    missing_cost: { before_per_order: 20000, now_per_order: 17500, per_order: 2500, note: '빠졌던 비용을 계산에 넣은 것 · 절약액이 아니며 다른 값과 더하지 않아요' } } }, base));
 var change2 = JSON.parse(JSON.stringify(change1));
 Object.assign(change2, { id: 203, action_id: 'act_demo2', date: '2026-09-22', name: '데님 팬츠 광고 · 영상 첫 장면 변경', ad: { ad_id: '1301', adset_id: '2301', ad_name: '데님 팬츠 광고', new_ad_id: '1302' },
   change: { element: '영상 첫 장면', before: '0~2초 실물 펼친 장면', after: '0초 착용 전신 + 밑단 스냅 시연', method: 'new_ad' }, compare: { days: 7, before: { since: '2026-09-15', until: '2026-09-21' }, after: { since: '2026-09-22', until: '2026-09-28' } },
   concurrent: [], concurrent_note: '', baseline: { metrics: mk(7, 63000, 4) }, basis: { currency: 'KRW', attribution: 'API 기본(클릭 후 7일 · 조회 후 1일)', margin: { product_label: '데님 팬츠', pre_ad: 21000, source_saved_at: 's1' } } });
 add('ad_log', change2);
+var change3 = JSON.parse(JSON.stringify(change2));
+Object.assign(change3, { id: 205, action_id: 'act_demo3', name: '셔츠 광고 · 이미지 변경', ad: { ad_id: '1401', adset_id: '2401', ad_name: '셔츠 광고', new_ad_id: null }, change: { element: '이미지', before: '흰 배경 상품 단독', after: '착용 전신 + 소재 확대', method: 'edit' }, basis: { currency: 'KRW', attribution: 'API 기본(클릭 후 7일 · 조회 후 1일)', margin: null } });
+add('ad_log', change3);
 var client = { from: function(table){ var f = {}; var q = { select: function(){ return q; }, order: function(){ return q; }, eq: function(k, v){ f[k] = v; return q; },
   insert: function(row){ if(table === 'tool_records') (db[row.tool_type] = db[row.tool_type] || []).unshift({ data: row.data }); return Promise.resolve({ error: null }); },
   then: function(ok, fail){ return Promise.resolve(table === 'ad_margin_links' ? { data: [{ meta_adset_id: '2301', product_label: '데님 팬츠', pre_ad: 21000, source_saved_at: 's1' }], error: null } : { data: (db[f.tool_type] || []).slice(), error: null }).then(ok, fail); } }; return q; },

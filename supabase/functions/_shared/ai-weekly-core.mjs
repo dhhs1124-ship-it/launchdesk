@@ -308,7 +308,8 @@ export function parseBatch(raw, batch, adsById, peers, casesById) {
     let rec = r.recommendation && typeof r.recommendation === "object" ? r.recommendation : null;
     // 실제 지표 근거가 없으면 개선안을 인정하지 않는다(판단 보류)
     if (!evidence.length && verdict !== "판단 보류") { verdict = "판단 보류"; rec = null; }
-    if (verdict === "추가 확인") rec = null; // 데이터 확인이 먼저 — 변경안 · 예산을 내지 않는다
+    // '추가 확인'은 데이터 확인이 먼저 — 확인한 소재에 근거한 선택적 테스트(scope=creative_test)만 남기고 예산 · 다른 변경안은 내지 않는다
+    if (verdict === "추가 확인" && !(rec && rec.scope === "creative_test")) rec = null;
     const test = rec && rec.test && typeof rec.test === "object" ? rec.test : {};
     results[id] = {
       ad_id: id, verdict, headline: t(r.headline, 160), next_action: t(r.next_action, 160),
@@ -317,7 +318,9 @@ export function parseBatch(raw, batch, adsById, peers, casesById) {
       funnel: { stage: t(r.funnel && r.funnel.stage, 20) || "판단 불가", evidence: t(r.funnel && r.funnel.evidence, 300) },
       peers: t(r.peers, 300), evidence, dropped_evidence: dropped,
       hypotheses: (Array.isArray(r.hypotheses) ? r.hypotheses : []).slice(0, 4).map((h) => ({ text: t(h && h.text, 300), basis: t(h && h.basis, 300), check: t(h && h.check, 300) })).filter((h) => h.text),
+      hold_scope: list(r.hold_scope, 4, 80),
       recommendation: rec ? {
+        scope: rec.scope === "creative_test" ? "creative_test" : "change",
         element: t(rec.element, 20), basis: t(rec.basis, 300), current: t(rec.current, 400), proposed: t(rec.proposed, 400), example: t(rec.example, 800),
         example_is_provisional: rec.example_is_provisional === true, needs_info: list(rec.needs_info, 5, 200),
         test: { method: t(test.method, 400), compare_metrics: list(test.compare_metrics, 6, 80), decision_rule: t(test.decision_rule, 300), sample_note: t(test.sample_note, 300) },
