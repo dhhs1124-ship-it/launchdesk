@@ -47,6 +47,14 @@
 - 기본 effort는 아직 바꾸지 않음(결정 필요).
 - 게재 위치(`targeting`)로 제목 노출 여부를 판단해 AI에 넘긴다(자동 게재 위치 = 일부). 연결 마진이 최근 저장값과 다르면 손익분기 판정 · 예상 잔액은 보류.
 
+## 다음 단계 설계 문서 (2026-10-06 · 서버 미적용)
+
+- `docs/ai/ad-review-policy.md` — 공통 분석 기준(판단 순서 · 판정 4종 · 예산 조건 · 필수 제약 · Meta 문서 검증 표)
+- `docs/ai/apparel-ad-playbook.md` — 의류 사례집(에이블리 인기 쇼핑몰 웹 상위 9곳 중 6곳 · 광고 36개, 지그재그 목록 미확보)
+- `docs/ai/research/2026-10-06-apparel-ads-notes.md` — 광고별 원자료 · 제외 사유 · 공식 사이트 대조
+- `docs/ai/ad-improvement-loop-design.md` — 실행 기록 ↔ 광고 기록 연결, 절감 · 성과 기준, 구현 순서
+- 기본 effort는 medium으로 배포됨(`AI_EFFORT`로 변경 가능).
+
 ## 관련 파일
 
 | 파일 | 내용 |
