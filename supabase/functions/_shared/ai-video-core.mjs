@@ -1,6 +1,8 @@
 // 광고 영상 분석 — 프레임 계획 · 비용 추정 · 지시문 · 요청 검사 · 출력 검증(순수 함수). ai-weekly-review verify_video가 쓴다(미배포 · 유료 호출 없음).
 // 원칙: 실제로 본 프레임 시각과 (있으면) 사용자가 준 전사만 근거로 쓴다. 일부 프레임만 봤으면 움직임 · 편집 리듬 · 음성을 분석했다고 쓰지 않는다.
 
+import { worstCallUsd } from "./ai-weekly-core.mjs";
+
 export const VIDEO_PROMPT_VERSION = "video-2026-10-07.2";
 
 // 0~3초는 0.5초 간격(훅 확인), 이후 step초 간격, 마지막 프레임 포함, 최대 maxFrames장
@@ -150,9 +152,9 @@ export function prepareVideoVerify(body, { model, price } = {}) {
   const fileName = typeof b.file_name === "string" ? b.file_name.slice(0, 120) : null;
   const source = { kind: "user_upload", label: "사용자가 제공한 영상", file_name: fileName, meta_ad_id: metaAdId, meta_ad_check: metaAdId ? "pending" : "not_linked" };
   const content = buildVideoContent({ ad: metaAdId ? { ad_id: metaAdId, ad_name: b.ad_name || null } : null, source, metrics: b.metrics || null, copy: b.copy || null, frames: clean, transcript, userFacts: b.user_facts || null });
-  // 최악 비용(사전 검사용): 프레임 크기를 모르므로 장당 1,600토큰(API가 줄이는 최대 크기 수준)으로 높게 잡는다
-  const inputWorst = clean.length * 1600 + Math.ceil(VIDEO_SYSTEM_PROMPT.length / 2) + 1500 + (transcript ? transcript.length : 0);
-  const worstUsd = Math.round(((inputWorst * inPerM + VIDEO_LIMITS.maxOutputTokens * outPerM) / 1e6) * 10000) / 10000;
+  // 최악 비용(사전 검사 · 예약용): 실제로 보낼 지시문 · 내용 전체의 상한(텍스트 ≤ UTF-8 바이트, 프레임 장당 고해상도 최대) — inputTokensUpperBound
+  // (이전: 프레임 1,600토큰 · 글자 수 ÷ 2 · 지표 · 문구 미포함 → 고해상도 모델 · 한국어에서 예약이 실제보다 작을 수 있었음)
+  const worstUsd = worstCallUsd({ inPerM, outPerM }, VIDEO_SYSTEM_PROMPT, content, VIDEO_LIMITS.maxOutputTokens);
   return { ok: true, content, source, frames_seen: ts, transcript, transcript_provided: !!transcript, model, max_output_tokens: VIDEO_LIMITS.maxOutputTokens,
     request_bytes: JSON.stringify({ system: VIDEO_SYSTEM_PROMPT, messages: [{ role: "user", content }] }).length, worst_usd: worstUsd };
 }

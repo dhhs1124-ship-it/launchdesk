@@ -48,6 +48,9 @@ ok("같은 대상(ref) 하루 시도 상한 — 상한에 닿으면 reason=attem
   assert.equal((await q("h2")).ok, true, "다른 프레임 묶음은 별도"); });
 ok("한도 초과 이유는 budget", async () => { const r = await reserve(1000, 1); assert.equal(r.reason, "budget"); });
 ok("금액 0 · 음수 예약은 오류", async () => { await assert.rejects(reserve(0, 1)); });
+ok("예약 금액은 소수 4자리 올림(내림하면 최악 비용보다 작아짐)", async () => {
+  const r = await reserve(0.00001, 100); assert.equal(r.ok, true);
+  assert.equal(Number((await db.query("select reserved_usd from public.ai_budget_reservations where id = $1", [r.reservation_id])).rows[0].reserved_usd), 0.0001); });
 ok("anon · authenticated는 함수 실행 권한 없음", async () => {
   const r = (await db.query("select has_function_privilege('authenticated', 'public.ai_budget_reserve(uuid,bigint,text,text,numeric,numeric,text,integer)', 'execute') a, has_function_privilege('anon', 'public.ai_month_spent()', 'execute') b, has_function_privilege('service_role', 'public.ai_budget_settle(bigint,numeric,boolean,text)', 'execute') c")).rows[0];
   assert.deepEqual([r.a, r.b, r.c], [false, false, true]); });

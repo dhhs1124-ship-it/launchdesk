@@ -128,6 +128,8 @@
     if(shown&&shown.after)add('변경 후 지표',metricLine(shown.after,cur));
     if(r&&r.cpa)add('구매당 광고비',(r.cpa.before==null?'—':amt(r.cpa.before,cur))+' → '+(r.cpa.after==null?'—':amt(r.cpa.after,cur)));
     add('귀속 기준',attrText(r&&r.baseline_source==='refetched'?r.attribution:c.basis.attribution));
+    var wk=r&&r.attribution_vs_weekly||c.basis.attribution_vs_weekly;
+    add('주간 분석과 기준',wk?'주간 분석 · '+wk.weekly.label+' — '+wk.note:'주간 분석 · '+CH.WEEKLY_ATTRIBUTION.label+' — 같은 기준인지 확인되지 않음');
     add('통화 · 환율',cur+(c.basis.fx_krw_per_unit?' · 1 '+cur+' = '+c.basis.fx_krw_per_unit+'원(당시 저장값)':''));
     add('연결 상품 마진',c.basis.margin?c.basis.margin.product_label+' 주문당 '+money(c.basis.margin.pre_ad)+' — 귀속 구매가 이 상품이라는 근거 없음':'없음');
     if(r&&r.profit&&r.profit.kind==='reference')add('참고 계산',r.profit.basis);
@@ -158,25 +160,42 @@
 
   // meta-adset-insights(scope=ads)를 하루씩 불러 기간 합산 — 명시 귀속(attribution_mode:'explicit')으로 요청하고 응답의 귀속 기준을 모은다
   // 하루 상태: ok(광고 행 있음) · absent(정상 조회 · 광고 없음 = 집행 0) · failed(조회 실패) · truncated(페이지 누락이고 광고 없음 — 빠졌을 수 있음)
-  // 귀속 기준: 정상 조회한 날이 모두 같은 기준을 돌려줬을 때만 그 값, 하나라도 없거나 다르면 null(확인 불가)
+  // 귀속 기준: 요청값(설정)과 적용 근거를 나눈다 — 요청값은 정상 조회한 날이 모두 같은 값을 돌려줬을 때만 쓰고(아니면 null),
+  // 창 적용은 대상 광고 행에 요청한 창별 값이 모두 보인 날이 하루라도 있을 때만 response_evidence. 보고 시점은 근거가 없어 항상 unconfirmed
   async function dailyAds(ctx,adsetId,adId,since,until){
-    var rows=[],currency=null,attrs=[],d=since;
+    var rows=[],currency=null,reqs=[],seen={},d=since;
     while(d<=until){
       var res;
       try{res=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'ads',period:'date',date:d,adset_id:adsetId,attribution_mode:'explicit'}});}catch(e){res={error:e};}
       if(!res.error&&res.data&&res.data.ok){
-        currency=res.data.account&&res.data.account.currency||currency;attrs.push(JSON.stringify(res.data.attribution||null));
+        currency=res.data.account&&res.data.account.currency||currency;reqs.push(JSON.stringify(res.data.attribution&&res.data.attribution.requested||null));
         var hit=(res.data.ads||[]).filter(function(a){return String(a.ad_id)===String(adId);})[0];
+        if(hit&&Array.isArray(hit.attribution_windows_seen))hit.attribution_windows_seen.forEach(function(w){seen[w]=true;});
         rows.push({date:d,metrics:hit?hit.metrics:null,state:hit?'ok':res.data.truncated?'truncated':'absent'});
       } else rows.push({date:d,metrics:null,state:'failed'});
       d=CH.addDays(d,1);
     }
-    var same=attrs.length&&attrs.every(function(a){return a===attrs[0];});
-    return {agg:CH.aggregate(rows,since,until),currency:currency,attribution:same?JSON.parse(attrs[0]):null};
+    var req=reqs.length&&reqs.every(function(a){return a===reqs[0];})?JSON.parse(reqs[0]):null,attribution=null;
+    if(req&&Array.isArray(req.windows)){
+      var got=req.windows.filter(function(w){return seen[w];});
+      attribution={source:'request',windows:req.windows,action_report_time:req.action_report_time,
+        applied:{windows:got.length===req.windows.length?'response_evidence':'unconfirmed',windows_seen:got,action_report_time:'unconfirmed'}};
+    }
+    return {agg:CH.aggregate(rows,since,until),currency:currency,attribution:attribution};
+  }
+  // 변경 전 · 후 두 조회의 귀속 — 요청값이 같을 때만, 창 적용 근거는 두 기간 모두에 있을 때만 response_evidence
+  function joinAttribution(a,b){
+    if(!a||!b||JSON.stringify([a.windows,a.action_report_time])!==JSON.stringify([b.windows,b.action_report_time]))return null;
+    var ok=a.applied.windows==='response_evidence'&&b.applied.windows==='response_evidence';
+    return {source:'request',windows:a.windows,action_report_time:a.action_report_time,applied:{windows:ok?'response_evidence':'unconfirmed',windows_seen:ok?a.windows:[],action_report_time:'unconfirmed'}};
   }
   function attrText(a){
-    if(a&&typeof a==='object'&&a.source==='request')return '요청에서 지정 · '+(a.windows||[]).join(', ')+' · 보고 기준 '+(a.action_report_time==='impression'?'노출일':a.action_report_time==='conversion'?'전환일':String(a.action_report_time));
-    return (typeof a==='string'&&a?a+' · ':'')+'확인 불가(응답에 귀속 기준 없음)';
+    if(a&&typeof a==='object'&&a.source==='request'){
+      var ap=a.applied||{};
+      return '요청한 설정 · '+(a.windows||[]).join(', ')+' · 보고 기준 '+(a.action_report_time==='impression'?'노출일':a.action_report_time==='conversion'?'전환일':String(a.action_report_time))
+        +' / 실제 적용 · 귀속 창 '+(ap.windows==='response_evidence'?'Meta 응답에서 확인':'미확인(응답 근거 없음)')+' · 보고 기준 미확인(응답에 드러나지 않음)';
+    }
+    return (typeof a==='string'&&a?a+' · ':'')+'미확인(응답에 귀속 기준 없음)';
   }
   async function findAdset(ctx,adId){
     var res=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'adsets',period:'month'}});
@@ -205,7 +224,7 @@
       var target=c.change.method==='new_ad'?c.ad.new_ad_id:c.ad.ad_id;
       var gb=await dailyAds(ctx,c.ad.adset_id,c.ad.ad_id,c.compare.before.since,c.compare.before.until);
       var ga=await dailyAds(ctx,c.ad.adset_id,target,c.compare.after.since,c.compare.after.until);
-      var attribution=JSON.stringify(gb.attribution)===JSON.stringify(ga.attribution)?ga.attribution:null;
+      var attribution=joinAttribution(gb.attribution,ga.attribution);
       var basis=basisFor(ctx,ga.currency||gb.currency,await marginFor(ctx,c.ad.adset_id),attribution);
       var cmp=CH.compare(c,ga.agg,basis,today(),{before:gb.agg,attribution:attribution,confirmedMissingCost:confirm});
       results[c.action_id]={before:gb.agg,after:ga.agg,cmp:cmp,confirm:confirm};

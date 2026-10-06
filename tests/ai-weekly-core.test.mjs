@@ -137,3 +137,31 @@ test("가격표에 없는 모델은 null · 정산은 모든 호출의 사용량
   assert.equal(settleTotals("claude-sonnet-5-5", [{ usage: { input_tokens: 1000, output_tokens: 1000 } }, { usage: undefined }]).known, false, "응답 실패 · 시간 초과");
   assert.equal(settleTotals("claude-sonnet-5-5", []).known, false, "호출 기록 없음");
 });
+
+import { inputTokensUpperBound, worstCallUsd, IMAGE_TOKENS_MAX } from "../supabase/functions/_shared/ai-weekly-core.mjs";
+import { readFileSync } from "node:fs";
+test("예약 최악 비용은 실제 입력의 상한 — 텍스트는 UTF-8 바이트 · 이미지는 고해상도 최대 · 올림", () => {
+  const ko = "한국어 지시문".repeat(100), en = "a".repeat(700);
+  const bytes = (s) => Buffer.byteLength(s, "utf8");
+  // 토큰은 최소 1바이트 — 한국어도 글자 수 ÷ 2(예전 영상 추정)보다 크게 잡힌다
+  assert.ok(inputTokensUpperBound(ko, []) >= bytes(ko));
+  assert.ok(inputTokensUpperBound("", [{ type: "text", text: ko }]) > ko.length * 2);
+  assert.ok(inputTokensUpperBound("", [{ type: "text", text: en }]) >= 700);
+  assert.ok(IMAGE_TOKENS_MAX >= 4784, "고해상도 모델 이미지 최대(약 4,784토큰) 이상");
+  const img = { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "AAAA" } };
+  assert.ok(inputTokensUpperBound("", [img, img]) >= 2 * IMAGE_TOKENS_MAX);
+  const price = priceOf("claude-sonnet-5-5");
+  const w = worstCallUsd(price, "s", [{ type: "text", text: "x" }], 16000);
+  assert.ok(w >= 16000 * 10 / 1e6, "출력 상한 포함"); assert.equal(w, Math.ceil(w * 10000) / 10000, "소수 4자리 올림");
+  assert.equal(worstCallUsd(null, "s", [], 1000), null, "가격 없으면 null");
+  // 운영자 검증은 실제로 보낼 내용으로 최악 비용을 잡은 뒤 예약한다(고정 20,000토큰 가정 제거)
+  const src = readFileSync(new URL("../supabase/functions/ai-weekly-review/index.ts", import.meta.url), "utf8");
+  const v = src.slice(src.indexOf("async function verify("), src.indexOf("function num("));
+  assert.doesNotMatch(v, /input_tokens: 20000/);
+  assert.ok(v.indexOf("worstCallUsd(price, v.system, batchContent(") > -1 && v.indexOf("worstCallUsd(") < v.indexOf("reserveBudget("), "내용 기준 최악 비용 → 예약 순서");
+  assert.ok(v.indexOf("downloadImage(") < v.indexOf("reserveBudget("), "이미지를 받은 뒤 예약");
+  // 주간 실행(예약 없음): 사용량 미확인 호출은 0이 아니라 최악 비용으로 · 중간 예외로 끝나도 그때까지의 비용을 기록
+  const run = src.slice(src.indexOf("let runCost"));
+  assert.match(run, /usage\.unconfirmed_calls = \(usage\.unconfirmed_calls \|\| 0\) \+ 1;\s*cost \+= worstCallUsd\(priceOf\(cfg\.model\), SYSTEM, content, cfg\.maxOutputTokens\)/);
+  assert.match(run, /catch \(e\)[\s\S]*cost_usd: Math\.round\(runCost \* 10000\) \/ 10000/);
+});

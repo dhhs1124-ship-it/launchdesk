@@ -4,7 +4,7 @@ import { getValidMetaAccessToken } from "../_shared/meta-token.ts";
 import { GRAPH_API_VERSION, buildInsightsUrl, fetchAllInsightsRows } from "../_shared/meta-adset-normalize.mjs";
 import {
   config, weekRanges, decideRun, adMetrics, totals, peerGroups, extractCreative, planBatches,
-  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks, priceOf, settleTotals, DECISION_INPUTS,
+  batchContent, parseBatch, priorities, costUsd, scopeOf, placementInfo, SYSTEM_PROMPT, pinnedWeeks, priceOf, settleTotals, DECISION_INPUTS, worstCallUsd,
 } from "../_shared/ai-weekly-core.mjs";
 import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases, policyVariants, casesForAds, forcedCases } from "../_shared/ai-policy.mjs";
 import { VIDEO_SYSTEM_PROMPT, VIDEO_PROMPT_VERSION, VIDEO_LIMITS, prepareVideoVerify, finishVideoVerify } from "../_shared/ai-video-core.mjs";
@@ -234,20 +234,15 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
     batches = [{ index: 0, ad_ids: [targetAd], status: "pending" }];
   }
   const calls = batches.length * efforts.length * variants.length;
-  const perCall = costUsd(cfg.model, { input_tokens: 20000, output_tokens: cfg.maxOutputTokens });
-  if (!(perCall && perCall > 0)) return json({ ok: false, code: "AI_MODEL_UNPRICED" }, 500);
-  const worst = Math.round(calls * perCall * 10000) / 10000;
-  if (worst > cap) return json({ ok: false, code: "OVER_VERIFY_BUDGET", calls, worst_usd: worst, cap_usd: cap });
-  const rsv = await reserveBudget(admin, userId, storeId, "verify", cfg.model, worst, cfg.monthlyBudgetUsd);
-  if (!rsv) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
-  if (!rsv.ok || !rsv.id) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: rsv.spent });
-  const reservationId = rsv.id, allCalls: any[] = [];
+  const price = priceOf(cfg.model);
+  if (!price) return json({ ok: false, code: "AI_MODEL_UNPRICED" }, 500);
   const adsById: Record<string, any> = {};
   for (const a of snap.ads) adsById[a.ad_id] = a;
   const peers = peerGroups(snap.ads);
   const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency, decision_inputs: DECISION_INPUTS };
   const autoCases = casesForAds(snap.ads, peers);
   const casesOf = (v: any) => !v.withCases ? null : forced ? Object.fromEntries(batches.flatMap((b: any) => b.ad_ids).map((id: string) => [id, forced as string[]])) : autoCases;
+  // 이미지(무료 다운로드)를 먼저 받아 실제로 보낼 내용으로 최악 비용을 잡는다 — 고정 입력 가정(예전 20,000토큰)은 이미지 · 광고 수가 많으면 예약이 실제보다 작았다
   const imagesByBatch = await Promise.all(batches.map(async (b: any) => {
     const images: Record<string, any[]> = {};
     for (const id of b.ad_ids) {
@@ -256,6 +251,16 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
     }
     return images;
   }));
+  let worst = 0;
+  for (const _effort of efforts) for (const v of variants) for (let i = 0; i < batches.length; i++) {
+    worst += worstCallUsd(price, v.system, batchContent(batches[i], adsById, peers, context, imagesByBatch[i], casesOf(v)), cfg.maxOutputTokens) as number;
+  }
+  worst = Math.ceil(worst * 10000) / 10000;
+  if (worst > cap) return json({ ok: false, code: "OVER_VERIFY_BUDGET", calls, worst_usd: worst, cap_usd: cap });
+  const rsv = await reserveBudget(admin, userId, storeId, "verify", cfg.model, worst, cfg.monthlyBudgetUsd);
+  if (!rsv) return json({ ok: false, code: "BUDGET_CHECK_FAILED" }, 500);
+  if (!rsv.ok || !rsv.id) return json({ ok: false, code: "BUDGET_EXCEEDED", spent_usd: rsv.spent });
+  const reservationId = rsv.id, allCalls: any[] = [];
   // 입력 지문 — 실제로 모델에 보내는 내용 그대로(지표 · 문구 · 이미지 데이터 · 귀속 · 목적 · 비교 광고 · 판단 입력 · 메모)
   // shared: 사례 블록을 뺀 공통 입력(두 변형이 같아야 함) / 실행별 full: 지시문 + 사례 포함 전체 입력
   const sharedFingerprint = await sha256(JSON.stringify(batches.map((b: any, i: number) => batchContent(b, adsById, peers, context, imagesByBatch[i], null))));
@@ -424,6 +429,8 @@ export default {
       return json({ ok: patch.status === "completed" || patch.status === "partial", ...publicView(data, weeks) });
     };
 
+    // 이번 실행에서 쓴 비용(누적) — 중간 예외로 끝나도 호출 비용을 기록에서 빠뜨리지 않는다
+    let runCost: number | null = null;
     try {
       // ---- 데이터: 이어서 하기면 저장한 스냅샷, 아니면 새로 조회 ----
       let snap = decision.kind === "continue" ? row.result?.snapshot : null;
@@ -463,9 +470,17 @@ export default {
             if (got) images[id].push({ ...got, label: im.label });
           }
         }
-        const res = await claude(key, cfg.model, cfg.maxOutputTokens, batchContent(b, adsById, peers, context, images, casesById), cfg.effort);
+        const content = batchContent(b, adsById, peers, context, images, casesById);
+        const res = await claude(key, cfg.model, cfg.maxOutputTokens, content, cfg.effort);
         usage.calls++;
-        if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
+        if (res.usage && typeof res.usage.input_tokens === "number" && typeof res.usage.output_tokens === "number") {
+          usage.input_tokens += res.usage.input_tokens; usage.output_tokens += res.usage.output_tokens; cost += costUsd(cfg.model, res.usage) || 0;
+        } else {
+          // 사용량 미확인(시간 초과 · 응답 실패) — 0으로 보지 않고 이 호출의 최악 비용으로 월 합계에 남긴다(운영자가 Anthropic 사용량 확인 후 정정)
+          usage.unconfirmed_calls = (usage.unconfirmed_calls || 0) + 1;
+          cost += worstCallUsd(priceOf(cfg.model), SYSTEM, content, cfg.maxOutputTokens) || 0;
+        }
+        runCost = cost;
         usage.images += Object.values(images).reduce((t, l) => t + l.length, 0);
         if (res.ok && res.stop !== "end_turn") (usage.stop_reasons = usage.stop_reasons || []).push(res.stop); // max_tokens = 답변 잘림 · refusal = 거절
         const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: POLICY, decisionInputs: DECISION_INPUTS }) : null;
@@ -503,7 +518,8 @@ export default {
         error: status !== "failed" ? null : budgetHit ? "이번 달 AI 점검 운영 한도에 도달했어요. 이용 횟수는 차감되지 않았어요." : "AI 분석에 실패했어요. 이용 횟수는 차감되지 않았어요." });
     } catch (e) {
       console.error("ai-weekly-review error:", e instanceof Error ? e.message : e);
-      return await finish({ status: row?.status === "partial" ? "partial" : "failed", error: "점검 중 오류가 발생했어요. 이용 횟수는 차감되지 않았어요." });
+      return await finish({ status: row?.status === "partial" ? "partial" : "failed", error: "점검 중 오류가 발생했어요. 이용 횟수는 차감되지 않았어요.",
+        ...(runCost != null ? { cost_usd: Math.round(runCost * 10000) / 10000 } : {}) });
     }
   }),
 };

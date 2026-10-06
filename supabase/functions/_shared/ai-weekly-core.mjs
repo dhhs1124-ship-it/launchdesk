@@ -406,6 +406,27 @@ export function priceOf(model) {
   const p = PRICES[model];
   return p ? { inPerM: p[0], outPerM: p[1] } : null;
 }
+// 예약용 입력 토큰 상한 — 추정이 아니라 넘지 않는 값(실제 비용은 정산에서). 시간 초과 · 사용량 미확인이면 이 예약 금액이 월 합계에 남으므로 낮게 잡으면 한도를 넘는다.
+// - 텍스트: 토큰은 최소 1바이트(바이트 수준 토큰화)라 토큰 수 ≤ UTF-8 바이트 수(한국어는 글자당 3바이트로 넉넉해진다)
+// - 이미지: 장당 IMAGE_TOKENS_MAX — 고해상도 지원 모델의 최대(긴 변 2576px 약 4,784토큰). 더 큰 이미지는 API가 줄인다
+// - 블록 · 메시지 구조 토큰 여유를 더한다. 출력은 max_tokens가 상한(사고 토큰 포함)
+export const IMAGE_TOKENS_MAX = 4800;
+export function inputTokensUpperBound(system, content) {
+  const bytes = (s) => new TextEncoder().encode(String(s ?? "")).length;
+  let n = 64 + bytes(system);
+  for (const c of Array.isArray(content) ? content : []) {
+    n += 16;
+    if (c && c.type === "image") n += IMAGE_TOKENS_MAX;
+    else if (c && c.type === "text") n += bytes(c.text);
+    else n += bytes(JSON.stringify(c));
+  }
+  return n;
+}
+// 호출 1회 최악 비용(USD) — 올림(내림하면 예약이 실제 상한보다 작아진다). 가격표에 없는 모델은 null
+export function worstCallUsd(price, system, content, maxOutputTokens) {
+  if (!price || !(price.inPerM > 0) || !(price.outPerM > 0)) return null;
+  return Math.ceil(((inputTokensUpperBound(system, content) * price.inPerM + maxOutputTokens * price.outPerM) / 1e6) * 10000) / 10000;
+}
 // 예약 정산값 — 모든 호출의 사용량(usage)을 확인했을 때만 known=true. 하나라도 없으면(시간 초과 · 응답 실패) 예약 금액을 유지한다
 export function settleTotals(model, calls) {
   let actual = 0, known = calls.length > 0;

@@ -488,13 +488,25 @@ export function validateAdsetInsightsRequest(body) {
 }
 
 // ---- 명시 귀속(광고 기록 결과 비교 전용) ----------------------------------
-// attribution_mode:'explicit' 요청에만 귀속 창 · 보고 시점을 URL에 넣고, 넣은 값을 응답(attribution)으로 돌려준다.
-// 화면은 응답에 이 값이 있을 때만 귀속 기준을 '확인됨'으로 본다. 다른 화면 요청(attribution_mode 없음)은 URL · 응답 그대로.
-// 미확인: 명시 귀속 시 actions[].value가 지정 창 합계인지는 재배포 후 실제 계정 무료 조회 1회로 확인해야 한다.
+// attribution_mode:'explicit' 요청에만 귀속 창 · 보고 시점을 URL에 넣고, 요청값(requested)을 응답(attribution)으로 돌려준다.
+// 요청값은 '설정'일 뿐 적용 근거가 아니다 — 적용 근거는 attributionWindowsSeen(Meta 응답 항목의 창별 키)만.
+// 다른 화면 요청(attribution_mode 없음)은 URL · 응답 그대로.
+// 미확인: 명시 귀속 시 actions[].value가 지정 창 합계인지 · 창별 키 형식은 재배포 후 실제 계정 무료 조회 1회로 확인해야 한다
+// (형식이 다르면 근거가 안 잡혀 '미확인'으로 남는다 — 안전한 쪽).
 export const EXPLICIT_ATTRIBUTION = Object.freeze({
   windows: Object.freeze(["7d_click", "1d_view"]),
   action_report_time: "impression",
 });
+
+// 적용 근거 — Meta는 action_attribution_windows를 적용하면 actions · action_values 항목마다 창별 값(예: "7d_click")을 함께 준다.
+// 이 행(광고)의 응답 항목에 실제로 보인 요청 창만 돌려준다. 보고 시점(action_report_time)은 응답에 드러나지 않아 근거가 없다.
+export function attributionWindowsSeen(row, windows) {
+  const entries = [].concat(
+    row && Array.isArray(row.actions) ? row.actions : [],
+    row && Array.isArray(row.action_values) ? row.action_values : []
+  );
+  return (windows || []).filter((w) => entries.some((e) => e && typeof e === "object" && Object.prototype.hasOwnProperty.call(e, w)));
+}
 
 // ---- Graph API 요청 URL 빌더 ------------------------------------------------
 // level='adset' → 광고 세트 목록(계정 전체). level='ad'이고 filteringAdsetId가

@@ -32,7 +32,9 @@ export default {
     if (!storeId || !/^\d{5,25}$/.test(adId)) return json({ ok: false, code: "BAD_REQUEST" }, 400);
     const { data: store } = await ctx.supabase.from("stores").select("id").eq("id", storeId).eq("user_id", userId).single();
     if (!store) return json({ ok: false, code: "STORE_NOT_FOUND" }, 404);
-    const { data: account } = await ctx.supabase.from("connected_accounts").select("id, status, external_account_id").eq("provider", "meta").eq("store_id", storeId).maybeSingle();
+    // 행 타입 명시(meta-adset-insights와 같은 방식) — 스키마 타입이 없는 클라이언트는 select 결과를 never로 추론한다
+    const { data: account } = await ctx.supabase.from("connected_accounts").select("id, status, external_account_id").eq("provider", "meta").eq("store_id", storeId)
+      .returns<{ id: number; status: string | null; external_account_id: string | null }[]>().maybeSingle();
     if (!account || account.status !== "connected") return json({ ok: false, code: "META_NOT_CONNECTED" });
     const tok = await getValidMetaAccessToken(ctx.supabaseAdmin, account.id);
     if (!tok.ok) return json({ ok: false, code: "META_TOKEN" });

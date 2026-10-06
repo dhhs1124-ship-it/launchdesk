@@ -90,7 +90,10 @@ test('변경 · 결과 기록은 합계에서 빠지고 금액 칸은 —, 결�
 const day = (date, spend, buy, value) => ({ date, metrics: { spend, impressions: spend * 10, link_clicks: spend / 100, purchase: { value: buy, observed: true }, purchase_value: { value, observed: true } } });
 const week = (start, spend, buy, value) => Array.from({ length: 7 }, (_, i) => day(CH.addDays(start, i), spend, buy, value));
 // meta-adset-insights가 attribution_mode:'explicit' 요청에 돌려주는 귀속 기준(요청에 실제로 넣은 값)
-const ATTR = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
+// 요청한 설정값 + Meta 응답 항목에서 요청 창별 값을 실제로 본 적용 근거(보고 시점은 응답 근거가 없어 미확인)
+const ATTR = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression',
+  applied: { windows: 'response_evidence', windows_seen: ['7d_click', '1d_view'], action_report_time: 'unconfirmed' } };
+const REQUESTED_ONLY = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
 // 결과 비교 — 화면(adlog.js)처럼 변경 전 기간을 비교 시점에 다시 조회한 값과 그때 확인한 귀속 기준을 넘긴다(여기서는 저장값과 같은 수치)
 const compareNow = (c, after, ab, today, o = {}) => CH.compare(c, after, ab, today, { before: c.baseline.metrics, attribution: ATTR, ...o });
 const basis = (pre) => ({ currency: 'KRW', attribution: ATTR, margin: { product_label: '니트', pre_ad: pre, source_saved_at: 's1' } });
@@ -297,14 +300,18 @@ test('새 광고 추가: 기존 광고 변경 전과의 비교는 관찰값만 �
   assert.equal(s.observed_spend_change_krw, 0); assert.equal(s.hold_reasons.different_ads, 1);
 });
 
-test('귀속 기준: 응답에서 확인한 값만 쓰고, 확인 불가면 보류 · 귀속 창이 끝나기 전은 잠정', () => {
+test('귀속 기준: 요청한 설정값과 적용 근거를 나눈다 — 응답 근거가 있을 때만 확인, 없으면 보류 · 귀속 창이 끝나기 전은 잠정', () => {
   assert.equal(CH.attributionWindowDays(ATTR), 7);
-  assert.equal(CH.attributionWindowDays({ ...ATTR, action_report_time: 'conversion' }), 0);
+  assert.equal(CH.attributionWindowDays(REQUESTED_ONLY), null, '요청값을 되돌려준 것만으로는 확인이 아니다');
+  assert.equal(CH.attributionWindowDays({ ...ATTR, applied: { ...ATTR.applied, windows: 'unconfirmed' } }), null, '응답 항목에 요청 창이 보이지 않으면 미확인');
+  // 보고 시점은 응답에 드러나지 않는다 — 전환일을 요청해도 근거가 없으면 노출일로 가정해 창 전체를 잠정(보수적)
+  assert.equal(CH.attributionWindowDays({ ...ATTR, action_report_time: 'conversion' }), 7);
+  assert.equal(CH.attributionWindowDays({ ...ATTR, action_report_time: 'conversion', applied: { ...ATTR.applied, action_report_time: 'response_evidence' } }), 0);
   assert.equal(CH.attributionWindowDays({ ...ATTR, windows: ['7d_click', 'dda'] }), null);
   assert.equal(CH.attributionWindowDays('API 기본(클릭 후 7일 · 조회 후 1일)'), null, '예전 기록의 문자열은 확인된 기준이 아니다');
   assert.equal(CH.attributionWindowDays({ windows: ['7d_click'], action_report_time: 'impression' }), null, '요청에서 확인한 값이 아니면 확인 불가');
   const x = caseOf(100000, 10, 100000, 30);
-  for (const attribution of [null, 'API 기본(클릭 후 7일 · 조회 후 1일)']) {
+  for (const attribution of [null, 'API 기본(클릭 후 7일 · 조회 후 1일)', REQUESTED_ONLY]) {
     const r = compareNow(x.c, x.after, basis(20000), '2026-09-30', { attribution });
     assert.equal(r.status, 'inconclusive'); assert.ok(r.blockers.includes('attribution_unverified')); assert.match(r.reasons[0], /귀속 기준을 확인하지 못해/);
   }
@@ -313,7 +320,20 @@ test('귀속 기준: 응답에서 확인한 값만 쓰고, 확인 불가면 보�
   assert.equal(early.status, 'inconclusive'); assert.ok(early.blockers.includes('provisional'));
   assert.ok(early.warnings.some((w) => w.includes('2026-09-22부터 확정 판단')));
   assert.equal(compareNow(x.c, x.after, basis(20000), '2026-09-22').status, 'improved');
-  assert.equal(compareNow(x.c, x.after, basis(20000), '2026-09-15', { attribution: { ...ATTR, action_report_time: 'conversion' } }).status, 'improved', '전환일 보고는 지난 날짜가 늘지 않는다');
+  const conv = compareNow(x.c, x.after, basis(20000), '2026-09-15', { attribution: { ...ATTR, action_report_time: 'conversion' } });
+  assert.ok(conv.blockers.includes('provisional'), '전환일 요청이어도 적용 근거가 없으면 잠정');
+  assert.match(conv.warnings.join(' '), /보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정/);
+});
+
+test('주간 분석과 귀속 기준이 다르면 결과와 변경 기록에 남긴다', () => {
+  const x = caseOf(100000, 10, 100000, 30);
+  assert.equal(x.c.basis.attribution_vs_weekly.same, false);
+  assert.equal(x.c.basis.attribution_vs_weekly.weekly.basis, 'ad_set_unified_setting');
+  const r = compareNow(x.c, x.after, basis(20000), '2026-09-30');
+  assert.equal(r.attribution_vs_weekly.same, false); assert.deepEqual(r.attribution_vs_weekly.compare, { windows: ATTR.windows, action_report_time: 'impression' });
+  assert.ok(r.warnings.some((w) => /주간 분석은 광고 세트 귀속 설정 기준/.test(w)));
+  const rr = CH.buildResultRecord(x.c, x.after, r, at('2026-09-30'), '', x.c.baseline.metrics);
+  assert.equal(rr.result.attribution_vs_weekly.weekly.label, CH.WEEKLY_ATTRIBUTION.label);
 });
 
 test('하루 조회 상태: 조회 실패 · 페이지 누락은 누락 일수 · 정상 조회의 광고 없음(부재)은 집행 0으로 구분한다', () => {

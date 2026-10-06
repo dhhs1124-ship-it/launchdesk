@@ -17,6 +17,7 @@ import {
   fetchAllInsightsRows,
   buildInsightsUrl,
   EXPLICIT_ATTRIBUTION,
+  attributionWindowsSeen,
 } from "../_shared/meta-adset-normalize.mjs";
 
 // Meta 캠페인/광고 세트/광고 레벨 Insights — 진단 1단계(원본 성과 조회·정규화만).
@@ -262,9 +263,15 @@ export default {
         truncated: pageResult.truncated,
         fetched_rows: pageResult.fetchedRows,
         page_count: pageResult.pageCount,
-        // 요청에 실제로 넣은 귀속 기준 — 명시 귀속 요청에만 있다(없으면 화면은 귀속 기준 확인 불가로 본다)
+        // 명시 귀속 요청에만: 요청한 설정값(requested)과 응답에서 본 적용 근거(windows_seen)를 나눠 돌려준다.
+        // 요청값만으로는 적용 확인이 아니다 · 보고 시점은 응답 근거가 없어 항상 unconfirmed
         ...(attribution
-          ? { attribution: { source: "request", windows: [...attribution.windows], action_report_time: attribution.action_report_time } }
+          ? { attribution: {
+              source: "request",
+              requested: { windows: [...attribution.windows], action_report_time: attribution.action_report_time },
+              windows_seen: [...new Set((pageResult.rows || []).flatMap((row: any) => attributionWindowsSeen(row, attribution.windows)))],
+              action_report_time_applied: "unconfirmed",
+            } }
           : {}),
       };
 
@@ -295,10 +302,12 @@ export default {
               adset_name: first.adset_name,
             }
           : { campaign_id: null, campaign_name: null, objective: null, adset_id, adset_name: null },
-        ads: normalizedRows.map((row: any) => ({
+        ads: normalizedRows.map((row: any, i: number) => ({
           ad_id: row.ad_id,
           ad_name: row.ad_name,
           metrics: row.metrics,
+          // 이 광고 행에서 실제로 보인 요청 창(명시 귀속 요청에만)
+          ...(attribution ? { attribution_windows_seen: attributionWindowsSeen((pageResult.rows || [])[i], attribution.windows) } : {}),
         })),
         ...pagingPayload,
       });

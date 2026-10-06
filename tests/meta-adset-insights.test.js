@@ -44,8 +44,21 @@ test('명시 귀속(attribution_mode=explicit)일 때만 귀속 창 · 보고 �
   assert.equal(m.validateAdsetInsightsRequest({ ...body, attribution_mode: 'explicit' }).attribution_mode, 'explicit');
   const bad = m.validateAdsetInsightsRequest({ ...body, attribution_mode: '28d_click' });
   assert.equal(bad.ok, false); assert.equal(bad.code, 'UNSUPPORTED_ATTRIBUTION_MODE');
-  assert.match(NEW_FN_SRC, /attribution: \{ source: "request", windows: \[\.\.\.attribution\.windows\], action_report_time: attribution\.action_report_time \}/);
   assert.match(NEW_FN_SRC, /const attribution = attribution_mode === "explicit" \? EXPLICIT_ATTRIBUTION : undefined;/);
+  // 요청값(requested)과 응답 근거(windows_seen)를 나눠 돌려준다 · 보고 시점은 근거가 없어 unconfirmed
+  assert.match(NEW_FN_SRC, /requested: \{ windows: \[\.\.\.attribution\.windows\], action_report_time: attribution\.action_report_time \}/);
+  assert.match(NEW_FN_SRC, /action_report_time_applied: "unconfirmed"/);
+  assert.match(NEW_FN_SRC, /attribution_windows_seen: attributionWindowsSeen\(\(pageResult\.rows \|\| \[\]\)\[i\], attribution\.windows\)/);
+});
+
+test('적용 근거: Meta 응답 항목에 요청 창별 값이 실제로 있을 때만 그 창을 본 것으로 센다(요청값만으로는 아님)', async () => {
+  const m = await modPromise;
+  const W = m.EXPLICIT_ATTRIBUTION.windows;
+  assert.deepEqual(m.attributionWindowsSeen({ actions: [{ action_type: 'purchase', value: '3', '7d_click': '2', '1d_view': '1' }] }, W), ['7d_click', '1d_view']);
+  assert.deepEqual(m.attributionWindowsSeen({ actions: [{ action_type: 'link_click', value: '9', '7d_click': '9' }] }, W), ['7d_click'], '한 창만 보이면 그 창만');
+  assert.deepEqual(m.attributionWindowsSeen({ actions: [{ action_type: 'purchase', value: '3' }] }, W), [], '창별 값 없이 value만 오면 근거 없음');
+  assert.deepEqual(m.attributionWindowsSeen({}, W), [], '행동이 없으면 근거 없음');
+  assert.deepEqual(m.attributionWindowsSeen({ action_values: [{ action_type: 'purchase', value: '9', '1d_view': '0', '7d_click': '9' }] }, W), ['7d_click', '1d_view']);
 });
 
 test('ads 요청은 level=ad를 쓴다', async () => {

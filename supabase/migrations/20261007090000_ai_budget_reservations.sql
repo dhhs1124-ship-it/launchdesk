@@ -59,10 +59,12 @@ as $$
 declare
   v_spent numeric;
   v_id bigint;
+  v_amount numeric;
 begin
   if p_amount is null or p_amount <= 0 or p_limit is null or p_limit <= 0 then
     raise exception 'ai_budget_reserve: amount and limit must be positive';
   end if;
+  v_amount := ceil(p_amount * 10000) / 10000; -- 올림: 예약 · 한도 검사가 최악 비용보다 작아지지 않게
   perform pg_advisory_xact_lock(hashtext('launchroas_ai_budget'));
   v_spent := public.ai_month_spent();
   if p_ref is not null and p_max_ref_per_day is not null and (
@@ -70,12 +72,12 @@ begin
     return query select false, null::bigint, v_spent, 'attempts'::text;
     return;
   end if;
-  if v_spent + p_amount > p_limit then
+  if v_spent + v_amount > p_limit then
     return query select false, null::bigint, v_spent, 'budget'::text;
     return;
   end if;
   insert into public.ai_budget_reservations (user_id, store_id, kind, model, reserved_usd, ref)
-  values (p_user, p_store, p_kind, p_model, round(p_amount, 4), p_ref)
+  values (p_user, p_store, p_kind, p_model, v_amount, p_ref)
   returning id into v_id;
   return query select true, v_id, v_spent, null::text;
 end;

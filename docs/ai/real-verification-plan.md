@@ -219,7 +219,7 @@ git worktree remove ../main-parity-wt
 |---|---|---|---|
 | 1 | 변경 전 지표가 저장 시점에 고정 → 늦게 귀속된 구매가 빠져 개선 쪽 편향 | 결과 비교 때 변경 전 · 후를 같은 명시 귀속으로 함께 다시 조회해 비교. 저장 당시 값만 있으면 관찰만 · 신호 없음(`baseline_not_refetched`). 저장 당시 값은 `saved_baseline` 이력, 재조회 값은 결과 기록 `before` | `adlog-change-core.js compare` · `adlog.js runCompare` |
 | 6 | 새 광고 비교가 신호를 냄 · 방식 기본값 new_ad | 새 광고 ↔ 기존 광고 비교는 관찰값만(`different_ads`) · 신호 · 지출 집계 제외(`observed_only_new_ad`). 방식 기본값 없음(‘선택해 주세요’) · 미선택이면 저장 거절 | `compare` · `outcomeSummary` · `buildChangeRecord` · `index.html chgMethod` |
-| 7 | 귀속 기준 고정 문자열 · 잠정 3일 | `meta-adset-insights`가 요청에 넣은 귀속 기준을 응답(`attribution`)으로 돌려준 것만 확인된 기준. 없으면 보류(`attribution_unverified`). 잠정 기간 = 귀속 창(7일 클릭 · 노출일 보고 → 변경 후 마지막 날 + 8일부터 확정) | `attributionWindowDays` · `dailyAds` · `meta-adset-insights` |
+| 7 | 귀속 기준 고정 문자열 · 잠정 3일 | 요청한 귀속 설정과 실제 적용 근거를 구분(10장에서 정정 — 요청값을 돌려준 것만으로는 확인으로 보지 않음). 근거가 없으면 보류(`attribution_unverified`). 잠정 기간 = 귀속 창(보고 시점 미확인 → 노출일 가정 · 변경 후 마지막 날 + 8일부터 확정) | `attributionWindowDays` · `dailyAds` · `meta-adset-insights` |
 | 8 | 변경 전 조회 실패해도 저장 · 응답에 없는 광고 0 처리 | 하루 상태 구분: ok · absent(정상 조회 · 광고 없음 = 0) · failed · truncated(페이지 누락이고 광고 없음). 실패 · 누락이 있으면 저장 거절 · 비교 안 함(`fetch_failed`) | `aggregate` · `dailyAds` · `buildChangeRecord` |
 | — | 재조회 기간이 기록된 기간과 다를 때 | 비교하지 않음(`condition_mismatch`) | `compare` |
 | — | 결과 카드 통화 표시 오류(`var cur` 재선언으로 ‘광고비 null 70000.00’) | 변수 분리 | `adlog.js changeCard` |
@@ -232,7 +232,7 @@ git worktree remove ../main-parity-wt
 - 미리보기 전체 테스트 776개 통과(새 회귀 테스트: 재조회 기준 · 새 광고 관찰값만 · 귀속 확인 불가 보류 · 귀속 창 잠정 경계 · 실패/누락/부재 구분 · 불완전 기준 거절 · 방식 기본값 없음 · 기록 조회 실패 · 명시 귀속 옵션)
 - 운영 메인 호환 브랜치 전체 테스트 639개 통과
 - 두 화면 모의 검증 10/10(기록 조회 실패 · 다시 불러오기 2개 추가) · 공용 DB 쓰기 0
-- `deno check` 통과: `meta-adset-insights` · `ai-weekly-review`(기존 `meta-adset-insights` 형식 오류 2건도 정리). `ad-video-source`는 수정 전부터 형식 오류 3건(`connected_accounts` 조회 결과 타입이 `never`) — 이번 범위 밖 · 미수정
+- `deno check` 통과: `meta-adset-insights` · `ai-weekly-review`(기존 `meta-adset-insights` 형식 오류 2건도 정리). `ad-video-source`는 수정 전부터 형식 오류 3건(`connected_accounts` 조회 결과 타입이 `never`) — 10장에서 수정
 
 ### 9-3. 원격 적용 항목(추가 · 승인 후)
 
@@ -246,3 +246,45 @@ git worktree remove ../main-parity-wt
 - 전후 비교는 인과를 증명하지 않는다(계절 · 행사 · 노출 배분). 같은 기간 두 광고 비교(새 광고 추가)는 이 화면에서 판정하지 않는다.
 - 귀속 창 동안 잠정 처리는 노출일 보고 기준의 가정 — Meta의 사후 데이터 정정(최대 28일)은 반영하지 못한다.
 - 결과 비교 1회에 Meta 조회 14회(하루 단위) — 비교 기간 28일이면 56회.
+
+## 10. 운영 배포 전 최종 확인 (로컬 · 원격 변경 없음)
+
+### 10-1. `ad-video-source` 형식 오류 3건
+
+- 오류: `connected_accounts` 조회 결과가 `never`로 추론돼 `account.status` · `account.id` · `account.external_account_id` 접근이 TS2339. 스키마 타입이 없는 Supabase 클라이언트의 `select` 결과 추론 문제.
+- 수정: `meta-adset-insights`와 같은 방식으로 행 타입을 명시(`.returns<{ id; status; external_account_id }[]>()`). 동작 변경 없음.
+- 이전 ‘통과’ 근거: **이전 환경 확인 불가.** 저장소 기록에서 `ad-video-source` 검사 통과를 적은 곳을 찾지 못했다. 인계 문서는 `ai-weekly-review`만 통과로 적었고, 8-4의 명령 목록은 실행할 명령만 있고 결과가 없다.
+  `ad-video-source`는 처음 추가(cfed98e) 이후 바뀌지 않았다. 저장소에 `deno.json` · `deno.lock`이 없어 `npx deno`가 그때그때 최신 Deno와 `jsr:@supabase/server@^1` 최신 1.x를 받으므로 회사 PC의 당시 버전은 알 수 없다. 이번 검사: deno 2.9.6 · TypeScript 6.0.3.
+- 현재 결과: `deno check` 통과 — `ad-video-source` · `meta-adset-insights` · `ai-weekly-review` · `ai-insights`.
+
+### 10-2. 귀속 기준 — 요청한 설정과 실제 적용 구분
+
+- 서버(`meta-adset-insights`, `attribution_mode:'explicit'`일 때만): 응답 `attribution`에 요청값(`requested`)과 응답 근거(`windows_seen`)를 나눠 넣는다. 광고 행마다 `attribution_windows_seen` = Meta 응답의 `actions` · `action_values` 항목에 요청한 창별 값(`7d_click` · `1d_view`)이 실제로 있던 창. 보고 시점(`action_report_time`)은 응답에 드러나지 않아 `action_report_time_applied: 'unconfirmed'`.
+- 화면(`adlog.js`): 요청값이 모든 날 같고, 대상 광고 행에서 요청 창이 모두 보였을 때만 `applied.windows = 'response_evidence'`. 결과 비교는 변경 전 · 후 두 기간 모두 근거가 있어야 한다. 그 외는 `unconfirmed` → 판단 보류(`attribution_unverified`).
+  요청값만 돌아오고 창별 값이 없거나(재배포 전 · 응답 형식 다름 · 그 기간 행동 없음) 예전 기록의 문자열이면 모두 미확인.
+- 잠정 기간: 보고 시점은 확인 근거가 없으므로 요청값과 관계없이 노출일 기준으로 가정해 귀속 창 전체(7일)를 잠정으로 둔다. 이전에는 요청값이 전환일이면 0일로 봤는데, 근거 없는 요청값을 쓴 것이라 바꿨다(테스트 기대값도 이 기준 변경에 맞춰 수정).
+- 주간 분석과의 차이: 주간 분석(`ai-weekly-review`)은 `use_unified_attribution_setting=true`(광고 세트 귀속 설정 기준), 결과 비교는 창을 지정해 요청한다. 요청 방식이 달라 같은 기준이라고 확인되지 않는다.
+  변경 기록(`basis.attribution_vs_weekly`) · 결과 기록(`result.attribution_vs_weekly`)에 남기고, 결과 주의 문구와 카드 ‘주간 분석과 기준’ 줄에 표시한다.
+- 재배포 후 무료 조회 1회로 확인할 것: 명시 귀속 응답의 `actions` 항목에 `7d_click` · `1d_view` 키가 실제로 오는지. 오지 않으면 결과 비교는 계속 ‘미확인 · 판단 보류’(안전한 쪽)이고, 응답 형식에 맞춰 근거 판별을 고쳐야 한다.
+
+### 10-3. 비용 예약 SQL · 호출 코드 검토
+
+| 상황 | 처리(수정 후) | 결과 |
+|---|---|---|
+| 동시 요청(운영자 검증) | `ai_budget_reserve`가 트랜잭션 advisory lock 안에서 합계 → 한도 → 예약 삽입. 다음 요청은 앞 예약이 커밋된 뒤 합계를 다시 계산 | 함께 통과 안 함(SQL 검사) |
+| 호출 후 시간 초과 · 응답 실패 | 사용량이 없으면 `known=false` → `unsettled` · 예약 금액 유지. 함수가 강제 종료돼 정산을 못 하면 `reserved` 그대로 예약 금액으로 집계 | 0으로 풀리지 않음 |
+| 검증 결과 저장 실패 | 정산은 저장 전에 끝나고 비용은 예약에 남음. 예약에 연결된 검증 기록 비용은 합계에서 빼므로 중복 없음 | 비용 유지 |
+| 사용량 미확인 | 예약 금액 유지 → 운영자가 Anthropic 사용량 확인 후 `ai_budget_settle(id, 실제, true, '수동 정산')` | 수동 정산 |
+| **[결함 · 수정] 예약 금액이 최악 비용보다 작음** | 운영자 검증은 호출당 입력 20,000토큰 고정 가정, 영상은 프레임 1,600토큰 · 글자 수 ÷ 2 · 지표 · 문구 미포함이었다. 시간 초과 시 이 예약 금액만 남으므로 실제 비용이 한도를 넘을 수 있었다. → 실제로 보낼 지시문 · 내용으로 상한 계산(`inputTokensUpperBound`: 텍스트 ≤ UTF-8 바이트, 이미지 장당 4,800토큰 = 고해상도 모델 최대 약 4,784 이상, 출력 = max_tokens). 검증은 이미지를 받은 뒤 예약 | 예약 ≥ 실제 최대 비용 |
+| **[결함 · 수정] 금액 내림** | SQL `round(p_amount, 4)` → 올림(`ceil`), 한도 검사도 같은 값. 화면 코드의 최악 비용도 올림 | 0.00001 예약이 0이 되어 실패하던 경우 포함 |
+| **[결함 · 수정] 주간 실행 사용량 미확인 = 0** | 주간 실행(예약 없음)은 시간 초과 호출 비용을 0으로 더했다 → 그 호출의 최악 비용으로 기록(`usage.unconfirmed_calls`). 중간 예외로 끝나도 그때까지의 비용을 저장 | 월 합계에서 빠지지 않음 |
+
+검증: SQL 로컬 검사 15/15(PGlite · 올림 검사 추가) · 회귀 테스트(상한 · 올림 · 예약 순서 · 주간 실행 미확인 비용).
+
+### 10-4. 남은 제한
+
+- 주간 실행(run)은 여전히 예약을 쓰지 않는다. 묶음 그룹마다 월 합계를 확인하므로 넘는 폭은 최대 그룹 1개 비용이고, 다른 요청(운영자 검증 · 다른 사용자의 주간 실행)과 동시에 돌면 잠금 없이 함께 통과할 수 있다. 결과 저장(`finish`)이 실패하면 그 실행 비용은 기록되지 않는다. 주간 점검은 현재 꺼져 있다 — 켜기 전에 주간 실행도 예약 방식으로 바꿔야 한다(이번 범위 밖).
+- 응답 실패(예: 529 · 400)는 과금되지 않았을 수도 있지만 사용량이 없어 예약 금액을 유지한다(보수적). 수동 정산 대상.
+- 이미지 상한 4,800토큰은 문서상 고해상도 모델 최대 기준. 더 큰 이미지 토큰을 쓰는 모델이 나오면 `IMAGE_TOKENS_MAX`를 올려야 한다.
+- 예약 SQL 동시성은 PGlite 단일 연결로만 확인했다(advisory lock 경로). 두 연결 동시 실험은 하지 않았다.
+- 귀속 적용 근거는 Meta 응답 형식(창별 키)에 의존한다. 재배포 후 실제 응답으로 확인하기 전까지 결과 비교는 판단 보류로 나온다.

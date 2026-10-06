@@ -54,16 +54,24 @@
       roas: spend > 0 && valObs ? value / spend : null };
   }
 
-  // 귀속 기준 — meta-adset-insights가 요청에 실제로 넣은 값을 응답으로 돌려준 것({source:'request', windows, action_report_time})만 확인된 기준으로 본다.
-  // 예전 기록의 문자열 · 응답에 기준이 없는 경우는 확인 불가(null).
-  // 잠정 기간 = 귀속 창(클릭 · 조회 중 긴 쪽). 근거: 보고 기준이 노출일(action_report_time=impression)이면 비교 기간 마지막 날 노출에서 생긴 구매가
-  // 귀속 창이 끝날 때까지 그 날짜로 더해진다. 전환일 기준(conversion)이면 지난 날짜에 더해지지 않는다(0일).
+  // 귀속 기준 — 요청한 설정값과 실제 적용 근거를 나눈다.
+  //   { source:'request', windows, action_report_time(요청값), applied:{ windows:'response_evidence'|'unconfirmed', action_report_time:'response_evidence'|'unconfirmed' } }
+  //   요청값을 서버가 돌려준 것만으로는 확인이 아니다. 창은 Meta 응답 항목에 요청한 창별 값이 실제로 보였을 때만(response_evidence) 확인으로 본다.
+  //   그 근거가 없거나 예전 기록의 문자열이면 확인 불가(null) → 판단 보류.
+  // 잠정 기간 = 귀속 창(클릭 · 조회 중 긴 쪽). 노출일 보고면 마지막 날 노출의 구매가 창이 끝날 때까지 그 날짜로 더해진다.
+  //   보고 시점은 응답에 드러나지 않아(근거 없음) 요청값이 전환일이어도 노출일로 가정해 창 전체를 잠정으로 둔다(보수적). 전환일이 근거로 확인될 때만 0일.
   function attributionWindowDays(a){
     if(!a || typeof a !== 'object' || a.source !== 'request' || !Array.isArray(a.windows) || !a.windows.length) return null;
-    if(a.action_report_time === 'conversion') return 0;
-    if(a.action_report_time !== 'impression') return null;
+    if(!a.applied || a.applied.windows !== 'response_evidence') return null;
     var d = a.windows.map(function(w){ var m = /^(\d+)d_(click|view)$/.exec(String(w)); return m ? Number(m[1]) : NaN; });
-    return d.some(isNaN) ? null : Math.max.apply(null, d);
+    if(d.some(isNaN)) return null;
+    return a.action_report_time === 'conversion' && a.applied.action_report_time === 'response_evidence' ? 0 : Math.max.apply(null, d);
+  }
+  // 주간 분석(ai-weekly-review)의 귀속 — 광고 세트 귀속 설정(use_unified_attribution_setting=true). 결과 비교는 창을 지정해 요청하므로 요청 방식이 다르다
+  var WEEKLY_ATTRIBUTION = { basis: 'ad_set_unified_setting', label: '광고 세트 귀속 설정 기준(use_unified_attribution_setting)' };
+  function weeklyDiff(a){
+    return { weekly: WEEKLY_ATTRIBUTION, compare: a && a.source === 'request' ? { windows: a.windows, action_report_time: a.action_report_time } : null, same: false,
+      note: '주간 분석은 광고 세트 귀속 설정 기준이고 결과 비교는 귀속 창을 지정해 요청해요 — 기준이 같다고 확인되지 않아 구매 수가 주간 분석과 다를 수 있어요' };
   }
   function sameAttribution(a, b){ return JSON.stringify(a || null) === JSON.stringify(b || null); }
 
@@ -93,7 +101,7 @@
       suggestion: i.suggestion || null,
       change: { element: i.element, before: String(i.before || ''), after: String(i.after), method: i.method === 'new_ad' ? 'new_ad' : 'edit' },
       compare: { days: days, before: p.before, after: p.after, metrics: ['spend', 'purchases', 'purchase_value', 'roas', 'link_ctr', 'est_profit'] },
-      baseline: i.baseline, basis: Object.assign({ profit_formula: PROFIT_FORMULA }, i.basis),
+      baseline: i.baseline, basis: Object.assign({ profit_formula: PROFIT_FORMULA, attribution_vs_weekly: weeklyDiff(i.basis && i.basis.attribution) }, i.basis),
       creative_snapshot: i.creative || null,
       concurrent: concurrent, concurrent_note: String(i.concurrentNote || ''), memo: String(i.memo || ''),
       recorded_at: new Date(t).toISOString()
@@ -165,9 +173,10 @@
     var attr = fresh ? (o.attribution || null) : basis.attribution;
     if(!fresh && ab.attribution && !sameAttribution(ab.attribution, basis.attribution)){ reasons.push('귀속 기준이 바뀌어 비교하지 않아요'); res.blockers.push('condition_mismatch'); return res; }
     res.attribution = attr || null;
+    res.attribution_vs_weekly = weeklyDiff(attr); w.push(res.attribution_vs_weekly.note);
     var win = attributionWindowDays(attr);
-    if(win === null){ res.provisional = true; res.blockers.push('attribution_unverified'); w.push('귀속 기준(기간 · 보고 시점)을 응답에서 확인하지 못해 개선 · 악화를 확정하지 않아요'); }
-    else if(daysBetween(after.until, today) - 1 <= win){ res.provisional = true; res.blockers.push('provisional'); w.push('귀속 창(' + win + '일, 노출일 기준 보고) 안이라 구매가 더 늘어날 수 있어 잠정 결과예요 — ' + addDays(after.until, win + 1) + '부터 확정 판단'); }
+    if(win === null){ res.provisional = true; res.blockers.push('attribution_unverified'); w.push('요청한 귀속 창이 Meta 응답에 실제로 적용된 근거가 없어(미확인) 개선 · 악화를 확정하지 않아요'); }
+    else if(daysBetween(after.until, today) - 1 <= win){ res.provisional = true; res.blockers.push('provisional'); w.push('귀속 창(' + win + '일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정) 안이라 구매가 더 늘어날 수 있어 잠정 결과예요 — ' + addDays(after.until, win + 1) + '부터 확정 판단'); }
     // 저장 당시 기준값은 이후 귀속으로 늘어난 구매가 빠져 있어 변경 후와 같은 시점 값이 아니다 — 관찰만, 신호로 판정하지 않는다
     if(!fresh){ res.blockers.push('baseline_not_refetched'); w.push('변경 전 지표가 기록 당시 값이라(비교 시점 재조회 아님) 늦게 귀속된 구매가 빠져 있을 수 있어 개선 · 악화를 확정하지 않아요'); }
     if(newAd){ res.blockers.push('different_ads'); w.push('새 광고의 변경 후 기간과 기존 광고의 변경 전 기간 비교 — 서로 다른 광고 · 기간이라 관찰값만 보여 주고 효율 신호로 판정하지 않아요'); }
@@ -319,12 +328,12 @@
     return { id: newId(t), source: 'change_result', action_id: change.action_id, store_id: change.store_id, date: new Date(t + 9 * 3600e3).toISOString().slice(0, 10),
       name: (change.ad && change.ad.ad_name || '광고') + ' · 결과 ' + STATUS_TEXT[cmp.status], channel: '메타', measured_at: new Date(t).toISOString(),
       after: after, before: before || null, result: { judgement_version: JUDGEMENT_VERSION, status: cmp.status, comparison: cmp.comparison || null, baseline_source: cmp.baseline_source || 'saved',
-        saved_baseline: cmp.saved_baseline || null, attribution: cmp.attribution || null, reasons: cmp.reasons, warnings: cmp.warnings, provisional: cmp.provisional, separable: cmp.separable,
+        saved_baseline: cmp.saved_baseline || null, attribution: cmp.attribution || null, attribution_vs_weekly: cmp.attribution_vs_weekly || null, reasons: cmp.reasons, warnings: cmp.warnings, provisional: cmp.provisional, separable: cmp.separable,
         blockers: cmp.blockers || [], observations: cmp.observations || [], test: cmp.test || null,
         spend: cmp.spend || null, purchases: cmp.purchases || null, cpa: cmp.cpa || null, roas: cmp.roas || null, profit: cmp.profit || null,
         margin_change: cmp.marginChange || null, missing_cost: cmp.missingCost || null }, memo: String(memo || '') };
   }
 
   return { ELEMENTS: ELEMENTS, CONCURRENT: CONCURRENT, PROFIT_FORMULA: PROFIT_FORMULA, STATUS_TEXT: STATUS_TEXT,
-    addDays: addDays, periods: periods, attributionWindowDays: attributionWindowDays, aggregate: aggregate, buildChangeRecord: buildChangeRecord, compare: compare, buildResultRecord: buildResultRecord, estProfit: estProfit, outcomeSummary: outcomeSummary, currentOf: currentOf, JUDGEMENT_VERSION: JUDGEMENT_VERSION };
+    addDays: addDays, periods: periods, attributionWindowDays: attributionWindowDays, WEEKLY_ATTRIBUTION: WEEKLY_ATTRIBUTION, aggregate: aggregate, buildChangeRecord: buildChangeRecord, compare: compare, buildResultRecord: buildResultRecord, estProfit: estProfit, outcomeSummary: outcomeSummary, currentOf: currentOf, JUDGEMENT_VERSION: JUDGEMENT_VERSION };
 });

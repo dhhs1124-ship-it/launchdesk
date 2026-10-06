@@ -15,10 +15,13 @@ const all = (n) => [n, ...(n.children || []).flatMap(all)];
 const text = (n) => all(n).map((x) => x.textContent || '').join(' ');
 const byClass = (n, cls) => all(n).filter((x) => String(x.className || '').split(' ').includes(cls));
 
-const ATTR = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
+// 서버 응답: 요청한 설정값(requested)과 광고 행별로 실제 보인 요청 창(attribution_windows_seen)
+const REQ = { windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
+// 화면이 만든 귀속 기준 — 두 기간 모두 대상 광고 행에서 요청 창을 봤을 때만 response_evidence
+const ATTR = { source: 'request', ...REQ, applied: { windows: 'response_evidence', windows_seen: REQ.windows, action_report_time: 'unconfirmed' } };
 function setup({ flag, rows, decisions, failDecisions, failRecords }){
-  // failDates: 조회 실패할 날짜 · truncDates: 페이지 누락(광고 없음) 날짜 · noAttribution: 재배포 전 서버(귀속 기준 응답 없음)
-  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false };
+  // failDates: 조회 실패할 날짜 · truncDates: 페이지 누락(광고 없음) 날짜 · noAttribution: 재배포 전 서버(귀속 기준 응답 없음) · noEvidence: 요청값은 오지만 광고 행에 창별 값이 없음
+  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false, noEvidence: false };
   const db = { ad_log: rows.map((data) => ({ data })), ad_log_decision: (decisions || []).map((data) => ({ data })) }, inserts = [], calls = [];
   const ids = {};
   const document = {
@@ -42,10 +45,10 @@ function setup({ flag, rows, decisions, failDecisions, failRecords }){
   const client = { from, functions: { invoke: async (name, { body }) => {
     calls.push(body);
     if (control.failDates.includes(body.date)) return { data: null, error: { message: '조회 실패(테스트)' } };
-    const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: ATTR } : {};
+    const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: { source: 'request', requested: REQ, windows_seen: control.noEvidence ? [] : REQ.windows, action_report_time_applied: 'unconfirmed' } } : {};
     if (control.truncDates.includes(body.date)) return { data: { ok: true, account: { currency: 'KRW' }, ads: [], truncated: true, ...attribution } };
     const buy = body.date < '2026-09-01' ? 1 : 2;
-    return { data: { ok: true, account: { currency: 'KRW' }, ...attribution, ads: [{ ad_id: '111', metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
+    return { data: { ok: true, account: { currency: 'KRW' }, ...attribution, ads: [{ ad_id: '111', ...(attribution.attribution ? { attribution_windows_seen: control.noEvidence ? [] : REQ.windows } : {}), metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
   } } };
   const ctx = { client, userId: 'u1', storeId: '4', stores: [{ id: '4' }], metaAccount: { id: 'm', status: 'connected', external_account_id: 'act_9' }, fx: null };
   const listeners = [], views = [];
@@ -140,7 +143,9 @@ test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준
   assert.deepEqual(JSON.parse(JSON.stringify(result.result.attribution)), ATTR);
   const t2 = text(s.ids.adlogChanges);
   assert.match(t2, /변경 전 지표\(비교 시점 재조회\) 광고비 ₩70,000 · 구매 7건/, '통화가 null로 바뀌지 않는다');
-  assert.match(t2, /귀속 기준 요청에서 지정 · 7d_click, 1d_view · 보고 기준 노출일/);
+  assert.match(t2, /귀속 기준 요청한 설정 · 7d_click, 1d_view · 보고 기준 노출일 \/ 실제 적용 · 귀속 창 Meta 응답에서 확인 · 보고 기준 미확인/);
+  assert.match(t2, /주간 분석과 기준 주간 분석 · 광고 세트 귀속 설정 기준/);
+  assert.equal(result.result.attribution_vs_weekly.same, false, '저장 기록에 주간 분석과의 기준 차이');
 });
 
 test('실행 기록: 변경 방식 기본값 없음 · 변경 전 조회 실패(누락)가 있으면 저장하지 않는다', async () => {
@@ -173,7 +178,12 @@ test('결과 비교: 페이지 누락은 비교하지 않고 · 귀속 기준 �
   s.control.truncDates = []; s.control.noAttribution = true;
   const t = await press();
   assert.match(t, /귀속 기준을 확인하지 못해 개선 여부를 확정하지 않아요/);
-  assert.match(t, /귀속 기준 확인 불가\(응답에 귀속 기준 없음\)/);
+  assert.match(t, /귀속 기준 미확인\(응답에 귀속 기준 없음\)/);
+  // 요청값은 돌아오지만 Meta 응답 항목에 창별 값이 없으면 — 요청값만으로 확인하지 않는다
+  s.control.noAttribution = false; s.control.noEvidence = true;
+  const e = await press();
+  assert.match(e, /귀속 기준을 확인하지 못해 개선 여부를 확정하지 않아요/);
+  assert.match(e, /실제 적용 · 귀속 창 미확인\(응답 근거 없음\)/);
 });
 
 test('광고 기록 조회 실패: 기록 없음(₩0)과 구분해 합계 — · 불러오지 못함 · 다시 불러오기', async () => {

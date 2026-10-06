@@ -88,6 +88,18 @@ test("운영자 영상 검증 요청 검사: 가격 · 광고 ID(선택) · 프�
   assert.equal(prepareVideoVerify({ frames: [frame(0)], meta_ad_id: "120000000000001" }, { price: PRICE }).source.meta_ad_check, "pending", "광고 연결은 서버 확인 전 pending");
 });
 
+test("영상 최악 비용은 실제 요청 상한 — 프레임 장당 고해상도 최대 · 지표 · 문구 · 전사 바이트 포함(예약이 실제보다 작지 않게)", () => {
+  const base = prepareVideoVerify({ frames: [frame(0)] }, { price: PRICE });
+  const more = prepareVideoVerify({ frames: [frame(0), frame(1)] }, { price: PRICE });
+  assert.ok(more.worst_usd - base.worst_usd >= 4784 * 2 / 1e6 - 1e-4, "프레임 1장 추가 = 고해상도 최대 토큰 이상");
+  const copy = "니트 가을 신상 할인 ".repeat(200);
+  const withCopy = prepareVideoVerify({ frames: [frame(0)], copy: { body: copy } }, { price: PRICE });
+  assert.ok(withCopy.worst_usd - base.worst_usd >= Buffer.byteLength(copy, "utf8") * 2 / 1e6 - 1e-4, "문구도 최악 비용에 들어간다");
+  // 최대 프레임 · 최대 전사여도 1회 상한(0.5달러) 안 — 고해상도 상한으로 잡아도 운영자 검증이 막히지 않는다
+  const max = prepareVideoVerify({ frames: Array.from({ length: VIDEO_LIMITS.maxFrames }, (_, i) => frame(i)), transcript: "가".repeat(VIDEO_LIMITS.maxTranscript) }, { price: PRICE });
+  assert.ok(max.worst_usd < 0.5, String(max.worst_usd));
+});
+
 test("전사는 서버에서 trim — 공백뿐이면 없음(리뷰 재현)", () => {
   const p = prepareVideoVerify({ frames: [frame(0)], transcript: "   \n " }, { price: PRICE });
   assert.equal(p.transcript_provided, false); assert.equal(p.transcript, null);
