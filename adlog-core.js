@@ -143,7 +143,7 @@
         if(d.decision === true) tags.push('중복 확인 · 사용자가 합계 포함 선택');
         else if(d.decision === false) tags.push('중복 확인 · 사용자가 합계 제외 선택');
         else if(d.status === 'confirmed') tags.push('확정 중복 · 합계 제외 (' + d.reason + ')');
-        else tags.push('중복 가능 · 합계 포함 중 · 선택 필요');
+        else { var miss = String(d.reason || '').split('확인 안 된 근거: ')[1]; tags.push('중복 가능 · 합계 포함 중 · 선택 필요' + (miss ? ' (확인 안 된 근거: ' + miss + ')' : '')); }
       }
       if(currencyOf(r) !== 'KRW' && toKrw(r, num(r.spend)) === null) tags.push(currencyOf(r) + ' 기록 · 적용 환율 없음 · 합계 제외');
     }
