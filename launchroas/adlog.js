@@ -6,7 +6,7 @@
   // 공용 DB(tool_records ad_log)에 새 종류 기록이 들어가면 예전 메인 화면에 ₩NaN 줄이 생기기 때문(docs/ai/ad-improvement-loop-design.md 5-6).
   var CHANGE_ON=!!(window.LAUNCHROAS_FLAGS&&window.LAUNCHROAS_FLAGS.adlogChangeRecords===true);
   var byId=function(id){return document.getElementById(id);};
-  var records=[], recordsFailed=false, decisions=[], decisionsFailed=false, currentUser=null, currentStore=null, epoch=0, busy=false, draft=null, results={};
+  var records=[], recordsFailed=false, decisions=[], decisionsFailed=false, currentUser=null, currentStore=null, epoch=0, busy=false, draft=null, results={}, zones={};
   var money=function(n){return '₩'+Math.round(Number(n)||0).toLocaleString('ko-KR');};
   function status(text){byId('adlogMessage').textContent=text||'';}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -149,9 +149,9 @@
       mf.append(el('span','small','마진이 낮아진 이유가 빠졌던 비용 때문이라면 항목과 금액을 확인해 기록하세요'),it,am,ok);more.appendChild(mf);
     }
     card.appendChild(more);
-    // 비교 가능은 한국 날짜로 먼저 열고(실제 판정은 광고계정 날짜로 core가 다시 거른다), 확정 전이면 잠정 결과임을 버튼에 미리 알린다
-    var ended=c.compare.after.until<today(),fin=CH.finalFrom(c.compare.after.until,CH.EXPECTED_WINDOW_DAYS);
-    var btn=el('button','secondary',live&&live.loading?'불러오는 중…':!ended?'비교 기간이 '+c.compare.after.until+'에 끝나요':today()<fin?'결과 비교하기(잠정 · '+fin+'부터 확정)':'결과 비교하기');
+    // 버튼 표시도 실제 판정과 같은 광고계정 날짜 — 시간대를 모르면 한국 날짜 − 1일(core accountToday와 같은 보수적 기준)
+    var day=compareToday(c),ended=c.compare.after.until<day,fin=CH.finalFrom(c.compare.after.until,CH.EXPECTED_WINDOW_DAYS);
+    var btn=el('button','secondary',live&&live.loading?'불러오는 중…':!ended?'비교 기간이 '+c.compare.after.until+'에 끝나요':day<fin?'결과 비교하기(잠정 · '+fin+'부터 확정)':'결과 비교하기');
     btn.type='button';btn.disabled=!ended||!!(live&&live.loading);btn.addEventListener('click',function(){runCompare(c);});
     var act=el('div','form-actions');act.appendChild(btn);
     if(live&&live.cmp){var sv=el('button','primary','결과 저장');sv.type='button';sv.disabled=!CHANGE_ON;sv.title=CHANGE_ON?'':'운영 화면 호환 수정 배포 전이라 저장을 꺼 두었어요';sv.addEventListener('click',function(){saveResult(c,live);});act.appendChild(sv);}
@@ -213,9 +213,11 @@
     var m=!res.error&&res.data&&res.data[0];
     return m?{product_label:m.product_label,pre_ad:Number(m.pre_ad),source_saved_at:m.source_saved_at||null}:null;
   }
-  function basisFor(ctx,currency,margin,attribution){
+  // 비교 판정 · 버튼에 쓰는 오늘 — 이번 화면에서 받은 광고계정 시간대 → 기록 당시 시간대 → 모름(보수적)
+  function compareToday(c){return CH.accountToday(Date.now(),zones[c.action_id]||c.basis&&c.basis.timezone||null);}
+  function basisFor(ctx,currency,margin,attribution,timezone){
     var fx=ctx.fx&&currency!=='KRW'&&ctx.fx.currency===currency?ctx.fx:null;
-    return {currency:currency||'KRW',fx_krw_per_unit:fx?Number(fx.krw_per_unit):null,fx_saved_at:fx?fx.saved_at:null,attribution:attribution||null,margin:margin};
+    return {currency:currency||'KRW',timezone:timezone||null,fx_krw_per_unit:fx?Number(fx.krw_per_unit):null,fx_saved_at:fx?fx.saved_at:null,attribution:attribution||null,margin:margin};
   }
   // 결과 비교 — 변경 전 · 후를 지금 같은 귀속 기준으로 함께 다시 조회한다(저장 당시 변경 전 지표는 이력으로만).
   // 변경 전은 원래 광고, 변경 후는 대상 광고(새 광고 추가면 새 광고 — core가 관찰값만으로 둔다)
@@ -226,9 +228,10 @@
       var gb=await dailyAds(ctx,c.ad.adset_id,c.ad.ad_id,c.compare.before.since,c.compare.before.until);
       var ga=await dailyAds(ctx,c.ad.adset_id,target,c.compare.after.since,c.compare.after.until);
       var attribution=joinAttribution(gb.attribution,ga.attribution);
-      var basis=basisFor(ctx,ga.currency||gb.currency,await marginFor(ctx,c.ad.adset_id),attribution);
+      var tz=ga.timezone||gb.timezone;if(tz)zones[c.action_id]=tz;
+      var basis=basisFor(ctx,ga.currency||gb.currency,await marginFor(ctx,c.ad.adset_id),attribution,tz);
       // 판정 날짜는 광고계정 시간대의 오늘(Meta 하루 지표 날짜 기준) — 한국 날짜로 보면 계정 시간대가 늦을 때 확정이 하루 앞당겨진다
-      var cmp=CH.compare(c,ga.agg,basis,CH.accountToday(Date.now(),ga.timezone||gb.timezone),{before:gb.agg,attribution:attribution,confirmedMissingCost:confirm});
+      var cmp=CH.compare(c,ga.agg,basis,compareToday(c),{before:gb.agg,attribution:attribution,confirmedMissingCost:confirm});
       results[c.action_id]={before:gb.agg,after:ga.agg,cmp:cmp,confirm:confirm};
     }catch(e){results[c.action_id]={error:'결과 지표를 불러오지 못했어요.'};}
     render();
@@ -271,7 +274,7 @@
       var built=CH.buildChangeRecord({storeId:ctx.storeId,ad:{ad_id:draft.ad.ad_id,adset_id:adsetId,ad_name:draft.ad.ad_name},suggestion:draft.suggestion,
         element:byId('chgElement').value,before:byId('chgBefore').value,after:byId('chgAfter').value,method:byId('chgMethod').value,newAdId:byId('chgNewAd').value.trim(),
         startDate:start,compareDays:days,baseline:{metrics:got.agg,fetched_at:new Date().toISOString(),source:'meta-adset-insights · 하루 단위 합산'},
-        basis:basisFor(ctx,got.currency,await marginFor(ctx,adsetId),got.attribution),creative:draft.creative,
+        basis:basisFor(ctx,got.currency,await marginFor(ctx,adsetId),got.attribution,got.timezone),creative:draft.creative,
         concurrent:[].slice.call(document.querySelectorAll('#adlogChangeForm input[name=chgConcurrent]:checked')).map(function(b){return b.value;}),
         concurrentNote:byId('chgConcurrentNote').value,memo:byId('chgMemo').value},Date.now());
       if(!built.ok){draft.message='확인해 주세요: '+built.errors.join(', ');return;}
@@ -281,7 +284,7 @@
   }
 
   async function load(ctx){
-    records=[];recordsFailed=false;decisions=[];decisionsFailed=false;results={};render();var stamp=++epoch;
+    records=[];recordsFailed=false;decisions=[];decisionsFailed=false;results={};zones={};render();var stamp=++epoch;
     if(!ctx.userId) return;
     var q=function(type){return ctx.client.from('tool_records').select('data,created_at').eq('user_id',ctx.userId).eq('tool_type',type).order('created_at',{ascending:false});};
     var both;

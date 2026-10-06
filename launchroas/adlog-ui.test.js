@@ -263,9 +263,11 @@ test('확정 판단일 안내 · 잠정 판정 날짜가 화면에서도 같다(
   assert.match(text(card(s)), /2026-09-15부터 확정 판단/);
   // 확정일(한국 9/15 01:30) · 계정 시간대 서울 → 확정
   s = await compareAt('2026-09-14T16:30:00Z', 'Asia/Seoul');
-  assert.equal(button(s).textContent, '결과 비교하기');
+  // 기록에 시간대가 없으면 비교 전 버튼은 보수적 기준(한국 날짜 − 1일 = 9/14) — 판정과 같은 기준이라 아직 잠정으로 표시
+  assert.equal(button(s).textContent, '결과 비교하기(잠정 · 2026-09-15부터 확정)');
   await button(s).events.click(); await settle(); await settle();
   assert.doesNotMatch(text(card(s)), /잠정/);
+  assert.equal(button(s).textContent, '결과 비교하기', '비교로 받은 계정 시간대(서울)로 버튼도 판정과 같아진다');
   // 같은 시각이라도 계정 시간대가 로스앤젤레스(9/14 09:30)면 아직 귀속 창 안 → 잠정(한국 날짜로 앞당기지 않음)
   s = await compareAt('2026-09-14T16:30:00Z', 'America/Los_Angeles');
   await button(s).events.click(); await settle(); await settle();
@@ -274,4 +276,44 @@ test('확정 판단일 안내 · 잠정 판정 날짜가 화면에서도 같다(
   s = await compareAt('2026-09-14T16:30:00Z', null);
   await button(s).events.click(); await settle(); await settle();
   assert.match(text(card(s)), /잠정\(2026-09-15부터 확정\)/);
+});
+
+test('비교 버튼 표시 = 실제 판정과 같은 광고계정 날짜 — 기록 시간대 · 모를 때 보수적 기준', async () => {
+  const CH = require('./adlog-change-core.js');
+  const p = CH.periods('2026-09-01', 7); // 변경 후 마지막 날 9/7 → 9/15부터 확정
+  const day = (d) => ({ date: d, metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: 1, observed: true }, purchase_value: { value: 30000, observed: true } } });
+  const rec = (timezone) => CH.buildChangeRecord({ storeId: '4', ad: { ad_id: '111', adset_id: '222', ad_name: '니트 광고' }, element: '문구', after: 'x', method: 'edit', startDate: '2026-09-01', compareDays: 7,
+    baseline: { metrics: CH.aggregate(Array.from({ length: 7 }, (_, i) => day(CH.addDays(p.before.since, i))), p.before.since, p.before.until) },
+    basis: { currency: 'KRW', timezone, attribution: ATTR, margin: null } }, Date.parse('2026-09-01T00:00:00Z')).record;
+  const button = (s) => all(byClass(s.ids.adlogChanges, 'adlog-change')[0]).find((x) => x.tagName === 'button' && /비교/.test(x.textContent));
+  const at = async (iso, timezone, respTz) => { const s = setup({ flag: false, rows: [rec(timezone)], now: Date.parse(iso), timezone: respTz }); await settle(); return s; };
+  // 한국 9/8 01:30(UTC 9/7 16:30): 서울 계정은 기간 끝 · LA(9/7 09:30)와 시간대 모름(9/7)은 아직 기간 중 — 한국 날짜로 먼저 열지 않는다
+  assert.equal(button(await at('2026-09-07T16:30:00Z', 'Asia/Seoul')).textContent, '결과 비교하기(잠정 · 2026-09-15부터 확정)');
+  let s = await at('2026-09-07T16:30:00Z', 'America/Los_Angeles');
+  assert.equal(button(s).textContent, '비교 기간이 2026-09-07에 끝나요'); assert.equal(button(s).disabled, true);
+  s = await at('2026-09-07T16:30:00Z', null);
+  assert.equal(button(s).textContent, '비교 기간이 2026-09-07에 끝나요', '시간대를 모르면 한국 날짜 − 1일'); assert.equal(button(s).disabled, true);
+  // 한국 9/15 01:30: 서울은 확정 · LA(9/14)와 모름(9/14)은 잠정 표시 — 판정과 같은 날짜
+  assert.equal(button(await at('2026-09-14T16:30:00Z', 'Asia/Seoul')).textContent, '결과 비교하기');
+  assert.equal(button(await at('2026-09-14T16:30:00Z', 'America/Los_Angeles')).textContent, '결과 비교하기(잠정 · 2026-09-15부터 확정)');
+  assert.equal(button(await at('2026-09-14T16:30:00Z', null)).textContent, '결과 비교하기(잠정 · 2026-09-15부터 확정)');
+  // 버튼과 판정이 같다: LA 기록 · LA 응답 — 버튼 잠정 → 비교 결과도 잠정
+  s = await at('2026-09-14T16:30:00Z', 'America/Los_Angeles', 'America/Los_Angeles');
+  await button(s).events.click(); await settle(); await settle();
+  assert.match(text(byClass(s.ids.adlogChanges, 'adlog-change')[0]), /잠정\(2026-09-15부터 확정\)/);
+  assert.equal(button(s).textContent, '결과 비교하기(잠정 · 2026-09-15부터 확정)');
+  // 기록 시간대 서울 · 응답 시간대 서울 — 버튼 확정 → 판정도 확정
+  s = await at('2026-09-14T16:30:00Z', 'Asia/Seoul', 'Asia/Seoul');
+  await button(s).events.click(); await settle(); await settle();
+  assert.doesNotMatch(text(byClass(s.ids.adlogChanges, 'adlog-change')[0]), /잠정/);
+});
+
+test('실행 기록 저장 시 광고계정 시간대를 당시 기준(basis.timezone)에 남긴다', async () => {
+  const s = setup({ flag: true, rows: [], timezone: 'America/Los_Angeles' });
+  await settle();
+  s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조' });
+  s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit';
+  await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
+  const saved = s.inserts.find((x) => x.row.tool_type === 'ad_log').row.data;
+  assert.equal(saved.basis.timezone, 'America/Los_Angeles');
 });
