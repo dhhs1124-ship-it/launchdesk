@@ -379,10 +379,13 @@
   async function run(){
     if(wk.busy)return; // 연속 클릭 방지(서버도 동시 요청을 막는다)
     var ctx=app.getContext();wk.busy=true;wk.message='지난주 · 그 전주 판매를 집계하는 중이에요.';render();
+    var mine=wk; // 실행 중 쇼핑몰을 바꾸면 loadStatus가 wk를 새로 만든다 — 그 뒤 결과는 버린다
     try{
       var w=lastWeeks(),cur=await weekSales(ctx,w.current),prev=await weekSales(ctx,w.previous);
+      if(wk!==mine)return;
       wk.message='광고와 소재를 확인하고 분석하는 중이에요. 1~2분 걸릴 수 있어요.';render();
       var r=await call(ctx,{store_id:ctx.storeId,action:'run',sales:{current:cur,previous:prev},fx_krw_per_unit:ctx.fx&&ctx.fx.krw_per_unit||null});
+      if(wk!==mine)return;
       var d=r.data||r.body||{};
       if(r.unavailable){wk.state='unavailable';wk.message='주간 AI 점검을 준비하고 있어요.';}
       else{
@@ -391,7 +394,7 @@
         // 서버 오류 코드는 보이지 않고 서버가 준 한국어 안내만
         else{wk.state=d.code==='AI_NOT_CONFIGURED'?'off':'error';wk.message=d.message||d.error||'점검에 실패했어요. 이용 횟수는 차감되지 않았어요.';}
       }
-    }catch(e){wk.state='error';wk.message='점검 요청에 실패했어요. 이용 횟수는 차감되지 않았어요.';}
+    }catch(e){if(wk!==mine)return;wk.state='error';wk.message='점검 요청에 실패했어요. 이용 횟수는 차감되지 않았어요.';}
     wk.busy=false;render();
   }
 

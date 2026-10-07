@@ -40,7 +40,7 @@
       state.calcs=rows.filter(function(r){return r.tool_type===CALC&&r.data&&r.data.calc_version===2&&r.data.input;}).map(function(r){return r.data;});
       state.fxRecord=rows.find(function(r){return r.tool_type===FX&&String(r.data&&r.data.store_id)===store;})||null;
       app.setFx(state.fxRecord?{currency:state.fxRecord.data.currency,krw_per_unit:state.fxRecord.data.krw_per_unit,saved_at:state.fxRecord.data.saved_at}:null);
-    }
+    }else state.error='저장된 상품 비용 · 환율을 불러오지 못했어요. 새로고침해 주세요.';
     if(!ctx.cafeAccount||ctx.cafeAccount.status!=='connected'){state.error='Cafe24를 연결하면 실제 판매 수량을 볼 수 있어요.';render(app.getContext());return;}
     if(!range){state.error='기간을 다시 선택해 주세요.';render(app.getContext());return;}
     try{
@@ -268,6 +268,8 @@
     this.disabled=true;
     // tool_records는 수정(UPDATE) 권한이 없다 — 새로 저장한 뒤 이 쇼핑몰의 이전 환율 기록을 지운다.
     var res=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:FX,data:data}).select('id').single();
+    // 저장을 기다리는 사이 계정 · 쇼핑몰이 바뀌었으면 화면 상태(현재 쇼핑몰의 환율 기록)를 건드리지 않는다
+    var now=app.getContext();if(now.userId!==ctx.userId||String(now.storeId)!==String(ctx.storeId)){this.disabled=false;return;}
     if(!res.error&&state.fxRecord)await ctx.client.from('tool_records').delete().eq('id',state.fxRecord.id).eq('user_id',ctx.userId).eq('tool_type',FX);
     this.disabled=false;
     if(res.error){byId('salesFxNote').textContent='환율을 저장하지 못했어요.';return;}

@@ -103,7 +103,7 @@
   // 실제 상태가 바뀌면 열린 단계의 완료 표시도 갱신. 첫 방문(로그인 · 연결 상태 확인 후)에는 한 번 자동으로 연다.
   window.addEventListener('launchroas:sales-state',function(e){
     lastSales=e.detail;
-    if(layer&&!layer.hidden&&idx>=0){steps=build();render();place();}
+    if(layer&&!layer.hidden&&idx>=0){steps=build();idx=Math.min(idx,steps.length-1);render();place();}
     else if(e.detail.ready&&!seen()&&!document.querySelector('#overviewView[hidden]'))setTimeout(function(){if(!seen())open();},600);
   });
   window.LaunchRoasTour={open:open,close:close};

@@ -88,7 +88,7 @@
     var previousStoreId = byId('storeSelect').value;
     var result = await sb.from('stores').select('id,name,platform').eq('user_id', userId).eq('platform','cafe24');
     if(id !== requestId) return;
-    if(result.error){ message('pageMessage', '쇼핑몰 목록을 불러오지 못했어요. 다시 조회해 주세요.'); return; }
+    if(result.error){ message('pageMessage', '쇼핑몰 목록을 불러오지 못했어요. 다시 조회해 주세요.'); setConnection('cafeConnection','Cafe24 확인 실패','error'); setConnection('metaConnection','Meta 확인 실패','error'); return; }
     stores = result.data || [];
     var select = byId('storeSelect');
     select.replaceChildren();

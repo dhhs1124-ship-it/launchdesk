@@ -424,3 +424,23 @@ test('양식 안내: 기록만 저장하고 Meta 광고는 바꾸지 않는다 �
   assert.match(html, /<input id="chgApplied" type="checkbox"> 이 광고를 Meta 광고 관리자에서 실제로 바꿨어요/);
   assert.match(html, /<select id="chgElement"><option value="">선택해 주세요<\/option><\/select>/);
 });
+
+test('실행 기록 저장 중 양식을 닫으면(또는 다른 광고로 다시 열면) 섞인 기록을 저장하지 않는다', async () => {
+  const s = setup({ flag: true, rows: [] });
+  await settle();
+  s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조' });
+  s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit'; s.ids.chgApplied.checked = true;
+  const saving = s.ids.adlogChangeForm.events.submit({ preventDefault(){} });
+  await s.ids.chgCancel.events.click(); // 변경 전 지표를 불러오는 사이 닫음
+  await saving; await settle(); await settle();
+  assert.equal(s.inserts.filter((x) => x.row.tool_type === 'ad_log').length, 0, '닫은 양식의 기록은 저장하지 않는다');
+  // 저장 중 다른 광고로 다시 열어도 앞 저장은 버리고 새 양식은 그대로 둔다
+  s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '첫 번째' });
+  s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit'; s.ids.chgApplied.checked = true;
+  const first = s.ids.adlogChangeForm.events.submit({ preventDefault(){} });
+  s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '두 번째' });
+  await first; await settle(); await settle();
+  assert.equal(s.inserts.filter((x) => x.row.tool_type === 'ad_log').length, 0);
+  assert.equal(s.ids.adlogChangeForm.hidden, false, '새로 연 양식은 닫히지 않는다');
+  assert.equal(s.ids.chgAfter.value, '두 번째');
+});
