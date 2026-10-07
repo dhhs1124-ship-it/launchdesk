@@ -23,7 +23,7 @@ const ATTR = { source: 'request', ...REQ, applied: { windows: 'response_evidence
 function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezone, basisConfirmed }){
   // failDates: 조회 실패할 날짜 · truncDates: 페이지 누락(광고 없음) 날짜 · noAttribution: 재배포 전 서버(귀속 기준 응답 없음) · noEvidence: 요청값은 오지만 광고 행에 창별 값이 없음
   // now: 화면의 현재 시각 고정(ms · 없으면 실제 시각) · timezone: 응답 광고계정 시간대
-  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false, noEvidence: false, basisConfirmed: !!basisConfirmed };
+  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false, noEvidence: false, basisConfirmed: !!basisConfirmed, noClick7: false };
   const account = { currency: 'KRW', ...(timezone ? { timezone } : {}) };
   const db = { ad_log: rows.map((data) => ({ data })), ad_log_decision: (decisions || []).map((data) => ({ data })) }, inserts = [], calls = [];
   const ids = {};
@@ -53,7 +53,7 @@ function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezon
     if (control.truncDates.includes(body.date)) return { data: { ok: true, account, ads: [], truncated: true, ...attribution } };
     const buy = body.date < '2026-09-01' ? 1 : 2;
     return { data: { ok: true, account, ...attribution, ads: [{ ad_id: '111', ...(attribution.attribution ? { attribution_windows_seen: control.noEvidence ? [] : REQ.windows,
-      attribution_purchase: { action_type: 'offsite_conversion.fb_pixel_purchase', count: { value: buy, windows: control.noEvidence ? { '7d_click': null, '1d_view': null } : { '7d_click': buy, '1d_view': 0 } }, purchase_value: null } } : {}), metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
+      attribution_purchase: { action_type: 'offsite_conversion.fb_pixel_purchase', count: { value: buy, windows: control.noEvidence ? { '7d_click': null, '1d_view': null } : { '7d_click': control.noClick7 ? null : buy, '1d_view': 0 } }, purchase_value: null } } : {}), metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
   } } };
   const ctx = { client, userId: 'u1', storeId: '4', stores: [{ id: '4' }], metaAccount: { id: 'm', status: 'connected', external_account_id: 'act_9' }, fx: null };
   const listeners = [], views = [];
@@ -195,11 +195,20 @@ test('결과 비교: 페이지 누락은 비교하지 않고 · 귀속 기준 �
   const e = await press();
   assert.match(e, /귀속 기준을 확인하지 못해 개선 여부를 확정하지 않아요/);
   assert.match(e, /응답 관찰 · 귀속 창별 값 미확인\(응답 근거 없음\)/);
-  // 창별 값은 보이지만 구매 수(value)가 그 창 기준이라는 근거가 없으면(현재 실제 서버) — 판단 보류
+  // 현재 실제 서버(value 계산 기준 미확인) + 광고 행의 같은 구매 항목에 7d_click이 전후 모든 날 있으면 — 7일 클릭 기준으로 비교
   s.control.noEvidence = false; s.control.basisConfirmed = false;
+  const k = await press();
+  assert.match(k, /구매 7 → 14건 7일 클릭 기준/);
+  assert.match(k, /같은 구매 항목의 7일 클릭 값\(offsite_conversion\.fb_pixel_purchase\)으로 비교해요/);
+  assert.doesNotMatch(k, /귀속 기준을 확인하지 못해/);
+  assert.match(k, /주간 분석은 광고 세트 귀속 설정 기준이고/);
+  // 광고 행의 구매 항목에 7d_click이 없으면(광고 단위 응답에서 확인 못 함) — 판단 보류 · value 기준 관찰값만
+  s.control.noClick7 = true;
   const m = await press();
   assert.match(m, /판단 보류/); assert.doesNotMatch(m, /개선 신호/);
-  assert.match(m, /응답에 귀속 창별 값은 있지만 구매 수가 그 기준으로 계산됐는지 확인되지 않아/);
+  assert.match(m, /귀속 기준을 확인하지 못해 개선 여부를 확정하지 않아요/);
+  assert.match(m, /구매 수가 그 기준으로 계산됐는지 확인되지 않고, 전후 모두 같은 구매 항목의 7일 클릭 값도 없어/);
+  assert.match(m, /구매 7 → 14건 Meta 기본 값\(value\)/);
   assert.match(m, /응답 관찰 · 귀속 창별 값 있음 .* 요청 창 기준인지 미확인/);
 });
 

@@ -334,8 +334,58 @@ test('계산 기준: 응답에 귀속 창별 키가 있어도 구매 수(value) 
   const x = caseOf(100000, 10, 100000, 30);
   const r = compareNow(x.c, x.after, basis(20000), '2026-10-30', { attribution: seenOnly });
   assert.equal(r.status, 'inconclusive'); assert.ok(r.blockers.includes('attribution_unverified'));
-  assert.match(r.warnings.join(' '), /구매 수가 그 기준으로 계산됐는지 확인되지 않아/);
-  assert.deepEqual(r.purchases, { before: 10, after: 30, diff: 20 }, '관찰값은 그대로 보여 준다');
+  assert.match(r.warnings.join(' '), /구매 수가 그 기준으로 계산됐는지 확인되지 않고, 전후 모두 같은 구매 항목의 7일 클릭 값도 없어/);
+  assert.deepEqual(r.purchases, { before: 10, after: 30, diff: 20, basis: 'Meta 기본 값(value)' }, '관찰값은 그대로 보여 준다');
+});
+
+// 7일 클릭 기준 — 하루별 같은 구매 항목의 7d_click(r.click7). 구매는 첫날에만 · 다른 날은 구매 항목 없음(null)
+const PT = 'offsite_conversion.fb_pixel_purchase';
+const SEEN_ONLY = { ...ATTR, applied: { ...ATTR.applied, metric_basis: 'unconfirmed' } }; // 지금 실제 서버 상태(value 계산 기준 미확인)
+const k7 = (start, spendTotal, valueBuys, click7, opts = {}) => span(start, spendTotal, valueBuys).map((r, i) => ({ ...r,
+  click7: opts.noField ? undefined : i === 0 ? { action_type: opts.type || PT, value: click7 } : null }));
+const k7Case = (b, a, opts = {}) => {
+  const p = CH.periods('2026-09-08', 7);
+  const c = makeChange(span('2026-09-01', b[0], b[1]), opts);
+  const before = CH.aggregate(k7('2026-09-01', ...b, opts.before || {}), p.before.since, p.before.until);
+  const after = CH.aggregate(k7('2026-09-08', ...a, opts.after || {}), p.after.since, p.after.until);
+  return { c, before, after, run: (today, attribution = SEEN_ONLY, ab = basis(20000)) => CH.compare(c, after, ab, today, { before, attribution }) };
+};
+
+test('7일 클릭 기준: 전후 모두 같은 구매 항목의 7d_click이 있으면 그 값으로 구매당 광고비 비교 — value · 1d_view와 더하지 않는다', () => {
+  // value는 10 → 13(차이 작음), 7d_click은 10 → 30(차이 큼) — 판정은 7d_click으로
+  const x = k7Case([100000, 10, 10], [100000, 13, 30]);
+  assert.deepEqual(x.after.purchases_7d_click, { value: 30, observed: true, action_type: PT });
+  assert.equal(x.after.purchases.value, 13, 'value는 따로 남는다(합산 없음)');
+  const r = x.run('2026-09-30');
+  assert.deepEqual(r.count_basis, { field: '7d_click', action_type: PT, label: '7일 클릭 기준' });
+  assert.deepEqual(r.purchases, { before: 10, after: 30, diff: 20, basis: '7일 클릭 기준' });
+  assert.equal(r.status, 'improved'); assert.match(r.reasons[0], /^7일 클릭 기준 구매당 광고비 개선 신호/);
+  assert.ok(!r.blockers.includes('attribution_unverified'), 'value 계산 기준 미확인과 무관');
+  assert.match(r.warnings.join(' '), /같은 구매 항목의 7일 클릭 값\(offsite_conversion\.fb_pixel_purchase\)으로 비교해요 — 1일 조회 · 기본 값\(value\)은 더하지 않아요/);
+  assert.match(r.warnings.join(' '), /주간 분석은 광고 세트 귀속 설정 기준이고/, '주간 AI 분석과 귀속 기준이 다르다는 안내 유지');
+  assert.equal(r.profit.before, 20000 * 10 - 100000, '참고 이익도 같은 7일 클릭 구매 수로');
+  // 귀속 창(7일) · 보고 시점 미확인(노출일 가정) — 확정일 전은 잠정
+  const early = x.run('2026-09-21');
+  assert.equal(early.status, 'inconclusive'); assert.ok(early.blockers.includes('provisional'));
+  assert.match(early.warnings.join(' '), /귀속 창\(7일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정\).*2026-09-22부터 확정 판단/);
+});
+
+test('7일 클릭 기준: 창별 값이 하루라도 없거나 · 관찰값이 없거나 · 구매 항목이 다르면 판단 보류(value 계산 기준 미확인 그대로)', () => {
+  const hold = (r) => { assert.equal(r.status, 'inconclusive'); assert.ok(r.blockers.includes('attribution_unverified')); assert.equal(r.count_basis.field, 'value'); };
+  hold(k7Case([100000, 10, 10], [100000, 30, null]).run('2026-09-30')); // 구매 항목은 있는데 7d_click 키 없음
+  hold(k7Case([100000, 10, 10], [100000, 30, 30], { after: { noField: true } }).run('2026-09-30')); // 재배포 전 서버(관찰값 없음)
+  hold(k7Case([100000, 10, 10], [100000, 30, 30], { after: { type: 'omni_purchase' } }).run('2026-09-30')); // 전후 구매 항목이 다름
+  hold(k7Case([100000, 10, 10], [100000, 30, 30]).run('2026-09-30', { ...SEEN_ONLY, windows: ['1d_view'] })); // 요청 설정에 7d_click 없음
+  assert.equal(k7Case([100000, 10, 10], [100000, 30, null]).after.purchases_7d_click.observed, false);
+});
+
+test('7일 클릭 기준이어도 기존 비교 조건(기간 · 통화 · 재조회 · 새 광고)은 그대로 막는다', () => {
+  const x = k7Case([100000, 10, 10], [100000, 30, 30]);
+  assert.ok(x.run('2026-09-14').blockers.includes('period_open'));
+  const cur = x.run('2026-09-30', SEEN_ONLY, { ...basis(20000), currency: 'USD' });
+  assert.equal(cur.status, 'unknown'); assert.ok(cur.blockers.includes('condition_mismatch'));
+  const saved = CH.compare(x.c, x.after, basis(20000), '2026-09-30'); // 변경 전 재조회 없음
+  assert.equal(saved.status, 'inconclusive'); assert.ok(saved.blockers.includes('baseline_not_refetched'));
 });
 
 test('주간 분석과 귀속 기준이 다르면 결과와 변경 기록에 남긴다', () => {

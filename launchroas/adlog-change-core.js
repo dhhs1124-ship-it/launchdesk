@@ -16,7 +16,7 @@
   var ELEMENTS = ['문구', '이미지', '영상 첫 장면', '영상 자막', '타깃', '예산', '랜딩 페이지', '기타'];
   var CONCURRENT = ['예산', '할인', '상품', '타깃', '게재 위치', '기타'];
   // 결과 판정 버전 — 이 버전의 신호(improved · worse)만 '구매당 광고비 신호'로 집계한다. 버전이 없는 예전 결과는 이전 기준
-  var JUDGEMENT_VERSION = 'adlog-compare-v4: 정확 이항검정(단측 0.05) · 광고비당 구매 · 전후 같은 시점 재조회 · 같은 광고만 · 귀속 창 동안 잠정 · 구매 수 계산 기준(value)이 요청 창 기준으로 확인될 때만';
+  var JUDGEMENT_VERSION = 'adlog-compare-v5: 정확 이항검정(단측 0.05) · 광고비당 구매 · 전후 같은 시점 재조회 · 같은 광고만 · 귀속 창 동안 잠정 · 구매 수는 전후 모두 같은 구매 항목의 7일 클릭 값이 있을 때 그 값(합산 없음), 아니면 value 계산 기준 확인 시에만';
   var PROFIT_FORMULA = 'ad-profit-reference-v1: 연결 상품 주문당 광고 전 잔액 × Meta 귀속 구매 수 − 광고비(원화) · 참고 계산';
   var DAY = 864e5;
 
@@ -55,6 +55,9 @@
   // 구매 · 구매금액은 하루라도 측정된 날이 있어야 측정으로 본다.
   function aggregate(rows, since, until){
     var want = daysBetween(since, until), seen = {}, spend = 0, imp = 0, clicks = 0, buy = 0, value = 0, buyObs = false, valObs = false, absent = 0, failed = 0, truncated = 0;
+    // 7일 클릭 구매 — 같은 구매 항목의 7d_click 값(r.click7 = { action_type, value } · 그날 구매 항목 없음 = null · 응답에 관찰값 없음 = undefined)
+    //   광고 행이 있는 날 모두 값이 있어야 complete. value · 1d_view와 더하지 않는다
+    var c7 = 0, c7Complete = true, c7Seen = false, c7Types = {};
     (rows || []).forEach(function(r){
       if(!r || !r.date || r.date < since || r.date > until || seen[r.date]) return;
       var st = r.state || (r.metrics ? 'ok' : 'absent');
@@ -66,10 +69,17 @@
       spend += num(m.spend) || 0; imp += num(m.impressions) || 0; clicks += num(m.link_clicks) || 0;
       if(m.purchase && m.purchase.observed){ buyObs = true; buy += num(m.purchase.value) || 0; }
       if(m.purchase_value && m.purchase_value.observed){ valObs = true; value += num(m.purchase_value.value) || 0; }
+      if(r.click7 === undefined) c7Complete = false;
+      else if(r.click7 !== null){
+        c7Types[r.click7.action_type] = true;
+        if(num(r.click7.value) === null) c7Complete = false; else { c7Seen = true; c7 += num(r.click7.value); }
+      }
     });
+    var c7TypeList = Object.keys(c7Types);
     var got = Object.keys(seen).length;
     return { since: since, until: until, days: want, missing_days: want - got, failed_days: failed, truncated_days: truncated, absent_days: absent, spend: spend, impressions: imp, link_clicks: clicks,
       purchases: { value: buy, observed: buyObs }, purchase_value: { value: value, observed: valObs },
+      purchases_7d_click: { value: c7, observed: c7Complete && c7Seen && c7TypeList.length === 1, action_type: c7TypeList.length === 1 ? c7TypeList[0] : null },
       link_ctr: imp > 0 ? clicks / imp * 100 : null, link_cpc: clicks > 0 ? spend / clicks : null,
       roas: spend > 0 && valObs ? value / spend : null };
   }
@@ -197,14 +207,23 @@
     if(!fresh && ab.attribution && !sameAttribution(ab.attribution, basis.attribution)){ reasons.push('귀속 기준이 바뀌어 비교하지 않아요'); res.blockers.push('condition_mismatch'); return res; }
     res.attribution = attr || null;
     res.attribution_vs_weekly = weeklyDiff(attr); w.push(res.attribution_vs_weekly.note);
-    var win = attributionWindowDays(attr);
+    // 7일 클릭 기준 — 전후 모두 같은 구매 항목의 7d_click 값이 광고 행이 있는 모든 날에 있을 때만(요청 설정에 7d_click 포함).
+    //   value · 1d_view는 더하지 않는다. 광고 단위 응답에서 값을 확인한 경우에만 — 광고 세트 단위 확인을 광고 단위에 가정하지 않는다
+    var k0 = b.purchases_7d_click, k1 = after.purchases_7d_click;
+    var click7 = !!(attr && typeof attr === 'object' && attr.source === 'request' && Array.isArray(attr.windows) && attr.windows.indexOf('7d_click') >= 0
+      && k0 && k1 && k0.observed && k1.observed && k0.action_type && k0.action_type === k1.action_type);
+    res.count_basis = click7 ? { field: '7d_click', action_type: k0.action_type, label: '7일 클릭 기준' }
+      : { field: 'value', label: 'Meta 기본 값(value)' };
+    // 잠정 기간 — 7일 클릭 기준이면 7일(보고 시점은 근거가 없어 노출일로 가정 · 전환일 근거가 있을 때만 0일)
+    var win = click7 ? (attr.action_report_time === 'conversion' && attr.applied && attr.applied.action_report_time === 'response_evidence' ? 0 : 7) : attributionWindowDays(attr);
     if(win === null){ res.provisional = true; res.blockers.push('attribution_unverified'); w.push(attr && attr.applied && attr.applied.windows === 'response_evidence'
-      ? '응답에 귀속 창별 값은 있지만 구매 수가 그 기준으로 계산됐는지 확인되지 않아(계산 기준 미확인) 개선 · 악화를 확정하지 않아요'
+      ? '응답에 귀속 창별 값은 있지만 구매 수가 그 기준으로 계산됐는지 확인되지 않고, 전후 모두 같은 구매 항목의 7일 클릭 값도 없어 개선 · 악화를 확정하지 않아요'
       : '요청한 귀속 창이 Meta 응답에 실제로 적용된 근거가 없어(미확인) 개선 · 악화를 확정하지 않아요'); }
     else {
       res.final_from = finalFrom(after.until, win);
       if(today < res.final_from){ res.provisional = true; res.blockers.push('provisional'); w.push('귀속 창(' + win + '일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정) 안이라 구매가 더 늘어날 수 있어 잠정 결과예요 — ' + res.final_from + '부터 확정 판단'); }
     }
+    if(click7) w.push('구매 수 · 구매당 광고비는 같은 구매 항목의 7일 클릭 값(' + k0.action_type + ')으로 비교해요 — 1일 조회 · 기본 값(value)은 더하지 않아요 · ROAS는 Meta 기본 값 기준 관찰값');
     // 저장 당시 기준값은 이후 귀속으로 늘어난 구매가 빠져 있어 변경 후와 같은 시점 값이 아니다 — 관찰만, 신호로 판정하지 않는다
     if(!fresh){ res.blockers.push('baseline_not_refetched'); w.push('변경 전 지표가 기록 당시 값이라(비교 시점 재조회 아님) 늦게 귀속된 구매가 빠져 있을 수 있어 개선 · 악화를 확정하지 않아요'); }
     if(newAd){ res.blockers.push('different_ads'); w.push('새 광고의 변경 후 기간과 기존 광고의 변경 전 기간 비교 — 서로 다른 광고 · 기간이라 관찰값만 보여 주고 효율 신호로 판정하지 않아요'); }
@@ -215,12 +234,13 @@
     var fx = basis.currency === 'KRW' ? 1 : num(basis.fx_krw_per_unit);
     res.spend = { before: b.spend, after: after.spend, diff: after.spend - b.spend, pct: pct(after.spend, b.spend), currency: basis.currency,
       krw_diff: fx ? Math.round((after.spend - b.spend) * fx) : null };
-    var buy0 = b.purchases, buy1 = after.purchases;
-    res.purchases = buy0.observed && buy1.observed ? { before: buy0.value, after: buy1.value, diff: buy1.value - buy0.value } : null;
+    var buy0 = click7 ? k0 : b.purchases, buy1 = click7 ? k1 : after.purchases;
+    res.purchases = buy0.observed && buy1.observed ? { before: buy0.value, after: buy1.value, diff: buy1.value - buy0.value, basis: res.count_basis.label } : null;
     res.cpa = res.purchases ? { before: buy0.value > 0 ? b.spend / buy0.value : null, after: buy1.value > 0 ? after.spend / buy1.value : null, currency: basis.currency } : null;
     if(res.cpa && res.cpa.before !== null && res.cpa.after !== null) res.cpa.pct = pct(res.cpa.after, res.cpa.before);
     res.roas = { before: b.roas, after: after.roas };
-    res.profit = profitView(b, after, basis);
+    // 참고 이익도 판정과 같은 구매 수 기준으로
+    res.profit = profitView(Object.assign({}, b, { purchases: buy0 }), Object.assign({}, after, { purchases: buy1 }), basis);
     res.observations = observe(res);
 
     // 상품 마진 변경 — 기본은 '변경'으로만 기록. 누락 비용 발견은 사용자가 항목 · 금액을 확인했거나 비용 항목 비교로 입증된 경우만
@@ -248,8 +268,9 @@
       return res;
     }
     // 신호의 범위: 광고비당 구매(구매당 광고비)뿐 — 매출 · 이익 증가나 AI 제안의 인과 효과를 확인한 것이 아니다
-    if(better && buy1.value >= buy0.value){ res.status = 'improved'; reasons.push('구매당 광고비 개선 신호 — 같은 광고비당 구매가 우연한 변동으로 보기 어려울 만큼 늘었어요(단측 p=' + res.test.p_better + ' · 매출 · 이익 · 제안의 인과 효과는 확인하지 않음)'); }
-    else if(worse){ res.status = 'worse'; reasons.push('구매당 광고비 악화 신호 — 같은 광고비당 구매가 우연한 변동으로 보기 어려울 만큼 줄었어요(단측 p=' + res.test.p_worse + ' · 매출 · 이익 · 원인은 확인하지 않음)'); }
+    var label = click7 ? '7일 클릭 기준 ' : '';
+    if(better && buy1.value >= buy0.value){ res.status = 'improved'; reasons.push(label + '구매당 광고비 개선 신호 — 같은 광고비당 구매가 우연한 변동으로 보기 어려울 만큼 늘었어요(단측 p=' + res.test.p_better + ' · 매출 · 이익 · 제안의 인과 효과는 확인하지 않음)'); }
+    else if(worse){ res.status = 'worse'; reasons.push(label + '구매당 광고비 악화 신호 — 같은 광고비당 구매가 우연한 변동으로 보기 어려울 만큼 줄었어요(단측 p=' + res.test.p_worse + ' · 매출 · 이익 · 원인은 확인하지 않음)'); }
     else if(better){ res.status = 'inconclusive'; reasons.push('구매당 광고비는 낮아졌지만 구매가 줄어 개선으로 확인하지 않아요'); }
     else { res.status = 'inconclusive'; reasons.push('관찰된 차이가 우연한 변동 범위 안이에요(변경 후 예상 ' + res.test.expected_after + '건 · 실제 ' + buy1.value + '건)'); }
     if(after.spend < b.spend && res.status !== 'improved') w.push('광고비 감소는 지출 변화로만 기록해요 · 개선 성공이 아니에요');

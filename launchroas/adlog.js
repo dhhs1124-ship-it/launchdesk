@@ -108,7 +108,7 @@
     if(r){
       var g2=el('div','adlog-result-grid');
       var tile=function(k,v,n){var t=el('div','');t.append(el('span','',k),el('strong','',v));if(n)t.appendChild(el('small','',n));g2.appendChild(t);};
-      tile('구매',r.purchases?r.purchases.before+' → '+r.purchases.after+'건':'미측정');
+      tile('구매',r.purchases?r.purchases.before+' → '+r.purchases.after+'건':'미측정',r.purchases&&r.purchases.basis);
       tile('광고비',r.spend?signed(r.spend.diff,cur):'—');
       var p=r.profit;
       if(p&&p.kind==='actual')tile('광고비 차감 후 예상 이익',signed(p.diff,'KRW'),'실제 주문 상품 · 비용 기준');
@@ -174,7 +174,9 @@
         if(hit&&Array.isArray(hit.attribution_windows_seen))hit.attribution_windows_seen.forEach(function(w){seen[w]=true;});
         if(hit&&hit.attribution_purchase&&hit.attribution_purchase.count)obs.push(hit.attribution_purchase.count);
         var mb=res.data.attribution&&res.data.attribution.metric_basis;basisOk=basisOk&&!!mb&&mb.matches_requested_windows==='response_evidence';
-        rows.push({date:d,metrics:hit?hit.metrics:null,state:hit?'ok':res.data.truncated?'truncated':'absent'});
+        // 7일 클릭 구매 — 이 광고 행의 같은 구매 항목 7d_click(광고 단위 응답에서 본 값만). 구매 항목 없음 = null · 관찰값 없음(재배포 전 서버) = undefined
+        var ap=hit&&hit.attribution_purchase,click7=!hit||ap===undefined?undefined:ap===null?null:{action_type:ap.action_type,value:ap.count&&ap.count.windows?ap.count.windows['7d_click']:null};
+        rows.push({date:d,metrics:hit?hit.metrics:null,click7:click7,state:hit?'ok':res.data.truncated?'truncated':'absent'});
       } else rows.push({date:d,metrics:null,state:'failed'});
       d=CH.addDays(d,1);
     }
