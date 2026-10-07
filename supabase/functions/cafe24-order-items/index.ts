@@ -3,6 +3,7 @@ import { withSupabase } from "jsr:@supabase/server@^1";
 import {
   getValidCafe24AccessToken,
   cafe24TokenErrorStatus,
+  cafe24ApiFailure,
 } from "../_shared/cafe24-token.ts";
 import { slimOrders, ordersNeedingCoupons, attachCoupons } from "../_shared/cafe24-order-items.mjs";
 
@@ -74,7 +75,8 @@ export default {
         const data = await res.json().catch(() => null);
         if (!res.ok || !data) {
           console.error("Cafe24 order items API failed:", res.status);
-          return Response.json({ error: "Cafe24 주문 상품을 가져오지 못했습니다.", status: res.status }, { status: 502 });
+          const failure = cafe24ApiFailure(res.status, "Cafe24 주문 상품을 가져오지 못했습니다.");
+          return Response.json(failure.body, { status: failure.status });
         }
         const page = slimOrders(data.orders);
         orders.push(...page);

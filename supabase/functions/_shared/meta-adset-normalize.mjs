@@ -78,27 +78,57 @@ export const META_ERROR_MESSAGES = {
   RATE_LIMITED: "Meta 요청이 많아 잠시 후 다시 시도해주세요.",
   ACCOUNT_UNAVAILABLE: "이 광고계정에 접근할 수 없습니다.",
   TEMPORARY_ERROR: "Meta 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+  INTERNAL_ERROR: "일시적인 오류로 Meta 연결 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.",
   FUTURE_DATE: "오늘 이후 날짜는 조회할 수 없습니다.",
   DATE_TOO_OLD: "Meta는 최근 37개월 안의 날짜만 조회할 수 있습니다.",
 };
 
+// Meta는 요청 한도(4/17/32/613)·권한(10/200~299) 오류에도 type:"OAuthException"을 붙여
+// 보낸다 — type을 먼저 보면 일시 오류가 '재연결 필요'가 되어 연결이 pending으로 내려간다.
+// 그래서 Meta 공식 오류 코드(Graph API 오류 처리 · 광고 API 요청 한도 문서)의 code를 먼저
+// 보고, code가 아예 없을 때만 subcode · type을 참고한다. 모르는 code는 재연결이 아니라
+// 일시 오류로 둔다(연결을 잘못 끊지 않기 위해).
+const META_TOKEN_ERROR_CODES = [102, 190]; // 세션 · access token 만료/무효
+// 토큰 문제 subcode: 앱 미설치 · 계정 확인 필요 · 비밀번호 변경 · 만료 · 미확인 사용자 · 무효 토큰
+const META_TOKEN_ERROR_SUBCODES = [458, 459, 460, 463, 464, 467];
+const META_RATE_LIMIT_CODES = [4, 17, 32, 341, 613]; // 앱 · 사용자 · 페이지 · 앱 한도 · 지정 한도
+
+function metaErrorNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && /^\d+$/.test(value)) return Number(value);
+  return null;
+}
+
 export function classifyMetaApiError(errorBody) {
-  const err = errorBody && errorBody.error;
-  const code = err && err.code;
-  const type = err && err.type;
-  if (code === 190 || type === "OAuthException") {
+  const err = errorBody && typeof errorBody === "object" ? errorBody.error : null;
+  const code = metaErrorNumber(err && err.code);
+  const subcode = metaErrorNumber(err && err.error_subcode);
+  if (code !== null) {
+    if (META_TOKEN_ERROR_CODES.includes(code)) return { code: "RECONNECT_REQUIRED", status: 401 };
+    // 80000~80014: 광고 관리 · 인사이트 등 업무 사용 사례(BUC) 요청 한도
+    if (META_RATE_LIMIT_CODES.includes(code) || (code >= 80000 && code <= 80014)) {
+      return { code: "RATE_LIMITED", status: 429 };
+    }
+    if (code === 10 || (code >= 200 && code <= 299)) return { code: "PERMISSION_REQUIRED", status: 403 };
+    return { code: "TEMPORARY_ERROR", status: 502 };
+  }
+  if ((subcode !== null && META_TOKEN_ERROR_SUBCODES.includes(subcode)) || (err && err.type === "OAuthException")) {
     return { code: "RECONNECT_REQUIRED", status: 401 };
-  }
-  if (code === 200 || code === 10) {
-    return { code: "PERMISSION_REQUIRED", status: 403 };
-  }
-  if (code === 4 || code === 17 || code === 32 || code === 613) {
-    return { code: "RATE_LIMITED", status: 429 };
   }
   return { code: "TEMPORARY_ERROR", status: 502 };
 }
 
-// RECONNECT_REQUIRED(credential 없음 · 로컬 만료 · OAuthException/190)만
+// Meta Graph API 요청 하나의 응답 대기 상한. 정상 조회(대부분 수 초)는 끊지 않을 만큼
+// 넉넉히 두되, 응답이 오지 않는 요청이 함수 실행 한도까지 붙잡혀 있지 않게 한다. 시간
+// 초과는 fetch(또는 본문 읽기)가 TimeoutError로 끝나 각 호출부의 네트워크 · 본문 오류
+// 처리로 가므로 TEMPORARY_ERROR(일시 오류)가 된다 — 재연결로 분류되지 않는다.
+export const META_REQUEST_TIMEOUT_MS = 25000;
+
+export function metaRequestSignal() {
+  return AbortSignal.timeout(META_REQUEST_TIMEOUT_MS);
+}
+
+// RECONNECT_REQUIRED(credential 없음 · 로컬 만료 · 토큰 오류 code 102/190)만
 // connected_accounts.status를 pending으로 되돌린다 — 직전 단계
 // (meta-insights/index.ts)와 정확히 같은 정책.
 export function shouldDowngradeToPending(code) {

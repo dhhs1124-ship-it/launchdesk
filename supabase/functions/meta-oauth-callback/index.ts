@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
 
 import { allowedReturnOrigin as allowListedOrigin } from "../_shared/return-origin.ts";
+import { metaRequestSignal } from "../_shared/meta-adset-normalize.mjs";
 
 const allowedReturnOrigin = (value: unknown) =>
   allowListedOrigin(value, Deno.env.get("LAUNCHROAS_RETURN_ORIGIN"));
@@ -138,7 +139,8 @@ export default {
       shortLivedUrl.searchParams.set("client_secret", appSecret);
       shortLivedUrl.searchParams.set("code", code);
 
-      const shortLivedResponse = await fetch(shortLivedUrl.toString());
+      // 응답이 오지 않으면 시간 제한 뒤 아래 catch → server_error로 돌아간다(연결 저장 없음).
+      const shortLivedResponse = await fetch(shortLivedUrl.toString(), { signal: metaRequestSignal() });
       const shortLivedData = await shortLivedResponse.json();
 
       if (!shortLivedResponse.ok || !shortLivedData?.access_token) {
@@ -163,7 +165,7 @@ export default {
         shortLivedData.access_token
       );
 
-      const longLivedResponse = await fetch(longLivedUrl.toString());
+      const longLivedResponse = await fetch(longLivedUrl.toString(), { signal: metaRequestSignal() });
       const longLivedData = await longLivedResponse.json();
 
       if (!longLivedResponse.ok || !longLivedData?.access_token) {

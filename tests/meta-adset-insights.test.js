@@ -760,9 +760,15 @@ test('Meta API 버전은 기존과 동일한 v21.0이다(임의 변경 없음)',
   assert.match(modText, /GRAPH_API_VERSION = "v21\.0"/);
 });
 
-test('기존 meta-insights/index.ts는 이번 작업으로 전혀 참조·수정되지 않았다', () => {
+test('기존 meta-insights/index.ts는 새 함수를 참조하지 않고, 공유 모듈은 오류 분류 · 요청 시간 제한만 가져온다', () => {
   assert.doesNotMatch(OLD_FN_SRC, /meta-adset-insights/);
-  assert.doesNotMatch(OLD_FN_SRC, /meta-adset-normalize/);
+  // 2026-10 베타 안정화: Meta 오류 분류(code 우선)와 요청 시간 제한을 두 함수가 같은 구현으로
+  // 쓰도록 meta-insights도 공유 모듈을 가져온다 — 그 두 가지 외에는 가져오지 않는다.
+  const imports = OLD_FN_SRC.match(/import \{([^}]*)\} from "\.\.\/_shared\/meta-adset-normalize\.mjs";/);
+  assert.ok(imports, 'meta-adset-normalize import 형식이 바뀜');
+  assert.deepEqual(imports[1].split(',').map((s) => s.trim()).filter(Boolean),
+    ['classifyMetaApiError as classifyMetaApiErrorShared', 'metaRequestSignal']);
+  assert.equal((OLD_FN_SRC.match(/from "\.\.\/_shared\/meta-adset-normalize\.mjs"/g) || []).length, 1);
   // 직전 단계에서 확인된 계정 레벨 계산(전체 clicks 기준 ctr/cpc)이 그대로인지 —
   // 이번 작업이 그 계산식을 바꾸지 않았음을 재확인(회귀 없음).
   assert.match(OLD_FN_SRC, /ctr: impressions > 0 \? \(clicks \/ impressions\) \* 100 : null/);

@@ -3,6 +3,7 @@ import { withSupabase } from "jsr:@supabase/server@^1";
 import {
   getValidCafe24AccessToken,
   cafe24TokenErrorStatus,
+  cafe24ApiFailure,
 } from "../_shared/cafe24-token.ts";
 import { nextOrdersSyncedFrom } from "../_shared/orders-sync-range.mjs";
 
@@ -273,22 +274,18 @@ export default {
           },
         });
 
-        const cafe24Data = await cafe24Response.json();
+        // 오류 응답 본문이 JSON이 아닐 수 있다(예: 401 텍스트) — 그때도 상태 코드로 분류한다.
+        const cafe24Data = await cafe24Response.json().catch(() => null);
 
-        if (!cafe24Response.ok) {
+        if (!cafe24Response.ok || !cafe24Data) {
           console.error(
             "Cafe24 orders API failed:",
             cafe24Response.status,
             cafe24Data
           );
 
-          return Response.json(
-            {
-              error: "Cafe24 주문을 가져오지 못했습니다.",
-              status: cafe24Response.status,
-            },
-            { status: 502 }
-          );
+          const failure = cafe24ApiFailure(cafe24Response.status, "Cafe24 주문을 가져오지 못했습니다.");
+          return Response.json(failure.body, { status: failure.status });
         }
 
         const orders = Array.isArray(cafe24Data.orders)
@@ -394,6 +391,25 @@ export default {
           console.warn(
             "last_synced_at update failed:",
             syncTimeError
+          );
+          // 주문은 이미 저장됐지만 동기화 기록(last_synced_at · orders_synced_from)은
+          // 그대로다 — 성공으로 답하면 화면이 '동기화 완료'로 보이는데 기록은 예전 시점이라
+          // 기간별 주문 채움 판단이 어긋난다. 저장한 주문은 되돌리지 않는다: 주문은
+          // (store_id, provider, external_order_id)로 upsert하므로 다시 동기화해도 같은 행을
+          // 덮어쓸 뿐 중복되지 않고, 기록이 예전 그대로라 다음 동기화가 이 구간을 다시 읽는다.
+          return Response.json(
+            {
+              ok: false,
+              code: "SYNC_CURSOR_SAVE_FAILED",
+              error: "주문은 저장했지만 동기화 기록을 저장하지 못했습니다. 잠시 후 다시 동기화해주세요.",
+              mall_id: mallId,
+              start_date,
+              end_date,
+              fetched: fetchedCount,
+              saved: savedCount,
+              last_synced_at_updated: false,
+            },
+            { status: 503 }
           );
         }
       }

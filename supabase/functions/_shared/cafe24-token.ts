@@ -377,3 +377,27 @@ export function cafe24TokenErrorStatus(
   if (code === "RECONNECT_REQUIRED") return 401;
   return code === "REFRESH_RETRYABLE" ? 503 : 500;
 }
+
+// Cafe24 Admin API(주문 · 주문 상품 · 쇼핑몰 정보) 실패 응답을 클라이언트 응답으로 바꾼다.
+// 401은 DB의 토큰이 유효 기간 안(또는 방금 갱신)인데도 Cafe24가 거부한 경우다(앱 삭제 ·
+// 권한 해제 · 토큰 무효화) — 일반 502로 감싸면 화면이 재연결 안내를 띄우지 못한다. 그래서
+// 토큰 갱신 실패와 같은 code(RECONNECT_REQUIRED · 401)로 내려 기존 재연결 안내를 그대로
+// 쓰게 하고, reason으로 토큰 갱신 거부(reason 없음)와 구분한다. 그 밖의 실패는 기존 응답 그대로.
+export const CAFE24_API_UNAUTHORIZED = "CAFE24_API_UNAUTHORIZED";
+
+export function cafe24ApiFailure(
+  upstreamStatus: number,
+  fallbackError: string
+): { status: number; body: Record<string, unknown> } {
+  if (upstreamStatus === 401) {
+    return {
+      status: 401,
+      body: {
+        error: "Cafe24 연결이 해제되었거나 만료되었습니다. Cafe24를 다시 연결해주세요.",
+        code: "RECONNECT_REQUIRED",
+        reason: CAFE24_API_UNAUTHORIZED,
+      },
+    };
+  }
+  return { status: 502, body: { error: fallbackError, status: upstreamStatus } };
+}

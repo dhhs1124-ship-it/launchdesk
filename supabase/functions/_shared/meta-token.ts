@@ -11,6 +11,12 @@
 //
 // 보안: access_token/refresh_token(해당 없음)은 로그 어디에도 남기지 않는다.
 
+import {
+  classifyMetaApiError,
+  META_ERROR_MESSAGES,
+  metaRequestSignal,
+} from "./meta-adset-normalize.mjs";
+
 // deno-lint-ignore no-explicit-any
 type SupabaseAdminClient = any;
 
@@ -18,21 +24,42 @@ export type MetaTokenResult =
   | { ok: true; accessToken: string }
   | {
       ok: false;
-      // CREDENTIAL_NOT_FOUND: integration_credentials 행 자체가 없음
-      // RECONNECT_REQUIRED : 장기 토큰이 만료됨 — 사용자가 다시 연결해야 함(자동 갱신 불가)
-      code: "CREDENTIAL_NOT_FOUND" | "RECONNECT_REQUIRED";
+      // CREDENTIAL_NOT_FOUND    : integration_credentials 행 자체가 없음
+      // CREDENTIAL_LOOKUP_FAILED: 조회 자체가 실패(DB 일시 오류 등) — 연결이 없다는 근거가 아니다
+      // RECONNECT_REQUIRED      : 장기 토큰이 만료됨 — 사용자가 다시 연결해야 함(자동 갱신 불가)
+      code: "CREDENTIAL_NOT_FOUND" | "CREDENTIAL_LOOKUP_FAILED" | "RECONNECT_REQUIRED";
       message: string;
     };
+
+// PostgREST가 .single()에서 행이 0개(또는 2개 이상)일 때 주는 code — 이것만 '행 없음'이다.
+const NO_SINGLE_ROW = "PGRST116";
 
 export async function getValidMetaAccessToken(
   supabaseAdmin: SupabaseAdminClient,
   connectedAccountId: number
 ): Promise<MetaTokenResult> {
-  const { data: credential, error } = await supabaseAdmin
-    .from("integration_credentials")
-    .select("access_token, access_token_expires_at")
-    .eq("connected_account_id", connectedAccountId)
-    .single();
+  let credential: { access_token?: string; access_token_expires_at?: string | null } | null = null;
+  let error: { code?: string; message?: string } | null = null;
+  try {
+    ({ data: credential, error } = await supabaseAdmin
+      .from("integration_credentials")
+      .select("access_token, access_token_expires_at")
+      .eq("connected_account_id", connectedAccountId)
+      .single());
+  } catch (err) {
+    error = { message: err instanceof Error ? err.message : "unknown error" };
+  }
+
+  // 조회 자체의 실패(시간 초과 · 연결 오류 등)를 '인증정보 없음'으로 바꾸면 호출부가 연결을
+  // pending으로 내려 사용자가 멀쩡한 연결을 다시 해야 한다 — 별도 code로 돌려준다.
+  if (error && error.code !== NO_SINGLE_ROW) {
+    console.error("Meta credential lookup failed:", error.code ?? "", error.message ?? "");
+    return {
+      ok: false,
+      code: "CREDENTIAL_LOOKUP_FAILED",
+      message: "일시적인 오류로 Meta 연결 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.",
+    };
+  }
 
   if (error || !credential || !credential.access_token) {
     return {
@@ -99,7 +126,9 @@ type MetaAdAccountsError = {
   ok: false;
   status: number;
   message: string;
-  code?: "META_ADACCOUNTS_PAGE_LIMIT";
+  // Meta 오류는 classifyMetaApiError와 같은 code(RECONNECT_REQUIRED · PERMISSION_REQUIRED ·
+  // RATE_LIMITED · TEMPORARY_ERROR)로 내려 화면이 재연결 · 재시도 안내를 고를 수 있게 한다.
+  code?: string;
 };
 
 export type MetaAdAccountsResult =
@@ -134,6 +163,8 @@ async function fetchMetaAdAccountsPage(
   try {
     res = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${accessToken}` },
+      // 응답이 오지 않으면 시간 제한 뒤 아래 catch(일시 오류)로 간다.
+      signal: metaRequestSignal(),
     });
   } catch (err) {
     console.error(
@@ -144,6 +175,7 @@ async function fetchMetaAdAccountsPage(
       ok: false,
       status: 502,
       message: "Meta 광고계정 목록을 가져오지 못했습니다.",
+      code: "TEMPORARY_ERROR",
     };
   }
 
@@ -155,10 +187,17 @@ async function fetchMetaAdAccountsPage(
       res.status,
       data?.error?.message
     );
+    // Meta의 HTTP status(토큰 만료 · 요청 한도도 대개 400)를 그대로 넘기지 않고 오류 code로
+    // 분류한다 — 토큰 만료면 화면이 재연결 안내를, 요청 한도 · 일시 오류면 재시도 안내를 띄운다.
+    const cls = classifyMetaApiError(data);
     return {
       ok: false,
-      status: res.status || 502,
-      message: "Meta 광고계정 목록을 가져오지 못했습니다.",
+      status: cls.status,
+      message:
+        cls.code === "TEMPORARY_ERROR"
+          ? "Meta 광고계정 목록을 가져오지 못했습니다."
+          : META_ERROR_MESSAGES[cls.code as keyof typeof META_ERROR_MESSAGES],
+      code: cls.code,
     };
   }
 

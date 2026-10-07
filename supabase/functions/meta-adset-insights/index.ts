@@ -7,6 +7,7 @@ import {
   MAX_INSIGHTS_ROWS,
   META_ERROR_MESSAGES,
   classifyMetaApiError,
+  metaRequestSignal,
   shouldDowngradeToPending,
   validateAdsetInsightsRequest,
   resolvePeriodRange,
@@ -57,7 +58,8 @@ async function fetchMetaJson(url: string, accessToken: string): Promise<MetaFetc
   try {
     // access_token은 쿼리 파라미터가 아니라 Authorization 헤더로만 전달 —
     // 로그 어디에도 남지 않는다(meta-insights.ts와 동일한 규칙).
-    res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    // 응답이 오지 않으면 시간 제한 뒤 아래 catch(network → TEMPORARY_ERROR)로 간다.
+    res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` }, signal: metaRequestSignal() });
   } catch (err) {
     console.error(
       "Meta adset insights API request failed:",
@@ -166,8 +168,11 @@ export default {
 
       // 3. access token 확보 — 실패(credential 없음 · 로컬 만료)는 실제
       //    인증이 끊어졌다는 뜻이므로 pending으로 되돌린다(meta-insights.ts와
-      //    동일한 정책).
+      //    동일한 정책). 조회 자체의 실패는 끊어졌다는 근거가 아니므로 연결을 그대로 둔다.
       const tokenResult = await getValidMetaAccessToken(ctx.supabaseAdmin, account.id);
+      if (!tokenResult.ok && tokenResult.code === "CREDENTIAL_LOOKUP_FAILED") {
+        return errorResponse("INTERNAL_ERROR", 500);
+      }
       if (!tokenResult.ok) {
         await downgradeToPendingIfStale(ctx.supabaseAdmin, account);
         return errorResponse("RECONNECT_REQUIRED", 401);

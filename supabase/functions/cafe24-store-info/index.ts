@@ -3,6 +3,7 @@ import { withSupabase } from "jsr:@supabase/server@^1";
 import {
   getValidCafe24AccessToken,
   cafe24TokenErrorStatus,
+  cafe24ApiFailure,
 } from "../_shared/cafe24-token.ts";
 
 export default {
@@ -92,22 +93,18 @@ export default {
         }
       );
 
-      const cafe24Data = await cafe24Response.json();
+      // 오류 응답 본문이 JSON이 아닐 수 있다(예: 401 텍스트) — 그때도 상태 코드로 분류한다.
+      const cafe24Data = await cafe24Response.json().catch(() => null);
 
-      if (!cafe24Response.ok) {
+      if (!cafe24Response.ok || !cafe24Data) {
         console.error(
           "Cafe24 store API failed:",
           cafe24Response.status,
           cafe24Data
         );
 
-        return Response.json(
-          {
-            error: "Cafe24 쇼핑몰 정보를 가져오지 못했습니다.",
-            status: cafe24Response.status,
-          },
-          { status: 502 }
-        );
+        const failure = cafe24ApiFailure(cafe24Response.status, "Cafe24 쇼핑몰 정보를 가져오지 못했습니다.");
+        return Response.json(failure.body, { status: failure.status });
       }
 
       // Access Token은 절대 반환하지 않음

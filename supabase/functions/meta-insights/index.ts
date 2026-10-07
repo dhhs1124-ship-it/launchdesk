@@ -3,6 +3,10 @@ import { withSupabase } from "jsr:@supabase/server@^1";
 import {
   getValidMetaAccessToken,
 } from "../_shared/meta-token.ts";
+import {
+  classifyMetaApiError as classifyMetaApiErrorShared,
+  metaRequestSignal,
+} from "../_shared/meta-adset-normalize.mjs";
 
 // Meta 광고 성과(Insights) 정식 조회 — docs/plans/meta-insights.md 기준.
 //
@@ -142,7 +146,8 @@ type ErrorCode =
   | "PERMISSION_REQUIRED"
   | "RATE_LIMITED"
   | "ACCOUNT_UNAVAILABLE"
-  | "TEMPORARY_ERROR";
+  | "TEMPORARY_ERROR"
+  | "INTERNAL_ERROR";
 
 const ERROR_MESSAGES: Record<ErrorCode, string> = {
   META_NOT_CONNECTED: "Meta 광고 계정을 연결해주세요.",
@@ -153,47 +158,32 @@ const ERROR_MESSAGES: Record<ErrorCode, string> = {
   RATE_LIMITED: "Meta 요청이 많아 잠시 후 다시 시도해주세요.",
   ACCOUNT_UNAVAILABLE: "이 광고계정에 접근할 수 없습니다.",
   TEMPORARY_ERROR: "Meta 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+  INTERNAL_ERROR: "일시적인 오류로 Meta 연결 정보를 확인하지 못했습니다. 잠시 후 다시 시도해주세요.",
 };
 
 function errorResponse(code: ErrorCode, status: number) {
   return Response.json({ error: ERROR_MESSAGES[code], code }, { status });
 }
 
-// Meta 자체 에러(error.code/type)를 위 6개 카테고리로 매핑한다. 불확실한
-// 코드를 억지로 세분하지 않고, 근거가 분명한 것만 매핑하고 나머지는 전부
-// TEMPORARY_ERROR로 떨어뜨린다(설계 문서 §10 원칙 — 모르면 임시 오류).
+// Meta 자체 에러를 RECONNECT_REQUIRED · PERMISSION_REQUIRED · RATE_LIMITED ·
+// TEMPORARY_ERROR로 매핑한다. 분류 기준은 다른 Meta 함수들과 같은 공유 구현(위 import)
+// 하나를 쓴다 — code/subcode가 먼저이고(Meta는 요청 한도 · 권한 오류에도
+// type:"OAuthException"을 붙인다), 모르는 code는 임시 오류다.
 function classifyMetaApiError(errorBody: unknown): {
   code: ErrorCode;
   status: number;
 } {
-  // deno-lint-ignore no-explicit-any
-  const err = (errorBody as any)?.error;
-  const code = err?.code;
-  const type = err?.type;
-
-  // 190 = OAuthException(만료/무효 토큰) — Meta 문서 기준 표준 코드.
-  if (code === 190 || type === "OAuthException") {
-    return { code: "RECONNECT_REQUIRED", status: 401 };
-  }
-  // 200 = Permissions error, 10 = 앱이 이 동작에 대한 권한 없음.
-  if (code === 200 || code === 10) {
-    return { code: "PERMISSION_REQUIRED", status: 403 };
-  }
-  // 4/17/32/613 = Meta 표준 rate limit 코드.
-  if (code === 4 || code === 17 || code === 32 || code === 613) {
-    return { code: "RATE_LIMITED", status: 429 };
-  }
-  return { code: "TEMPORARY_ERROR", status: 502 };
+  return classifyMetaApiErrorShared(errorBody) as { code: ErrorCode; status: number };
 }
 
 // [베타 전 필수 수정 — 감사 지적] connected_accounts.status가 'connected'로
 // 남아있는데 실제 Meta 인증이 끊어진 경우(로컬 만료, credential 없음, Meta
-// OAuthException/code 190)를 구분해 'pending'(재연결 필요)으로 되돌린다.
+// 토큰 오류 code 102/190)를 구분해 'pending'(재연결 필요)으로 되돌린다.
 // 판정을 순수 함수로 분리해 DB/네트워크 없이 테스트한다.
 //
 // 정책(요구사항 2에 따라 명시적으로 결정):
 // - RECONNECT_REQUIRED: getValidMetaAccessToken/classifyMetaApiError가
-//   "credential 없음 · 로컬 만료 · OAuthException(190)"을 이미 이 하나의
+//   "credential 없음 · 로컬 만료 · 토큰 오류(102/190)"를 이미 이 하나의
 //   코드로 묶어 판정한다 — 실제 인증 자체가 끊어졌다는 뜻이므로 되돌린다.
 // - PERMISSION_REQUIRED(code 200/10)는 토큰 자체는 유효한데 이 광고계정에
 //   대한 권한만 없는 경우일 수 있다(Meta가 190과 200/10을 서로 다른
@@ -269,6 +259,8 @@ async function fetchMetaJson(
     // 로그 어디에도 남지 않는다(기존 4개 Meta 함수와 동일한 규칙).
     res = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      // 응답이 오지 않으면 시간 제한 뒤 아래 catch(network → TEMPORARY_ERROR)로 간다.
+      signal: metaRequestSignal(),
     });
   } catch (err) {
     console.error(
@@ -390,9 +382,13 @@ export default {
         account.id
       );
 
+      // CREDENTIAL_NOT_FOUND · RECONNECT_REQUIRED 둘 다 "실제 인증이 끊어짐"에
+      // 해당한다(위 shouldDowngradeToPending 정책과 동일한 근거). 조회 자체의 실패
+      // (CREDENTIAL_LOOKUP_FAILED)는 끊어졌다는 근거가 아니므로 연결을 그대로 두고 일시 오류로 답한다.
+      if (!tokenResult.ok && tokenResult.code === "CREDENTIAL_LOOKUP_FAILED") {
+        return errorResponse("INTERNAL_ERROR", 500);
+      }
       if (!tokenResult.ok) {
-        // CREDENTIAL_NOT_FOUND · RECONNECT_REQUIRED 둘 다 "실제 인증이
-        // 끊어짐"에 해당한다(위 shouldDowngradeToPending 정책과 동일한 근거).
         await downgradeToPendingIfStale(ctx.supabaseAdmin, account);
         return errorResponse("RECONNECT_REQUIRED", 401);
       }

@@ -157,6 +157,11 @@ export default {
         throw existingError;
       }
 
+      // 연결 행은 먼저 'pending'(연결 진행 중)으로 준비하고, 토큰 · stores 저장이 모두 끝난
+      // 뒤 마지막 단계에서만 'connected'로 바꾼다. 중간 단계가 실패하면 행은 pending으로
+      // 남아 모든 화면에서 '연결 안 됨'으로 보인다(화면은 status === 'connected'만 연결됨으로
+      // 본다). 재연결도 같다 — 쇼핑몰 ID와 토큰이 어긋난 채 '연결됨'이 남지 않게 한다.
+      // 행을 먼저 만드는 이유: 토큰 테이블의 connected_account_id가 이 행의 FK다.
       let connectedAccountId: number;
 
       if (existingAccounts && existingAccounts.length > 0) {
@@ -167,8 +172,7 @@ export default {
           .update({
             external_account_id: mallId,
             display_name: mallId,
-            status: "connected",
-            connected_at: new Date().toISOString(),
+            status: "pending",
             updated_at: new Date().toISOString(),
           })
           .eq("id", connectedAccountId);
@@ -182,8 +186,7 @@ export default {
             provider: "cafe24",
             external_account_id: mallId,
             display_name: mallId,
-            status: "connected",
-            connected_at: new Date().toISOString(),
+            status: "pending",
           })
           .select("id")
           .single();
@@ -232,6 +235,21 @@ export default {
 
       if (storeError) {
         throw storeError;
+      }
+
+      // 6. 모든 저장이 끝난 뒤에만 연결됨으로 표시한다(실패하면 pending으로 남는다).
+      const connectedAtIso = new Date().toISOString();
+      const { error: connectError } = await ctx.supabaseAdmin
+        .from("connected_accounts")
+        .update({
+          status: "connected",
+          connected_at: connectedAtIso,
+          updated_at: connectedAtIso,
+        })
+        .eq("id", connectedAccountId);
+
+      if (connectError) {
+        throw connectError;
       }
 
       // state는 위 1번 claim 시점에 이미 used 처리됐으므로 여기서 다시
