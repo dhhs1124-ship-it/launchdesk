@@ -25,13 +25,15 @@
     authed: false,
     userId: null,
     steps: {},        // { [step_path]: { data: array|object|null, isCompleted: boolean } }
-    calcHistory: [],  // 최근 것이 배열 앞쪽 — 화면엔 최대 5개까지만
+    calcHistory: [],  // 최근 것이 배열 앞쪽 — 화면 · 스냅샷엔 최대 5개까지만(저장 실패 시 기존 기록이 그대로 남도록 메모리에서는 자르지 않는다)
+    session: 0,       // 로그인 · 로그아웃마다 새 번호 — 같은 계정 재로그인(A→로그아웃→A)도 다른 세션으로 구분
     adlogRecords: [],  // 최근 것이 배열 앞쪽
     adlogDecisions: [], // LaunchROAS 광고 기록에서 고른 합계 포함 · 제외(tool_type='ad_log_decision') — 메인은 읽기만
     adlogDecisionsFailed: false, // 선택 조회 실패(저장된 선택이 없던 경우와 구분 — 합계 미확정 표시용)
     adlogFailed: false // 광고 기록 조회 실패(기록 0건과 구분 — 합계를 내지 않고 다시 불러오기)
   };
   var listeners = [];
+  var sessionSeq = 0;
 
   function notifyChange(){
     listeners.forEach(function(fn){
@@ -96,7 +98,7 @@
     Object.keys(na.fields).concat(Object.keys(nb.fields)).forEach(function(k){ keys[k] = true; });
     return Object.keys(keys).every(function(k){ return (na.fields[k] || '') === (nb.fields[k] || ''); });
   }
-  function getCalcHistory(){ return state.calcHistory.slice(); }
+  function getCalcHistory(){ return state.calcHistory.slice(0, 5); }
   function getAdlogRecords(){ return state.adlogRecords.slice(); }
   function getAdlogDecisions(){ return state.adlogDecisions.slice(); }
   function isAdlogDecisionsFailed(){ return !!state.adlogDecisionsFailed; }
@@ -139,7 +141,7 @@
     });
     return {
       steps: stepsCopy,
-      calcHistory: state.calcHistory.slice(),
+      calcHistory: state.calcHistory.slice(0, 5),
       adlogRecords: state.adlogRecords.slice()
     };
   }
@@ -296,11 +298,11 @@
   }
   function addCalcRecord(record){
     state.calcHistory.unshift(record);
-    state.calcHistory = state.calcHistory.slice(0, 5);
     if(!state.authed || !state.userId) return Promise.resolve(true);
     var sb = client();
     if(!sb) return Promise.resolve(true);
-    var undo = function(){ state.calcHistory = state.calcHistory.filter(function(r){ return r !== record; }); return false; };
+    var sess = state.session;
+    var undo = function(){ if(state.session === sess) state.calcHistory = state.calcHistory.filter(function(r){ return r !== record; }); return false; };
     return sb.from('tool_records').insert({
       user_id: state.userId,
       tool_type: 'margin_calc',
@@ -317,7 +319,12 @@
     if(!state.authed || !state.userId) return Promise.resolve(true);
     var sb = client();
     if(!sb) return Promise.resolve(true);
-    var undo = function(){ if(!state.calcHistory.length) state.calcHistory = before; return false; };
+    var sess = state.session;
+    var undo = function(){
+      if(state.session !== sess) return false;
+      state.calcHistory = state.calcHistory.concat(before.filter(function(r){ return state.calcHistory.indexOf(r) < 0; }));
+      return false;
+    };
     return sb.from('tool_records').delete()
       .eq('user_id', state.userId).eq('tool_type', 'margin_calc')
       .then(function(res){ if(!res.error) return true; console.warn('[launchdesk] 마진계산 기록 삭제 실패:', res.error.message); return undo(); }, undo);
@@ -327,7 +334,8 @@
     if(!state.authed || !state.userId) return Promise.resolve(true);
     var sb = client();
     if(!sb) return Promise.resolve(true);
-    var undo = function(){ state.adlogRecords = state.adlogRecords.filter(function(r){ return r !== record; }); return false; };
+    var sess = state.session;
+    var undo = function(){ if(state.session === sess) state.adlogRecords = state.adlogRecords.filter(function(r){ return r !== record; }); return false; };
     return sb.from('tool_records').insert({
       user_id: state.userId,
       tool_type: 'ad_log',
@@ -382,12 +390,21 @@
     state.adlogRecords = state.adlogRecords.filter(function(r){ return !match(r); });
   }
   function removeAdlogRecord(id){
+    var at = state.adlogRecords.findIndex(function(r){ return String(r.id) === String(id); });
     var removed = state.adlogRecords.filter(function(r){ return String(r.id) === String(id); });
     state.adlogRecords = state.adlogRecords.filter(function(r){ return String(r.id) !== String(id); });
     if(!state.authed || !state.userId) return Promise.resolve(true);
     var sb = client();
     if(!sb) return Promise.resolve(true);
-    var undo = function(){ state.adlogRecords = removed.concat(state.adlogRecords); return false; };
+    var sess = state.session;
+    var undo = function(){
+      if(state.session !== sess || !removed.length) return false;
+      if(state.adlogRecords.some(function(r){ return String(r.id) === String(id); })) return false;
+      var list = state.adlogRecords.slice(), pos = Math.min(at < 0 ? 0 : at, list.length);
+      list.splice.apply(list, [pos, 0].concat(removed));
+      state.adlogRecords = list;
+      return false;
+    };
     // ad_log 레코드의 식별자는 DB 기본 PK가 아니라, 생성 시 data 안에
     // 함께 저장해 둔 클라이언트 id(Date.now())다 — JSON 컬럼 안 값으로
     // 필터링한다(PostgREST의 `column->>key` 표기).
@@ -411,6 +428,7 @@
     // 경우처럼, A 몫으로 예약된 저장이 B의 user_id로 실행되는 것을 막는다.
     clearPendingStepTimers();
     state.userId = userId;
+    var mySession = state.session = ++sessionSeq;
 
     var stepsQ = sb.from('user_step_progress').select('step_path, data, is_completed, completed_at').eq('user_id', userId);
     var calcQ = sb.from('tool_records').select('data, created_at').eq('user_id', userId).eq('tool_type', 'margin_calc').order('created_at', { ascending: false }).limit(5);
@@ -418,7 +436,7 @@
     var decisionQ = sb.from('tool_records').select('data, created_at').eq('user_id', userId).eq('tool_type', 'ad_log_decision');
 
     return Promise.all([stepsQ, calcQ, adlogQ, decisionQ]).then(function(results){
-      if(state.userId !== userId) return; // 그 사이 로그아웃 · 계정 전환 — 이전 사용자 데이터를 넣지 않는다
+      if(state.session !== mySession) return; // 그 사이 로그아웃 · 계정 전환 · 다시 로그인 — 이전 세션 데이터를 넣지 않는다
       var stepsRes = results[0], calcRes = results[1], adlogRes = results[2], decisionRes = results[3];
       resetState();
 
@@ -451,14 +469,16 @@
       state.authed = true;
       notifyChange();
     }).catch(function(err){
-      if(state.userId !== userId) return;
+      if(state.session !== mySession) return;
       console.warn('[launchdesk] 데이터 불러오기 중 오류:', err && err.message);
+      state.stepsFailed = true; // 진행상황도 못 불러왔다 — 빈 진행으로 서버 기록을 덮어쓰지 않게 저장 차단
       state.adlogFailed = true; // 광고 기록도 못 불러왔다 — 기록 없음으로 보이지 않게
       state.authed = true; // 일부 조회 실패로 로그인 자체를 무효화하지 않는다
       notifyChange();
     });
   }
   function resetToGuest(){
+    state.session = ++sessionSeq; // 진행 중이던 요청의 결과 · 실패 복원이 게스트 상태에 섞이지 않게
     clearPendingStepTimers(); // 로그아웃하는 사용자 몫으로 예약된 저장은 실행되지 않게 취소
     state.authed = false;
     state.userId = null;
