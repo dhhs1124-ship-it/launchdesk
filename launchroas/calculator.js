@@ -98,7 +98,8 @@
     st.products=null;st.error='';renderList();
     var recs=await ctx.client.from('tool_records').select('id,tool_type,data,created_at').eq('user_id',ctx.userId).in('tool_type',[LINK,CALC]).order('created_at',{ascending:false}).limit(300);
     if(id!==ticket)return;
-    var rows=recs.error?[]:recs.data||[],store=String(ctx.storeId);
+    if(recs.error){st.products=[];st.error='저장된 상품 비용을 불러오지 못했어요. 새로고침해 주세요.';renderList();return;}
+    var rows=recs.data||[],store=String(ctx.storeId);
     st.links=S.latestLinks(rows.filter(function(r){return r.tool_type===LINK&&String(r.data&&r.data.store_id)===store;}).map(function(r){return Object.assign({_id:r.id},r.data);}));
     st.linkIds=rows.filter(function(r){return r.tool_type===LINK&&String(r.data&&r.data.store_id)===store;}).map(function(r){return {id:r.id,key:r.data.product_no+'|'+(r.data.variant_code||'')};});
     st.calcs=rows.filter(function(r){return r.tool_type===CALC&&r.data&&r.data.input;}).map(function(r){return r.data;});
@@ -161,10 +162,11 @@
       input:out.calc.input,source_saved_at:now,linked_at:now};
     // tool_records는 수정(UPDATE) 권한이 없다 — 새로 저장한 뒤 같은 상품 · 옵션의 이전 기록을 지운다.
     var key=t.product.product_no+'|'+t.variant_code,oldIds=(st.linkIds||[]).filter(function(x){return x.key===key;}).map(function(x){return x.id;});
-    var btn=byId('pmSave');btn.disabled=true;
+    var btn=byId('pmSave');btn.disabled=true;var mine=st; // 쇼핑몰을 바꾸면 st가 새로 만들어진다
     var res=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:LINK,data:data}).select('id').single();
     if(!res.error&&oldIds.length)await ctx.client.from('tool_records').delete().in('id',oldIds).eq('user_id',ctx.userId).eq('tool_type',LINK);
     btn.disabled=false;
+    if(st!==mine)return;
     if(res.error){say('저장하지 못했어요. 다시 시도해 주세요.');return;}
     var saved=Object.assign({_id:res.data&&res.data.id},data);
     st.links=[saved].concat(st.links.filter(function(l){return l.product_no+'|'+(l.variant_code||'')!==key;}));
