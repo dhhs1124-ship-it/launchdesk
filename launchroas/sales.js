@@ -30,7 +30,7 @@
 
   async function load(ctx,key){
     var id=++ticket,range=periods.resolve(ctx.period.kind,ctx.period.date,Date.now());
-    state={orders:null,error:'',truncated:false,links:[],calcs:[],fxRecord:null,range:range};render(ctx);
+    state={orders:null,error:'',recordsError:'',truncated:false,links:[],calcs:[],fxRecord:null,range:range};render(ctx);
     var records=await ctx.client.from('tool_records').select('id,data,created_at,tool_type').eq('user_id',ctx.userId)
       .in('tool_type',[LINK,FX,CALC]).order('created_at',{ascending:false}).limit(300);
     if(id!==ticket)return;
@@ -40,7 +40,7 @@
       state.calcs=rows.filter(function(r){return r.tool_type===CALC&&r.data&&r.data.calc_version===2&&r.data.input;}).map(function(r){return r.data;});
       state.fxRecord=rows.find(function(r){return r.tool_type===FX&&String(r.data&&r.data.store_id)===store;})||null;
       app.setFx(state.fxRecord?{currency:state.fxRecord.data.currency,krw_per_unit:state.fxRecord.data.krw_per_unit,saved_at:state.fxRecord.data.saved_at}:null);
-    }else state.error='저장된 상품 비용 · 환율을 불러오지 못했어요. 새로고침해 주세요.';
+    }else state.recordsError='저장된 상품 비용 · 환율을 불러오지 못했어요. 새로고침해 주세요.'; // 주문 오류(state.error)와 따로 — '비용 미입력 · 환율 필요'로 보이지 않게
     if(!ctx.cafeAccount||ctx.cafeAccount.status!=='connected'){state.error='Cafe24를 연결하면 실제 판매 수량을 볼 수 있어요.';render(app.getContext());return;}
     if(!range){state.error='기간을 다시 선택해 주세요.';render(app.getContext());return;}
     try{
@@ -145,10 +145,11 @@
     if(state.error)chips.push({text:ctx.cafeAccount&&ctx.cafeAccount.status==='connected'?'Cafe24 조회 실패':'Cafe24 미연결',tone:'warn'});
     if(ms)chips.push({text:'Meta '+ms.text,tone:ms.text==='조회 중'?'':'warn'});
     // 미등록은 상품 종류(옵션은 같은 상품)와 판매 수량을 함께 — '19개'가 종류로 오해되지 않게.
-    if(s&&s.unlinkedQty)chips.push({text:'비용 미입력 상품 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+') · 입력하기',tone:'warn',action:'products'});
+    if(state.recordsError)chips.unshift({text:state.recordsError,tone:'warn'});
+    if(s&&s.unlinkedQty&&!state.recordsError)chips.push({text:'비용 미입력 상품 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+') · 입력하기',tone:'warn',action:'products'});
     if(s&&s.margin.estimatedOrders)chips.push({text:'판매가 추정 '+count(s.margin.estimatedOrders,'건'),tone:''});
     if(s&&s.margin.savedOnlyOrders)chips.push({text:'저장 판매가 기준 '+count(s.margin.savedOnlyOrders,'건'),tone:''});
-    if(!ms&&mp&&spendKrw==null)chips.push({text:'환율 입력 필요',tone:'warn',action:'fx'});
+    if(!ms&&mp&&spendKrw==null&&!state.recordsError)chips.push({text:'환율 입력 필요',tone:'warn',action:'fx'});
     if(s&&!s.soldQty)chips.push({text:'판매 없음',tone:''});
     renderHero(profit,base,spendKrw,partial,chips,s);
     var ready=!!ctx.connectionsLoaded;
@@ -170,6 +171,7 @@
     var cost={title:'상품 비용 입력',done:false,button:{label:'상품 비용 입력하기',run:openProducts}};
     // 앞 단계가 필요한 단계에는 버튼을 두지 않는다(누를 수 있는 곳을 하나로).
     if(!cafeOk){cost.text='Cafe24를 연결하면 판매 상품이 보여요.';cost.button=null;}
+    else if(state.recordsError){cost.text=state.recordsError;cost.button=null;}
     else if(!s)cost.text=state.error?'판매 상품을 불러오지 못했어요.':'판매 상품을 확인하는 중이에요.';
     else if(!s.soldQty)cost.text='이 기간 판매가 없어 확인할 상품이 없어요.';
     else if(!s.unlinkedQty){cost.done=true;cost.text='판매 상품 '+count(s.productKinds,'종')+' 모두 비용 저장됨';cost.button=null;}
