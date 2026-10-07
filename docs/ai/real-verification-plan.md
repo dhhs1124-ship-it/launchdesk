@@ -425,3 +425,12 @@ git worktree remove ../main-parity-wt
 - 순서: A 배포 → 운영 메인에서 실제 저장 · 재조회 · 실패 · 재시도 확인 → 저장 스위치 켜고 미리보기 푸시(브랜치 배포 방식 확인 필요) → 실제 광고 변경 기록 1건(결과는 약 2주 뒤).
 ### C. 이번 범위 밖
 - `ad-video-source` 배포(영상 광고가 생겼을 때만) · `AI_WEEKLY_ENABLED` 재활성(별도 승인 · 지금 false) · `migration repair`(별도 결정) · `db push` 금지 유지 · 유료 AI 호출.
+
+### A 운영 메인 호환 배포 — 완료 (2026-10-07 10:33 KST)
+- 배포 전: 원격 `master` = `6695178`(변경 없음) · 호환 브랜치는 그 위 커밋 5개(fast-forward). 제품 코드 = 광고 기록 호환만(`adlog-core.js` · `index.html` · `store.js` · `tools.js`), 나머지는 테스트(광고 기록 1 · 마이그레이션 SQL CRLF 읽기 보정 2 — SQL 변경 없음).
+- 검사(임시 폴더에 `git archive`로 풀어 Vercel 빌드 명령 그대로): 공개 전 점검 통과 · 테스트 639/639 · 빌드 통과(`dist`에 `adlog-core.js`) · 두 화면 모의 검증 10/10(공용 DB 쓰기 0).
+- `master` `6695178` → `d4d56c7` 푸시 · Vercel `launchdesk` · `launchroas` 운영 배포 success.
+- 운영 메인(launchdesk.co.kr) 확인: 로그인 유지 · 새 스크립트 적용 · 광고 기록 0건 · 합계 ₩0 · ₩NaN 없음 · 조회 실패 흉내(페이지 메모리만) → '불러오지 못함 · 합계 — · 다시 불러오기' → 복구.
+- 실제 저장: `[검증용] 운영 메인 호환 확인 2026-10-07`(카카오 · ₩1,000) 저장 → 목록 · 합계 ₩1,000 · 서버 재조회 1행 확인 → 사용자가 ✕로 삭제 → 서버 재조회 광고 기록 0행 · 선택 0행 · 합계 ₩0.
+- 함께 배포된 LaunchROAS 운영(launchroas.vercel.app, 읽기 전용): 이번 커밋에 `launchroas/` 변경 없음 · 제공 파일 `index.html` · `core.js` · `app.js` · `styles.css`가 `master`와 동일 · 미리보기 전용 파일(`adlog.js` · `adlog-change-core.js` · `insights.js` 등) 404 · `LAUNCHROAS_FLAGS`/저장 스위치 없음(운영 메인도 없음).
+- 하지 않음: 미리보기 병합 · 저장 스위치 · AI 재활성화 · 광고 변경 · 다른 함수 배포.
