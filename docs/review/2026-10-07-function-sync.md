@@ -42,18 +42,36 @@
 
 ## 6. 테스트
 - 미리보기에서 가져옴(함수 관련만): `ai-insights-core` · `ai-policy` · `ai-video-core` · `ai-weekly-core` · `cafe24-token-concurrency` · `return-origin`(.mjs) · `cafe24-oauth-state-claim` · `meta-adset-insights`(.js).
-- (갱신) 예약 SQL 대조 테스트는 보존 파일(`migrations-applied-manually/`)을 읽어 **실행 · 통과**. 남은 건너뜀은 영상 프레임 일치 1개(아래)뿐.
-- 두 테스트는 저장소에 없는 파일이 필요해 **없으면 이유를 표시하고 건너뜀**으로 바꿨다(미리보기처럼 파일이 있으면 그대로 실행 — 미리보기에서 12/12 · 18/18 통과 확인): 영상 프레임 일치(`launchroas/video-frames.js`) · 주간 실행 예약 SQL 대조(마이그레이션 `20261007100000`).
-- 결과: 루트 `tests/**/*.test.js` 654/654 · `.mjs` 50 통과 · 2 건너뜀 · LaunchROAS 114/114 · 공개 전 점검 · 빌드(결과물에 supabase · tests 없음).
+- 영상 프레임 일치 테스트(`ai-video-core`)는 `launchroas/video-frames.js`(운영자 영상 도구 · 미리보기 브랜치에만)가 없으면 이유를 표시하고 건너뜀 — 동기화 브랜치에서는 **미검증**(미리보기에서 12/12 통과).
+- 예약 SQL 대조 테스트(`ai-weekly-core`)는 보존 파일(`supabase/migrations-applied-manually/`)을 읽어 실행 · 통과(18/18).
+- 현재 결과(`sync/deployed-functions` 최신): 루트 `tests/**/*.test.js` 654/654 · `.mjs` 66 통과 · 1 건너뜀(영상 프레임 일치) · LaunchROAS 114/114 · `deno check` 16개 · 공개 전 점검 · 빌드(결과물에 supabase · tests 없음).
 
-## 8. Cafe24 토큰 시차 요청 중복 갱신 — 버그 수정(`b1fc72d`, 동기화와 별도 커밋)
+## 7. Cafe24 토큰 시차 요청 중복 갱신 — 버그 수정(`b1fc72d`, 동기화와 별도 커밋)
 - 문제(배포본에도 있음): 첫 요청이 갱신 권한을 잡으며 `updated_at`을 바꾸고 Cafe24 응답을 기다리는 동안 온 요청이 바뀐 `updated_at`을 읽어 다시 CAS에 성공 → 같은 refresh_token으로 갱신을 두 번 요청 → 한쪽 `RECONNECT_REQUIRED`(재현: 호출 2회 · 첫 성공 · 두 번째 실패).
 - 수정(스키마 변경 없음): 토큰이 만료됐는데 `updated_at`이 임대 시간(30초) 안이면 '갱신 중'으로 보고 CAS하지 않고 새 토큰을 기다림 · 임대 시간이 지나도 새 토큰이 없으면 다시 권한을 잡음 · Cafe24 갱신 요청 시간 제한 10초(임대 시간 안에 끝나게).
 - 회귀 테스트: 시차 요청(Cafe24 호출 1회 · 둘 다 성공) — 수정 전 실패 확인 · 임대 시간 경과 후 재획득. 기존 동시 요청 3개 · 갱신 직후 · 거부 테스트 유지.
 - 한계: 원격 `integration_credentials`에 `updated_at`을 덮어쓰는 트리거가 있어도 동작(쓰는 값이 현재 시각이므로). 함수 시계와 DB 시각이 크게 어긋나면 임대 판정이 흔들릴 수 있음(임대 30초로 여유). 더 엄격한 대안은 잠금 전용 컬럼(`refresh_claimed_until`) 추가 — 원격 스키마 변경이 필요해 이번에는 제안만.
 - 반영하려면 `cafe24-orders-sync` · `cafe24-store-info` · `cafe24-order-items` 재배포 필요(콜백은 갱신 경로를 쓰지 않음) — 승인 후.
 
-## 7. 다음 (각각 승인 후)
+## 8. Cafe24 토큰 갱신 실패 분류 — 버그 수정(`02bff01`, 동기화와 별도 커밋)
+- 문제(배포본에도 있음): 갱신 요청이 시간 초과(`TimeoutError`) · 네트워크 오류로 실패하거나, 응답이 5xx이거나, 본문을 읽지 못해도 모두 `RECONNECT_REQUIRED`(401) — 일시 장애에도 사용자에게 재연결 안내가 나감.
+- 수정: 토큰 만료 · 폐기 근거가 있는 응답만 재연결.
+
+| 실패 | 코드 · 상태 |
+|---|---|
+| 시간 초과 · 네트워크 오류 · 본문 읽기 중 끊김(상태 무관) | `REFRESH_RETRYABLE` · 503 |
+| 5xx · 429 · 408 응답(본문이 HTML이어도) · 2xx인데 토큰 없음 | `REFRESH_RETRYABLE` · 503 |
+| 4xx + OAuth 오류 `invalid_grant`(만료 · 폐기 · 이미 쓴 refresh_token) · 저장된 refresh_token 만료 | `RECONNECT_REQUIRED` · 401 |
+| `invalid_client` · `unauthorized_client`(앱 인증 설정) | `CONFIG_ERROR` · 500 |
+| 그 밖의 4xx(근거 없음) · 새 토큰 저장 실패 | `REFRESH_FAILED` · 500 |
+| 다른 요청의 갱신 대기 초과 | `REFRESH_RETRYABLE` · 503(전에는 `REFRESH_FAILED`) |
+
+- 회귀 테스트 13개(위 표의 각 경우 · 상태 코드 매핑) — 수정 전 12개 실패 확인. 실패 시 DB 토큰을 바꾸지 않는 것도 확인.
+- 화면: `RECONNECT_REQUIRED`일 때만 재연결 안내, 나머지는 기존 일반 오류 문구(LaunchDesk 쇼핑몰 화면은 응답 메시지 “잠시 후 다시 시도”) — 화면 코드 변경 없음.
+- 한계: Cafe24가 토큰을 새로 발급한 직후 응답이 끊기면(시간 초과) 이전 refresh_token은 이미 폐기됐을 수 있다 — 다음 시도에서 `invalid_grant`로 재연결 안내가 나간다(복구할 방법 없음 · 근거 있는 재연결). 재시도 가능 실패 뒤에도 갱신 권한(임대 30초)은 그대로 두어 그동안 다른 요청은 기다린다(장애 중 Cafe24에 몰리지 않게).
+- 반영 범위는 7과 같다(재배포 승인 후).
+
+## 9. 다음 (각각 승인 후)
 1. 이 브랜치 검토 → master 병합(소스만 · 배포 없음).
 2. 배포본 기준으로 서버 함수 결함 수정(Meta 오류 분류 · 토큰 조회 일시 오류 · Cafe24 401 재연결 안내 등) → 함수별 재배포 승인.
 3. 마이그레이션 파일 · 원격 기록 정리 방침 결정.
