@@ -423,7 +423,7 @@
     });
   });
   if(refreshBtn){
-    refreshBtn.addEventListener('click', function(){ ctl.refresh(); });
+    refreshBtn.addEventListener('click', function(){ ctl.refresh(); ensureLinksLoaded(); });
   }
   // 운영 현황 상단의 전역 새로고침 — 이 파일은 그 버튼 자체를 바꾸지 않고
   // 클릭만 구독해 캐시를 비운다. 이어서 계정 요약이 다시 성공하면 위 흐름이
@@ -448,7 +448,7 @@
     } else if(btn.getAttribute('data-madsets-retry') === 'ads'){
       ctl.retryAds(btn.getAttribute('data-mk'));
     } else if(btn.getAttribute('data-madsets-retry') === 'list'){
-      ctl.ensureList();
+      ctl.ensureList(); ensureLinksLoaded();
     }
   });
 

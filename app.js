@@ -1232,15 +1232,13 @@
 
     var legacyCalc = [];
     try{ legacyCalc = JSON.parse(localStorage.getItem('ld-tools-calc-history') || '[]'); }catch(e){}
-    legacyCalc.forEach(function(item){
-      writes.push(sb.from('tool_records').insert({ user_id: userId, tool_type: 'margin_calc', data: item }));
-    });
+    // 종류별 한 번의 insert(배열) — 일부만 들어가 다음 시도에서 중복되는 일을 막는다. 성공하면 그 키만 바로 지운다
+    var clearOnOk = function(key){ return function(res){ if(res && !res.error){ try{ localStorage.removeItem(key); }catch(e){} } return res; }; };
+    if(legacyCalc.length) writes.push(sb.from('tool_records').insert(legacyCalc.map(function(item){ return { user_id: userId, tool_type: 'margin_calc', data: item }; })).then(clearOnOk('ld-tools-calc-history')));
 
     var legacyAdlog = [];
     try{ legacyAdlog = JSON.parse(localStorage.getItem('ld-adlog-records') || '[]'); }catch(e){}
-    legacyAdlog.forEach(function(item){
-      writes.push(sb.from('tool_records').insert({ user_id: userId, tool_type: 'ad_log', data: item }));
-    });
+    if(legacyAdlog.length) writes.push(sb.from('tool_records').insert(legacyAdlog.map(function(item){ return { user_id: userId, tool_type: 'ad_log', data: item }; })).then(clearOnOk('ld-adlog-records')));
 
     if(!writes.length) return Promise.resolve(true); // 실제로 옮길 데이터가 없었음
 
@@ -1477,16 +1475,6 @@
       if(deskNavAuth){ deskNavAuth.textContent = '로그인'; deskNavAuth.setAttribute('href', '#/login'); }
     }
   }
-  // profiles 테이블에 현재 사용자 행이 있는지만 참고로 확인(콘솔 로그만,
-  // 화면에는 영향 없음) — display_name 등 프로필 기능은 다음 단계.
-  function checkProfileRow(user){
-    var sb = window.launchdeskSupabase;
-    if(!sb || !user) return;
-    sb.from('profiles').select('id').eq('id', user.id).maybeSingle().then(function(res){
-      if(res.error) console.log('[launchdesk] profiles 조회 결과(테이블 미생성이면 에러가 정상):', res.error.message);
-      else console.log('[launchdesk] profiles 행 존재 여부:', !!res.data);
-    }).catch(function(err){ console.log('[launchdesk] profiles 조회 중 오류:', err && err.message); });
-  }
   // 로그인 상태: 카드를 누르면 "내 쇼핑몰"(#/account)로 이동한다. 카드 안의
   // 로그아웃 링크는 자체 클릭 핸들러에서 stopPropagation()하므로 이 핸들러와
   // 충돌하지 않는다.
@@ -1521,7 +1509,6 @@
       renderAuthUI(session);
       var user = session && session.user;
       if(user){
-        checkProfileRow(user);
         // UTM First-Touch Acquisition — auth.uid()가 확정된 이 지점에서만
         // 대기 중인 UTM(있으면)을 record_user_acquisition() RPC로 전송한다.
         // 아래 hydrate 중복 방지 return보다 앞에 둬서, 이미 hydrate된
