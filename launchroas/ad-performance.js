@@ -42,7 +42,7 @@
       :stale?'연결한 상품 마진이 최근 저장값과 달라 계산하지 않았어요. 다시 연결해 주세요.':spendKrw==null?'광고비 환율을 저장하면 계산해요(실제 판매 기준 패널).':'Meta가 집계한 구매가 없어 계산하지 않았어요.'));
     if(computable)box.append(element('p','estimate-caution','취소·환불, 부가세·세금·고정비 미반영 · 확정 순이익 아님'));
     box.append(element('small','','사용한 마진 기준: '+link.product_label+' · 주문당 광고 전 잔액 '+won(link.pre_ad)+' · '+savedDate(link.source_saved_at)));
-    var newer=newerMargin(link);
+    var newer=stale;
     if(newer)box.append(element('p','margin-stale','마진 기준 갱신 필요 · 같은 상품의 최근 저장 계산은 주문당 광고 전 잔액 '+won(newer.result.preAd)+'이에요. 상품·마진 연결에서 다시 연결해 주세요.'));
     if(computable)box.append(element('small','','광고별 주문 귀속은 Meta 전환 기준이라 실제 광고별 이익이 아니에요. Meta 구매에는 다른 상품 구매가 포함될 수 있어요.'));
     return box;
@@ -154,13 +154,13 @@
       if(id!==generation||!valid(ctx,key))return;
       if(response.error||!response.data||response.data.ok!==true){message.textContent='광고별 성과를 불러오지 못했어요. Meta 연결을 확인해 주세요.';publish({key:key,error:'광고 세트 성과를 불러오지 못함'});return;}
       var data=response.data;accountCurrency=String(data.account&&data.account.currency||'KRW').toUpperCase();
-      if(data.truncated){message.textContent='조회 한도를 넘어 일부 광고 세트가 누락됐어요. 이 기간의 광고별 성과를 계산에 사용하지 마세요.';return;}
+      if(data.truncated){message.textContent='조회 한도를 넘어 일부 광고 세트가 누락됐어요. 이 기간의 광고별 성과를 계산에 사용하지 마세요.';publish({key:key,error:'광고 세트 일부 누락'});return;}
       var loaded=await Promise.all([
         ctx.client.from('ad_margin_links').select('meta_adset_id,product_label,pre_ad,total_income,source_saved_at').eq('store_id',ctx.storeId),
         ctx.client.from('tool_records').select('tool_type,data').eq('user_id',ctx.userId).in('tool_type',['margin_calc','product_margin_link']).order('created_at',{ascending:false}).limit(300)
       ]),linked=loaded[0];
       if(id!==generation||!valid(ctx,key))return;
-      if(linked.error){message.textContent='저장된 광고·마진 연결을 불러오지 못했어요. 연결 상태를 확인해 주세요.';return;}
+      if(linked.error){message.textContent='저장된 광고·마진 연결을 불러오지 못했어요. 연결 상태를 확인해 주세요.';publish({key:key,error:'광고·마진 연결 조회 실패'});return;}
       (linked.data||[]).forEach(function(row){marginLinks[String(row.meta_adset_id)]=row;});
       if(!loaded[1].error){
         var recs=loaded[1].data||[];
@@ -177,7 +177,7 @@
       var count=rows.length;
       more.hidden=count<=3;if(count>3)more.textContent='광고 세트 전체 '+count+'개 보기 ↓';
       message.textContent=count?'광고 세트 '+count+'개':'선택 기간에 성과가 잡힌 광고 세트가 없어요.';
-    }catch(e){if(id===generation&&valid(ctx,key))message.textContent='광고별 성과 조회 중 오류가 발생했어요.';}
+    }catch(e){if(id===generation&&valid(ctx,key)){message.textContent='광고별 성과 조회 중 오류가 발생했어요.';publish({key:key,error:'광고별 성과 조회 오류'});}}
   });
   window.addEventListener('launchroas:margin-linked',function(event){
     if(String(event.detail.storeId)!==String(app.getContext().storeId))return;

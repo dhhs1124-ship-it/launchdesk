@@ -589,8 +589,9 @@
     var clearBtn = byId('savedCalcClear');
     if(clearBtn) clearBtn.addEventListener('click', function(){
       if(!window.confirm('저장한 계산 기록을 전부 지울까요? 되돌릴 수 없어요.')) return;
-      if(window.launchdeskStore) window.launchdeskStore.clearCalcHistory();
+      var cleared = window.launchdeskStore ? window.launchdeskStore.clearCalcHistory() : null;
       renderSavedCalcs();
+      Promise.resolve(cleared).then(function(ok){ if(ok === false){ renderSavedCalcs(); showToast('계산 기록을 지우지 못했어요. 다시 시도해 주세요.'); } });
     });
     Array.prototype.forEach.call(list.querySelectorAll('.scr-load'), function(btn){
       btn.addEventListener('click', function(){
@@ -750,9 +751,10 @@
         }
         return;
       }
-      if(window.launchdeskStore) window.launchdeskStore.addCalcRecord(mcBuildRecord(calc));
+      var savedCalc = window.launchdeskStore ? window.launchdeskStore.addCalcRecord(mcBuildRecord(calc)) : null;
       renderSavedCalcs();
-      showToast('계산 결과를 저장했어요', 'success');
+      // 저장 결과를 받은 뒤 알림 — 실패면 목록을 되돌린 상태로 다시 그린다
+      Promise.resolve(savedCalc).then(function(ok){ if(ok === false){ renderSavedCalcs(); showToast('계산 결과를 저장하지 못했어요. 다시 시도해 주세요.'); } else showToast('계산 결과를 저장했어요', 'success'); });
       /* GA4 margin_calculator_use — only reaches here once a save actually
          happened. No price/cost/fee/result here on purpose — those are
          business-sensitive figures, not needed just to know the tool got used. */
@@ -837,8 +839,9 @@
     return window.launchdeskStore ? window.launchdeskStore.getAdlogRecords() : [];
   }
   window.deleteAdlogRecord = function(id){
-    if(window.launchdeskStore) window.launchdeskStore.removeAdlogRecord(id);
+    var removedRes = window.launchdeskStore ? window.launchdeskStore.removeAdlogRecord(id) : null;
     renderAdlog();
+    Promise.resolve(removedRes).then(function(ok){ if(ok === false){ renderAdlog(); showToast('광고 기록을 삭제하지 못했어요. 다시 시도해 주세요.'); } });
   };
   var roasClass = function(roas){
     if(roas >= 4) return 'roas-good';
@@ -926,11 +929,11 @@
       // 새 수동 기록은 지금 선택한 쇼핑몰에 붙인다(쇼핑몰별 합계에 들어가도록).
       var adlogStore = selectedAdlogStoreId();
       if(adlogStore) record.store_id = adlogStore;
-      if(window.launchdeskStore) window.launchdeskStore.addAdlogRecord(record);
+      var savedAdlog = window.launchdeskStore ? window.launchdeskStore.addAdlogRecord(record) : null;
       renderAdlog();
       e.target.reset();
       document.getElementById('adlogFormWrap').hidden = true;
-      showToast('광고 기록이 저장됐어요', 'success');
+      Promise.resolve(savedAdlog).then(function(ok){ if(ok === false){ renderAdlog(); showToast('광고 기록을 저장하지 못했어요. 다시 입력해 주세요.'); } else showToast('광고 기록이 저장됐어요', 'success'); });
       /* GA4 ad_record_add — fires right after the record above actually
          persisted. No date/name/spend/revenue/channel here on purpose —
          those are the seller's own business numbers, not needed just to

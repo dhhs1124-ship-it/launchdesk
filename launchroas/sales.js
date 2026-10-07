@@ -6,7 +6,7 @@
   if(!app||!S||!MC||!periods)return;
   var byId=function(id){return document.getElementById(id);};
   var LINK='product_margin_link',FX='ad_fx_rate',CALC='margin_calc';
-  var dataKey='',ticket=0,state={orders:null,error:'',truncated:false,links:[],calcs:[],fxRecord:null,range:null};
+  var dataKey='',ticket=0,fxSeq=0,state={orders:null,error:'',truncated:false,links:[],calcs:[],fxRecord:null,fxStale:[],range:null};
   var EXCLUDED_LABEL={canceled:'취소',canceledBeforePayment:'입금 전 취소',returned:'반품',exchangedOriginal:'교환 원상품',unpaid:'미입금',claimPending:'취소·반품 진행 중',unknown:'상태 확인 필요'};
 
   function won(n){return Math.round(Number(n)).toLocaleString('ko-KR')+'원';}
@@ -30,7 +30,7 @@
 
   async function load(ctx,key){
     var id=++ticket,range=periods.resolve(ctx.period.kind,ctx.period.date,Date.now());
-    state={orders:null,error:'',truncated:false,links:[],calcs:[],fxRecord:null,range:range};render(ctx);
+    state={orders:null,error:'',recordsError:'',truncated:false,links:[],calcs:[],fxRecord:null,fxStale:[],range:range};render(ctx);
     var records=await ctx.client.from('tool_records').select('id,data,created_at,tool_type').eq('user_id',ctx.userId)
       .in('tool_type',[LINK,FX,CALC]).order('created_at',{ascending:false}).limit(300);
     if(id!==ticket)return;
@@ -38,9 +38,10 @@
       var rows=records.data||[],store=String(ctx.storeId);
       state.links=S.latestLinks(rows.filter(function(r){return r.tool_type===LINK&&String(r.data&&r.data.store_id)===store;}).map(function(r){return Object.assign({_id:r.id},r.data);}));
       state.calcs=rows.filter(function(r){return r.tool_type===CALC&&r.data&&r.data.calc_version===2&&r.data.input;}).map(function(r){return r.data;});
-      state.fxRecord=rows.find(function(r){return r.tool_type===FX&&String(r.data&&r.data.store_id)===store;})||null;
+      var fxRows=rows.filter(function(r){return r.tool_type===FX&&String(r.data&&r.data.store_id)===store;});
+      state.fxRecord=fxRows[0]||null;state.fxStale=fxRows.slice(1).map(function(r){return r.id;}); // 지우지 못하고 남은 예전 환율 기록 — 다음 저장 때 같이 정리
       app.setFx(state.fxRecord?{currency:state.fxRecord.data.currency,krw_per_unit:state.fxRecord.data.krw_per_unit,saved_at:state.fxRecord.data.saved_at}:null);
-    }
+    }else state.recordsError='저장된 상품 비용 · 환율을 불러오지 못했어요. 새로고침해 주세요.'; // 주문 오류(state.error)와 따로 — '비용 미입력 · 환율 필요'로 보이지 않게
     if(!ctx.cafeAccount||ctx.cafeAccount.status!=='connected'){state.error='Cafe24를 연결하면 실제 판매 수량을 볼 수 있어요.';render(app.getContext());return;}
     if(!range){state.error='기간을 다시 선택해 주세요.';render(app.getContext());return;}
     try{
@@ -122,7 +123,7 @@
       }
       spendNotes.push('Meta 광고계정 시간대'+(tz?' '+tz:'')+' 기준 같은 날짜 범위'+(tz&&tz!=='Asia/Seoul'?' — 한국 시간과 달라 날짜 경계가 몇 시간 어긋날 수 있어요.':''));
     }
-    figures.appendChild(row('원화 광고비',ms?ms.text:spendKrw==null?'환율 입력 필요':won(spendKrw),spendNotes));
+    figures.appendChild(row('원화 광고비',ms?ms.text:spendKrw==null?(state.recordsError?'환율을 불러오지 못했어요':'환율 입력 필요'):won(spendKrw),spendNotes));
     renderSpend(mp,ms,currency,spendKrw,ctx.fx);
 
     // 5. 광고비 차감 후 예상 이익 — 필요한 값이 없으면 0원으로 표시하지 않는다.
@@ -145,10 +146,11 @@
     if(state.error)chips.push({text:ctx.cafeAccount&&ctx.cafeAccount.status==='connected'?'Cafe24 조회 실패':'Cafe24 미연결',tone:'warn'});
     if(ms)chips.push({text:'Meta '+ms.text,tone:ms.text==='조회 중'?'':'warn'});
     // 미등록은 상품 종류(옵션은 같은 상품)와 판매 수량을 함께 — '19개'가 종류로 오해되지 않게.
-    if(s&&s.unlinkedQty)chips.push({text:'비용 미입력 상품 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+') · 입력하기',tone:'warn',action:'products'});
+    if(state.recordsError)chips.unshift({text:state.recordsError,tone:'warn'});
+    if(s&&s.unlinkedQty&&!state.recordsError)chips.push({text:'비용 미입력 상품 '+count(s.unlinkedKinds,'종')+' (판매 '+count(s.unlinkedQty)+') · 입력하기',tone:'warn',action:'products'});
     if(s&&s.margin.estimatedOrders)chips.push({text:'판매가 추정 '+count(s.margin.estimatedOrders,'건'),tone:''});
     if(s&&s.margin.savedOnlyOrders)chips.push({text:'저장 판매가 기준 '+count(s.margin.savedOnlyOrders,'건'),tone:''});
-    if(!ms&&mp&&spendKrw==null)chips.push({text:'환율 입력 필요',tone:'warn',action:'fx'});
+    if(!ms&&mp&&spendKrw==null&&!state.recordsError)chips.push({text:'환율 입력 필요',tone:'warn',action:'fx'});
     if(s&&!s.soldQty)chips.push({text:'판매 없음',tone:''});
     renderHero(profit,base,spendKrw,partial,chips,s);
     var ready=!!ctx.connectionsLoaded;
@@ -170,6 +172,7 @@
     var cost={title:'상품 비용 입력',done:false,button:{label:'상품 비용 입력하기',run:openProducts}};
     // 앞 단계가 필요한 단계에는 버튼을 두지 않는다(누를 수 있는 곳을 하나로).
     if(!cafeOk){cost.text='Cafe24를 연결하면 판매 상품이 보여요.';cost.button=null;}
+    else if(state.recordsError){cost.text=state.recordsError;cost.button=null;}
     else if(!s)cost.text=state.error?'판매 상품을 불러오지 못했어요.':'판매 상품을 확인하는 중이에요.';
     else if(!s.soldQty)cost.text='이 기간 판매가 없어 확인할 상품이 없어요.';
     else if(!s.unlinkedQty){cost.done=true;cost.text='판매 상품 '+count(s.productKinds,'종')+' 모두 비용 저장됨';cost.button=null;}
@@ -179,8 +182,8 @@
     var partialResult=profit!=null&&!!(s&&s.partial);
     var result={title:'광고비 차감 후 예상 이익 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};
     result.text=profit!=null?(partialResult?'지금은 일부 상품 기준(판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')이에요':'전체 판매 상품 기준으로 확인할 수 있어요')
-      :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
-    if(profit==null&&mp&&spendKrw==null&&!ms)result.button={label:'환율 입력',run:openFx};
+      :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:state.recordsError?'저장된 상품 비용 · 환율을 불러오지 못했어요':mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
+    if(profit==null&&mp&&spendKrw==null&&!ms&&!state.recordsError)result.button={label:'환율 입력',run:openFx};
     return [conn,cost,result];
   }
   function renderGuide(steps,ready){
@@ -262,18 +265,28 @@
   }
 
   byId('salesFxSave').addEventListener('click',async function(){
-    var ctx=app.getContext(),rate=Number(byId('salesFxRate').value),currency=byId('salesFxCurrency').textContent;
+    var ctx=app.getContext(),rate=Number(byId('salesFxRate').value),currency=byId('salesFxCurrency').textContent,btn=this;
     if(!ctx.userId||!ctx.storeId||!(rate>0)||!/^[A-Z]{3}$/.test(currency)){byId('salesFxNote').textContent='0보다 큰 환율을 입력해 주세요.';return;}
     var data={store_id:String(ctx.storeId),currency:currency,krw_per_unit:rate,saved_at:new Date().toISOString()};
-    this.disabled=true;
-    // tool_records는 수정(UPDATE) 권한이 없다 — 새로 저장한 뒤 이 쇼핑몰의 이전 환율 기록을 지운다.
-    var res=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:FX,data:data}).select('id').single();
-    if(!res.error&&state.fxRecord)await ctx.client.from('tool_records').delete().eq('id',state.fxRecord.id).eq('user_id',ctx.userId).eq('tool_type',FX);
-    this.disabled=false;
-    if(res.error){byId('salesFxNote').textContent='환율을 저장하지 못했어요.';return;}
-    state.fxRecord={id:res.data.id,data:data};
-    byId('salesFxNote').textContent='환율을 저장했어요.';
-    app.setFx({currency:currency,krw_per_unit:rate,saved_at:data.saved_at});
+    // 요청 시작 때 고정: 이 저장이 지울 이전 기록(현재 기록 + 예전에 못 지운 기록) · 요청 번호 · 화면 상태
+    var req=++fxSeq,mine=state,oldIds=(state.fxRecord?[state.fxRecord.id]:[]).concat(state.fxStale||[]);
+    // 계정 · 쇼핑몰이 바뀌었거나 더 새 저장이 시작됐거나 화면이 다시 불러와졌으면(state 교체) 이 결과로 화면을 바꾸지 않는다
+    var valid=function(){var now=app.getContext();return req===fxSeq&&state===mine&&now.userId===ctx.userId&&String(now.storeId)===String(ctx.storeId);};
+    btn.disabled=true;
+    try{
+      // tool_records는 수정(UPDATE) 권한이 없다 — 새로 저장한 뒤 이 쇼핑몰의 이전 환율 기록을 지운다.
+      var res=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:FX,data:data}).select('id').single();
+      if(!valid())return;
+      if(res.error){byId('salesFxNote').textContent='환율을 저장하지 못했어요.';return;}
+      var del=oldIds.length?await ctx.client.from('tool_records').delete().in('id',oldIds).eq('user_id',ctx.userId).eq('tool_type',FX):{error:null};
+      if(!valid())return;
+      state.fxRecord={id:res.data.id,data:data};
+      // 삭제 실패면 새 환율은 저장됐고(가장 최근 기록이 쓰인다) 남은 이전 기록은 다음 저장 때 다시 정리한다
+      state.fxStale=del&&del.error?oldIds:[];
+      byId('salesFxNote').textContent=del&&del.error?'환율을 저장했어요. 이전 환율 기록 정리는 다음 저장 때 다시 시도해요.':'환율을 저장했어요.';
+      app.setFx({currency:currency,krw_per_unit:rate,saved_at:data.saved_at});
+    }catch(e){if(valid())byId('salesFxNote').textContent='환율을 저장하지 못했어요.';}
+    finally{if(req===fxSeq)btn.disabled=false;}
   });
 
   function refresh(ctx){

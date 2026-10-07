@@ -402,7 +402,6 @@
   // ---------------------------------------------------------------- 도매처
   // fetchPublishedWholesalers()는 RLS가 published 행만 돌려주므로 로그인
   // 여부와 무관하게 호출 가능하다(wholesalers.js 기존 구현 그대로 재사용).
-  var wholesalersLoaded = false;
   function loadWholesalers(){
     if(!wholesalersEl) return;
     // index.html의 script 순서상 wholesalers.js가 이 파일보다 먼저 로드돼
@@ -415,7 +414,6 @@
     }
     wholesalersEl.innerHTML = '<p class="opsdash-empty-note">불러오는 중…</p>';
     window.launchdeskWholesalers.fetchPublishedWholesalers().then(function(res){
-      wholesalersLoaded = true;
       if(!res.ok || !res.data || !res.data.length){
         wholesalersEl.innerHTML = '<p class="opsdash-empty-note">아직 등록된 도매처가 없습니다. <a href="#/wholesale" style="color:var(--op-accent-ink); font-weight:600;">도매처 둘러보기</a></p>';
         return;
@@ -430,7 +428,6 @@
       }).join('');
       wholesalersEl.innerHTML = rowsHtml + '<a class="opsdash-see-all" href="#/wholesale">도매처 전체보기 →</a>';
     }).catch(function(err){
-      wholesalersLoaded = true;
       console.warn('[launchdesk] 홈 대시보드: 도매처 조회 중 오류:', err && err.message);
       wholesalersEl.innerHTML = '<p class="opsdash-empty-note">도매처를 불러오지 못했습니다.</p>';
     });

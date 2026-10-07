@@ -96,7 +96,7 @@
   function signed(v,cur){return v===0?'변화 없음':(v<0?'−':'+')+amt(Math.abs(v),cur);}
   // 기본 카드: 결과 상태 · 구매 변화 · 광고비 변화 · 이익(실제 / 참고 / 보류) · 바꾼 요소 한 줄. 나머지는 '비교 근거'에서 펼친다.
   function changeCard(g){
-    var c=g.change,cur=c.basis&&c.basis.currency||'KRW',card=el('article','adlog-change'),latest=g.latest,live=results[c.action_id];
+    var c=g.change,cur=c.basis&&c.basis.currency||'KRW',card=el('article','adlog-change'),live=results[c.action_id];
     // 저장된 결과는 최신 기준. 최신이 조회 실패뿐이면 마지막 유효 결과를 '갱신 실패 · 이전 결과'로 보여 준다
     var now=g.results.length?CH.currentOf(g.results):null;
     var shown=live&&live.cmp?{before:live.before,after:live.after,cmp:live.cmp,saved:false}:now?{before:now.record.before,after:now.record.after,cmp:now.record.result,saved:true,stale:now.state==='stale',legacy:!now.record.result.judgement_version}:null;
@@ -321,20 +321,24 @@
     if(!draft.ad){draft.message='기록할 광고를 골라 주세요.';renderDraft();return;}
     if(!byId('chgApplied').checked){draft.message='Meta 광고 관리자에서 실제로 바꾼 광고만 기록할 수 있어요 — 확인란을 체크해 주세요.';renderDraft();return;}
     busy=true;draft.message='변경 전 지표와 당시 계산 기준을 불러오고 있어요.';renderDraft();
+    // 저장 시작 때의 양식 — 조회를 기다리는 사이 닫거나 다른 광고로 다시 열면(draft가 바뀌면) 저장하지 않는다
+    var d=draft;
     try{
-      var adsetId=draft.ad.adset_id||await findAdset(ctx,draft.ad.ad_id);
-      if(!adsetId){draft.message='이 광고의 광고 세트를 찾지 못했어요(이번 달 집행 기준).';return;}
+      var adsetId=d.ad.adset_id||await findAdset(ctx,d.ad.ad_id);
+      if(draft!==d)return;
+      if(!adsetId){d.message='이 광고의 광고 세트를 찾지 못했어요(이번 달 집행 기준).';return;}
       var days=Number(byId('chgDays').value),start=byId('chgStart').value,p=CH.periods(start,days);
-      var got=await dailyAds(ctx,adsetId,draft.ad.ad_id,p.before.since,p.before.until);
-      var built=CH.buildChangeRecord({storeId:ctx.storeId,ad:{ad_id:draft.ad.ad_id,adset_id:adsetId,ad_name:draft.ad.ad_name},suggestion:draft.suggestion,entry:draft.direct?'direct':'ai_suggestion',appliedConfirmed:true,
+      var got=await dailyAds(ctx,adsetId,d.ad.ad_id,p.before.since,p.before.until),margin=await marginFor(ctx,adsetId);
+      if(draft!==d)return;
+      var built=CH.buildChangeRecord({storeId:ctx.storeId,ad:{ad_id:d.ad.ad_id,adset_id:adsetId,ad_name:d.ad.ad_name},suggestion:d.suggestion,entry:d.direct?'direct':'ai_suggestion',appliedConfirmed:true,
         element:byId('chgElement').value,before:byId('chgBefore').value,after:byId('chgAfter').value,method:byId('chgMethod').value,newAdId:byId('chgNewAd').value.trim(),
         startDate:start,compareDays:days,baseline:{metrics:got.agg,fetched_at:new Date().toISOString(),source:'meta-adset-insights · 하루 단위 합산'},
-        basis:basisFor(ctx,got.currency,await marginFor(ctx,adsetId),got.attribution,got.timezone),creative:draft.creative,
+        basis:basisFor(ctx,got.currency,margin,got.attribution,got.timezone),creative:d.creative,
         concurrent:[].slice.call(document.querySelectorAll('#adlogChangeForm input[name=chgConcurrent]:checked')).map(function(b){return b.value;}),
         concurrentNote:byId('chgConcurrentNote').value,memo:byId('chgMemo').value},Date.now());
-      if(!built.ok){draft.message='확인해 주세요: '+built.errors.join(', ');return;}
-      if(await insert(built.record)){draft=null;status('실행 기록을 저장했어요. 비교 기간이 끝나면 “결과 비교하기”를 눌러 주세요.');}
-    }catch(e){draft.message='실행 기록을 저장하지 못했어요.';}
+      if(!built.ok){d.message='확인해 주세요: '+built.errors.join(', ');return;}
+      if(await insert(built.record)){if(draft===d)draft=null;status('실행 기록을 저장했어요. 비교 기간이 끝나면 “결과 비교하기”를 눌러 주세요.');}
+    }catch(e){d.message='실행 기록을 저장하지 못했어요.';}
     finally{busy=false;render();}
   }
 
