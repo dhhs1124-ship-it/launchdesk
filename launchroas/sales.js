@@ -122,7 +122,7 @@
       }
       spendNotes.push('Meta 광고계정 시간대'+(tz?' '+tz:'')+' 기준 같은 날짜 범위'+(tz&&tz!=='Asia/Seoul'?' — 한국 시간과 달라 날짜 경계가 몇 시간 어긋날 수 있어요.':''));
     }
-    figures.appendChild(row('원화 광고비',ms?ms.text:spendKrw==null?'환율 입력 필요':won(spendKrw),spendNotes));
+    figures.appendChild(row('원화 광고비',ms?ms.text:spendKrw==null?(state.recordsError?'환율을 불러오지 못했어요':'환율 입력 필요'):won(spendKrw),spendNotes));
     renderSpend(mp,ms,currency,spendKrw,ctx.fx);
 
     // 5. 광고비 차감 후 예상 이익 — 필요한 값이 없으면 0원으로 표시하지 않는다.
@@ -181,7 +181,7 @@
     var partialResult=profit!=null&&!!(s&&s.partial);
     var result={title:'광고비 차감 후 예상 이익 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};
     result.text=profit!=null?(partialResult?'지금은 일부 상품 기준(판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')이에요':'전체 판매 상품 기준으로 확인할 수 있어요')
-      :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
+      :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:state.recordsError?'저장된 상품 비용 · 환율을 불러오지 못했어요':mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
     if(profit==null&&mp&&spendKrw==null&&!ms)result.button={label:'환율 입력',run:openFx};
     return [conn,cost,result];
   }
