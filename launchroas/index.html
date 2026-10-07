@@ -4,57 +4,254 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#101214">
   <title>LaunchROAS · 쇼핑몰 운영 현황</title>
   <meta name="description" content="Cafe24 주문과 Meta 광고 성과를 각각 확인하는 LaunchROAS">
+  <!-- 런치데스크 로고 심볼(2x2 사각형 그리드) 원본 파일을 그대로 복사해 사용 -->
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="./favicon.ico" sizes="32x32">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="wordmark" href="./" aria-label="LaunchROAS 홈">Launch<span>ROAS</span></a>
+    <a class="wordmark" href="./" aria-label="LaunchROAS 홈"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="6" height="6" rx="1"/><rect x="10" y="2" width="6" height="6" rx="1"/><rect x="2" y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/></svg></span>Launch<span>ROAS</span></a>
     <div class="top-actions">
-      <a href="https://launchdesk.co.kr/" class="top-link">런치데스크 가이드 ↗</a>
+      <div id="connectionPills" class="connection-pills" hidden aria-label="연결 상태">
+        <span id="cafeConnection" class="connection-pill" data-state="loading">Cafe24 확인 중</span>
+        <span id="metaConnection" class="connection-pill" data-state="loading">Meta 확인 중</span>
+        <button type="button" class="connection-manage" data-view="connections" aria-label="연결 관리">연결 관리 ↗</button>
+      </div>
+      <a href="https://launchdesk.co.kr/" class="top-link">런치데스크 가이드 <span aria-hidden="true">↗</span></a>
       <span id="accountEmail" class="account-email" hidden></span>
+      <button id="switchAccount" type="button" class="text-button" hidden>계정 바꾸기</button>
       <button type="button" id="logout" class="text-button" hidden>로그아웃</button>
     </div>
   </header>
   <main>
     <section id="loginPanel" class="login-panel">
-      <p class="eyebrow">LAUNCHROAS / EARLY ACCESS</p>
-      <h1>운영 중인 쇼핑몰의<br>주문과 광고를 한눈에.</h1>
-      <p class="intro">런치데스크에서 사용하던 계정으로 로그인하세요. 연결된 쇼핑몰의 실제 데이터만 표시합니다.</p>
-      <form id="loginForm" class="login-form">
-        <label for="email">이메일</label>
-        <input id="email" type="email" autocomplete="email" required>
-        <label for="password">비밀번호</label>
-        <input id="password" type="password" autocomplete="current-password" required>
-        <button type="submit" id="loginSubmit" class="primary">로그인</button>
-      </form>
-      <p id="loginMessage" class="message" role="status"></p>
-      <p class="small">계정이 없다면 <a href="https://launchdesk.co.kr/#/login">런치데스크에서 가입</a>하세요. Google·Kakao 로그인은 새 사이트의 인증 주소 설정 후 제공합니다.</p>
+      <div class="login-intro">
+        <p class="eyebrow"><span class="eyebrow-line"></span> LAUNCHDESK / ROAS</p>
+        <h1>오늘의 운영을<br><em>한눈에.</em></h1>
+        <p class="intro">쇼핑몰 주문과 광고 성과를 한 공간에서 확인하세요. 연결된 계정의 실제 데이터가 표시됩니다.</p>
+        <div class="login-caption"><span class="caption-dot"></span> Cafe24 주문 · Meta 광고</div>
+      </div>
+      <div class="login-card">
+        <p class="section-kicker">WELCOME BACK</p>
+        <h2 id="authTitle">다시 만나서 반가워요.</h2>
+        <p class="form-description">런치데스크와 같은 계정으로 이용합니다.</p>
+        <form id="loginForm" class="login-form">
+          <label for="email">이메일</label>
+          <input id="email" type="email" autocomplete="email" placeholder="name@example.com" required>
+          <label for="password">비밀번호</label>
+          <input id="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required>
+          <div id="signupFields" hidden>
+            <label for="passwordConfirm">비밀번호 확인</label>
+            <input id="passwordConfirm" type="password" autocomplete="new-password" placeholder="비밀번호 다시 입력">
+            <p class="consent-info">가입·본인 확인·서비스 데이터 동기화를 위해 이메일과 인증 정보, 필수 동의 기록을 처리합니다. 탈퇴 또는 목적 달성 시까지 보유하며, 동의를 거부하면 회원 기능을 이용할 수 없습니다.</p>
+            <label class="check-row"><input id="signupTerms" type="checkbox"> [필수] 이용약관 동의</label>
+            <a class="policy-link" href="https://launchdesk.co.kr/#/terms" target="_blank" rel="noopener">이용약관 보기 ↗</a>
+            <label class="check-row"><input id="signupPrivacy" type="checkbox"> [필수] 개인정보 수집·이용 동의</label>
+            <a class="policy-link" href="https://launchdesk.co.kr/#/privacy" target="_blank" rel="noopener">개인정보처리방침 보기 ↗</a>
+          </div>
+          <button type="submit" id="loginSubmit" class="primary">로그인 <span aria-hidden="true">→</span></button>
+        </form>
+        <p id="loginMessage" class="message" role="status"></p>
+        <p class="small"><button id="authMode" type="button" class="inline-button">계정이 없나요? 회원가입</button></p>
+      </div>
+    </section>
+
+    <section id="consentGate" class="consent-gate" hidden aria-labelledby="consentTitle">
+      <div class="login-card">
+        <p class="section-kicker">ACCOUNT</p><h2 id="consentTitle">필수 동의 확인</h2>
+        <p class="form-description">이 계정의 동의 이력을 확인할 수 없습니다. 계속하려면 약관을 확인해 주세요.</p>
+        <label class="check-row"><input id="gateTerms" type="checkbox"> [필수] 이용약관 동의</label>
+        <a class="policy-link" href="https://launchdesk.co.kr/#/terms" target="_blank" rel="noopener">이용약관 보기 ↗</a>
+        <label class="check-row"><input id="gatePrivacy" type="checkbox"> [필수] 개인정보 수집·이용 동의</label>
+        <a class="policy-link" href="https://launchdesk.co.kr/#/privacy" target="_blank" rel="noopener">개인정보처리방침 보기 ↗</a>
+        <button id="gateSubmit" type="button" class="primary">동의하고 계속하기</button>
+        <p id="gateMessage" class="message" role="status"></p>
+        <button id="gateLogout" type="button" class="inline-button">다른 계정으로 로그인</button>
+      </div>
     </section>
 
     <section id="dashboard" class="dashboard" hidden>
-      <div class="dashboard-head">
-        <div><p class="eyebrow">OPERATIONS / OVERVIEW</p><h1>운영 현황</h1><p class="intro">오늘 기준 · 한국 시간의 주문, 광고계정 시간의 Meta 성과</p></div>
-        <div class="controls"><label for="storeSelect">쇼핑몰</label><select id="storeSelect"></select><button id="refresh" type="button" class="secondary">다시 조회</button></div>
+      <aside class="sidebar" aria-label="서비스 메뉴">
+        <button class="sidebar-current" type="button" data-view="overview"><span class="nav-icon" aria-hidden="true">◫</span> 운영 현황</button>
+        <button class="sidebar-link" type="button" data-view="ads"><span class="nav-icon" aria-hidden="true">▤</span> 광고 성과</button>
+        <button class="sidebar-link" type="button" data-view="calculator"><span class="nav-icon" aria-hidden="true">▦</span> 상품 비용 · 환율</button>
+        <button class="sidebar-link" type="button" data-view="records"><span class="nav-icon" aria-hidden="true">≡</span> 광고 기록</button>
+        <button class="sidebar-link" type="button" data-view="connections"><span class="nav-icon" aria-hidden="true">⌘</span> 연결 관리</button>
+        <a class="sidebar-link" href="https://launchdesk.co.kr/#/services/setup"><span class="nav-icon" aria-hidden="true">◈</span> 세팅 대행 <span class="external" aria-hidden="true">↗</span></a>
+        <button class="sidebar-link" type="button" data-tour-open><span class="nav-icon" aria-hidden="true">?</span> 사용법 다시 보기</button>
+        <div class="sidebar-bottom"><span class="caption-dot"></span> LAUNCHROAS <span class="version">EARLY ACCESS</span></div>
+      </aside>
+      <div class="workspace">
+      <nav class="mobile-nav" aria-label="LaunchROAS 메뉴"><button type="button" data-view="overview" aria-current="page">운영 현황</button><button type="button" data-view="ads">광고 성과</button><button type="button" data-view="calculator">상품 비용</button><button type="button" data-view="records">광고 기록</button><button type="button" data-view="connections">연결 관리</button><button type="button" data-tour-open>사용법</button></nav>
+      <div id="overviewView">
+      <div class="ov-head">
+        <div class="ov-title"><h1>운영 현황</h1><p id="ovPeriodLabel" class="ov-period">오늘 기준</p></div>
+        <div class="ov-controls">
+          <div class="period-controls" role="group" aria-label="운영 현황 조회 기간"><button type="button" data-period="today" aria-pressed="true">오늘</button><button type="button" data-period="yesterday" aria-pressed="false">어제</button><button type="button" data-period="month" aria-pressed="false">이번 달</button><label class="sr-only" for="periodDate">날짜 선택</label><input id="periodDate" type="date" aria-label="날짜 선택"></div>
+          <label class="sr-only" for="storeSelect">쇼핑몰</label><select id="storeSelect" aria-label="쇼핑몰"></select>
+          <button id="refresh" type="button" class="secondary">주문 동기화 <span aria-hidden="true">↻</span></button>
+        </div>
       </div>
-      <p id="pageMessage" class="message" role="status"></p>
-      <div class="metric-grid">
-        <article class="metric"><span>Cafe24 오늘 주문</span><strong id="orderCount">—</strong><small id="orderNote">연결 상태 확인 전</small></article>
-        <article class="metric"><span>Cafe24 오늘 주문금액</span><strong id="orderAmount">—</strong><small>취소·환불·미입금 미차감</small></article>
-        <article class="metric"><span>Meta 오늘 광고비</span><strong id="adSpend">—</strong><small id="adNote">광고계정 상태 확인 전</small></article>
-        <article class="metric"><span>Meta ROAS</span><strong id="adRoas">—</strong><small>Meta 귀속 구매금액 ÷ 광고비</small></article>
+      <p id="pageMessage" class="message page-message" role="status"></p>
+      <div class="key-grid">
+        <article class="key-card">
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 7h11l-.8 9.2a1 1 0 0 1-1 .8H6.3a1 1 0 0 1-1-.8L4.5 7Z"/><path d="M7.5 7V5.5a2.5 2.5 0 0 1 5 0V7"/></svg>주문금액<button type="button" class="help" popovertarget="helpOrder" aria-label="주문금액 설명"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r=".6" class="dot"/></svg></button><div id="helpOrder" popover class="help-pop"><strong>주문금액</strong><p>Cafe24에 들어온 주문의 결제 금액 합계예요. 취소 · 환불 · 미입금은 빼지 않았고, 마지막 주문 동기화 이후 주문은 빠질 수 있어요.</p></div></span>
+          <strong id="orderAmount" class="key-value">—</strong>
+          <small id="orderNote" class="key-note">연결 상태 확인 전</small>
+        </article>
+        <article class="key-card">
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 8.5v3h2.5l6 3.5v-10l-6 3.5H3.5Z"/><path d="M14.5 7.5a3.5 3.5 0 0 1 0 5"/></svg>광고비<button type="button" class="help" popovertarget="helpSpend" aria-label="광고비 설명"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r=".6" class="dot"/></svg></button><div id="helpSpend" popover class="help-pop"><strong>광고비</strong><p>Meta 광고계정의 광고비예요. 외화 계정은 직접 저장한 환율로 원화로 바꿔요(일별 환율 아님).</p><strong>ROAS</strong><p>Meta가 광고에 귀속한 구매금액 ÷ 광고비예요. Cafe24 실제 매출과 다른 값이고, 구매 기록이 없으면 계산하지 않아요.</p></div></span>
+          <strong id="adSpend" class="key-value">—</strong>
+          <small id="adNote" class="key-note">광고계정 상태 확인 전</small>
+        </article>
+        <article class="key-card key-profit">
+          <span class="key-label"><svg class="key-icon" viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="5.5" rx="5.5" ry="2.2"/><path d="M4.5 5.5v4.5c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V5.5"/><path d="M4.5 10v4.5c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V10"/></svg>광고비 차감 후 예상 이익<button type="button" class="help" popovertarget="helpProfit" aria-label="광고비 차감 후 예상 이익 설명"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4"/><circle cx="8" cy="4.9" r=".6" class="dot"/></svg></button><div id="helpProfit" popover class="help-pop"><strong>광고비 차감 후 예상 이익</strong><p id="salesFormula" class="help-formula"></p><p>비용을 저장한 상품의 판매만 계산해요.</p><ul><li>더함: 상품 판매금액(쿠폰 · 할인 반영, 취소 · 반품 제외) + 고객이 낸 배송비</li><li>뺌: 적립금 사용 · 상품 원가 · 판매 수수료 · PG 수수료 · 배송비 수수료</li><li>뺌: 택배비 · 포장비 · 기타 비용(저장한 설정값, 주문당 1회)</li><li>뺌: Meta 광고비 전체(원화 환산)</li></ul><p>세금(부가세 등) · 인건비 · 임대료 · 반품 배송비는 빼지 않았어요. 순이익이 아니에요.</p><p>비용을 저장하지 않은 상품이 팔렸으면 그 판매는 빠지고 광고비는 전체를 빼서 '일부 상품 기준'으로 표시해요.</p></div></span>
+          <div class="key-amount"><strong id="salesAmount" class="key-value">—</strong><span id="salesScope" class="sales-scope" hidden>일부 상품 기준</span></div>
+          <div id="salesChips" class="sales-chips"></div>
+          <small id="salesMessage" class="key-note" role="status"></small>
+        </article>
       </div>
-      <section class="detail-grid">
-        <article class="detail"><h2>Cafe24 주문</h2><p id="cafeStatus">연결 상태를 확인하고 있어요.</p><p id="lastSync" class="small"></p></article>
-        <article class="detail"><h2>Meta 광고</h2><p id="metaStatus">연결 상태를 확인하고 있어요.</p><p id="metaPurchase" class="small"></p></article>
+      <div class="ov-main">
+        <section id="insights" class="weekly-panel" aria-label="주간 AI 점검" hidden><div id="insightsBody"></div></section>
+        <aside class="ov-side" aria-label="광고 · 비용 요약">
+          <section class="side-card" aria-labelledby="sideAdsTitle"><h2 id="sideAdsTitle">광고 현황</h2><dl id="sideAds" class="side-list"></dl><button type="button" class="secondary side-btn" data-view="ads">광고 성과 전체 보기 →</button></section>
+          <section class="side-card" aria-labelledby="sideCostTitle"><h2 id="sideCostTitle">비용 설정</h2><dl id="sideCost" class="side-list"></dl><div class="side-actions"><button type="button" class="secondary" data-view="calculator">상품 비용 관리</button><button type="button" id="sideFx" class="secondary">환율 설정</button></div></section>
+        </aside>
+      </div>
+      <section id="setupGuide" class="setup-guide" hidden aria-labelledby="setupGuideTitle">
+        <div class="setup-head"><h2 id="setupGuideTitle">처음 설정</h2><span id="setupProgress" class="small"></span></div>
+        <ol id="setupSteps" class="setup-steps"></ol>
       </section>
-      <p class="footnote">Cafe24 주문금액과 Meta 귀속 구매금액은 집계 기준이 달라 합산하지 않습니다. 주문 데이터는 마지막 동기화 시각 이후의 주문을 포함하지 않을 수 있습니다.</p>
-      <a href="https://launchdesk.co.kr/#/account" class="manage-link">쇼핑몰·광고계정 연결 관리 ↗</a>
+      </div>
+      <section id="adsView" hidden aria-labelledby="adPerformanceTitle">
+        <div class="view-head"><h1 id="adPerformanceTitle">광고 성과</h1><p id="adsPeriodLabel" class="ov-period">운영 현황에서 선택한 기간 · Meta 귀속 기준</p></div>
+        <section class="ad-performance">
+          <p id="adPerformanceMessage" class="small" role="status">Meta 연결을 확인하고 있어요.</p>
+          <div id="adPerformanceList" class="ad-performance-list"></div>
+          <button id="adPerformanceMore" type="button" class="ad-performance-more" hidden aria-expanded="false">광고 세트 전체 보기 ↓</button>
+        </section>
+      </section>
+      <section id="recordsView" hidden aria-labelledby="adlogTitle">
+        <div class="view-head"><h1 id="adlogTitle">광고 기록</h1><p class="ov-period">직접 입력한 기록과 Meta 하루 합계 · Meta 귀속 구매금액은 Cafe24 주문금액과 합산하지 않아요</p></div>
+        <section class="operations-panel adlog-panel">
+          <div class="adlog-head"><button id="adlogAdd" type="button" class="secondary">+ 기록 추가</button></div>
+          <div class="adlog-toolbar"><label for="adlogMetaDate">Meta 기록할 날짜</label><input id="adlogMetaDate" type="date"><button id="adlogMetaSave" type="button" class="secondary">Meta 성과 기록하기 (어제)</button><span id="adlogMessage" class="small" role="status"></span></div>
+          <form id="adlogForm" class="adlog-form" hidden><label>날짜<input id="adlogDate" type="date" required></label><label>소재명<input id="adlogName" maxlength="100" required></label><label>광고비 (원)<input id="adlogSpend" type="number" min="0" required></label><label>전환 매출 (원)<input id="adlogRevenue" type="number" min="0" required></label><label>채널<select id="adlogChannel"><option>메타</option><option>네이버</option><option>카카오</option><option>인스타</option></select></label><div id="adlogAccountWrap" class="adlog-account"><label>광고계정<select id="adlogAccount"><option value="">모름</option><option value="connected">이 쇼핑몰에 연결한 Meta 광고계정</option><option value="other">다른 광고계정</option></select></label><label>집계 범위<select id="adlogScope"><option value="">모름</option><option value="account_total">광고계정 하루 전체</option><option value="partial">일부 캠페인 · 광고</option></select></label><small>같은 날 Meta 하루 합계와 중복인지 판단할 때 써요</small></div><div class="form-actions"><button type="submit" class="primary">저장하기</button><button type="button" id="adlogCancel" class="secondary">취소</button></div></form>
+          <div class="adlog-table-wrap"><table><thead><tr><th>날짜</th><th>채널</th><th>기록 내용</th><th>광고비</th><th>전환 매출</th><th>ROAS</th><th></th></tr></thead><tbody id="adlogRows"></tbody></table></div>
+          <div class="adlog-totals"><div>총 광고비 <strong id="adlogTotalSpend">—</strong><small id="adlogTotalNote" class="adlog-total-note"></small></div><div>평균 ROAS <strong id="adlogAverageRoas">—</strong></div><div>최고 기록 <strong id="adlogBest">—</strong></div></div>
+          <form id="adlogChangeForm" class="adlog-change-form" hidden aria-labelledby="chgTitle">
+            <h2 id="chgTitle">실행 기록</h2>
+            <p id="chgTarget" class="chg-target"></p><p id="chgSuggest" class="small"></p>
+            <p id="chgFlag" class="chg-flag" role="note">운영 화면 호환 수정이 배포되기 전이라 저장을 꺼 두었어요. 입력해 볼 수는 있지만 저장되지 않아요.</p>
+            <div class="chg-grid">
+              <label>바꾼 요소<select id="chgElement"></select></label>
+              <label>방식<select id="chgMethod"><option value="">선택해 주세요</option><option value="new_ad">새 광고 추가</option><option value="edit">기존 광고 수정</option></select></label>
+              <label>새 광고 ID<input id="chgNewAd" inputmode="numeric" placeholder="새 광고를 추가했다면"></label>
+              <label>시작일<input id="chgStart" type="date" required></label>
+              <label>비교 기간(일)<input id="chgDays" type="number" min="3" max="28" value="7" required></label>
+              <label class="chg-wide">바꾸기 전<textarea id="chgBefore" rows="2" maxlength="500"></textarea></label>
+              <label class="chg-wide">실제로 바꾼 내용<textarea id="chgAfter" rows="2" maxlength="500" required placeholder="제안과 다르게 바꿨다면 실제 내용을 적어 주세요"></textarea></label>
+              <fieldset class="chg-wide"><legend>같은 기간에 함께 바뀐 조건</legend><div id="chgConcurrentBox" class="chg-checks"></div><input id="chgConcurrentNote" maxlength="200" placeholder="예: 10/10~10/12 전 품목 10% 할인"></fieldset>
+              <label class="chg-wide">메모<input id="chgMemo" maxlength="300"></label>
+            </div>
+            <p class="small">저장할 때 변경 전 같은 길이 기간의 광고 지표와 당시 계산 기준(통화 · 환율 · 귀속 기준 · 연결 상품 마진)을 함께 남겨요. 광고 자체는 바꾸지 않아요.</p>
+            <div class="form-actions"><button id="chgSave" type="submit" class="primary">실행 기록 저장</button><button id="chgCancel" type="button" class="secondary">닫기</button><span id="chgStatus" class="small" role="status"></span></div>
+          </form>
+          <section id="adlogChanges" class="adlog-changes" aria-label="실행 기록과 결과 비교"></section>
+        </section>
+      </section>
+      <section id="connectionsView" hidden aria-labelledby="connectionsTitle">
+        <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>연결 관리</strong></div>
+        <div class="dashboard-head"><div><p class="eyebrow"><span class="eyebrow-line"></span> CONNECTIONS</p><h1 id="connectionsTitle">연결 관리<span class="title-period">.</span></h1><p class="intro">쇼핑몰과 Meta 광고계정을 이곳에서 연결하세요.</p></div></div>
+        <section class="calc-card connection-card"><h2>선택한 쇼핑몰의 연동</h2><p id="connectionReturn" class="linked-ad-notice" role="status" hidden></p><label class="saved-product-label" for="connectionStore">쇼핑몰 선택 <select id="connectionStore"></select></label><p id="connectionStatus" class="small" role="status"></p><div class="connection-form"><label>Cafe24 쇼핑몰 ID<input id="connectionMallId" placeholder="예: myshop" pattern="[a-zA-Z0-9_-]+"></label><button id="connectCafe" type="button" class="secondary">Cafe24 연결 · 재연결</button><button id="connectMeta" type="button" class="secondary">Meta 연결 · 재연결</button></div><div id="metaAccountPicker" hidden><label class="saved-product-label" for="metaAccountChoice">광고계정 선택 <select id="metaAccountChoice"></select></label><button id="chooseMetaAccount" type="button" class="secondary">선택한 광고계정 연결</button></div><p id="connectionMessage" class="message" role="status"></p></section>
+        <section class="calc-card connection-card"><h2>새 쇼핑몰 등록</h2><p class="small">현재 쇼핑몰의 연결 상태는 아래에서 확인하세요. 다른 쇼핑몰을 추가할 때만 사용합니다.</p><form id="storeCreateForm" class="connection-form"><label>쇼핑몰 이름<input id="newStoreName" required maxlength="80" placeholder="내 쇼핑몰"></label><label>쇼핑몰 주소<input id="newStoreUrl" type="url" required placeholder="https://myshop.cafe24.com"></label><button type="submit" class="secondary">쇼핑몰 등록</button></form></section>
+      </section>
+      <section id="calculatorView" hidden aria-labelledby="calculatorTitle">
+        <div class="breadcrumb">워크스페이스 <span aria-hidden="true">/</span> <strong>상품 비용 · 환율</strong></div>
+        <div class="view-head"><h1 id="calculatorTitle">상품 비용 · 환율</h1><p class="ov-period">상품을 고르고 비용을 저장하세요. 광고비는 운영 현황에서 실제 금액으로 뺍니다.</p></div>
+        <section id="costSettings" class="calc-card cost-settings" aria-labelledby="costSettingsTitle"><h2 id="costSettingsTitle">광고비 환율 · 계산 기준</h2>
+          <div id="salesFx" class="sales-fx" hidden><label for="salesFxRate"><span>광고비 환율 · 1 <b id="salesFxCurrency">USD</b>당 원화</span><input id="salesFxRate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="예: 1390"></label><button id="salesFxSave" type="button" class="secondary">환율 저장</button><small id="salesFxNote" role="status"></small></div>
+          <details id="salesBasis" class="sales-basis"><summary>운영 현황 계산 기준 보기 (선택한 기간)</summary>
+            <div id="salesFigures" class="sales-figures"></div>
+            <details class="sales-breakdown" hidden><summary>실제 결제 기준 계산 내역</summary><div id="salesBreakdown"></div></details>
+          </details>
+        </section>
+        <div class="pm-bar"><button id="pmPick" type="button" class="primary pm-pick">상품 선택하기</button><span id="pmSelected" class="small" role="status"></span></div>
+        <div id="pmPicker" class="calc-card pm-picker" hidden>
+          <div class="pm-picker-head"><input id="pmSearch" type="search" placeholder="상품 이름 검색" aria-label="상품 이름 검색"><button id="pmClose" type="button" class="inline-button">닫기</button></div>
+          <p class="small pm-note">최근 31일 판매 상품과 저장한 상품이 표시됩니다.</p>
+          <div id="pmList" class="pm-list"></div>
+        </div>
+        <div id="pmEditor" hidden>
+        <div class="calc-mode"><button type="button" data-calc-mode="simple" aria-pressed="true">간편 입력</button><button type="button" data-calc-mode="detailed" aria-pressed="false">상세 입력</button></div>
+        <div class="calculator-grid">
+          <form id="calcForm" class="calc-card">
+            <h2 id="pmFormTitle">상품 비용</h2>
+            <div class="calc-fields">
+              <label class="pm-wide">상품<input id="calcProduct" readonly></label>
+            </div>
+            <h3 class="pm-group">상품 1개당 원가 · 수수료 <span>팔린 개수만큼 곱해져요</span></h3>
+            <div class="calc-fields">
+              <label>상품 원가 (원) <b>필수</b><span>1개 매입·제작 비용</span><input id="calcCost" type="number" min="0" required inputmode="numeric" placeholder="15000"></label>
+              <label>판매 수수료율 (%) <b>필수</b><span>판매금액에 붙는 수수료</span><input id="calcFee" type="number" min="0" max="100" step="0.01" required inputmode="decimal" placeholder="3"></label>
+              <label>판매가 (원)<span>미리보기용 · 실제 계산은 Cafe24 주문 금액</span><input id="calcPrice" type="number" min="0" required inputmode="numeric"></label>
+              <label data-detail>상품 수수료 기준<select id="calcFeeBase"><option value="after_discount">할인 후 상품금액</option><option value="before_discount">할인 전 상품금액</option></select></label>
+              <label data-detail>수수료 부가세<select id="calcFeeVat"><option value="included">포함</option><option value="excluded">별도 (10% 가산)</option></select></label>
+              <label data-detail>별도 PG 수수료율 (%)<span>결제 금액에 붙는 수수료</span><input id="calcPgRate" type="number" min="0" max="100" step="0.01" placeholder="0"></label>
+              <label data-detail>판매 플랫폼 <span>안내용</span><select id="calcPlatform"><option value="">선택 안 함</option><option value="cafe24">카페24</option><option value="smartstore">스마트스토어</option><option value="coupang">쿠팡</option><option value="other">기타·자사몰</option></select></label>
+            </div>
+            <h3 class="pm-group">발송 1번에 드는 배송 · 포장 비용 <span>주문 1건에 한 번만 · 담긴 상품 중 가장 큰 값</span></h3>
+            <div class="calc-fields">
+              <label>택배비 (원)<span>판매자가 택배사에 내는 금액(추정용 설정값)</span><input id="calcActualShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
+              <label>포장·부자재 (원)<span>박스·봉투 등</span><input id="calcPackaging" type="number" min="0" inputmode="numeric" placeholder="1000"></label>
+              <label>배송 조건 <span>미리보기용 · 운영 현황은 주문에 실제 부과된 배송비 사용</span><select id="calcShippingType"><option value="free">무료배송</option><option value="paid">고객 배송비 별도</option></select></label>
+              <label id="calcCustomerShipWrap" hidden>고객에게 받는 배송비 (원)<input id="calcCustomerShip" type="number" min="0" inputmode="numeric" placeholder="3000"></label>
+              <label data-detail>판매자 부담 할인 (원)<input id="calcDiscount" type="number" min="0" placeholder="0"></label>
+              <label data-detail>배송비 수수료<select id="calcShipFeeMode"><option value="none">없음</option><option value="same">상품과 동일</option><option value="separate">별도 요율</option></select></label>
+              <label id="calcShipFeeRateWrap" data-detail hidden>배송비 수수료율 (%)<input id="calcShipFeeRate" type="number" min="0" max="100" step="0.01"></label>
+              <label data-detail>기타 비용 (원)<input id="calcOther" type="number" min="0" placeholder="0"></label>
+            </div>
+            <p id="calcError" class="message" role="alert"></p>
+          </form>
+          <div class="calc-results"><div class="calc-card">
+            <h2>광고비 차감 전 마진</h2>
+            <p id="calcEmpty" class="small">원가와 판매 수수료율을 입력하면 결과가 나와요.</p>
+            <div id="calcResult" hidden><p class="calc-result-label">1개 판매 주문의 상품 마진</p><strong id="calcPostAd" class="calc-hero-value">—</strong><div id="calcFacts" class="calc-facts"></div></div>
+            <button id="pmSave" type="button" class="primary pm-save" disabled>이 상품에 저장</button>
+            <p id="pmMessage" class="small" role="status"></p>
+            <div id="pmNext" class="pm-next" hidden><button id="pmNextProduct" type="button" class="secondary">다음 미입력 상품</button><button id="pmGoResult" type="button" class="inline-button">운영 현황에서 결과 보기</button></div>
+            <details id="pmVariantsBox" class="pm-variants-box" hidden><summary>옵션별 설정 <span id="pmVariantsCount"></span></summary><p class="small">사이즈·색상마다 원가가 다를 때만. 옵션별 값이 우선해요.</p><div id="pmVariants" class="pm-variants"></div></details>
+          </div></div>
+        </div>
+        </div>
+</section>
+      </div>
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+  <script src="./policy-consent-core.js"></script>
   <script src="./core.js"></script>
+  <script src="./ops-period-core.js"></script>
+  <script src="./margin-calc.js"></script>
+  <script src="./adlog-meta.js"></script>
+  <script src="./motion.js"></script>
   <script src="./app.js"></script>
+  <script src="./connections.js"></script>
+  <script src="./sales-core.js"></script>
+  <script src="./insights.js"></script>
+  <script src="./calculator.js"></script>
+  <script src="./sales.js"></script>
+  <script src="./ad-performance.js"></script>
+  <script src="./adlog-core.js"></script>
+  <script src="./adlog-change-core.js"></script>
+  <!-- 미리보기 저장 스위치 — 실행 기록 · 결과 저장(운영 메인 호환 d4d56c7 배포 뒤 켬, 2026-10-07) -->
+  <script>window.LAUNCHROAS_FLAGS = { adlogChangeRecords: true };</script>
+  <script src="./adlog.js"></script>
+  <script src="./tour.js"></script>
 </body>
 </html>
