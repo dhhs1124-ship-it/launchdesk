@@ -382,6 +382,7 @@ export function groupAdsetsByCampaign(normalizedRows) {
       adset_id: row.adset_id,
       adset_name: row.adset_name,
       metrics: row.metrics,
+      ...(row.attribution_purchase !== undefined ? { attribution_purchase: row.attribution_purchase } : {}),
     });
   }
   return order;
@@ -467,6 +468,10 @@ export function validateAdsetInsightsRequest(body) {
   if (period === "date" && !isValidDateString(date)) {
     return { ok: false, status: 400, error: "조회 날짜는 YYYY-MM-DD 형식이어야 합니다.", code: "INVALID_DATE" };
   }
+  const attribution_mode = body && body.attribution_mode;
+  if (attribution_mode !== undefined && attribution_mode !== "explicit") {
+    return { ok: false, status: 400, error: "attribution_mode는 'explicit'만 지원합니다.", code: "UNSUPPORTED_ATTRIBUTION_MODE" };
+  }
   if (scope === "ads") {
     if (!adset_id) {
       return { ok: false, status: 400, error: "ads 조회에는 adset_id가 필요합니다." };
@@ -479,7 +484,44 @@ export function validateAdsetInsightsRequest(body) {
     ok: true, store_id, scope, period,
     date: period === "date" ? date : undefined,
     adset_id: scope === "ads" ? adset_id : undefined,
+    attribution_mode: attribution_mode === "explicit" ? "explicit" : undefined,
   };
+}
+
+// ---- 명시 귀속(광고 기록 결과 비교 전용) ----------------------------------
+// attribution_mode:'explicit' 요청에만 귀속 창 · 보고 시점을 URL에 넣고, 요청값(requested)을 응답(attribution)으로 돌려준다.
+// 요청값은 '설정'일 뿐 적용 근거가 아니다 — 적용 근거는 attributionWindowsSeen(Meta 응답 항목의 창별 키)만.
+// 다른 화면 요청(attribution_mode 없음)은 URL · 응답 그대로.
+// 미확인: 명시 귀속 시 actions[].value가 지정 창 합계인지 · 창별 키 형식은 재배포 후 실제 계정 무료 조회 1회로 확인해야 한다
+// (형식이 다르면 근거가 안 잡혀 '미확인'으로 남는다 — 안전한 쪽).
+export const EXPLICIT_ATTRIBUTION = Object.freeze({
+  windows: Object.freeze(["7d_click", "1d_view"]),
+  action_report_time: "impression",
+});
+
+// 적용 근거 — Meta는 action_attribution_windows를 적용하면 actions · action_values 항목마다 창별 값(예: "7d_click")을 함께 준다.
+// 이 행(광고)의 응답 항목에 실제로 보인 요청 창만 돌려준다. 보고 시점(action_report_time)은 응답에 드러나지 않아 근거가 없다.
+export function attributionWindowsSeen(row, windows) {
+  const entries = [].concat(
+    row && Array.isArray(row.actions) ? row.actions : [],
+    row && Array.isArray(row.action_values) ? row.action_values : []
+  );
+  return (windows || []).filter((w) => entries.some((e) => e && typeof e === "object" && Object.prototype.hasOwnProperty.call(e, w)));
+}
+
+// 구매 항목의 관찰값 — 화면 구매 수(pickCountAndValue)와 같은 action_type 항목에서 value와 요청 창별 값을 원본 그대로 나눠 돌려준다.
+// value는 Meta 문서상 "Metric value of default attribution window"(AdsActionStats) — 요청 창 기준이라는 근거가 아니다.
+// 창별 값은 더하지 않는다(클릭 · 조회 창의 합산 · 중복 제거 규칙이 공식 문서에 없음). 없는 창은 null.
+export function purchaseWindowValues(row, windows) {
+  const pick = pickCountAndValue(row && row.actions, row && row.action_values, PURCHASE_ACTION_PRIORITY);
+  if (!pick.count.observed) return null;
+  const type = pick.count.basis;
+  const entryOf = (list) => (Array.isArray(list) ? list : []).find((a) => a && a.action_type === type) || null;
+  const view = (e) => e && {
+    value: toNumber(e.value),
+    windows: Object.fromEntries((windows || []).map((w) => [w, Object.prototype.hasOwnProperty.call(e, w) ? toNumber(e[w]) : null])),
+  };
+  return { action_type: type, count: view(entryOf(row.actions)), purchase_value: view(entryOf(row.action_values)) };
 }
 
 // ---- Graph API 요청 URL 빌더 ------------------------------------------------
@@ -496,7 +538,8 @@ export function validateAdsetInsightsRequest(body) {
 // 확인됐다(교정 — 이전 보고의 "objective 미확인"은 오류였음, 최종 보고 3번
 // 참고). filtering 파라미터의 정확한 스키마만 아직 실제 v21 계정으로
 // 검증되지 않았다.
-export function buildInsightsUrl({ accountId, level, since, until, preset, after, filteringAdsetId, apiVersion }) {
+/** @param {{ accountId: string, level: string, since?: string | null, until?: string | null, preset?: string | null, after?: string | null, filteringAdsetId?: string | null, apiVersion?: string | null, attribution?: { windows: readonly string[], action_report_time: string } | null }} opts */
+export function buildInsightsUrl({ accountId, level, since, until, preset, after, filteringAdsetId, apiVersion, attribution }) {
   const version = apiVersion || GRAPH_API_VERSION;
   const url = new URL(`https://graph.facebook.com/${version}/${accountId}/insights`);
   const identityFields =
@@ -520,6 +563,10 @@ export function buildInsightsUrl({ accountId, level, since, until, preset, after
   url.searchParams.set("time_increment", "all_days");
   url.searchParams.set("limit", String(PAGE_LIMIT));
   if (after) url.searchParams.set("after", after);
+  if (attribution) {
+    url.searchParams.set("action_attribution_windows", JSON.stringify(attribution.windows));
+    url.searchParams.set("action_report_time", attribution.action_report_time);
+  }
   if (filteringAdsetId) {
     url.searchParams.set(
       "filtering",

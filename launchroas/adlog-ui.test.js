@@ -49,11 +49,12 @@ function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezon
   const client = { from, functions: { invoke: async (name, { body }) => {
     calls.push(body);
     if (control.failDates.includes(body.date)) return { data: null, error: { message: '조회 실패(테스트)' } };
+    if (body.scope === 'adsets') return control.failAdsets ? { data: null, error: { message: '조회 실패(테스트)' } } : { data: { ok: true, account, campaigns: [{ campaign_id: 'c1', campaign_name: '전환 캠페인', adsets: [{ adset_id: '222', adset_name: '니트 세트', metrics: {} }] }] } };
     const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: { source: 'request', requested: control.reportTimeByDate[body.date] ? { ...REQ, action_report_time: control.reportTimeByDate[body.date] } : REQ, windows_seen: control.noEvidence ? [] : REQ.windows, action_report_time_applied: 'unconfirmed',
       metric_basis: { field: 'value', windows_summed: false, matches_requested_windows: control.basisConfirmed ? 'response_evidence' : 'unconfirmed' } } } : {};
     if (control.truncDates.includes(body.date)) return { data: { ok: true, account, ads: [], truncated: true, ...attribution } };
     const buy = body.date < '2026-09-01' ? 1 : 2;
-    return { data: { ok: true, account, ...attribution, ads: [{ ad_id: '111', ...(attribution.attribution ? { attribution_windows_seen: control.noEvidence ? [] : REQ.windows,
+    return { data: { ok: true, account, ...attribution, ads: [{ ad_id: '111', ad_name: '니트 광고', ...(attribution.attribution ? { attribution_windows_seen: control.noEvidence ? [] : REQ.windows,
       attribution_purchase: { action_type: 'offsite_conversion.fb_pixel_purchase', count: { value: buy, windows: control.noEvidence ? { '7d_click': null, '1d_view': null } : { '7d_click': control.noClick7 ? null : buy, '1d_view': 0 } }, purchase_value: null } } : {}), metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
   } } };
   const ctx = { client, userId: 'u1', storeId: '4', stores: [{ id: '4' }], metaAccount: { id: 'm', status: 'connected', external_account_id: 'act_9' }, fx: null };
@@ -96,6 +97,7 @@ test('스위치가 꺼져 있으면 실행 기록 양식은 열리지만 공용 
   assert.equal(s.ids.adlogChangeForm.hidden, false);
   assert.equal(s.ids.chgFlag.hidden, false);
   assert.equal(s.ids.chgSave.disabled, true);
+  s.ids.chgApplied.checked = true; // 사용자가 실제로 바꿨다고 확인
   await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle();
   assert.equal(s.inserts.length, 0);
   assert.equal(s.calls.length, 0, 'Meta 조회도 하지 않는다');
@@ -108,6 +110,7 @@ test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준
   s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, before: '가을 신상 10% 할인', after: '울 50% · 가벼운 두께 강조', suggestion: { week: '2026-08-25', ad_id: '111', verdict: '개선 필요', proposed: '첫 줄을 소재 강점으로' } });
   s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit';
   all(s.ids.chgConcurrentBox).find((x) => x.value === '할인').checked = true;
+  s.ids.chgApplied.checked = true; // 사용자가 실제로 바꿨다고 확인
   await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
   const saved = s.inserts.find((x) => x.row.tool_type === 'ad_log');
   assert.ok(saved, s.ids.chgStatus.textContent);
@@ -166,11 +169,13 @@ test('실행 기록: 변경 방식 기본값 없음 · 변경 전 조회 실패(
   s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조' });
   assert.equal(s.ids.chgMethod.value, '', '기존 광고 수정 · 새 광고 추가 중 기본 선택 없음');
   s.ids.chgStart.value = '2026-09-01';
+  s.ids.chgApplied.checked = true; // 사용자가 실제로 바꿨다고 확인
   await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
   assert.match(s.ids.chgStatus.textContent, /변경 방식\(기존 광고 수정 · 새 광고 추가\)/);
   s.ids.chgMethod.value = 'edit'; s.control.failDates = ['2026-08-27'];
   s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조' });
   s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit';
+  s.ids.chgApplied.checked = true; // 사용자가 실제로 바꿨다고 확인
   await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
   assert.match(s.ids.chgStatus.textContent, /변경 전 지표 일부를 불러오지 못함\(조회 실패 · 페이지 누락 1일\)/);
   assert.equal(s.inserts.length, 0);
@@ -352,7 +357,70 @@ test('실행 기록 저장 시 광고계정 시간대를 당시 기준(basis.tim
   await settle();
   s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조' });
   s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit';
+  s.ids.chgApplied.checked = true; // 사용자가 실제로 바꿨다고 확인
   await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
   const saved = s.inserts.find((x) => x.row.tool_type === 'ad_log').row.data;
   assert.equal(saved.basis.timezone, 'America/Los_Angeles');
+});
+
+test('광고 변경 기록 추가(직접 입력): AI 제안 없이 광고를 골라 같은 양식 · 저장 로직으로 저장 — 직접 입력으로 구분 · 실제 변경 확인 필수 · Meta 광고는 바꾸지 않음 안내', async () => {
+  const s = setup({ flag: true, rows: [] });
+  await settle();
+  const addBtn = all(s.ids.adlogChanges).find((x) => x.id === 'adlogDirectAdd');
+  assert.ok(addBtn, '광고 기록 화면에 직접 입력 버튼');
+  assert.equal(addBtn.textContent, '광고 변경 기록 추가');
+  await addBtn.events.click(); await settle(); await settle();
+  assert.equal(s.ids.adlogChangeForm.hidden, false); assert.equal(s.ids.chgAdRow.hidden, false, '직접 입력에서만 광고 선택칸');
+  assert.match(s.ids.chgTarget.textContent, /광고를 골라 주세요 · 직접 입력/);
+  assert.equal(s.ids.chgElement.value, '', '바꾼 요소도 직접 고른다(기본값 없음)');
+  const opts = s.ids.chgAd.children.map((o) => o.textContent);
+  assert.deepEqual(opts, ['광고를 골라 주세요', '니트 광고 · 니트 세트 (광고 ID 111)']);
+  // 광고를 고르지 않으면 · 실제 변경 확인 없으면 저장하지 않는다(조회도 하지 않음)
+  const before = s.calls.length;
+  await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle();
+  assert.match(s.ids.chgStatus.textContent, /기록할 광고를 골라 주세요/);
+  s.ids.chgAd.value = '0'; await s.ids.chgAd.events.change(); await settle();
+  assert.match(s.ids.chgTarget.textContent, /니트 광고 \(광고 ID 111\) · 직접 입력/);
+  s.ids.chgElement.value = '이미지'; s.ids.chgMethod.value = 'edit'; s.ids.chgStart.value = '2026-09-01';
+  s.ids.chgAfter.value = '모델 착용 컷으로 교체'; all(s.ids.chgConcurrentBox).find((x) => x.value === '예산').checked = true;
+  await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle();
+  assert.match(s.ids.chgStatus.textContent, /실제로 바꾼 광고만 기록할 수 있어요/);
+  assert.equal(s.calls.length, before, '확인 전에는 Meta 조회 · 저장 없음');
+  assert.equal(s.inserts.length, 0);
+  s.ids.chgApplied.checked = true; // 사용자가 실제로 바꿨다고 확인
+  await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
+  const saved = s.inserts.find((x) => x.row.tool_type === 'ad_log');
+  assert.ok(saved, s.ids.chgStatus.textContent);
+  const c = saved.row.data;
+  assert.equal(c.entry, 'direct'); assert.equal(c.suggestion, null); assert.equal(c.creative_snapshot, null);
+  assert.equal(c.change.applied_confirmed, true); assert.equal(c.change.element, '이미지'); assert.equal(c.change.method, 'edit');
+  assert.deepEqual(JSON.parse(JSON.stringify(c.ad)), { ad_id: '111', adset_id: '222', ad_name: '니트 광고', new_ad_id: null });
+  assert.equal(JSON.stringify(c.concurrent), '["예산"]'); assert.equal(c.compare.before.since, '2026-08-25');
+  assert.equal(c.baseline.metrics.days, 7, '같은 저장 로직 — 변경 전 7일 지표');
+  assert.ok(text(s.ids.adlogChanges).includes('연결된 제안 직접 입력') || /직접 입력/.test(text(s.ids.adlogChanges)));
+});
+
+test('직접 입력: 광고 목록 조회 실패는 빈 목록과 구분 · AI 개선안 경로는 제안과 함께 ai_suggestion으로 저장', async () => {
+  const s = setup({ flag: true, rows: [] });
+  await settle();
+  s.control.failAdsets = true;
+  await all(s.ids.adlogChanges).find((x) => x.id === 'adlogDirectAdd').events.click(); await settle(); await settle();
+  assert.deepEqual(s.ids.chgAd.children.map((o) => o.textContent), ['광고 목록을 불러오지 못했어요']);
+  assert.match(s.ids.chgStatus.textContent, /광고 목록을 불러오지 못했어요/);
+  s.control.failAdsets = false;
+  s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조', suggestion: { week: '2026-08-25', ad_id: '111', verdict: '개선 필요' } });
+  assert.equal(s.ids.chgAdRow.hidden, true, 'AI 경로는 광고가 정해져 있어 선택칸 없음');
+  assert.match(s.ids.chgTarget.textContent, /2026-08-25 주간 점검 제안/);
+  assert.equal(s.ids.chgApplied.checked, false, '양식을 열 때마다 확인란은 꺼짐');
+  s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit'; s.ids.chgApplied.checked = true;
+  await s.ids.adlogChangeForm.events.submit({ preventDefault(){} }); await settle(); await settle();
+  const c = s.inserts.find((x) => x.row.tool_type === 'ad_log').row.data;
+  assert.equal(c.entry, 'ai_suggestion'); assert.equal(c.suggestion.week, '2026-08-25'); assert.equal(c.change.applied_confirmed, true);
+});
+
+test('양식 안내: 기록만 저장하고 Meta 광고는 바꾸지 않는다 · 실제 변경 확인란', () => {
+  const html = fs.readFileSync(__dirname + '/index.html', 'utf8');
+  assert.match(html, /<p id="chgNote" class="chg-note" role="note">기록만 저장해요 — Meta 광고는 바뀌지 않아요\. 광고 관리자에서 실제로 바꾼 광고만 기록해 주세요\.<\/p>/);
+  assert.match(html, /<input id="chgApplied" type="checkbox"> 이 광고를 Meta 광고 관리자에서 실제로 바꿨어요/);
+  assert.match(html, /<select id="chgElement"><option value="">선택해 주세요<\/option><\/select>/);
 });

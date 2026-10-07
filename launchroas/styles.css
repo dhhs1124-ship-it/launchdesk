@@ -277,7 +277,10 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .adlog-account{grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}.adlog-account small{grid-column:1/-1;color:#8f999b;font-size:11px}.adlog-account select{height:42px;border:1px solid #41494d;border-radius:8px;background:#111618;color:#f5f5f3;padding:0 12px;color-scheme:dark}.adlog-account[hidden]{display:none}
 .adlog-total-note{color:#c9b38f;font-size:11px;line-height:1.5}
 .adlog-change-form,.adlog-changes{margin-top:26px;padding:22px;border:1px solid #41494d;border-radius:12px;background:#1d2224}.adlog-change-form h2,.adlog-sub-head h2{margin:0;font-size:17px;letter-spacing:-.03em}
-.chg-target{margin:10px 0 4px;color:#fff;font-weight:600}.chg-flag{margin:12px 0;padding:10px 12px;border-left:3px solid #ff9a61;background:#2a2421;color:#f1d9c8;font-size:12px}.chg-flag[hidden]{display:none}
+.chg-target{margin:10px 0 4px;color:#fff;font-weight:600}.chg-flag{margin:12px 0;padding:10px 12px;border-left:3px solid #ff9a61;background:#2a2421;color:#f1d9c8;font-size:12px}
+.chg-note{margin:8px 0 0;font-size:12px;color:#b9c2c6}
+.chg-grid .chg-confirm{flex-direction:row;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#f5f5f3}
+.chg-grid .chg-confirm input{width:18px;height:18px;padding:0;flex:none}.chg-flag[hidden]{display:none}
 .chg-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:14px}.chg-grid label,.chg-grid fieldset{display:flex;flex-direction:column;gap:7px;color:#ccd1d1;font-size:12px;min-width:0}.chg-wide{grid-column:1/-1}
 .chg-grid input,.chg-grid select,.chg-grid textarea{min-width:0;border:1px solid #41494d;border-radius:8px;background:#111618;color:#f5f5f3;padding:10px 12px;color-scheme:dark;font:inherit}.chg-grid input,.chg-grid select{height:42px;padding:0 12px}
 .chg-grid fieldset{border:1px solid #2f3639;border-radius:8px;padding:10px 12px}.chg-grid legend{padding:0 4px}.chg-checks{display:flex;flex-wrap:wrap;gap:6px 14px}.adlog-check{display:flex;align-items:center;gap:6px;flex-direction:row!important}

@@ -6,7 +6,7 @@
   // 공용 DB(tool_records ad_log)에 새 종류 기록이 들어가면 예전 메인 화면에 ₩NaN 줄이 생기기 때문(docs/ai/ad-improvement-loop-design.md 5-6).
   var CHANGE_ON=!!(window.LAUNCHROAS_FLAGS&&window.LAUNCHROAS_FLAGS.adlogChangeRecords===true);
   var byId=function(id){return document.getElementById(id);};
-  var records=[], recordsFailed=false, decisions=[], decisionsFailed=false, currentUser=null, currentStore=null, epoch=0, busy=false, draft=null, results={}, zones={};
+  var records=[], recordsFailed=false, decisions=[], decisionsFailed=false, currentUser=null, currentStore=null, epoch=0, busy=false, draft=null, adChoices=[], results={}, zones={};
   var money=function(n){return '₩'+Math.round(Number(n)||0).toLocaleString('ko-KR');};
   function status(text){byId('adlogMessage').textContent=text||'';}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
@@ -84,10 +84,12 @@
   function renderChanges(links,storeId){
     var box=byId('adlogChanges');box.replaceChildren();
     var list=Object.keys(links.changes).map(function(k){return links.changes[k];}).filter(function(g){return String(g.change.store_id)===storeId;});
-    var head=el('div','adlog-sub-head');head.append(el('h2','','실행 기록 · 결과 비교'),el('span','small',CHANGE_ON?'AI 개선안에서 바꾼 내용과 결과':'저장 꺼짐 · 운영 화면 호환 수정 배포 후 켜요'));
+    var head=el('div','adlog-sub-head');head.append(el('h2','','실행 기록 · 결과 비교'),el('span','small',CHANGE_ON?'광고에서 실제로 바꾼 내용과 결과':'저장 꺼짐 · 운영 화면 호환 수정 배포 후 켜요'));
+    // 직접 입력 — AI 제안 없이 광고를 골라 기록(AI가 꺼져 있어도 쓸 수 있다)
+    var add=el('button','secondary','광고 변경 기록 추가');add.type='button';add.id='adlogDirectAdd';add.addEventListener('click',startDirect);head.appendChild(add);
     box.appendChild(head);
     if(recordsFailed){box.appendChild(el('p','small','실행 기록을 불러오지 못했어요. 위의 다시 불러오기를 눌러 주세요.'));return;}
-    if(!list.length){box.appendChild(el('p','small','아직 실행 기록이 없어요. 운영 현황의 광고 개선안에서 “실행 기록”을 눌러 시작하세요.'));return;}
+    if(!list.length){box.appendChild(el('p','small','아직 실행 기록이 없어요. 광고를 실제로 바꿨다면 “광고 변경 기록 추가”로 남겨 주세요.'));return;}
     list.forEach(function(g){box.appendChild(changeCard(g));});
   }
   function amt(v,cur){return cur==='KRW'?money(v):cur+' '+Number(v).toFixed(2);}
@@ -224,15 +226,22 @@
     }
     return (typeof a==='string'&&a?a+' · ':'')+'미확인(응답에 귀속 기준 없음)';
   }
-  async function findAdset(ctx,adId){
+  // 이번 달 집행된 광고 목록(광고 세트별 무료 조회) — 직접 입력의 광고 선택과 광고 세트 찾기에 같이 쓴다. 광고 세트 조회 실패면 null
+  async function listAds(ctx,stopAt){
     var res=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'adsets',period:'month'}});
     if(res.error||!res.data||!res.data.ok)return null;
-    var sets=[];(res.data.campaigns||[]).forEach(function(c){(c.adsets||[]).forEach(function(s){sets.push(String(s.adset_id));});});
+    var sets=[],out=[];(res.data.campaigns||[]).forEach(function(c){(c.adsets||[]).forEach(function(s){sets.push({id:String(s.adset_id),name:s.adset_name||null});});});
     for(var i=0;i<sets.length;i++){
-      var a=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'ads',period:'month',adset_id:sets[i]}});
-      if(!a.error&&a.data&&a.data.ok&&(a.data.ads||[]).some(function(x){return String(x.ad_id)===String(adId);}))return sets[i];
+      var a=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'ads',period:'month',adset_id:sets[i].id}});
+      if(a.error||!a.data||!a.data.ok)continue;
+      (a.data.ads||[]).forEach(function(x){out.push({ad_id:String(x.ad_id),ad_name:x.ad_name||'광고',adset_id:sets[i].id,adset_name:sets[i].name});});
+      if(stopAt&&out.some(function(x){return x.ad_id===String(stopAt);}))break;
     }
-    return null;
+    return out;
+  }
+  async function findAdset(ctx,adId){
+    var ads=await listAds(ctx,adId),hit=ads&&ads.filter(function(x){return x.ad_id===String(adId);})[0];
+    return hit?hit.adset_id:null;
   }
   async function marginFor(ctx,adsetId){
     var res=await ctx.client.from('ad_margin_links').select('meta_adset_id,product_label,pre_ad,source_saved_at').eq('store_id',ctx.storeId).eq('meta_adset_id',String(adsetId));
@@ -272,32 +281,52 @@
   function renderDraft(){
     var f=byId('adlogChangeForm');if(!f)return;
     f.hidden=!draft;if(!draft)return;
-    byId('chgTarget').textContent=draft.ad.ad_name+' (광고 ID '+draft.ad.ad_id+')'+(draft.suggestion?' · '+draft.suggestion.week+' 주간 점검 제안':'');
+    byId('chgAdRow').hidden=!draft.direct;
+    byId('chgTarget').textContent=!draft.ad?'광고를 골라 주세요 · 직접 입력':draft.ad.ad_name+' (광고 ID '+draft.ad.ad_id+')'+(draft.suggestion?' · '+draft.suggestion.week+' 주간 점검 제안':' · 직접 입력');
     byId('chgSuggest').textContent=draft.suggestion&&draft.suggestion.proposed?'제안: '+draft.suggestion.proposed:'';
     byId('chgFlag').hidden=CHANGE_ON;
     byId('chgSave').disabled=!CHANGE_ON||busy;
     byId('chgStatus').textContent=draft.message||'';
   }
-  function startChange(p){
-    draft={ad:{ad_id:String(p.ad.ad_id),ad_name:p.ad.ad_name||'광고',adset_id:p.ad.adset_id||null},suggestion:p.suggestion||null,creative:p.creative||null,message:''};
-    var sel=byId('chgElement');sel.value=p.element&&CH.ELEMENTS.indexOf(p.element)>=0?p.element:'문구';
+  // 양식 열기 — AI 개선안(startChange · 광고 · 제안 채움)과 직접 입력(startDirect · 광고 선택)이 같은 양식 · 같은 저장 로직을 쓴다
+  function openForm(p,direct){
+    draft={ad:p.ad?{ad_id:String(p.ad.ad_id),ad_name:p.ad.ad_name||'광고',adset_id:p.ad.adset_id||null}:null,direct:!!direct,suggestion:direct?null:p.suggestion||null,creative:direct?null:p.creative||null,message:p.message||''};
+    var sel=byId('chgElement');sel.value=p.element&&CH.ELEMENTS.indexOf(p.element)>=0?p.element:'';
     byId('chgBefore').value=p.before||'';byId('chgAfter').value=p.after||'';byId('chgStart').value=today();byId('chgDays').value='7';
-    byId('chgMethod').value='';byId('chgNewAd').value='';byId('chgMemo').value='';byId('chgConcurrentNote').value='';
+    byId('chgMethod').value='';byId('chgNewAd').value='';byId('chgMemo').value='';byId('chgConcurrentNote').value='';byId('chgApplied').checked=false;
     document.querySelectorAll('#adlogChangeForm input[name=chgConcurrent]').forEach(function(b){b.checked=false;});
     if(app.showView)app.showView('records');
     render();byId('adlogChangeForm').scrollIntoView({block:'start'});
+  }
+  function startChange(p){openForm({ad:p.ad,suggestion:p.suggestion,creative:p.creative,element:p.element||'문구',before:p.before,after:p.after},false);}
+  async function startDirect(){
+    var ctx=app.getContext();if(!ctx.userId||!ctx.storeId)return;
+    openForm({message:'이번 달 집행된 광고를 불러오고 있어요.'},true);
+    var mine=draft,pick=byId('chgAd');adChoices=[];pick.replaceChildren(el('option','','광고를 불러오는 중…'));pick.value='';
+    var ads=null;try{ads=await listAds(ctx);}catch(e){ads=null;}
+    if(draft!==mine)return;
+    var first=el('option','',ads===null?'광고 목록을 불러오지 못했어요':ads.length?'광고를 골라 주세요':'이번 달 집행된 광고가 없어요');first.value='';pick.replaceChildren(first);
+    adChoices=ads||[];adChoices.forEach(function(a,i){var o=el('option','',a.ad_name+' · '+(a.adset_name||'광고 세트')+' (광고 ID '+a.ad_id+')');o.value=String(i);pick.appendChild(o);});
+    pick.value='';draft.message=ads===null?'광고 목록을 불러오지 못했어요. 닫고 다시 열어 주세요.':'';renderDraft();
+  }
+  function pickAd(){
+    if(!draft||!draft.direct)return;
+    var a=adChoices[Number(byId('chgAd').value)];
+    draft.ad=byId('chgAd').value!==''&&a?{ad_id:a.ad_id,ad_name:a.ad_name,adset_id:a.adset_id}:null;draft.message='';renderDraft();
   }
   async function submitChange(event){
     event.preventDefault();
     var ctx=app.getContext();if(!draft||!ctx.userId||!ctx.storeId)return;
     if(!CHANGE_ON){draft.message='운영 화면 호환 수정이 배포되기 전이라 저장을 꺼 두었어요. 입력 내용은 저장되지 않아요.';renderDraft();return;}
+    if(!draft.ad){draft.message='기록할 광고를 골라 주세요.';renderDraft();return;}
+    if(!byId('chgApplied').checked){draft.message='Meta 광고 관리자에서 실제로 바꾼 광고만 기록할 수 있어요 — 확인란을 체크해 주세요.';renderDraft();return;}
     busy=true;draft.message='변경 전 지표와 당시 계산 기준을 불러오고 있어요.';renderDraft();
     try{
       var adsetId=draft.ad.adset_id||await findAdset(ctx,draft.ad.ad_id);
       if(!adsetId){draft.message='이 광고의 광고 세트를 찾지 못했어요(이번 달 집행 기준).';return;}
       var days=Number(byId('chgDays').value),start=byId('chgStart').value,p=CH.periods(start,days);
       var got=await dailyAds(ctx,adsetId,draft.ad.ad_id,p.before.since,p.before.until);
-      var built=CH.buildChangeRecord({storeId:ctx.storeId,ad:{ad_id:draft.ad.ad_id,adset_id:adsetId,ad_name:draft.ad.ad_name},suggestion:draft.suggestion,
+      var built=CH.buildChangeRecord({storeId:ctx.storeId,ad:{ad_id:draft.ad.ad_id,adset_id:adsetId,ad_name:draft.ad.ad_name},suggestion:draft.suggestion,entry:draft.direct?'direct':'ai_suggestion',appliedConfirmed:true,
         element:byId('chgElement').value,before:byId('chgBefore').value,after:byId('chgAfter').value,method:byId('chgMethod').value,newAdId:byId('chgNewAd').value.trim(),
         startDate:start,compareDays:days,baseline:{metrics:got.agg,fetched_at:new Date().toISOString(),source:'meta-adset-insights · 하루 단위 합산'},
         basis:basisFor(ctx,got.currency,await marginFor(ctx,adsetId),got.attribution,got.timezone),creative:draft.creative,
@@ -356,6 +385,7 @@
   CH.CONCURRENT.forEach(function(x){var l=el('label','adlog-check'),b=document.createElement('input');b.type='checkbox';b.name='chgConcurrent';b.value=x;l.append(b,document.createTextNode(x));byId('chgConcurrentBox').appendChild(l);});
   byId('adlogChangeForm').addEventListener('submit',submitChange);
   byId('chgCancel').addEventListener('click',function(){draft=null;render();});
+  byId('chgAd').addEventListener('change',pickAd);
   byId('adlogAdd').addEventListener('click',function(){byId('adlogForm').hidden=false;byId('adlogDate').value=today();});
   byId('adlogCancel').addEventListener('click',function(){byId('adlogForm').hidden=true;});
   byId('adlogChannel').addEventListener('change',function(){byId('adlogAccountWrap').hidden=this.value!=='메타';});
