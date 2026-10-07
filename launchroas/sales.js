@@ -182,7 +182,7 @@
     var result={title:'광고비 차감 후 예상 이익 확인',done:profit!=null&&!partialResult,button:profit!=null?{label:'결과 보기',run:goResult}:null};
     result.text=profit!=null?(partialResult?'지금은 일부 상품 기준(판매 '+count(s.soldQty)+' 중 '+count(s.linkedQty)+')이에요':'전체 판매 상품 기준으로 확인할 수 있어요')
       :!metaOk?'Meta 광고계정 연결이 필요해요':ms?'Meta '+ms.text:state.recordsError?'저장된 상품 비용 · 환율을 불러오지 못했어요':mp&&spendKrw==null?'광고비 환율 입력이 필요해요':'상품 비용 입력이 필요해요';
-    if(profit==null&&mp&&spendKrw==null&&!ms)result.button={label:'환율 입력',run:openFx};
+    if(profit==null&&mp&&spendKrw==null&&!ms&&!state.recordsError)result.button={label:'환율 입력',run:openFx};
     return [conn,cost,result];
   }
   function renderGuide(steps,ready){
