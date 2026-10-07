@@ -201,6 +201,11 @@ test('결과 비교: 페이지 누락은 비교하지 않고 · 귀속 기준 �
   assert.match(k, /구매 7 → 14건 7일 클릭 기준/);
   assert.match(k, /같은 구매 항목의 7일 클릭 값\(offsite_conversion\.fb_pixel_purchase\)으로 비교해요/);
   assert.doesNotMatch(k, /귀속 기준을 확인하지 못해/);
+  // 구매당 광고비 · ROAS는 같은 기준으로만 — 7일 클릭 매출 값이 없으면 ROAS 계산 보류(기본 값 ROAS와 섞지 않음) · 지표 줄은 기본 값 기준으로 표시
+  assert.match(k, /구매당 광고비 \(7일 클릭 기준\) ₩10,000 → ₩5,000/);
+  assert.match(k, /ROAS \(7일 클릭 기준\) 7일 클릭 기준 매출 값이 없어 ROAS 계산 보류 — 기본 값\(value\) ROAS와 섞지 않아요/);
+  assert.match(k, /변경 후 지표 광고비 ₩70,000 · 구매 14건 · ROAS 600% · 클릭률 1\.00% \(구매 · ROAS는 Meta 기본 값 기준\)/);
+  assert.match(k, /보고 시점\(노출일 · 전환일\)이 Meta 응답으로 확인되지 않아 개선 · 악화 신호로 확정하지 않아요/);
   assert.match(k, /주간 분석은 광고 세트 귀속 설정 기준이고/);
   // 광고 행의 구매 항목에 7d_click이 없으면(광고 단위 응답에서 확인 못 함) — 판단 보류 · value 기준 관찰값만
   s.control.noClick7 = true;
@@ -250,7 +255,8 @@ test('저장된 결과: 최신이 조회 실패뿐이면 갱신 실패 · 이전
     baseline: { metrics: CH.aggregate(span(p.before.since, 100000, 10), p.before.since, p.before.until) }, basis: { currency: 'KRW', attribution: 'A', margin: null } }, Date.now() + id).record;
   const c1 = mk(1), c2 = mk(2);
   const good = CH.aggregate(span(p.after.since, 100000, 30), p.after.since, p.after.until), bad = CH.aggregate(span(p.after.since, 100000, 30).slice(0, 6), p.after.since, p.after.until);
-  const again = { before: c1.baseline.metrics, attribution: ATTR }; // 비교 시점 재조회(화면과 같은 입력)
+  // 비교 시점 재조회(화면과 같은 입력) — 저장된 신호 표시 검사용 가정: 보고 시점까지 확인된 결과
+  const again = { before: c1.baseline.metrics, attribution: { ...ATTR, applied: { ...ATTR.applied, action_report_time: 'response_evidence' } } };
   const r1 = CH.buildResultRecord(c1, good, CH.compare(c1, good, null, '2026-09-30', again), Date.parse('2026-09-30T00:00:00Z'), '', again.before);
   const r2 = CH.buildResultRecord(c1, bad, CH.compare(c1, bad, null, '2026-10-03', again), Date.parse('2026-10-03T00:00:00Z'), '', again.before);
   const legacy = { id: 9, source: 'change_result', action_id: c2.action_id, store_id: '4', measured_at: '2026-09-20T00:00:00Z', after: good, result: { status: 'improved', reasons: ['예전 규칙'], warnings: [] } };

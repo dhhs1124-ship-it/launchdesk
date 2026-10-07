@@ -93,8 +93,8 @@ const week = (start, spend, buy, value) => Array.from({ length: 7 }, (_, i) => d
 // meta-adset-insights가 attribution_mode:'explicit' 요청에 돌려주는 귀속 기준(요청에 실제로 넣은 값)
 // 요청한 설정값 + Meta 응답 항목에서 요청 창별 값을 실제로 본 적용 근거(보고 시점은 응답 근거가 없어 미확인)
 const ATTR = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression',
-  applied: { windows: 'response_evidence', windows_seen: ['7d_click', '1d_view'], action_report_time: 'unconfirmed', metric_basis: 'response_evidence' } };
-// ↑ 판정 로직 검사용 가정: 구매 수 계산 기준까지 확인된 상태. 실제 화면은 아직 metric_basis를 확인하지 못해 항상 unconfirmed(아래 '계산 기준' 테스트)
+  applied: { windows: 'response_evidence', windows_seen: ['7d_click', '1d_view'], action_report_time: 'response_evidence', metric_basis: 'response_evidence' } };
+// ↑ 판정 로직 검사용 가정: 구매 수 계산 기준 · 보고 시점까지 확인된 상태. 실제 서버는 둘 다 unconfirmed(아래 '계산 기준' · '보고 시점' 테스트)
 const REQUESTED_ONLY = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
 // 결과 비교 — 화면(adlog.js)처럼 변경 전 기간을 비교 시점에 다시 조회한 값과 그때 확인한 귀속 기준을 넘긴다(여기서는 저장값과 같은 수치)
 const compareNow = (c, after, ab, today, o = {}) => CH.compare(c, after, ab, today, { before: c.baseline.metrics, attribution: ATTR, ...o });
@@ -307,7 +307,7 @@ test('귀속 기준: 요청한 설정값과 적용 근거를 나눈다 — 응�
   assert.equal(CH.attributionWindowDays(REQUESTED_ONLY), null, '요청값을 되돌려준 것만으로는 확인이 아니다');
   assert.equal(CH.attributionWindowDays({ ...ATTR, applied: { ...ATTR.applied, windows: 'unconfirmed' } }), null, '응답 항목에 요청 창이 보이지 않으면 미확인');
   // 보고 시점은 응답에 드러나지 않는다 — 전환일을 요청해도 근거가 없으면 노출일로 가정해 창 전체를 잠정(보수적)
-  assert.equal(CH.attributionWindowDays({ ...ATTR, action_report_time: 'conversion' }), 7);
+  assert.equal(CH.attributionWindowDays({ ...ATTR, action_report_time: 'conversion', applied: { ...ATTR.applied, action_report_time: 'unconfirmed' } }), 7);
   assert.equal(CH.attributionWindowDays({ ...ATTR, action_report_time: 'conversion', applied: { ...ATTR.applied, action_report_time: 'response_evidence' } }), 0);
   assert.equal(CH.attributionWindowDays({ ...ATTR, windows: ['7d_click', 'dda'] }), null);
   assert.equal(CH.attributionWindowDays('API 기본(클릭 후 7일 · 조회 후 1일)'), null, '예전 기록의 문자열은 확인된 기준이 아니다');
@@ -322,7 +322,7 @@ test('귀속 기준: 요청한 설정값과 적용 근거를 나눈다 — 응�
   assert.equal(early.status, 'inconclusive'); assert.ok(early.blockers.includes('provisional'));
   assert.ok(early.warnings.some((w) => w.includes('2026-09-22부터 확정 판단')));
   assert.equal(compareNow(x.c, x.after, basis(20000), '2026-09-22').status, 'improved');
-  const conv = compareNow(x.c, x.after, basis(20000), '2026-09-15', { attribution: { ...ATTR, action_report_time: 'conversion' } });
+  const conv = compareNow(x.c, x.after, basis(20000), '2026-09-15', { attribution: { ...ATTR, action_report_time: 'conversion', applied: { ...ATTR.applied, action_report_time: 'unconfirmed' } } });
   assert.ok(conv.blockers.includes('provisional'), '전환일 요청이어도 적용 근거가 없으면 잠정');
   assert.match(conv.warnings.join(' '), /보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정/);
 });
@@ -340,9 +340,10 @@ test('계산 기준: 응답에 귀속 창별 키가 있어도 구매 수(value) 
 
 // 7일 클릭 기준 — 하루별 같은 구매 항목의 7d_click(r.click7). 구매는 첫날에만 · 다른 날은 구매 항목 없음(null)
 const PT = 'offsite_conversion.fb_pixel_purchase';
-const SEEN_ONLY = { ...ATTR, applied: { ...ATTR.applied, metric_basis: 'unconfirmed' } }; // 지금 실제 서버 상태(value 계산 기준 미확인)
+const SEEN_ONLY = { ...ATTR, applied: { ...ATTR.applied, metric_basis: 'unconfirmed', action_report_time: 'unconfirmed' } }; // 지금 실제 서버 상태(value 계산 기준 · 보고 시점 미확인)
+const SEEN_REPORT_OK = { ...SEEN_ONLY, applied: { ...SEEN_ONLY.applied, action_report_time: 'response_evidence' } }; // 판정 경로 검사용 가정: 보고 시점만 확인
 const k7 = (start, spendTotal, valueBuys, click7, opts = {}) => span(start, spendTotal, valueBuys).map((r, i) => ({ ...r,
-  click7: opts.noField ? undefined : i === 0 ? { action_type: opts.type || PT, value: click7 } : null }));
+  click7: opts.noField ? undefined : i === 0 ? { action_type: opts.type || PT, value: click7, revenue: opts.noRevenue || click7 === null ? null : click7 * 40000 } : null }));
 const k7Case = (b, a, opts = {}) => {
   const p = CH.periods('2026-09-08', 7);
   const c = makeChange(span('2026-09-01', b[0], b[1]), opts);
@@ -356,7 +357,7 @@ test('7일 클릭 기준: 전후 모두 같은 구매 항목의 7d_click이 있�
   const x = k7Case([100000, 10, 10], [100000, 13, 30]);
   assert.deepEqual(x.after.purchases_7d_click, { value: 30, observed: true, action_type: PT });
   assert.equal(x.after.purchases.value, 13, 'value는 따로 남는다(합산 없음)');
-  const r = x.run('2026-09-30');
+  const r = x.run('2026-09-30', SEEN_REPORT_OK);
   assert.deepEqual(r.count_basis, { field: '7d_click', action_type: PT, label: '7일 클릭 기준' });
   assert.deepEqual(r.purchases, { before: 10, after: 30, diff: 20, basis: '7일 클릭 기준' });
   assert.equal(r.status, 'improved'); assert.match(r.reasons[0], /^7일 클릭 기준 구매당 광고비 개선 신호/);
@@ -364,10 +365,31 @@ test('7일 클릭 기준: 전후 모두 같은 구매 항목의 7d_click이 있�
   assert.match(r.warnings.join(' '), /같은 구매 항목의 7일 클릭 값\(offsite_conversion\.fb_pixel_purchase\)으로 비교해요 — 1일 조회 · 기본 값\(value\)은 더하지 않아요/);
   assert.match(r.warnings.join(' '), /주간 분석은 광고 세트 귀속 설정 기준이고/, '주간 AI 분석과 귀속 기준이 다르다는 안내 유지');
   assert.equal(r.profit.before, 20000 * 10 - 100000, '참고 이익도 같은 7일 클릭 구매 수로');
+  // 매출 · ROAS도 같은 7일 클릭 기준(같은 항목 구매 금액의 7d_click) — 기본 값(value) ROAS(span의 30,000원/건)와 섞지 않는다
+  assert.deepEqual([Math.round(r.roas.before * 1000) / 1000, Math.round(r.roas.after * 1000) / 1000, r.roas.basis], [4, 12, '7일 클릭 기준']);
+  const noRev = k7Case([100000, 10, 10], [100000, 13, 30], { after: { noRevenue: true } }).run('2026-09-30', SEEN_REPORT_OK);
+  assert.equal(noRev.roas.before, null); assert.equal(noRev.roas.after, null); assert.match(noRev.roas.withheld, /ROAS 계산 보류 — 기본 값\(value\) ROAS와 섞지 않아요/);
+  assert.equal(noRev.count_basis.field, '7d_click', '매출 값이 없어도 구매당 광고비는 7일 클릭 기준 그대로');
   // 귀속 창(7일) · 보고 시점 미확인(노출일 가정) — 확정일 전은 잠정
   const early = x.run('2026-09-21');
   assert.equal(early.status, 'inconclusive'); assert.ok(early.blockers.includes('provisional'));
   assert.match(early.warnings.join(' '), /귀속 창\(7일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정\).*2026-09-22부터 확정 판단/);
+});
+
+test('보고 시점 미확인(지금 실제 서버)이면 7일 클릭 값으로 차이가 커도 · 확정일이 지나도 개선 · 악화 신호로 확정하지 않는다', () => {
+  const x = k7Case([100000, 10, 10], [100000, 13, 30]);
+  for (const today of ['2026-09-30', '2026-12-31']) {
+    const r = x.run(today, SEEN_ONLY);
+    assert.equal(r.status, 'inconclusive'); assert.ok(r.blockers.includes('report_time_unverified'));
+    assert.ok(!r.blockers.includes('provisional'), '확정일은 지났다');
+    assert.match(r.reasons[0], /보고 시점\(노출일 · 전환일\)을 확인하지 못해 개선 · 악화를 확정하지 않아요/);
+    assert.ok(r.test.p_better < 0.05, '검정 결과는 관찰로 남긴다');
+  }
+  const worse = k7Case([100000, 30, 30], [100000, 10, 10]).run('2026-09-30', SEEN_ONLY);
+  assert.equal(worse.status, 'inconclusive'); assert.ok(worse.blockers.includes('report_time_unverified'));
+  const rr = CH.buildResultRecord(x.c, x.after, x.run('2026-09-30', SEEN_ONLY), Date.parse('2026-09-30T00:00:00Z'), '');
+  const sum = CH.outcomeSummary([x.c, rr]);
+  assert.equal(sum.signals.cpa_better, 0); assert.equal(sum.hold_reasons.report_time_unverified, 1);
 });
 
 test('7일 클릭 기준: 창별 값이 하루라도 없거나 · 관찰값이 없거나 · 구매 항목이 다르면 판단 보류(value 계산 기준 미확인 그대로)', () => {

@@ -79,7 +79,7 @@
   function metricLine(m,cur){
     if(!m)return '—';
     var buy=m.purchases.observed?m.purchases.value+'건':'미측정',roas=m.roas==null?'미측정':Math.round(m.roas*100)+'%';
-    return '광고비 '+(cur==='KRW'?money(m.spend):cur+' '+m.spend.toFixed(2))+' · 구매 '+buy+' · ROAS '+roas+' · 클릭률 '+(m.link_ctr==null?'—':m.link_ctr.toFixed(2)+'%');
+    return '광고비 '+(cur==='KRW'?money(m.spend):cur+' '+m.spend.toFixed(2))+' · 구매 '+buy+' · ROAS '+roas+' · 클릭률 '+(m.link_ctr==null?'—':m.link_ctr.toFixed(2)+'%')+' (구매 · ROAS는 Meta 기본 값 기준)';
   }
   function renderChanges(links,storeId){
     var box=byId('adlogChanges');box.replaceChildren();
@@ -126,7 +126,10 @@
     if(shown&&shown.before)add('변경 전 지표(비교 시점 재조회)',metricLine(shown.before,cur));
     add(shown&&shown.before?'변경 전 지표(기록 당시 · 이력)':'변경 전 지표(기록 당시)',metricLine(c.baseline.metrics,cur));
     if(shown&&shown.after)add('변경 후 지표',metricLine(shown.after,cur));
-    if(r&&r.cpa)add('구매당 광고비',(r.cpa.before==null?'—':amt(r.cpa.before,cur))+' → '+(r.cpa.after==null?'—':amt(r.cpa.after,cur)));
+    var cb=r&&r.purchases&&r.purchases.basis?' ('+r.purchases.basis+')':'';
+    if(r&&r.cpa)add('구매당 광고비'+cb,(r.cpa.before==null?'—':amt(r.cpa.before,cur))+' → '+(r.cpa.after==null?'—':amt(r.cpa.after,cur)));
+    // 구매당 광고비와 같은 기준의 ROAS만 — 기준이 다른 값은 섞지 않는다
+    if(r&&r.roas&&r.roas.basis&&r.purchases&&r.roas.basis===r.purchases.basis)add('ROAS'+cb,r.roas.withheld||((r.roas.before==null?'—':Math.round(r.roas.before*100)+'%')+' → '+(r.roas.after==null?'—':Math.round(r.roas.after*100)+'%')));
     add('귀속 기준',attrText(r&&r.baseline_source==='refetched'?r.attribution:c.basis.attribution));
     var wk=r&&r.attribution_vs_weekly||c.basis.attribution_vs_weekly;
     add('주간 분석과 기준',wk?'주간 분석 · '+wk.weekly.label+' — '+wk.note:'주간 분석 · '+CH.WEEKLY_ATTRIBUTION.label+' — 같은 기준인지 확인되지 않음');
@@ -175,7 +178,8 @@
         if(hit&&hit.attribution_purchase&&hit.attribution_purchase.count)obs.push(hit.attribution_purchase.count);
         var mb=res.data.attribution&&res.data.attribution.metric_basis;basisOk=basisOk&&!!mb&&mb.matches_requested_windows==='response_evidence';
         // 7일 클릭 구매 — 이 광고 행의 같은 구매 항목 7d_click(광고 단위 응답에서 본 값만). 구매 항목 없음 = null · 관찰값 없음(재배포 전 서버) = undefined
-        var ap=hit&&hit.attribution_purchase,click7=!hit||ap===undefined?undefined:ap===null?null:{action_type:ap.action_type,value:ap.count&&ap.count.windows?ap.count.windows['7d_click']:null};
+        var ap=hit&&hit.attribution_purchase,click7=!hit||ap===undefined?undefined:ap===null?null:{action_type:ap.action_type,value:ap.count&&ap.count.windows?ap.count.windows['7d_click']:null,
+          revenue:ap.purchase_value&&ap.purchase_value.windows?ap.purchase_value.windows['7d_click']:null};
         rows.push({date:d,metrics:hit?hit.metrics:null,click7:click7,state:hit?'ok':res.data.truncated?'truncated':'absent'});
       } else rows.push({date:d,metrics:null,state:'failed'});
       d=CH.addDays(d,1);
