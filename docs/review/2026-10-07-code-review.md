@@ -54,3 +54,23 @@
 
 ## D. 별도 트랙 — 미리보기 전용 미배포 AI · 영상 코드
 운영 `master`에 없는 코드: `launchroas/video-verify.html` · `video-frames.js` · `supabase/functions/ad-video-source`(미배포) · `ai-weekly-review`의 `verify_video` · `_shared/ai-video-core.mjs` · `ai-policy.mjs` · `ai-weekly-core.mjs` · `ai-insights-core.mjs` · 관련 테스트 · 검증 스크립트. `ai-weekly-review`는 배포(v16)돼 있지만 소스는 미리보기에만 있다. AI 재활성화 결정 때 함께 검토.
+
+## E. 배포 전 검증용 미리보기에서 찾아 고친 것 (`a0841eb` · `b4b9339` · `60fed2e`)
+판매 화면(`launchroas/sales.js`): 저장 기록(상품 비용 · 환율) 조회 실패가 주문 오류(`state.error`)와 섞여, 주문 조회가 성공하면 안내가 안 보이고 'Cafe24 조회 실패' 칩이 잘못 붙을 수 있었다.
+- `state.recordsError`로 분리 → 안내 칩 · '상품 비용 입력' 단계에 '저장된 상품 비용 · 환율을 불러오지 못했어요' 표시, 그때는 '비용 미입력 · 환율 입력 필요' 칩 · '환율 입력' 버튼을 내지 않고 광고비 칸은 '환율을 불러오지 못했어요'.
+
+## F. 배포 전 검증 결과 (브랜치 미리보기 · 2026-10-07)
+- 미리보기: LaunchROAS `launchroas-git-cleanup-master-ce034f8-launchdesk.vercel.app` · 런치데스크 `launchdesk-git-cleanup-master-ce034f8-launchdesk.vercel.app` (Vercel Preview · 운영 영향 없음).
+- 공용 DB 저장 없음 — 모의 중 저장 · 삭제 · 진행 저장 요청은 브라우저에서 차단(서버로 나가지 않음).
+| 구분 | 항목 | 결과 |
+|---|---|---|
+| 실제 | 두 사이트 로그인 · LaunchROAS 화면 5개 · AI 칸 숨김 · 런치데스크 대시보드(0건 · ₩0) | 정상 |
+| 실제 | 매장 전환 | 확인 불가(계정 매장 1개) — 늦은 응답 처리는 회귀 테스트로 확인 |
+| 실제 | 로그아웃 | 실행 안 함 — 두 사이트 모두 `signOut()` 기본 범위(모든 세션)라 운영 로그인도 풀림. 방식 변경은 별도 결정 |
+| 모의 | LaunchROAS 쇼핑몰 목록 조회 실패 | 'Cafe24 확인 실패 / Meta 확인 실패'(멈춤 없음) |
+| 모의 | LaunchROAS 광고 세트 일부 누락 | 오른쪽 요약 '조회 실패'(확인 중에 멈추지 않음) |
+| 모의 | LaunchROAS 저장 기록 조회 실패 | 상품 비용 · 광고 기록(다시 불러오기) · 판매 화면 안내 정상, 주문 조회 실패('Cafe24 조회 실패')와 구분, 같은 기간 재조회 후 처음 상태와 동일 |
+| 모의 | 런치데스크 광고 기록 저장 실패 | '저장하지 못했어요' 안내 · 목록 · 합계 원래대로 |
+| 모의 | 런치데스크 광고 기록 조회 실패 → 다시 불러오기 | 실패 안내 · 합계 — → 재시도 후 ₩0 |
+| 모의 | 런치데스크 로그인 데이터 조회 중 로그아웃 | 늦은 응답 무시 |
+| 모의 | 런치데스크 진행상황 조회 실패 | 진행 저장 시도 0회 |
