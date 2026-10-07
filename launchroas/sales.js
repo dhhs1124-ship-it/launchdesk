@@ -24,7 +24,7 @@
     if(!ctx.metaAccount)return {text:'미연동',note:'Meta 광고계정을 연결하면 표시돼요.'};
     if(ctx.metaAccount.status!=='connected')return {text:'연결 확인 필요',note:'연결 관리에서 광고계정을 선택해 주세요.'};
     if(!ctx.metaData)return {text:'조회 중',note:''};
-    if(ctx.metaData.error)return {text:'조회 실패',note:'Meta 성과를 불러오지 못했어요. 0건이 아닙니다.'};
+    if(ctx.metaData.error)return {text:'조회 실패',note:((ctx.metaData.notice&&ctx.metaData.notice.message)||'Meta 성과를 불러오지 못했어요.')+' 0건이 아닙니다.'};
     return null;
   }
 
@@ -47,7 +47,12 @@
     try{
       var res=await ctx.client.functions.invoke('cafe24-order-items',{body:{store_id:ctx.storeId,start_date:range.since,end_date:range.until}});
       if(id!==ticket)return;
-      if(res.error||!res.data||res.data.ok!==true)state.error='Cafe24 주문 상품을 불러오지 못했어요. 판매 수량을 0개로 보지 마세요.';
+      if(res.error||!res.data||res.data.ok!==true){
+        // 재연결 필요 · 앱 권한 해제 · 일시 오류 · 서버 오류를 나눠 안내한다(수량을 0으로 보지 말라는 안내는 그대로)
+        var core=window.LaunchRoasCore,failure=await core.readFunctionError(res);
+        if(id!==ticket)return;
+        state.error=core.functionErrorNotice('cafe24',failure).message+' 판매 수량을 0개로 보지 마세요.';
+      }
       else if(res.data.truncated){state.truncated=true;state.error='주문이 조회 한도(5,000건)를 넘어 일부가 빠졌어요. 이 기간은 계산하지 않습니다.';}
       else state.orders=res.data.orders||[];
     }catch(e){if(id===ticket)state.error='Cafe24 주문 상품 조회 중 오류가 발생했어요.';}

@@ -44,6 +44,13 @@ export function fakeSupabase(handlers, log) {
   const calls = log || [];
   return {
     calls,
+    // RPC는 handlers['rpc:<이름>'](args)가 { data, error }를 돌려준다.
+    async rpc(name, args) {
+      calls.push({ table: 'rpc:' + name, op: 'rpc', values: args });
+      const h = handlers['rpc:' + name];
+      const r = h ? await h(args) : { data: null, error: { message: 'no fake handler for rpc ' + name } };
+      return { data: r && r.data !== undefined ? r.data : null, error: (r && r.error) || null };
+    },
     from(table) {
       const q = { table, op: 'select', values: null, options: null, filters: [], mode: 'many', columns: null };
       const run = async () => {

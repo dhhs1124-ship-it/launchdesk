@@ -389,6 +389,14 @@ verify_jwt = true
 [functions.meta-disconnect]
 verify_jwt = true
 
+# cafe24-oauth-callback — Cafe24 인증 후 Cafe24가 사용자 브라우저를 리다이렉트로 보내는
+# 주소라 요청에 Supabase JWT가 없다. 그래서 meta-oauth-callback과 같이 verify_jwt = false.
+# 이 항목이 없으면 다시 배포할 때 기본값(true)이 적용돼 콜백이 401로 막히고 Cafe24 연결이
+# 끊긴다(그동안은 배포 때마다 --no-verify-jwt를 직접 붙여야 했다). 함수 안에서는 OAuth state를
+# 원자적으로 claim해 위조 · 재사용 요청을 거른다.
+[functions.cafe24-oauth-callback]
+verify_jwt = false
+
 # cafe24-disconnect — Cafe24 연동 해제(연결 정보·자격증명·주문 데이터 삭제).
 # meta-disconnect와 같은 이유로 로그인 사용자만 호출해야 하므로 verify_jwt
 # = true.

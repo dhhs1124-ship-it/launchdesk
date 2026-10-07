@@ -118,7 +118,11 @@
       try{
         var response=await ctx.client.functions.invoke('meta-adset-insights',{body:params(ctx,'ads',adset.adset_id)});
         if(!valid(ctx,key)||details.hidden)return;
-        if(response.error||!response.data||response.data.ok!==true){details.textContent='광고 성과 조회에 실패했어요. 연결 상태를 확인한 뒤 다시 열어 주세요.';return;}
+        if(response.error||!response.data||response.data.ok!==true){
+          var core=window.LaunchRoasCore,failure=await core.readFunctionError(response);
+          if(valid(ctx,key)&&!details.hidden)details.textContent=core.functionErrorNotice('meta',failure).message;
+          return;
+        }
         var data=response.data;details.replaceChildren();
         if(data.truncated){details.textContent='조회 한도를 넘어서 일부 광고가 누락됐어요. 이 결과로 마진을 계산하지 마세요.';return;}
         if(!data.ads||!data.ads.length){details.textContent='선택 기간에 성과가 잡힌 광고가 없어요.';details.dataset.loaded='true';return;}
@@ -152,7 +156,11 @@
     try{
       var response=await ctx.client.functions.invoke('meta-adset-insights',{body:params(ctx,'adsets')});
       if(id!==generation||!valid(ctx,key))return;
-      if(response.error||!response.data||response.data.ok!==true){message.textContent='광고별 성과를 불러오지 못했어요. Meta 연결을 확인해 주세요.';publish({key:key,error:'광고 세트 성과를 불러오지 못함'});return;}
+      if(response.error||!response.data||response.data.ok!==true){
+        var core=window.LaunchRoasCore,failure=await core.readFunctionError(response);
+        if(id!==generation||!valid(ctx,key))return;
+        message.textContent=core.functionErrorNotice('meta',failure).message;publish({key:key,error:'광고 세트 성과를 불러오지 못함'});return;
+      }
       var data=response.data;accountCurrency=String(data.account&&data.account.currency||'KRW').toUpperCase();
       if(data.truncated){message.textContent='조회 한도를 넘어 일부 광고 세트가 누락됐어요. 이 기간의 광고별 성과를 계산에 사용하지 마세요.';publish({key:key,error:'광고 세트 일부 누락'});return;}
       var loaded=await Promise.all([

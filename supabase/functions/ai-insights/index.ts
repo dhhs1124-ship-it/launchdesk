@@ -7,8 +7,18 @@ import { SYSTEM_PROMPT, MAX_OUTPUT_TOKENS, validatePayload, parseOutput } from "
 // 모델은 시크릿 AI_MODEL로 바꿀 수 있다(기본 claude-sonnet-5-5).
 const DEFAULT_MODEL = "claude-sonnet-5-5";
 
+// 베타 기간 비활성화(2026-10): 화면은 이 함수를 더 이상 부르지 않는다(주간 점검 ai-weekly-review로
+// 대체). 그런데 이 함수는 로그인만 하면 누구나 이용 횟수 · 월 예산 · 켜기 스위치 없이 Claude API를
+// 반복 호출할 수 있는 경로였다. 그래서 키를 읽거나 AI를 부르기 전에 항상 멈춘다. 다시 쓰려면 먼저
+// ai-weekly-review의 비용 예약(ai_budget_reserve — kind 추가는 DB 변경 필요)과 이용 횟수 제한에
+// 연결한 뒤 이 값을 바꾼다.
+const AI_INSIGHTS_DISABLED = true;
+
 export default {
   fetch: withSupabase({ auth: "user" }, async (req, ctx) => {
+    if (AI_INSIGHTS_DISABLED) {
+      return Response.json({ ok: false, code: "AI_DISABLED", message: "이 AI 분석은 지금 제공하지 않아요." }, { status: 410 });
+    }
     try {
       if (!ctx.userClaims?.id) return Response.json({ ok: false, code: "UNAUTHORIZED" }, { status: 401 });
       const body = await req.json().catch(() => null);

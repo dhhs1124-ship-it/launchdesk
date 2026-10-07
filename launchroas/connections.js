@@ -30,7 +30,12 @@
     var ticket=++generation,box=byId('metaAccountPicker');say('연결할 Meta 광고계정을 불러오는 중이에요.');
     var response=await ctx.client.functions.invoke('meta-adaccounts',{body:{connected_account_id:ctx.metaAccount.id}});
     if(ticket!==generation||!same(ctx))return;
-    if(response.error||!response.data||response.data.ok!==true){say('광고계정 목록을 불러오지 못했어요. Meta를 재연결해 주세요.');return;}
+    if(response.error||!response.data||response.data.ok!==true){
+      // 재연결이 필요한 경우에만 재연결을 안내한다(요청 한도 · 일시 오류 · 서버 오류는 다시 시도)
+      var core=window.LaunchRoasCore,failure=await core.readFunctionError(response);
+      if(ticket!==generation||!same(ctx))return;
+      say(core.functionErrorNotice('meta',failure,'광고계정 목록을 불러오지 못했어요. 다시 시도해 주세요.').message);return;
+    }
     var select=byId('metaAccountChoice');select.replaceChildren();
     (response.data.ad_accounts||[]).forEach(function(account){var option=document.createElement('option');option.value=account.id;option.textContent=account.name||account.id;select.appendChild(option);});
     box.hidden=!select.options.length;say(select.options.length?'Meta 광고계정을 선택하면 연결이 완료돼요.':'접근 가능한 광고계정이 없습니다.');
@@ -80,7 +85,11 @@
     try{
       var result=await ctx.client.functions.invoke('meta-account-select',{body:{connected_account_id:ctx.metaAccount.id,ad_account_id:id}});
       if(!same(ctx))return;
-      if(result.error||!result.data||result.data.ok!==true){say('광고계정을 연결하지 못했어요. 다시 시도해 주세요.');return;}
+      if(result.error||!result.data||result.data.ok!==true){
+        var core=window.LaunchRoasCore,failure=await core.readFunctionError(result);
+        if(!same(ctx))return;
+        say(core.functionErrorNotice('meta',failure,'광고계정을 연결하지 못했어요. 다시 시도해 주세요.').message);return;
+      }
       say('Meta 광고계정을 연결했어요.');await app.selectStore(ctx.storeId);
     }finally{this.disabled=false;}
   });

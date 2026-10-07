@@ -179,7 +179,10 @@
     if(id !== requestId) return;
     var data = result.data;
     if(result.error || !data || data.ok !== true){
-      viewState.meta={error:true};publish();return;
+      // 오류 종류(재연결 · 권한 · 요청 한도 · 일시 오류 · 서버 오류)에 맞는 안내를 같이 넘긴다
+      var failure = await core.readFunctionError(result);
+      if(id !== requestId) return;
+      viewState.meta={error:true,notice:core.functionErrorNotice('meta',failure)};publish();return;
     }
     viewState.meta=data;
     publish();
@@ -291,10 +294,8 @@
         var plan=periods.syncPlan(range,Date.now(),accounts.data[0].last_synced_at);
         var result = await sb.functions.invoke('cafe24-orders-sync',{body:{store_id:storeId,start_date:plan.start_date,end_date:plan.end_date}});
         if(result.error || !result.data || result.data.ok !== true){
-          var body = result.error && result.error.context && await result.error.context.json().catch(function(){return null;});
-          syncError = body && body.code === 'RECONNECT_REQUIRED'
-            ? 'Cafe24 인증이 만료됐어요. 연결 관리에서 Cafe24를 다시 연결해 주세요.'
-            : '주문 동기화에 실패했어요. 연결 상태를 확인해 주세요.';
+          // 재연결 필요 · 앱 권한 해제 · 일시 오류 · 기록 저장 실패 · 서버 오류를 나눠 안내한다
+          syncError = core.functionErrorNotice('cafe24', await core.readFunctionError(result), '주문 동기화에 실패했어요. 잠시 후 다시 시도해 주세요.').message;
         }
       } else syncError = 'Cafe24가 연결되지 않아 저장된 데이터만 다시 조회했어요.';
     }catch(e){ syncError = '주문 동기화 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'; }

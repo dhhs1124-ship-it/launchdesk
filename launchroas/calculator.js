@@ -108,7 +108,11 @@
       var today=periods.kstDate(Date.now()),since=new Date(Date.parse(today+'T00:00:00Z')-(RECENT_DAYS-1)*86400000).toISOString().slice(0,10);
       var res=await ctx.client.functions.invoke('cafe24-order-items',{body:{store_id:ctx.storeId,start_date:since,end_date:today}});
       if(id!==ticket)return;
-      if(res.error||!res.data||res.data.ok!==true)st.error='Cafe24 상품을 불러오지 못했어요. 연결 상태를 확인해 주세요.';
+      if(res.error||!res.data||res.data.ok!==true){
+        var core=window.LaunchRoasCore,failure=await core.readFunctionError(res);
+        if(id!==ticket)return;
+        st.error=core.functionErrorNotice('cafe24',failure).message;
+      }
       else orders=res.data.orders||[];
     }else st.error='Cafe24를 연결하면 판매 상품을 고를 수 있어요.';
     st.products=buildProducts(orders);
