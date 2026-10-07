@@ -434,3 +434,12 @@ git worktree remove ../main-parity-wt
 - 실제 저장: `[검증용] 운영 메인 호환 확인 2026-10-07`(카카오 · ₩1,000) 저장 → 목록 · 합계 ₩1,000 · 서버 재조회 1행 확인 → 사용자가 ✕로 삭제 → 서버 재조회 광고 기록 0행 · 선택 0행 · 합계 ₩0.
 - 함께 배포된 LaunchROAS 운영(launchroas.vercel.app, 읽기 전용): 이번 커밋에 `launchroas/` 변경 없음 · 제공 파일 `index.html` · `core.js` · `app.js` · `styles.css`가 `master`와 동일 · 미리보기 전용 파일(`adlog.js` · `adlog-change-core.js` · `insights.js` 등) 404 · `LAUNCHROAS_FLAGS`/저장 스위치 없음(운영 메인도 없음).
 - 하지 않음: 미리보기 병합 · 저장 스위치 · AI 재활성화 · 광고 변경 · 다른 함수 배포.
+
+### B 미리보기 저장 기능 — 완료 (2026-10-07 10:40~10:55 KST)
+- 저장 스위치: `launchroas/index.html`에 `window.LAUNCHROAS_FLAGS = { adlogChangeRecords: true }`(커밋 `6d2423c`) · 테스트 795/795 · 운영 빌드 테스트 640/640 · 푸시 범위 비밀 값 검사 이상 없음.
+- `preview/launchroas-apple` 푸시(`d4edd76..6d2423c`, 43커밋) → Vercel **Preview** 배포만(launchroas · launchdesk success, Vercel SSO 보호). 운영 `master` · 운영 배포 변경 없음 · LaunchROAS 운영 주소는 그대로(미리보기 파일 404).
+- 미리보기에서 스위치 켜짐 확인(`changeEnabled:true`) → 사용자 로그인 → ‘9월 전환광고’ 실행 기록 1건 저장(`[검증용] 저장·조회 확인 — 실제 광고 변경 없음`, 기타 · 기존 광고 수정, AI 제안 연결 없음, 광고 변경 없음, 무료 Meta 조회만):
+  - 서버 재조회 1행(`source:change` · id `1791337882709039`) · 변경 전 9/30~10/6 누락 0 · $137.05 · 구매 8(7일 클릭 8) · USD · Asia/Seoul · 귀속 `explicit_request` · 계산 기준 unconfirmed 저장.
+  - 미리보기: '변경 기록 · 합계 제외 · 결과 대기' · 비교 기간 10/13 종료 · 확정 판단일 10/21 안내. 운영 메인: 같은 기록 '변경 기록 · 합계 제외 · 결과 대기' · 금액 — · 합계 ₩0 · ₩NaN 없음.
+  - 사용자가 삭제 → 서버 광고 기록 0 · 선택 0 · 미리보기 · 운영 메인 모두 '기록 없음 · ₩0'.
+- 하지 않음: 운영 `master` 병합 · 운영 배포 · AI 재활성화 · 광고 변경.
