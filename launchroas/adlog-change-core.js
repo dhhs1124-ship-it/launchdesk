@@ -16,7 +16,7 @@
   var ELEMENTS = ['문구', '이미지', '영상 첫 장면', '영상 자막', '타깃', '예산', '랜딩 페이지', '기타'];
   var CONCURRENT = ['예산', '할인', '상품', '타깃', '게재 위치', '기타'];
   // 결과 판정 버전 — 이 버전의 신호(improved · worse)만 '구매당 광고비 신호'로 집계한다. 버전이 없는 예전 결과는 이전 기준
-  var JUDGEMENT_VERSION = 'adlog-compare-v3: 정확 이항검정(단측 0.05) · 광고비당 구매 · 전후 같은 시점 재조회 · 같은 광고만 · 귀속 창 동안 잠정';
+  var JUDGEMENT_VERSION = 'adlog-compare-v4: 정확 이항검정(단측 0.05) · 광고비당 구매 · 전후 같은 시점 재조회 · 같은 광고만 · 귀속 창 동안 잠정 · 구매 수 계산 기준(value)이 요청 창 기준으로 확인될 때만';
   var PROFIT_FORMULA = 'ad-profit-reference-v1: 연결 상품 주문당 광고 전 잔액 × Meta 귀속 구매 수 − 광고비(원화) · 참고 계산';
   var DAY = 864e5;
 
@@ -78,11 +78,14 @@
   //   { source:'request', windows, action_report_time(요청값), applied:{ windows:'response_evidence'|'unconfirmed', action_report_time:'response_evidence'|'unconfirmed' } }
   //   요청값을 서버가 돌려준 것만으로는 확인이 아니다. 창은 Meta 응답 항목에 요청한 창별 값이 실제로 보였을 때만(response_evidence) 확인으로 본다.
   //   그 근거가 없거나 예전 기록의 문자열이면 확인 불가(null) → 판단 보류.
+  //   applied.metric_basis: 구매 수 계산 기준(응답의 value)이 요청 창 기준이라는 근거 — 지금은 근거가 없어 항상 unconfirmed → 판단 보류.
   // 잠정 기간 = 귀속 창(클릭 · 조회 중 긴 쪽). 노출일 보고면 마지막 날 노출의 구매가 창이 끝날 때까지 그 날짜로 더해진다.
   //   보고 시점은 응답에 드러나지 않아(근거 없음) 요청값이 전환일이어도 노출일로 가정해 창 전체를 잠정으로 둔다(보수적). 전환일이 근거로 확인될 때만 0일.
   function attributionWindowDays(a){
     if(!a || typeof a !== 'object' || a.source !== 'request' || !Array.isArray(a.windows) || !a.windows.length) return null;
     if(!a.applied || a.applied.windows !== 'response_evidence') return null;
+    // 창별 키가 보인 것과 구매 수가 그 창 기준으로 계산된 것은 다르다 — 지표는 응답의 value(Meta 문서: 기본 귀속 창 값)라 계산 기준 근거가 있을 때만
+    if(a.applied.metric_basis !== 'response_evidence') return null;
     var d = a.windows.map(function(w){ var m = /^(\d+)d_(click|view)$/.exec(String(w)); return m ? Number(m[1]) : NaN; });
     if(d.some(isNaN)) return null;
     return a.action_report_time === 'conversion' && a.applied.action_report_time === 'response_evidence' ? 0 : Math.max.apply(null, d);
@@ -195,7 +198,9 @@
     res.attribution = attr || null;
     res.attribution_vs_weekly = weeklyDiff(attr); w.push(res.attribution_vs_weekly.note);
     var win = attributionWindowDays(attr);
-    if(win === null){ res.provisional = true; res.blockers.push('attribution_unverified'); w.push('요청한 귀속 창이 Meta 응답에 실제로 적용된 근거가 없어(미확인) 개선 · 악화를 확정하지 않아요'); }
+    if(win === null){ res.provisional = true; res.blockers.push('attribution_unverified'); w.push(attr && attr.applied && attr.applied.windows === 'response_evidence'
+      ? '응답에 귀속 창별 값은 있지만 구매 수가 그 기준으로 계산됐는지 확인되지 않아(계산 기준 미확인) 개선 · 악화를 확정하지 않아요'
+      : '요청한 귀속 창이 Meta 응답에 실제로 적용된 근거가 없어(미확인) 개선 · 악화를 확정하지 않아요'); }
     else {
       res.final_from = finalFrom(after.until, win);
       if(today < res.final_from){ res.provisional = true; res.blockers.push('provisional'); w.push('귀속 창(' + win + '일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정) 안이라 구매가 더 늘어날 수 있어 잠정 결과예요 — ' + res.final_from + '부터 확정 판단'); }

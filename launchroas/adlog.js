@@ -164,7 +164,7 @@
   // 귀속 기준: 요청값(설정)과 적용 근거를 나눈다 — 요청값은 정상 조회한 날이 모두 같은 값을 돌려줬을 때만 쓰고(아니면 null),
   // 창 적용은 대상 광고 행에 요청한 창별 값이 모두 보인 날이 하루라도 있을 때만 response_evidence. 보고 시점은 근거가 없어 항상 unconfirmed
   async function dailyAds(ctx,adsetId,adId,since,until){
-    var rows=[],currency=null,timezone=null,reqs=[],seen={},d=since;
+    var rows=[],currency=null,timezone=null,reqs=[],seen={},obs=[],basisOk=true,d=since;
     while(d<=until){
       var res;
       try{res=await ctx.client.functions.invoke('meta-adset-insights',{body:{store_id:ctx.storeId,scope:'ads',period:'date',date:d,adset_id:adsetId,attribution_mode:'explicit'}});}catch(e){res={error:e};}
@@ -172,6 +172,8 @@
         currency=res.data.account&&res.data.account.currency||currency;timezone=res.data.account&&res.data.account.timezone||timezone;reqs.push(JSON.stringify(res.data.attribution&&res.data.attribution.requested||null));
         var hit=(res.data.ads||[]).filter(function(a){return String(a.ad_id)===String(adId);})[0];
         if(hit&&Array.isArray(hit.attribution_windows_seen))hit.attribution_windows_seen.forEach(function(w){seen[w]=true;});
+        if(hit&&hit.attribution_purchase&&hit.attribution_purchase.count)obs.push(hit.attribution_purchase.count);
+        var mb=res.data.attribution&&res.data.attribution.metric_basis;basisOk=basisOk&&!!mb&&mb.matches_requested_windows==='response_evidence';
         rows.push({date:d,metrics:hit?hit.metrics:null,state:hit?'ok':res.data.truncated?'truncated':'absent'});
       } else rows.push({date:d,metrics:null,state:'failed'});
       d=CH.addDays(d,1);
@@ -180,21 +182,35 @@
     if(req&&Array.isArray(req.windows)){
       var got=req.windows.filter(function(w){return seen[w];});
       attribution={source:'request',windows:req.windows,action_report_time:req.action_report_time,
-        applied:{windows:got.length===req.windows.length?'response_evidence':'unconfirmed',windows_seen:got,action_report_time:'unconfirmed'}};
+        applied:{windows:got.length===req.windows.length?'response_evidence':'unconfirmed',windows_seen:got,action_report_time:'unconfirmed',
+          // 구매 수는 응답의 value(Meta 문서: 기본 귀속 창 값) — 서버가 정상 조회한 날 모두 요청 창 기준이라는 근거를 줬을 때만 확인(현재 서버는 항상 unconfirmed)
+          metric_basis:basisOk&&reqs.length?'response_evidence':'unconfirmed'},
+        // 관찰값 — 같은 구매 항목의 value · 창별 값을 창마다 날짜별로만 더한다(창끼리는 더하지 않음). 하루라도 값이 없으면 null
+        observed:{purchase_count:observedSum(obs,req.windows)},
+        calculation:{field:'value',windows_summed:false}};
     }
     return {agg:CH.aggregate(rows,since,until),currency:currency,timezone:timezone,attribution:attribution};
+  }
+  function observedSum(list,windows){
+    if(!list.length)return null;
+    var tot=function(get){var s=0;for(var i=0;i<list.length;i++){var v=get(list[i]);if(typeof v!=='number')return null;s+=v;}return s;};
+    var w={};(windows||[]).forEach(function(k){w[k]=tot(function(c){return c.windows&&c.windows[k];});});
+    return {days:list.length,value:tot(function(c){return c.value;}),windows:w};
   }
   // 변경 전 · 후 두 조회의 귀속 — 요청값이 같을 때만, 창 적용 근거는 두 기간 모두에 있을 때만 response_evidence
   function joinAttribution(a,b){
     if(!a||!b||JSON.stringify([a.windows,a.action_report_time])!==JSON.stringify([b.windows,b.action_report_time]))return null;
     var ok=a.applied.windows==='response_evidence'&&b.applied.windows==='response_evidence';
-    return {source:'request',windows:a.windows,action_report_time:a.action_report_time,applied:{windows:ok?'response_evidence':'unconfirmed',windows_seen:ok?a.windows:[],action_report_time:'unconfirmed'}};
+    var mb=a.applied.metric_basis==='response_evidence'&&b.applied.metric_basis==='response_evidence';
+    return {source:'request',windows:a.windows,action_report_time:a.action_report_time,applied:{windows:ok?'response_evidence':'unconfirmed',windows_seen:ok?a.windows:[],action_report_time:'unconfirmed',metric_basis:mb?'response_evidence':'unconfirmed'},
+      observed:{before:a.observed||null,after:b.observed||null},calculation:{field:'value',windows_summed:false}};
   }
   function attrText(a){
     if(a&&typeof a==='object'&&a.source==='request'){
       var ap=a.applied||{};
       return '요청한 설정 · '+(a.windows||[]).join(', ')+' · 보고 기준 '+(a.action_report_time==='impression'?'노출일':a.action_report_time==='conversion'?'전환일':String(a.action_report_time))
-        +' / 실제 적용 · 귀속 창 '+(ap.windows==='response_evidence'?'Meta 응답에서 확인':'미확인(응답 근거 없음)')+' · 보고 기준 미확인(응답에 드러나지 않음)';
+        +' / 응답 관찰 · 귀속 창별 값 '+(ap.windows==='response_evidence'?'있음':'미확인(응답 근거 없음)')+' · 보고 기준 미확인(응답에 드러나지 않음)'
+        +' / 계산 기준 · 구매 수는 Meta 기본 값(value) · 창별 값 합산 안 함 · '+(ap.metric_basis==='response_evidence'?'요청 창 기준 확인':'요청 창 기준인지 미확인');
     }
     return (typeof a==='string'&&a?a+' · ':'')+'미확인(응답에 귀속 기준 없음)';
   }

@@ -18,11 +18,12 @@ const byClass = (n, cls) => all(n).filter((x) => String(x.className || '').split
 // 서버 응답: 요청한 설정값(requested)과 광고 행별로 실제 보인 요청 창(attribution_windows_seen)
 const REQ = { windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
 // 화면이 만든 귀속 기준 — 두 기간 모두 대상 광고 행에서 요청 창을 봤을 때만 response_evidence
-const ATTR = { source: 'request', ...REQ, applied: { windows: 'response_evidence', windows_seen: REQ.windows, action_report_time: 'unconfirmed' } };
-function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezone }){
+const ATTR = { source: 'request', ...REQ, applied: { windows: 'response_evidence', windows_seen: REQ.windows, action_report_time: 'unconfirmed', metric_basis: 'response_evidence' } };
+// basisConfirmed: 서버가 구매 수 계산 기준(value)이 요청 창 기준이라는 근거를 준다고 가정(판정 경로 검사용 — 실제 서버는 아직 항상 unconfirmed)
+function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezone, basisConfirmed }){
   // failDates: 조회 실패할 날짜 · truncDates: 페이지 누락(광고 없음) 날짜 · noAttribution: 재배포 전 서버(귀속 기준 응답 없음) · noEvidence: 요청값은 오지만 광고 행에 창별 값이 없음
   // now: 화면의 현재 시각 고정(ms · 없으면 실제 시각) · timezone: 응답 광고계정 시간대
-  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false, noEvidence: false };
+  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false, noEvidence: false, basisConfirmed: !!basisConfirmed };
   const account = { currency: 'KRW', ...(timezone ? { timezone } : {}) };
   const db = { ad_log: rows.map((data) => ({ data })), ad_log_decision: (decisions || []).map((data) => ({ data })) }, inserts = [], calls = [];
   const ids = {};
@@ -47,10 +48,12 @@ function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezon
   const client = { from, functions: { invoke: async (name, { body }) => {
     calls.push(body);
     if (control.failDates.includes(body.date)) return { data: null, error: { message: '조회 실패(테스트)' } };
-    const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: { source: 'request', requested: REQ, windows_seen: control.noEvidence ? [] : REQ.windows, action_report_time_applied: 'unconfirmed' } } : {};
+    const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: { source: 'request', requested: REQ, windows_seen: control.noEvidence ? [] : REQ.windows, action_report_time_applied: 'unconfirmed',
+      metric_basis: { field: 'value', windows_summed: false, matches_requested_windows: control.basisConfirmed ? 'response_evidence' : 'unconfirmed' } } } : {};
     if (control.truncDates.includes(body.date)) return { data: { ok: true, account, ads: [], truncated: true, ...attribution } };
     const buy = body.date < '2026-09-01' ? 1 : 2;
-    return { data: { ok: true, account, ...attribution, ads: [{ ad_id: '111', ...(attribution.attribution ? { attribution_windows_seen: control.noEvidence ? [] : REQ.windows } : {}), metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
+    return { data: { ok: true, account, ...attribution, ads: [{ ad_id: '111', ...(attribution.attribution ? { attribution_windows_seen: control.noEvidence ? [] : REQ.windows,
+      attribution_purchase: { action_type: 'offsite_conversion.fb_pixel_purchase', count: { value: buy, windows: control.noEvidence ? { '7d_click': null, '1d_view': null } : { '7d_click': buy, '1d_view': 0 } }, purchase_value: null } } : {}), metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: buy, observed: true }, purchase_value: { value: buy * 30000, observed: true } } }] } };
   } } };
   const ctx = { client, userId: 'u1', storeId: '4', stores: [{ id: '4' }], metaAccount: { id: 'm', status: 'connected', external_account_id: 'act_9' }, fx: null };
   const listeners = [], views = [];
@@ -99,7 +102,7 @@ test('스위치가 꺼져 있으면 실행 기록 양식은 열리지만 공용 
 });
 
 test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준과 함께 저장하고, 결과 비교 → 결과 기록을 덧붙인다', async () => {
-  const s = setup({ flag: true, rows: [] });
+  const s = setup({ flag: true, rows: [], basisConfirmed: true });
   await settle();
   s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, before: '가을 신상 10% 할인', after: '울 50% · 가벼운 두께 강조', suggestion: { week: '2026-08-25', ad_id: '111', verdict: '개선 필요', proposed: '첫 줄을 소재 강점으로' } });
   s.ids.chgStart.value = '2026-09-01'; s.ids.chgMethod.value = 'edit';
@@ -141,18 +144,23 @@ test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준
   assert.deepEqual([...cmpCalls.map((b) => b.date)], ['2026-08-25', '2026-08-26', '2026-08-27', '2026-08-28', '2026-08-29', '2026-08-30', '2026-08-31',
     '2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-05', '2026-09-06', '2026-09-07']);
   assert.ok(s.calls.every((b) => b.attribution_mode === 'explicit'));
-  assert.deepEqual(JSON.parse(JSON.stringify(c.basis.attribution)), ATTR, '기록 당시 귀속 기준은 응답 값');
+  const core = (a) => { const { observed, calculation, ...rest } = JSON.parse(JSON.stringify(a)); return rest; };
+  assert.deepEqual(core(c.basis.attribution), ATTR, '기록 당시 귀속 기준은 응답 값');
+  // 관찰값(같은 구매 항목의 value · 창별 값 — 창마다 날짜별로만 더함, 창끼리 더하지 않음)과 계산 기준을 따로 남긴다
+  assert.deepEqual(JSON.parse(JSON.stringify(c.basis.attribution.observed.purchase_count)), { days: 7, value: 7, windows: { '7d_click': 7, '1d_view': 0 } });
+  assert.deepEqual(JSON.parse(JSON.stringify(c.basis.attribution.calculation)), { field: 'value', windows_summed: false });
   assert.equal(result.result.baseline_source, 'refetched'); assert.equal(result.before.purchases.value, 7);
-  assert.deepEqual(JSON.parse(JSON.stringify(result.result.attribution)), ATTR);
+  assert.deepEqual(core(result.result.attribution), ATTR);
+  assert.equal(result.result.attribution.observed.after.purchase_count.value, 14);
   const t2 = text(s.ids.adlogChanges);
   assert.match(t2, /변경 전 지표\(비교 시점 재조회\) 광고비 ₩70,000 · 구매 7건/, '통화가 null로 바뀌지 않는다');
-  assert.match(t2, /귀속 기준 요청한 설정 · 7d_click, 1d_view · 보고 기준 노출일 \/ 실제 적용 · 귀속 창 Meta 응답에서 확인 · 보고 기준 미확인/);
+  assert.match(t2, /귀속 기준 요청한 설정 · 7d_click, 1d_view · 보고 기준 노출일 \/ 응답 관찰 · 귀속 창별 값 있음 · 보고 기준 미확인\(응답에 드러나지 않음\) \/ 계산 기준 · 구매 수는 Meta 기본 값\(value\) · 창별 값 합산 안 함 · 요청 창 기준 확인/);
   assert.match(t2, /주간 분석과 기준 주간 분석 · 광고 세트 귀속 설정 기준/);
   assert.equal(result.result.attribution_vs_weekly.same, false, '저장 기록에 주간 분석과의 기준 차이');
 });
 
 test('실행 기록: 변경 방식 기본값 없음 · 변경 전 조회 실패(누락)가 있으면 저장하지 않는다', async () => {
-  const s = setup({ flag: true, rows: [] });
+  const s = setup({ flag: true, rows: [], basisConfirmed: true });
   await settle();
   s.window.LaunchRoasAdlog.startChange({ ad: { ad_id: '111', ad_name: '니트 광고', adset_id: '222' }, after: '울 50% 강조' });
   assert.equal(s.ids.chgMethod.value, '', '기존 광고 수정 · 새 광고 추가 중 기본 선택 없음');
@@ -173,7 +181,7 @@ test('결과 비교: 페이지 누락은 비교하지 않고 · 귀속 기준 �
   const day = (d) => ({ date: d, metrics: { spend: 10000, impressions: 100000, link_clicks: 1000, purchase: { value: 1, observed: true }, purchase_value: { value: 30000, observed: true } } });
   const c = CH.buildChangeRecord({ storeId: '4', ad: { ad_id: '111', adset_id: '222', ad_name: '니트 광고' }, element: '문구', after: 'x', method: 'edit', startDate: '2026-09-01', compareDays: 7,
     baseline: { metrics: CH.aggregate(Array.from({ length: 7 }, (_, i) => day(CH.addDays(p.before.since, i))), p.before.since, p.before.until) }, basis: { currency: 'KRW', attribution: ATTR, margin: null } }, Date.now()).record;
-  const s = setup({ flag: false, rows: [c] });
+  const s = setup({ flag: false, rows: [c], basisConfirmed: true });
   await settle();
   const press = async () => { await all(byClass(s.ids.adlogChanges, 'adlog-change')[0]).find((x) => x.textContent === '결과 비교하기').events.click(); await settle(); await settle(); return text(byClass(s.ids.adlogChanges, 'adlog-change')[0]); };
   s.control.truncDates = ['2026-09-03'];
@@ -186,7 +194,13 @@ test('결과 비교: 페이지 누락은 비교하지 않고 · 귀속 기준 �
   s.control.noAttribution = false; s.control.noEvidence = true;
   const e = await press();
   assert.match(e, /귀속 기준을 확인하지 못해 개선 여부를 확정하지 않아요/);
-  assert.match(e, /실제 적용 · 귀속 창 미확인\(응답 근거 없음\)/);
+  assert.match(e, /응답 관찰 · 귀속 창별 값 미확인\(응답 근거 없음\)/);
+  // 창별 값은 보이지만 구매 수(value)가 그 창 기준이라는 근거가 없으면(현재 실제 서버) — 판단 보류
+  s.control.noEvidence = false; s.control.basisConfirmed = false;
+  const m = await press();
+  assert.match(m, /판단 보류/); assert.doesNotMatch(m, /개선 신호/);
+  assert.match(m, /응답에 귀속 창별 값은 있지만 구매 수가 그 기준으로 계산됐는지 확인되지 않아/);
+  assert.match(m, /응답 관찰 · 귀속 창별 값 있음 .* 요청 창 기준인지 미확인/);
 });
 
 test('광고 기록 조회 실패: 기록 없음(₩0)과 구분해 합계 — · 불러오지 못함 · 다시 불러오기', async () => {
@@ -247,7 +261,7 @@ test('확정 판단일 안내 · 잠정 판정 날짜가 화면에서도 같다(
   const card = (s) => byClass(s.ids.adlogChanges, 'adlog-change')[0];
   const button = (s) => all(card(s)).find((x) => x.tagName === 'button' && /비교/.test(x.textContent));
   const compareAt = async (iso, timezone) => {
-    const s = setup({ flag: false, rows: [c], now: Date.parse(iso), timezone });
+    const s = setup({ flag: false, rows: [c], now: Date.parse(iso), timezone, basisConfirmed: true });
     await settle();
     return s;
   };
@@ -286,7 +300,7 @@ test('비교 버튼 표시 = 실제 판정과 같은 광고계정 날짜 — 기
     baseline: { metrics: CH.aggregate(Array.from({ length: 7 }, (_, i) => day(CH.addDays(p.before.since, i))), p.before.since, p.before.until) },
     basis: { currency: 'KRW', timezone, attribution: ATTR, margin: null } }, Date.parse('2026-09-01T00:00:00Z')).record;
   const button = (s) => all(byClass(s.ids.adlogChanges, 'adlog-change')[0]).find((x) => x.tagName === 'button' && /비교/.test(x.textContent));
-  const at = async (iso, timezone, respTz) => { const s = setup({ flag: false, rows: [rec(timezone)], now: Date.parse(iso), timezone: respTz }); await settle(); return s; };
+  const at = async (iso, timezone, respTz) => { const s = setup({ flag: false, rows: [rec(timezone)], now: Date.parse(iso), timezone: respTz, basisConfirmed: true }); await settle(); return s; };
   // 한국 9/8 01:30(UTC 9/7 16:30): 서울 계정은 기간 끝 · LA(9/7 09:30)와 시간대 모름(9/7)은 아직 기간 중 — 한국 날짜로 먼저 열지 않는다
   assert.equal(button(await at('2026-09-07T16:30:00Z', 'Asia/Seoul')).textContent, '결과 비교하기(잠정 · 2026-09-15부터 확정)');
   let s = await at('2026-09-07T16:30:00Z', 'America/Los_Angeles');

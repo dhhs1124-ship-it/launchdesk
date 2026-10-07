@@ -18,6 +18,7 @@ import {
   buildInsightsUrl,
   EXPLICIT_ATTRIBUTION,
   attributionWindowsSeen,
+  purchaseWindowValues,
 } from "../_shared/meta-adset-normalize.mjs";
 
 // Meta 캠페인/광고 세트/광고 레벨 Insights — 진단 1단계(원본 성과 조회·정규화만).
@@ -250,7 +251,11 @@ export default {
         return errorResponse(cls.code as keyof typeof META_ERROR_MESSAGES, cls.status);
       }
 
-      const normalizedRows = (pageResult.rows || []).map((row: any) => normalizeIdentityRow(row, level));
+      // 명시 귀속 요청에만: 화면 구매 수와 같은 구매 항목의 value · 요청 창별 값을 원본 그대로(합산하지 않음)
+      const normalizedRows = (pageResult.rows || []).map((row: any) => ({
+        ...normalizeIdentityRow(row, level),
+        ...(attribution ? { attribution_purchase: purchaseWindowValues(row, attribution.windows) } : {}),
+      }));
 
       const accountPayload = {
         id: externalAccountId,
@@ -271,6 +276,8 @@ export default {
               requested: { windows: [...attribution.windows], action_report_time: attribution.action_report_time },
               windows_seen: [...new Set((pageResult.rows || []).flatMap((row: any) => attributionWindowsSeen(row, attribution.windows)))],
               action_report_time_applied: "unconfirmed",
+              // 지표(metrics.purchase 등)의 계산 기준 — Meta 응답 항목의 value(문서: 기본 귀속 창 값). 요청 창 기준이라는 근거가 없어 미확인 · 창별 값은 더하지 않음
+              metric_basis: { field: "value", windows_summed: false, matches_requested_windows: "unconfirmed" },
             } }
           : {}),
       };
@@ -306,6 +313,7 @@ export default {
           ad_id: row.ad_id,
           ad_name: row.ad_name,
           metrics: row.metrics,
+          ...(attribution ? { attribution_purchase: row.attribution_purchase } : {}),
           // 이 광고 행에서 실제로 보인 요청 창(명시 귀속 요청에만)
           ...(attribution ? { attribution_windows_seen: attributionWindowsSeen((pageResult.rows || [])[i], attribution.windows) } : {}),
         })),

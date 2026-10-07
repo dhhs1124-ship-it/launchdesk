@@ -322,3 +322,28 @@ git worktree remove ../main-parity-wt
 - 예약 SQL 동시성은 여전히 PGlite 단일 연결 확인뿐.
 - 그룹 최악 비용은 출력 상한(16,000토큰 × 그룹 호출 수)을 포함해 커서, 월 한도에 가까우면 실제로는 들어갈 그룹도 예약이 거절될 수 있다(보수적).
 - 확정일 이후에도 Meta 사후 데이터 정정(최대 28일)은 반영하지 못한다.
+
+## 12. 2026-10-07 귀속 구매 수 계산 기준 (로컬 · 함수 재배포 전)
+### 실제 확인한 것 (`meta-adset-insights` v13 · 무료 조회 1회 · 광고 세트 · 2026-10-01~10-07)
+- 응답 `attribution.windows_seen` = `["7d_click","1d_view"]` — Meta 응답 **어떤 행동 항목이든** 창별 키가 있다는 뜻일 뿐(링크 클릭 항목도 포함), 구매 수가 그 기준으로 계산됐다는 근거가 아니다.
+- 화면 구매 6건 = `offsite_conversion.fb_pixel_purchase` 항목의 **`value`**(`pickCountAndValue` → `metrics.purchase.value`). 창별 값(`7d_click` · `1d_view`)은 쓰지 않는다.
+- **같은 구매 항목의 `value` · `7d_click` · `1d_view` 숫자는 아직 보지 못했다** — v13 응답은 창별 숫자를 내려주지 않는다. 아래 서버 수정을 재배포(승인 후)한 뒤 무료 조회 1회로 본다.
+
+### Meta 공식 문서 (2026-10-07 확인)
+- AdsActionStats(`developers.facebook.com/docs/marketing-api/reference/ads-action-stats/`): `value` = "Metric value of default attribution window", `7d_click` = "Metric value of attribution window '7 days after clicking the ad'", `1d_view` = "… '1 day after viewing the ad'".
+- Ad Account Insights(`…/reference/ad-account/insights/`): `action_attribution_windows`는 행동을 보고할 창 · 참여 유형을 정하는 필터. **창별 값을 더해도 되는지 · 클릭/조회 중복 제거 규칙은 문서에 없다.**
+- → `value`는 요청 창 기준이라는 근거가 없고(문서상 '기본 귀속 창'), 창별 값의 단순 합산도 근거가 없다. **더하지 않는다.**
+
+### 바꾼 것 (로컬 · 커밋 · 함수 재배포 안 함)
+- 서버(`_shared/meta-adset-normalize.mjs` `purchaseWindowValues` · `meta-adset-insights/index.ts`, 명시 귀속 요청에만):
+  - 행별 `attribution_purchase` = 화면 구매 수와 **같은 action_type 항목**의 `{ count: { value, windows:{7d_click, 1d_view} }, purchase_value: {...} }` 원본 그대로(없는 창 null · 합산 · 보정 없음).
+  - `attribution.metric_basis = { field:'value', windows_summed:false, matches_requested_windows:'unconfirmed' }`.
+- 화면(`adlog.js`) 귀속 기준을 세 가지로 나눠 저장 · 표시:
+  - 요청한 설정(`windows` · `action_report_time`) / 응답 관찰(`applied.windows` = 창별 키 있음 여부 · `observed.purchase_count` = 같은 구매 항목의 value · 창별 값, 창마다 날짜별로만 더함) / 계산 기준(`calculation:{field:'value', windows_summed:false}` · `applied.metric_basis`).
+  - `metric_basis`는 서버가 정상 조회한 날 모두 `matches_requested_windows:'response_evidence'`를 줬을 때만 확인 — **현재 서버는 항상 unconfirmed**.
+- 판정(`adlog-change-core.js` `attributionWindowDays`): 창별 키 근거 + **구매 수 계산 기준 근거**가 모두 있을 때만 귀속 기준 확인. 아니면 `attribution_unverified` → **판단 보류**(관찰값은 그대로 표시). 판정 버전 `adlog-compare-v4`.
+- 테스트 790/790 · `deno check`(meta-adset-insights · ai-weekly-review) 통과.
+
+### 남은 일 (각각 승인 후)
+1. `meta-adset-insights` 재배포 → 무료 조회 1회(`scope:'ads'` 또는 `adsets` · `attribution_mode:'explicit'`)로 같은 구매 항목의 `value` · `7d_click` · `1d_view` 확인.
+2. 그 숫자와 Meta 문서 · 광고 관리자 '귀속 설정 비교' 값으로 `value`가 어떤 창 기준인지 판단할 근거를 정한다. 근거가 생기기 전까지 `matches_requested_windows`는 unconfirmed 유지 → 광고 기록 비교는 판단 보류.

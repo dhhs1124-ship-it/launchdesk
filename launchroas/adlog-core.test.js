@@ -93,7 +93,8 @@ const week = (start, spend, buy, value) => Array.from({ length: 7 }, (_, i) => d
 // meta-adset-insights가 attribution_mode:'explicit' 요청에 돌려주는 귀속 기준(요청에 실제로 넣은 값)
 // 요청한 설정값 + Meta 응답 항목에서 요청 창별 값을 실제로 본 적용 근거(보고 시점은 응답 근거가 없어 미확인)
 const ATTR = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression',
-  applied: { windows: 'response_evidence', windows_seen: ['7d_click', '1d_view'], action_report_time: 'unconfirmed' } };
+  applied: { windows: 'response_evidence', windows_seen: ['7d_click', '1d_view'], action_report_time: 'unconfirmed', metric_basis: 'response_evidence' } };
+// ↑ 판정 로직 검사용 가정: 구매 수 계산 기준까지 확인된 상태. 실제 화면은 아직 metric_basis를 확인하지 못해 항상 unconfirmed(아래 '계산 기준' 테스트)
 const REQUESTED_ONLY = { source: 'request', windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
 // 결과 비교 — 화면(adlog.js)처럼 변경 전 기간을 비교 시점에 다시 조회한 값과 그때 확인한 귀속 기준을 넘긴다(여기서는 저장값과 같은 수치)
 const compareNow = (c, after, ab, today, o = {}) => CH.compare(c, after, ab, today, { before: c.baseline.metrics, attribution: ATTR, ...o });
@@ -324,6 +325,17 @@ test('귀속 기준: 요청한 설정값과 적용 근거를 나눈다 — 응�
   const conv = compareNow(x.c, x.after, basis(20000), '2026-09-15', { attribution: { ...ATTR, action_report_time: 'conversion' } });
   assert.ok(conv.blockers.includes('provisional'), '전환일 요청이어도 적용 근거가 없으면 잠정');
   assert.match(conv.warnings.join(' '), /보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정/);
+});
+
+test('계산 기준: 응답에 귀속 창별 키가 있어도 구매 수(value) 계산 기준이 미확인이면 판단 보류 — 확정일이 지나도', () => {
+  const seenOnly = { ...ATTR, applied: { ...ATTR.applied, metric_basis: 'unconfirmed' } };
+  const noField = { ...ATTR, applied: { windows: 'response_evidence', windows_seen: ['7d_click', '1d_view'], action_report_time: 'unconfirmed' } };
+  for (const a of [seenOnly, noField]) assert.equal(CH.attributionWindowDays(a), null);
+  const x = caseOf(100000, 10, 100000, 30);
+  const r = compareNow(x.c, x.after, basis(20000), '2026-10-30', { attribution: seenOnly });
+  assert.equal(r.status, 'inconclusive'); assert.ok(r.blockers.includes('attribution_unverified'));
+  assert.match(r.warnings.join(' '), /구매 수가 그 기준으로 계산됐는지 확인되지 않아/);
+  assert.deepEqual(r.purchases, { before: 10, after: 30, diff: 20 }, '관찰값은 그대로 보여 준다');
 });
 
 test('주간 분석과 귀속 기준이 다르면 결과와 변경 기록에 남긴다', () => {

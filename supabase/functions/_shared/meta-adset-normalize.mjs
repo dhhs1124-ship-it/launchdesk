@@ -382,6 +382,7 @@ export function groupAdsetsByCampaign(normalizedRows) {
       adset_id: row.adset_id,
       adset_name: row.adset_name,
       metrics: row.metrics,
+      ...(row.attribution_purchase !== undefined ? { attribution_purchase: row.attribution_purchase } : {}),
     });
   }
   return order;
@@ -506,6 +507,21 @@ export function attributionWindowsSeen(row, windows) {
     row && Array.isArray(row.action_values) ? row.action_values : []
   );
   return (windows || []).filter((w) => entries.some((e) => e && typeof e === "object" && Object.prototype.hasOwnProperty.call(e, w)));
+}
+
+// 구매 항목의 관찰값 — 화면 구매 수(pickCountAndValue)와 같은 action_type 항목에서 value와 요청 창별 값을 원본 그대로 나눠 돌려준다.
+// value는 Meta 문서상 "Metric value of default attribution window"(AdsActionStats) — 요청 창 기준이라는 근거가 아니다.
+// 창별 값은 더하지 않는다(클릭 · 조회 창의 합산 · 중복 제거 규칙이 공식 문서에 없음). 없는 창은 null.
+export function purchaseWindowValues(row, windows) {
+  const pick = pickCountAndValue(row && row.actions, row && row.action_values, PURCHASE_ACTION_PRIORITY);
+  if (!pick.count.observed) return null;
+  const type = pick.count.basis;
+  const entryOf = (list) => (Array.isArray(list) ? list : []).find((a) => a && a.action_type === type) || null;
+  const view = (e) => e && {
+    value: toNumber(e.value),
+    windows: Object.fromEntries((windows || []).map((w) => [w, Object.prototype.hasOwnProperty.call(e, w) ? toNumber(e[w]) : null])),
+  };
+  return { action_type: type, count: view(entryOf(row.actions)), purchase_value: view(entryOf(row.action_values)) };
 }
 
 // ---- Graph API 요청 URL 빌더 ------------------------------------------------
