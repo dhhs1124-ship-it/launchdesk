@@ -178,9 +178,12 @@ test("주간 실행 그룹 최악 비용 — 호출별 최악 비용 합(올림)
   assert.equal(worstGroupUsd(price, "s", [], 16000), null, "빈 그룹");
 });
 
-// 예약 SQL(마이그레이션 파일)은 원격에 SQL 편집기로 적용됐지만 master에는 아직 파일이 없다(마이그레이션 동기화는 별도 결정) — 없으면 이유를 남기고 건너뛴다
-const HAS_RUN_RESERVATION_SQL = existsSync(new URL("../supabase/migrations/20261007100000_ai_budget_run_reservations.sql", import.meta.url));
-test("주간 실행도 그룹마다 원자적 예약 → 호출 → 정산(예외여도) · 예약 비용은 reserved_cost_usd로 남겨 이중 집계하지 않는다", { skip: !HAS_RUN_RESERVATION_SQL && "20261007100000 마이그레이션 파일 없음(원격 적용됨 · 저장소 동기화는 별도)" }, () => {
+// 예약 SQL은 원격에 SQL 편집기로 적용됐고 원격 마이그레이션 기록이 없어 master에서는 supabase/migrations-applied-manually/에 보존한다
+// (CLI 적용 대상 아님 · db push 금지). 미리보기처럼 supabase/migrations/에 있는 경우도 읽는다.
+const RUN_RESERVATION_SQL = ["../supabase/migrations-applied-manually/20261007100000_ai_budget_run_reservations.sql", "../supabase/migrations/20261007100000_ai_budget_run_reservations.sql"]
+  .map((p) => new URL(p, import.meta.url)).find((u) => existsSync(u));
+const HAS_RUN_RESERVATION_SQL = !!RUN_RESERVATION_SQL;
+test("주간 실행도 그룹마다 원자적 예약 → 호출 → 정산(예외여도) · 예약 비용은 reserved_cost_usd로 남겨 이중 집계하지 않는다", { skip: !HAS_RUN_RESERVATION_SQL && "20261007100000 예약 SQL 파일 없음" }, () => {
   const src = readFileSync(new URL("../supabase/functions/ai-weekly-review/index.ts", import.meta.url), "utf8");
   const run = src.slice(src.indexOf("let runCost"), src.indexOf("const done = batches.filter"));
   const at = (s) => { const i = run.indexOf(s); assert.ok(i > -1, "없음: " + s); return i; };
@@ -199,7 +202,7 @@ test("주간 실행도 그룹마다 원자적 예약 → 호출 → 정산(예�
   assert.match(run, /cost \+= callCost; reservedCost \+= callCost;/);
   assert.match(src, /reserved_cost_usd: Math\.round\(reservedCost \* 10000\) \/ 10000/);
   // DB: kind run 허용 · 월 합계는 주간 기록에서 예약분을 뺀다
-  const sql = readFileSync(new URL("../supabase/migrations/20261007100000_ai_budget_run_reservations.sql", import.meta.url), "utf8");
+  const sql = readFileSync(RUN_RESERVATION_SQL, "utf8");
   assert.match(sql, /check \(kind in \('verify', 'verify_video', 'run'\)\)/);
   assert.match(sql, /sum\(greatest\(cost_usd - reserved_cost_usd, 0\)\) from public\.ai_weekly_reviews/);
 });
