@@ -128,13 +128,16 @@
     if(i.method === 'new_ad' && !/^\d+$/.test(String(i.newAdId || ''))) e.push('새 광고 ID');
     if(i.baseline && i.baseline.metrics && i.baseline.metrics.missing_days) e.push('변경 전 지표 일부를 불러오지 못함(조회 실패 · 페이지 누락 ' + i.baseline.metrics.missing_days + '일)');
     if(e.length) return { ok: false, errors: e };
+    var entry = i.entry === 'direct' || i.entry === 'ai_suggestion' ? i.entry : i.suggestion ? 'ai_suggestion' : 'direct';
     var t = now || Date.now(), p = periods(i.startDate, days), concurrent = (i.concurrent || []).filter(function(c){ return CONCURRENT.indexOf(c) >= 0; });
     return { ok: true, record: {
       id: newId(t), action_id: 'act_' + newId(t).toString(36), source: 'change', store_id: String(i.storeId), date: i.startDate,
       name: String(ad.ad_name || '광고') + ' · ' + i.element + ' 변경', channel: '메타',
       ad: { ad_id: String(ad.ad_id), adset_id: String(ad.adset_id), ad_name: ad.ad_name || null, new_ad_id: i.method === 'new_ad' ? String(i.newAdId) : null },
-      suggestion: i.suggestion || null,
-      change: { element: i.element, before: String(i.before || ''), after: String(i.after), method: i.method === 'new_ad' ? 'new_ad' : 'edit' },
+      // 입력 경로 — AI 주간 점검 제안에서 열었는지(ai_suggestion) · 제안 없이 직접 골랐는지(direct). 직접 입력에는 제안을 남기지 않는다
+      entry: entry, suggestion: entry === 'direct' ? null : i.suggestion || null,
+      // applied_confirmed: 사용자가 Meta 광고 관리자에서 실제로 바꿨다고 확인함(기록 저장은 광고를 바꾸지 않는다)
+      change: { element: i.element, before: String(i.before || ''), after: String(i.after), method: i.method === 'new_ad' ? 'new_ad' : 'edit', applied_confirmed: i.appliedConfirmed === true },
       compare: { days: days, before: p.before, after: p.after, metrics: ['spend', 'purchases', 'purchase_value', 'roas', 'link_ctr', 'est_profit'] },
       baseline: i.baseline, basis: Object.assign({ profit_formula: PROFIT_FORMULA, attribution_vs_weekly: weeklyDiff(i.basis && i.basis.attribution) }, i.basis),
       creative_snapshot: i.creative || null,

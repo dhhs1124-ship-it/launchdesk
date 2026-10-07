@@ -1,0 +1,4 @@
+# LaunchROAS Vercel 운영 결과물에서 제외 — 테스트 · 내부 문서(이 폴더가 프로젝트 루트)
+*.test.js
+*.test.mjs
+README.md

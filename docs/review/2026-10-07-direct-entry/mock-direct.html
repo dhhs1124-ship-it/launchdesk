@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>광고 변경 기록 추가 — 검증용 모의 화면</title>
+<link rel="stylesheet" href="../../../launchroas/styles.css">
+<style>.mock-banner{position:sticky;top:0;z-index:5;margin:0;padding:10px 16px;background:#ffd166;color:#1d1d1d;font:700 13px/1.4 sans-serif}main{max-width:1180px;margin:0 auto;padding:16px}</style>
+</head><body>
+<p class="mock-banner">검증용 모의 화면 — 가짜 앱 · 가짜 DB(메모리) · 가짜 광고 목록 · 실제 DB 저장 · Meta 조회 · 광고 변경 없음</p>
+<main id="host"></main>
+<script>
+// 검수용(운영 결과물에 포함되지 않음): 실제 화면 마크업(launchroas/index.html의 #recordsView)과 실제 adlog.js를 가짜 앱으로 그린다.
+// #direct = 직접 입력 양식 · #ai = AI 개선안 경로 양식
+window.LAUNCHROAS_FLAGS = { adlogChangeRecords: true };
+var db = { ad_log: [], ad_log_decision: [] };
+var client = { from: function(table){ var f = {}; var q = { select: function(){ return q; }, order: function(){ return q; }, eq: function(k, v){ f[k] = v; return q; },
+  insert: function(row){ (db[row.tool_type] = db[row.tool_type] || []).unshift({ data: row.data }); return Promise.resolve({ error: null }); },
+  then: function(ok, fail){ return Promise.resolve(table === 'ad_margin_links' ? { data: [], error: null } : { data: (db[f.tool_type] || []).slice(), error: null }).then(ok, fail); } }; return q; },
+  functions: { invoke: function(name, o){ var b = o.body;
+    if(b.scope === 'adsets') return Promise.resolve({ data: { ok: true, account: { currency: 'KRW' }, campaigns: [{ campaign_id: 'c1', campaign_name: '모의 캠페인', adsets: [{ adset_id: '2201', adset_name: '모의 니트 세트', metrics: {} }, { adset_id: '2301', adset_name: '모의 데님 세트', metrics: {} }] }] } });
+    var ads = b.adset_id === '2201' ? [{ ad_id: '1201', ad_name: '[모의] 니트 가디건 광고' }] : [{ ad_id: '1301', ad_name: '[모의] 데님 팬츠 광고' }, { ad_id: '1302', ad_name: '[모의] 데님 팬츠 새 광고' }];
+    return Promise.resolve({ data: { ok: true, account: { currency: 'KRW', timezone: 'Asia/Seoul' }, ads: ads.map(function(a){ return Object.assign({ metrics: { spend: 0, impressions: 0, link_clicks: 0, purchase: { value: 0, observed: false }, purchase_value: { value: 0, observed: false } } }, a); }) } }); } } };
+var ctx = { client: client, userId: 'mock', storeId: '4', stores: [{ id: '4' }], metaAccount: { id: 'm', status: 'connected', external_account_id: 'act_mock' }, fx: null };
+window.LaunchRoasApp = { getContext: function(){ return ctx; }, subscribe: function(fn){ fn(ctx); }, showView: function(){} };
+window.launchdeskAdlogMeta = { buildMetaAdlogRecord: function(){ return { ok: false, message: '모의 화면' }; } };
+fetch('../../../launchroas/index.html').then(function(r){ return r.text(); }).then(function(html){
+  var sec = new DOMParser().parseFromString(html, 'text/html').getElementById('recordsView'); sec.hidden = false;
+  document.getElementById('host').appendChild(document.importNode(sec, true));
+  return ['adlog-core.js', 'adlog-change-core.js', 'adlog.js'].reduce(function(p, f){ return p.then(function(){ return new Promise(function(res){ var s = document.createElement('script'); s.src = '../../../launchroas/' + f; s.onload = res; document.body.appendChild(s); }); }); }, Promise.resolve());
+}).then(function(){
+  if(location.hash === '#direct') document.getElementById('adlogDirectAdd').click();
+  if(location.hash === '#ai') window.LaunchRoasAdlog.startChange({ ad: { ad_id: '1201', ad_name: '[모의] 니트 가디건 광고', adset_id: '2201' }, before: '가을 신상 10% 할인', after: '울 50% · 가벼운 두께', suggestion: { week: '2026-09-29', ad_id: '1201', verdict: '개선 필요', proposed: '첫 줄을 확인된 소재 정보로' } });
+  document.title = 'mock ready';
+});
+</script>
+</body></html>

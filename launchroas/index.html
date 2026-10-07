@@ -147,9 +147,11 @@
           <form id="adlogChangeForm" class="adlog-change-form" hidden aria-labelledby="chgTitle">
             <h2 id="chgTitle">실행 기록</h2>
             <p id="chgTarget" class="chg-target"></p><p id="chgSuggest" class="small"></p>
+            <p id="chgNote" class="chg-note" role="note">기록만 저장해요 — Meta 광고는 바뀌지 않아요. 광고 관리자에서 실제로 바꾼 광고만 기록해 주세요.</p>
             <p id="chgFlag" class="chg-flag" role="note">운영 화면 호환 수정이 배포되기 전이라 저장을 꺼 두었어요. 입력해 볼 수는 있지만 저장되지 않아요.</p>
             <div class="chg-grid">
-              <label>바꾼 요소<select id="chgElement"></select></label>
+              <label class="chg-wide" id="chgAdRow" hidden>광고<select id="chgAd"><option value="">광고를 불러오는 중…</option></select></label>
+              <label>바꾼 요소<select id="chgElement"><option value="">선택해 주세요</option></select></label>
               <label>방식<select id="chgMethod"><option value="">선택해 주세요</option><option value="new_ad">새 광고 추가</option><option value="edit">기존 광고 수정</option></select></label>
               <label>새 광고 ID<input id="chgNewAd" inputmode="numeric" placeholder="새 광고를 추가했다면"></label>
               <label>시작일<input id="chgStart" type="date" required></label>
@@ -158,6 +160,7 @@
               <label class="chg-wide">실제로 바꾼 내용<textarea id="chgAfter" rows="2" maxlength="500" required placeholder="제안과 다르게 바꿨다면 실제 내용을 적어 주세요"></textarea></label>
               <fieldset class="chg-wide"><legend>같은 기간에 함께 바뀐 조건</legend><div id="chgConcurrentBox" class="chg-checks"></div><input id="chgConcurrentNote" maxlength="200" placeholder="예: 10/10~10/12 전 품목 10% 할인"></fieldset>
               <label class="chg-wide">메모<input id="chgMemo" maxlength="300"></label>
+              <label class="chg-wide chg-confirm"><input id="chgApplied" type="checkbox"> 이 광고를 Meta 광고 관리자에서 실제로 바꿨어요</label>
             </div>
             <p class="small">저장할 때 변경 전 같은 길이 기간의 광고 지표와 당시 계산 기준(통화 · 환율 · 귀속 기준 · 연결 상품 마진)을 함께 남겨요. 광고 자체는 바꾸지 않아요.</p>
             <div class="form-actions"><button id="chgSave" type="submit" class="primary">실행 기록 저장</button><button id="chgCancel" type="button" class="secondary">닫기</button><span id="chgStatus" class="small" role="status"></span></div>

@@ -15,3 +15,12 @@ test('스크립트가 찾는 요소 ID는 index.html에 있다',()=>{
   }
   assert.deepEqual(missing,[]);
 });
+
+test('운영 결과물에 테스트 파일 · 내부 문서가 올라가지 않는다(.vercelignore) · 검수 자료는 이 폴더 밖', () => {
+  const fs = require('node:fs');
+  const ig = fs.readFileSync(__dirname + '/.vercelignore', 'utf8').split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  for (const p of ['*.test.js', '*.test.mjs', 'README.md']) assert.ok(ig.includes(p), p);
+  const files = fs.readdirSync(__dirname);
+  assert.ok(files.filter((f) => /\.test\.m?js$/.test(f)).length > 0);
+  assert.deepEqual(files.filter((f) => /mock|review|\.jpg$|\.png$/i.test(f) && f !== 'apple-touch-icon.png'), [], '검수 자료(모의 화면 · 캡처)는 docs/review에만');
+});

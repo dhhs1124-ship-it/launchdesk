@@ -531,3 +531,15 @@ test('안내용 예상 귀속 창은 결과 비교가 실제로 요청하는 창
   const days = m[1].split(',').map((w) => Number(/(\d+)d_/.exec(w)[1]));
   assert.equal(CH.EXPECTED_WINDOW_DAYS, Math.max(...days));
 });
+
+test('변경 기록 입력 경로: 제안이 있으면 ai_suggestion · 없으면 direct · 직접 입력에는 제안을 남기지 않음 · 실제 변경 확인 저장', () => {
+  const p = CH.periods('2026-09-08', 7), base = { metrics: CH.aggregate(week('2026-09-01', 10000, 2, 60000), p.before.since, p.before.until) };
+  const mk = (o) => CH.buildChangeRecord({ storeId: '4', ad: { ad_id: '111', adset_id: '222', ad_name: '니트 광고' }, element: '문구', after: 'x', method: 'edit', startDate: '2026-09-08', compareDays: 7, baseline: base, basis: basis(20000), ...o }, Date.parse('2026-09-08T00:00:00Z')).record;
+  const sug = { week: '2026-09-01', ad_id: '111' };
+  assert.equal(mk({ suggestion: sug }).entry, 'ai_suggestion');
+  assert.equal(mk({}).entry, 'direct');
+  const d = mk({ entry: 'direct', suggestion: sug });
+  assert.equal(d.entry, 'direct'); assert.equal(d.suggestion, null, '직접 입력은 AI 제안과 섞지 않는다');
+  assert.equal(mk({ entry: 'ai_suggestion', suggestion: sug, appliedConfirmed: true }).change.applied_confirmed, true);
+  assert.equal(mk({}).change.applied_confirmed, false, '확인하지 않은 기록은 false로 남는다');
+});
