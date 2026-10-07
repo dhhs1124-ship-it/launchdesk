@@ -19,6 +19,8 @@
   // 단계 정의. state는 실제 저장 상태(없으면 확인 중).
   function build(){
     var st=(lastSales&&lastSales.steps)||[];
+    // 숨겨진 칸(예: AI가 꺼져 있을 때의 주간 AI 점검)은 안내하지 않는다
+    var shown=function(s){var n=document.querySelector(s.target);return !(n&&n.hidden);};
     function status(i){var x=st[i];return x?(x.done?'완료됨 · ':'')+x.text:'설정 상태 확인 중';}
     return [
       {target:'#connectionPills, .sidebar [data-view="connections"], .mobile-nav [data-view="connections"]',title:'1. 쇼핑몰 · 광고 계정 연결',
@@ -31,7 +33,7 @@
        text:'판매 마진에서 실제 광고비를 뺀 금액이에요. 일부 상품만 저장했으면 \'일부 상품 기준\'으로 표시돼요.',state:status(2),done:st[2]&&st[2].done},
       {target:'#insights',view:'overview',title:'4. 주간 AI 점검',
        text:'주간 AI 점검(주 1회)을 누르면 지난주 광고 지표와 소재를 함께 보고 우선 점검할 광고와 변경안을 알려줘요. 판단 이유 · 지금 할 일 · 변경 예시는 광고를 눌러 펼쳐 봐요.',state:'',done:false}
-    ];
+    ].filter(shown);
   }
 
   function ensure(){

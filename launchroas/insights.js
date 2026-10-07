@@ -150,7 +150,10 @@
       return a.rank-b.rank||((x.analysis&&x.analysis.priority)||9)-((y.analysis&&y.analysis.priority)||9)||((y.current&&y.current.spend)||0)-((x.current&&x.current.spend)||0);
     });
   }
-  return {ruleSignals:ruleSignals,recUsable:recUsable,trimNote:trimNote,keyLine:keyLine,actionLine:actionLine,checkLine:checkLine,metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
+  // 주간 AI 점검 칸 표시 — AI가 켜져 있다고 서버가 답했을 때(ready)나 점검 중일 때만. 꺼짐 · 준비 중 · 상태 조회 실패 · 확인 전이면 칸 전체를 숨긴다
+  //   (‘AI 미설정’ 안내 · 쓸 수 없는 점검 버튼을 보이지 않게 — AI를 다시 켜면 그대로 나타난다)
+  function weeklyVisible(state,busy){return state==='ready'||!!busy;}
+  return {weeklyVisible:weeklyVisible,ruleSignals:ruleSignals,recUsable:recUsable,trimNote:trimNote,keyLine:keyLine,actionLine:actionLine,checkLine:checkLine,metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
 });
 
 
@@ -169,6 +172,7 @@
 
   function render(){
     var box=byId('insightsBody');if(!box)return;
+    var sec=byId('insights');if(sec)sec.hidden=!I.weeklyVisible(wk.state,wk.busy);
     var sig=JSON.stringify([wk,ui,sales&&[sales.ready,sales.loading,sales.error,sales.currency,sales.fx,sales.summary&&[sales.summary.unlinkedKinds,sales.summary.productKinds],sales.links&&sales.links.length],ads&&[ads.loading,ads.error,ads.rows&&ads.rows.length]]);
     if(sig===lastSig)return;lastSig=sig;
     box.replaceChildren(renderWeekly());

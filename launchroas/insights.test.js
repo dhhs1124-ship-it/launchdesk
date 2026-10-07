@@ -96,3 +96,14 @@ test('신호 문구는 픽셀 오류 · 광고 실패로 단정하지 않는다'
   const all=[I.ruleSignals({spend:90,impressions:9000,link_ctr:0.5,link_clicks:300,frequency:4,purchase:{observed:false}},false,null),I.ruleSignals({purchase:{observed:false},link_clicks:500},false,null)].flat().join(' ');
   assert.doesNotMatch(all,/픽셀|오류|실패|문제/);
 });
+
+test('AI가 꺼져 있으면 주간 AI 점검 칸 전체를 숨긴다 — 켜짐(ready) · 점검 중일 때만 보이고, 처음(상태 확인 전)부터 숨김', () => {
+  assert.equal(I.weeklyVisible('ready', false), true);
+  assert.equal(I.weeklyVisible('idle', true), true, '점검 중');
+  for (const s of ['off', 'idle', 'error', 'unavailable']) assert.equal(I.weeklyVisible(s, false), false, s);
+  const fs = require('node:fs');
+  const html = fs.readFileSync(__dirname + '/index.html', 'utf8'), src = fs.readFileSync(__dirname + '/insights.js', 'utf8'), tour = fs.readFileSync(__dirname + '/tour.js', 'utf8');
+  assert.match(html, /<section id="insights" class="weekly-panel" aria-label="주간 AI 점검" hidden>/, '상태 확인 전에 AI 칸이 잠깐 보이지 않게');
+  assert.match(src, /sec\.hidden=!I\.weeklyVisible\(wk\.state,wk\.busy\)/);
+  assert.match(tour, /\]\.filter\(shown\)/, '숨겨진 칸은 사용법 안내에서도 뺀다');
+});
