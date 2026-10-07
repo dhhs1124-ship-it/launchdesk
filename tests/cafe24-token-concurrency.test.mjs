@@ -100,3 +100,43 @@ test('갱신 권한을 잡은 요청이 끝내지 못하면(임대 시간 경과
   const r = await getValidCafe24AccessToken(db.client, 1, 'mall');
   assert.equal(r.ok, true); assert.equal(cafe24.calls, 1);
 });
+
+// 갱신 실패 분류: 시간 초과 · 네트워크 오류 · 일시적 서버 오류 · 본문 읽기 실패는 재시도 가능(REFRESH_RETRYABLE, 503)이고,
+// 토큰 만료 · 폐기 근거(invalid_grant)가 있는 응답만 재연결(RECONNECT_REQUIRED, 401)이다. 어느 실패든 DB 토큰은 그대로 둔다.
+const { cafe24TokenErrorStatus } = await import('../supabase/functions/_shared/cafe24-token.ts');
+async function refreshWith(fetchImpl) {
+  const db = fakeDb(expiredRow()); let signal;
+  globalThis.fetch = async (url, init) => { signal = init.signal; return fetchImpl(); };
+  const r = await getValidCafe24AccessToken(db.client, 1, 'mall');
+  assert.equal(db.row.refresh_token, 'R0', '실패하면 DB의 refresh_token은 바꾸지 않는다');
+  assert.ok(signal instanceof AbortSignal, '갱신 요청에는 시간 제한 신호가 붙는다');
+  return r;
+}
+const timeoutError = () => new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+const brokenBody = (status, err) => ({ ok: status >= 200 && status < 300, status, json: async () => { throw err; } });
+const html = (status) => new Response('<html>error</html>', { status, headers: { 'Content-Type': 'text/html' } });
+const cases = [
+  ['시간 초과(TimeoutError)', () => { throw timeoutError(); }, 'REFRESH_RETRYABLE'],
+  ['네트워크 오류', () => { throw new TypeError('error sending request'); }, 'REFRESH_RETRYABLE'],
+  ['서버 오류 500 · JSON', () => new Response(JSON.stringify({ error: 'server_error' }), { status: 500 }), 'REFRESH_RETRYABLE'],
+  ['게이트웨이 502 · HTML 본문', () => html(502), 'REFRESH_RETRYABLE'],
+  ['서비스 불가 503', () => new Response('', { status: 503 }), 'REFRESH_RETRYABLE'],
+  ['요청 한도 429', () => new Response(JSON.stringify({ error: 'too_many_requests' }), { status: 429 }), 'REFRESH_RETRYABLE'],
+  ['200인데 본문 읽기 시간 초과', () => brokenBody(200, timeoutError()), 'REFRESH_RETRYABLE'],
+  ['400인데 본문 읽기 중 연결 끊김', () => brokenBody(400, new TypeError('connection reset')), 'REFRESH_RETRYABLE'],
+  ['200인데 토큰 없는 본문', () => new Response(JSON.stringify({}), { status: 200 }), 'REFRESH_RETRYABLE'],
+  ['400 invalid_grant(만료 · 폐기)', () => new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'refresh_token time expired' }), { status: 400 }), 'RECONNECT_REQUIRED'],
+  ['401 invalid_client(앱 설정 오류)', () => new Response(JSON.stringify({ error: 'invalid_client' }), { status: 401 }), 'CONFIG_ERROR'],
+  ['400 · 근거 없는 HTML 본문', () => html(400), 'REFRESH_FAILED'],
+];
+for (const [name, impl, code] of cases) {
+  test(`갱신 실패 분류 — ${name} → ${code}`, async () => {
+    const r = await refreshWith(impl);
+    assert.equal(r.ok, false); assert.equal(r.code, code, JSON.stringify(r));
+  });
+}
+test('재시도 가능 실패는 503, 재연결만 401', () => {
+  assert.equal(cafe24TokenErrorStatus('REFRESH_RETRYABLE'), 503);
+  assert.equal(cafe24TokenErrorStatus('RECONNECT_REQUIRED'), 401);
+  assert.equal(cafe24TokenErrorStatus('REFRESH_FAILED'), 500);
+});

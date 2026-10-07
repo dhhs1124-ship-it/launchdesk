@@ -5,8 +5,10 @@
 //   - 아직 충분히 유효하면 저장된 값을 그대로,
 //   - 만료됐거나 곧 만료되면(5분 이내) Cafe24 공식 refresh_token 플로우로
 //     새로 받아서 DB에 즉시 저장한 뒤 그 값을,
-//   - refresh_token 자체도 만료됐거나 Cafe24가 refresh를 거부하면
+//   - refresh_token 자체도 만료됐거나 Cafe24가 만료 · 폐기(invalid_grant)로 거부하면
 //     RECONNECT_REQUIRED를,
+//   - 시간 초과 · 네트워크 오류 · 일시적 서버 오류(5xx · 429) · 응답 본문 읽기 실패처럼
+//     토큰 만료 근거가 없는 실패는 REFRESH_RETRYABLE(잠시 후 다시 시도)을,
 // 돌려준다.
 //
 // 보안 주의:
@@ -77,13 +79,15 @@ export type Cafe24TokenResult =
   | {
       ok: false;
       // CREDENTIAL_NOT_FOUND: integration_credentials 행 자체가 없음
-      // RECONNECT_REQUIRED : refresh_token이 만료됐거나 Cafe24가 refresh를 거부함 — 사용자가 다시 연결해야 함
-      // CONFIG_ERROR       : CAFE24_CLIENT_ID/SECRET이 설정되지 않음(서버 설정 문제)
-      // REFRESH_FAILED     : Cafe24 refresh는 성공했지만 새 토큰을 DB에 저장하지 못함
+      // RECONNECT_REQUIRED : refresh_token이 만료됐거나 Cafe24가 만료 · 폐기(invalid_grant)로 거부함 — 사용자가 다시 연결해야 함
+      // CONFIG_ERROR       : CAFE24_CLIENT_ID/SECRET이 없거나 Cafe24가 앱 인증을 거부함(invalid_client — 서버 설정 문제)
+      // REFRESH_RETRYABLE  : 시간 초과 · 네트워크 오류 · 일시적 서버 오류 · 본문 읽기 실패 · 다른 요청의 갱신 대기 초과 — 잠시 후 다시 시도
+      // REFRESH_FAILED     : 새 토큰을 DB에 저장하지 못함 · 근거를 알 수 없는 거부(그 밖의 4xx)
       code:
         | "CREDENTIAL_NOT_FOUND"
         | "RECONNECT_REQUIRED"
         | "CONFIG_ERROR"
+        | "REFRESH_RETRYABLE"
         | "REFRESH_FAILED";
       message: string;
     };
@@ -153,7 +157,7 @@ async function requestCafe24TokenRefresh(
   refreshToken: string
 ): Promise<
   | { ok: true; data: Cafe24TokenRefreshResponse }
-  | { ok: false; code: "CONFIG_ERROR" | "RECONNECT_REQUIRED"; message: string }
+  | { ok: false; code: Cafe24RefreshFailureCode; message: string }
 > {
   const clientId = Deno.env.get("CAFE24_CLIENT_ID");
   const clientSecret = Deno.env.get("CAFE24_CLIENT_SECRET");
@@ -187,32 +191,52 @@ async function requestCafe24TokenRefresh(
       }
     );
   } catch (err) {
-    console.error(
-      "Cafe24 token refresh request failed:",
-      err instanceof Error ? err.message : "network error"
-    );
-    return {
-      ok: false,
-      code: "RECONNECT_REQUIRED",
-      message: "Cafe24 Refresh Token 갱신 요청에 실패했습니다.",
-    };
+    // 시간 초과(TimeoutError) · 네트워크 오류 — 토큰 만료 근거가 아니므로 재연결로 보내지 않는다.
+    console.error("Cafe24 token refresh request failed:", errorName(err));
+    return retryable("Cafe24 토큰 갱신 요청이 시간 초과되었거나 연결되지 않았습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   // 응답 바디(토큰 포함 가능성)는 절대 로그로 남기지 않는다 — status만 기록.
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok || !data?.access_token || !data?.refresh_token) {
-    // Cafe24는 만료/폐기된 refresh_token에 보통 400을 반환한다 — 이 경우
-    // 자동 재시도하지 않고 재연결이 필요하다는 신호로 취급한다.
-    console.error("Cafe24 token refresh rejected:", response.status);
-    return {
-      ok: false,
-      code: "RECONNECT_REQUIRED",
-      message: "Cafe24 Refresh Token이 만료되었거나 거부되었습니다.",
-    };
+  // deno-lint-ignore no-explicit-any
+  let data: any = null;
+  try {
+    data = await response.json();
+  } catch (err) {
+    // 본문을 읽다 끊김(시간 초과 · 연결 끊김)은 재시도 가능. JSON이 아닌 본문(SyntaxError)은 아래에서 상태 코드로 판단.
+    if (!(err instanceof SyntaxError)) {
+      console.error("Cafe24 token refresh body read failed:", response.status, errorName(err));
+      return retryable("Cafe24 토큰 갱신 응답을 끝까지 받지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
   }
 
-  return { ok: true, data: data as Cafe24TokenRefreshResponse };
+  if (response.ok && data?.access_token && data?.refresh_token) {
+    return { ok: true, data: data as Cafe24TokenRefreshResponse };
+  }
+  console.error("Cafe24 token refresh rejected:", response.status);
+  return classifyCafe24RefreshFailure(response.status, typeof data?.error === "string" ? data.error : null);
+}
+
+type Cafe24RefreshFailureCode = "CONFIG_ERROR" | "RECONNECT_REQUIRED" | "REFRESH_RETRYABLE" | "REFRESH_FAILED";
+const errorName = (err: unknown) => (err instanceof Error || err instanceof DOMException ? err.name : "network error");
+const retryable = (message: string) => ({ ok: false as const, code: "REFRESH_RETRYABLE" as const, message });
+
+// Cafe24 갱신 거부 응답 분류 — 재연결은 토큰 만료 · 폐기 근거(OAuth 오류 invalid_grant: 만료 · 폐기 · 이미 쓴
+// refresh_token)가 있을 때만. 근거 없는 실패를 재연결로 보내면 일시 장애에도 사용자가 연결을 다시 해야 한다.
+export function classifyCafe24RefreshFailure(
+  status: number,
+  oauthError: string | null
+): { ok: false; code: Cafe24RefreshFailureCode; message: string } {
+  if (status >= 400 && status < 500 && oauthError === "invalid_grant") {
+    return { ok: false, code: "RECONNECT_REQUIRED", message: "Cafe24 Refresh Token이 만료되었거나 폐기되었습니다." };
+  }
+  if (oauthError === "invalid_client" || oauthError === "unauthorized_client") {
+    return { ok: false, code: "CONFIG_ERROR", message: "Cafe24 앱 인증 설정이 거부되었습니다." };
+  }
+  // 일시적 서버 오류 · 요청 한도 · 시간 초과 응답, 또는 성공 응답인데 토큰이 없는 경우(근거 없음)
+  if (status >= 500 || status === 429 || status === 408 || (status >= 200 && status < 300)) {
+    return retryable("Cafe24 토큰 갱신이 일시적으로 실패했습니다. 잠시 후 다시 시도해 주세요.");
+  }
+  return { ok: false, code: "REFRESH_FAILED", message: "Cafe24 토큰 갱신이 거부되었습니다(만료 근거 없음)." };
 }
 
 /**
@@ -284,7 +308,7 @@ export async function getValidCafe24AccessToken(
   if (!claimed) {
     return {
       ok: false,
-      code: "REFRESH_FAILED",
+      code: "REFRESH_RETRYABLE",
       message: "다른 요청의 Cafe24 토큰 갱신을 기다리지 못했습니다. 잠시 후 다시 시도해 주세요.",
     };
   }
@@ -345,10 +369,11 @@ export async function getValidCafe24AccessToken(
 // getValidCafe24AccessToken()의 실패 code를 호출부(index.ts)의
 // Response.json({ ... }, { status }) 상태코드로 매핑 — 두 함수(store-info,
 // orders-sync)가 각자 같은 switch를 반복하지 않도록 여기 하나로 모았다.
-// RECONNECT_REQUIRED만 401(클라이언트가 재연결 흐름을 타야 함)이고, 나머지는
-// 전부 서버/설정 쪽 문제라 500.
+// RECONNECT_REQUIRED만 401(클라이언트가 재연결 흐름을 타야 함), REFRESH_RETRYABLE은 503(잠시 후
+// 다시 시도), 나머지는 서버/설정 쪽 문제라 500.
 export function cafe24TokenErrorStatus(
   code: Extract<Cafe24TokenResult, { ok: false }>["code"]
 ): number {
-  return code === "RECONNECT_REQUIRED" ? 401 : 500;
+  if (code === "RECONNECT_REQUIRED") return 401;
+  return code === "REFRESH_RETRYABLE" ? 503 : 500;
 }
