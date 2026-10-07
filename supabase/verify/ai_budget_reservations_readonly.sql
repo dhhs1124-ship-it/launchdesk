@@ -137,7 +137,7 @@ limit 50;
 
 -- [블록 8] 최근 주간 실행 기록 — 항상 실행 가능(ai_weekly_reviews는 20261006100000부터 있음)
 -- 비활성(2026-10-06 밤) 전에 실제 실행이 있었는지 · 이번 달 비용. 사용자 · 쇼핑몰 · 결과 · 오류 본문 제외
-select quota_week, status, created_at, updated_at, retry_count,
+select id, quota_week, status, created_at, updated_at, retry_count,
        (usage ->> 'calls')::int            as calls,
        (usage ->> 'unconfirmed_calls')::int as unconfirmed_calls,
        cost_usd, error is not null         as has_error
