@@ -150,6 +150,7 @@
   // forUserId는 "이 요청을 시작한 시점의" 사용자 — 완료 후 재저장 여부를
   // 판단할 때, 그 사이 사용자가 바뀌지 않았는지 다시 확인하는 기준이 된다.
   function runStepUpsert(path, forUserId){
+    if(state.stepsFailed){ console.warn('[launchdesk] 진행상황을 불러오지 못해 저장하지 않았어요(서버 기록 보호):', path); return; }
     stepWriteInFlight[path] = true;
     var entry = state.steps[path];
     var sb = client();
@@ -264,38 +265,46 @@
   function addCalcRecord(record){
     state.calcHistory.unshift(record);
     state.calcHistory = state.calcHistory.slice(0, 5);
-    if(!state.authed || !state.userId) return;
+    if(!state.authed || !state.userId) return Promise.resolve(true);
     var sb = client();
-    if(!sb) return;
-    sb.from('tool_records').insert({
+    if(!sb) return Promise.resolve(true);
+    var undo = function(){ state.calcHistory = state.calcHistory.filter(function(r){ return r !== record; }); return false; };
+    return sb.from('tool_records').insert({
       user_id: state.userId,
       tool_type: 'margin_calc',
       data: record
     }).then(function(res){
-      if(res.error) console.warn('[launchdesk] 마진계산 기록 저장 실패:', res.error.message);
-    });
+      if(!res.error) return true;
+      console.warn('[launchdesk] 마진계산 기록 저장 실패:', res.error.message);
+      return undo();
+    }, undo);
   }
   function clearCalcHistory(){
+    var before = state.calcHistory;
     state.calcHistory = [];
-    if(!state.authed || !state.userId) return;
+    if(!state.authed || !state.userId) return Promise.resolve(true);
     var sb = client();
-    if(!sb) return;
-    sb.from('tool_records').delete()
+    if(!sb) return Promise.resolve(true);
+    var undo = function(){ if(!state.calcHistory.length) state.calcHistory = before; return false; };
+    return sb.from('tool_records').delete()
       .eq('user_id', state.userId).eq('tool_type', 'margin_calc')
-      .then(function(res){ if(res.error) console.warn('[launchdesk] 마진계산 기록 삭제 실패:', res.error.message); });
+      .then(function(res){ if(!res.error) return true; console.warn('[launchdesk] 마진계산 기록 삭제 실패:', res.error.message); return undo(); }, undo);
   }
   function addAdlogRecord(record){
     state.adlogRecords.unshift(record);
-    if(!state.authed || !state.userId) return;
+    if(!state.authed || !state.userId) return Promise.resolve(true);
     var sb = client();
-    if(!sb) return;
-    sb.from('tool_records').insert({
+    if(!sb) return Promise.resolve(true);
+    var undo = function(){ state.adlogRecords = state.adlogRecords.filter(function(r){ return r !== record; }); return false; };
+    return sb.from('tool_records').insert({
       user_id: state.userId,
       tool_type: 'ad_log',
       data: record
     }).then(function(res){
-      if(res.error) console.warn('[launchdesk] 광고기록 저장 실패:', res.error.message);
-    });
+      if(!res.error) return true;
+      console.warn('[launchdesk] 광고기록 저장 실패:', res.error.message);
+      return undo();
+    }, undo);
   }
   // Meta 자동 기록(adlog-meta.js) — 회원만. 같은 meta_auto_key가 이미 목록에
   // 있으면 요청하지 않고, DB insert가 성공한 뒤에만 목록에 넣는다(두 탭 동시
@@ -341,22 +350,24 @@
     state.adlogRecords = state.adlogRecords.filter(function(r){ return !match(r); });
   }
   function removeAdlogRecord(id){
+    var removed = state.adlogRecords.filter(function(r){ return String(r.id) === String(id); });
     state.adlogRecords = state.adlogRecords.filter(function(r){ return String(r.id) !== String(id); });
-    if(!state.authed || !state.userId) return;
+    if(!state.authed || !state.userId) return Promise.resolve(true);
     var sb = client();
-    if(!sb) return;
+    if(!sb) return Promise.resolve(true);
+    var undo = function(){ state.adlogRecords = removed.concat(state.adlogRecords); return false; };
     // ad_log 레코드의 식별자는 DB 기본 PK가 아니라, 생성 시 data 안에
     // 함께 저장해 둔 클라이언트 id(Date.now())다 — JSON 컬럼 안 값으로
     // 필터링한다(PostgREST의 `column->>key` 표기).
-    sb.from('tool_records').delete()
+    return sb.from('tool_records').delete()
       .eq('user_id', state.userId).eq('tool_type', 'ad_log')
       .eq('data->>id', String(id))
-      .then(function(res){ if(res.error) console.warn('[launchdesk] 광고기록 삭제 실패:', res.error.message); });
+      .then(function(res){ if(!res.error) return true; console.warn('[launchdesk] 광고기록 삭제 실패:', res.error.message); return undo(); }, undo);
   }
 
   // -------------------------------------------------------------- lifecycle
   function resetState(){
-    state.steps = {};
+    state.steps = {}; state.stepsFailed = false;
     state.calcHistory = [];
     state.adlogRecords = [];
   }
@@ -374,6 +385,7 @@
     var adlogQ = sb.from('tool_records').select('data, created_at').eq('user_id', userId).eq('tool_type', 'ad_log').order('created_at', { ascending: false });
 
     return Promise.all([stepsQ, calcQ, adlogQ]).then(function(results){
+      if(state.userId !== userId) return; // 그 사이 로그아웃 · 계정 전환 — 이전 사용자 데이터를 넣지 않는다
       var stepsRes = results[0], calcRes = results[1], adlogRes = results[2];
       resetState();
 
@@ -382,6 +394,7 @@
           state.steps[row.step_path] = { data: row.data, isCompleted: !!row.is_completed, completedAt: row.completed_at || null };
         });
       } else if(stepsRes && stepsRes.error){
+        state.stepsFailed = true;
         console.warn('[launchdesk] user_step_progress 조회 실패:', stepsRes.error.message);
       }
 
@@ -400,6 +413,7 @@
       state.authed = true;
       notifyChange();
     }).catch(function(err){
+      if(state.userId !== userId) return;
       console.warn('[launchdesk] 데이터 불러오기 중 오류:', err && err.message);
       state.authed = true; // 일부 조회 실패로 로그인 자체를 무효화하지 않는다
       notifyChange();
