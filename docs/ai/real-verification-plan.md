@@ -347,3 +347,17 @@ git worktree remove ../main-parity-wt
 ### 남은 일 (각각 승인 후)
 1. `meta-adset-insights` 재배포 → 무료 조회 1회(`scope:'ads'` 또는 `adsets` · `attribution_mode:'explicit'`)로 같은 구매 항목의 `value` · `7d_click` · `1d_view` 확인.
 2. 그 숫자와 Meta 문서 · 광고 관리자 '귀속 설정 비교' 값으로 `value`가 어떤 창 기준인지 판단할 근거를 정한다. 근거가 생기기 전까지 `matches_requested_windows`는 unconfirmed 유지 → 광고 기록 비교는 판단 보류.
+
+### 실제 값 (2026-10-07 09:52 KST · `meta-adset-insights` v14 = `8cb1883` · 무료 조회 · 광고 세트 · 2026-10-01~10-07 · Asia/Seoul · 1행 · 잘림 없음)
+| `offsite_conversion.fb_pixel_purchase` | value | 7d_click | 1d_view |
+|---|---|---|---|
+| 구매 수 | 6 | 6 | null(키 없음) |
+| 구매 금액 | 550.3 | 550.3 | null(키 없음) |
+- 화면 값(구매 6 · 금액 550.3) = 같은 항목의 `value`. 서버 `metric_basis.matches_requested_windows` = unconfirmed.
+- 응답 전체 `windows_seen`에는 `1d_view`가 있었지만 **구매 항목에는 `1d_view` 키가 없다** → 다른 행동 항목의 키였다(창별 키 존재 ≠ 구매 근거, 위 판단 확인).
+- 해석 한계(확정하지 않음):
+  - `value` = `7d_click`이 이번 한 번 같았을 뿐 — `1d_view`가 없거나 0이면 "`value` = 7d_click만"과 "`value` = 7d_click + 1d_view(합산 · 중복 제거)" 두 해석이 같은 숫자를 낸다. 구분하려면 같은 구매 항목에 `1d_view` 값이 있는 기간 · 광고가 필요하다.
+  - 구매 항목에 `1d_view` 키가 없는 것이 '조회 후 구매 0'인지 '보고 안 됨'인지 문서로 확인되지 않았다 → 0으로 보지 않고 null.
+  - Meta 문서상 `value`는 '기본 귀속 창 값' — 어떤 기본(계정 · 광고 세트 설정 · API 기본)인지 명시 없음. 보고 시점(`impression`) 적용 근거도 없음.
+  - 광고 세트 1개 · 기간 1개 · 구매 6건 관찰.
+- 결론: 계산 기준 **미확인 유지 → 광고 기록 비교 판단 보류 유지**(`matches_requested_windows` 변경 없음).
