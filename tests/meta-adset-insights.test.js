@@ -30,6 +30,58 @@ test('adsets 요청은 level=adset을 쓴다', async () => {
   assert.equal(url.searchParams.get('level'), 'adset');
 });
 
+test('명시 귀속(attribution_mode=explicit)일 때만 귀속 창 · 보고 시점을 넣고, 넣은 값을 응답에 돌려준다 · 다른 요청은 그대로', async () => {
+  const m = await modPromise;
+  const base = { accountId: 'act_1', level: 'ad', since: '2026-09-01', until: '2026-09-01', filteringAdsetId: '12345' };
+  const plain = new URL(m.buildInsightsUrl(base));
+  assert.equal(plain.searchParams.get('action_attribution_windows'), null);
+  assert.equal(plain.searchParams.get('action_report_time'), null);
+  const explicit = new URL(m.buildInsightsUrl({ ...base, attribution: m.EXPLICIT_ATTRIBUTION }));
+  assert.deepEqual(JSON.parse(explicit.searchParams.get('action_attribution_windows')), ['7d_click', '1d_view']);
+  assert.equal(explicit.searchParams.get('action_report_time'), 'impression');
+  const body = { store_id: 's1', scope: 'ads', period: 'date', date: '2026-09-01', adset_id: '12345' };
+  assert.equal(m.validateAdsetInsightsRequest(body).attribution_mode, undefined);
+  assert.equal(m.validateAdsetInsightsRequest({ ...body, attribution_mode: 'explicit' }).attribution_mode, 'explicit');
+  const bad = m.validateAdsetInsightsRequest({ ...body, attribution_mode: '28d_click' });
+  assert.equal(bad.ok, false); assert.equal(bad.code, 'UNSUPPORTED_ATTRIBUTION_MODE');
+  assert.match(NEW_FN_SRC, /const attribution = attribution_mode === "explicit" \? EXPLICIT_ATTRIBUTION : undefined;/);
+  // 요청값(requested)과 응답 근거(windows_seen)를 나눠 돌려준다 · 보고 시점은 근거가 없어 unconfirmed
+  assert.match(NEW_FN_SRC, /requested: \{ windows: \[\.\.\.attribution\.windows\], action_report_time: attribution\.action_report_time \}/);
+  assert.match(NEW_FN_SRC, /action_report_time_applied: "unconfirmed"/);
+  assert.match(NEW_FN_SRC, /attribution_windows_seen: attributionWindowsSeen\(\(pageResult\.rows \|\| \[\]\)\[i\], attribution\.windows\)/);
+});
+
+test('적용 근거: Meta 응답 항목에 요청 창별 값이 실제로 있을 때만 그 창을 본 것으로 센다(요청값만으로는 아님)', async () => {
+  const m = await modPromise;
+  const W = m.EXPLICIT_ATTRIBUTION.windows;
+  assert.deepEqual(m.attributionWindowsSeen({ actions: [{ action_type: 'purchase', value: '3', '7d_click': '2', '1d_view': '1' }] }, W), ['7d_click', '1d_view']);
+  assert.deepEqual(m.attributionWindowsSeen({ actions: [{ action_type: 'link_click', value: '9', '7d_click': '9' }] }, W), ['7d_click'], '한 창만 보이면 그 창만');
+  assert.deepEqual(m.attributionWindowsSeen({ actions: [{ action_type: 'purchase', value: '3' }] }, W), [], '창별 값 없이 value만 오면 근거 없음');
+  assert.deepEqual(m.attributionWindowsSeen({}, W), [], '행동이 없으면 근거 없음');
+  assert.deepEqual(m.attributionWindowsSeen({ action_values: [{ action_type: 'purchase', value: '9', '1d_view': '0', '7d_click': '9' }] }, W), ['7d_click', '1d_view']);
+});
+
+test('구매 관찰값: 화면 구매 수와 같은 action_type 항목의 value · 창별 값을 원본 그대로 — 창별 값을 더하지 않는다', async () => {
+  const m = await modPromise;
+  const W = m.EXPLICIT_ATTRIBUTION.windows;
+  const row = {
+    actions: [{ action_type: 'link_click', value: '50', '7d_click': '50' }, { action_type: 'offsite_conversion.fb_pixel_purchase', value: '6', '7d_click': '5', '1d_view': '2' }, { action_type: 'purchase', value: '9' }],
+    action_values: [{ action_type: 'offsite_conversion.fb_pixel_purchase', value: '180000', '7d_click': '150000' }],
+  };
+  const p = m.purchaseWindowValues(row, W);
+  assert.equal(p.action_type, 'offsite_conversion.fb_pixel_purchase', '화면 구매 수(pickCountAndValue)와 같은 항목');
+  assert.equal(p.count.value, m.normalizeAdsetMetrics(row).purchase.value, '화면 구매 수 = 그 항목의 value');
+  assert.deepEqual(p.count, { value: 6, windows: { '7d_click': 5, '1d_view': 2 } }, '5 + 2 ≠ 6이어도 그대로 둔다(합산 · 보정 없음)');
+  assert.deepEqual(p.purchase_value, { value: 180000, windows: { '7d_click': 150000, '1d_view': null } }, '없는 창은 0이 아니라 null');
+  assert.equal(m.purchaseWindowValues({ actions: [{ action_type: 'link_click', value: '3', '7d_click': '3' }] }, W), null, '구매 항목이 없으면 null(다른 항목의 창별 키는 구매 근거가 아님)');
+  // 서버 응답: 지표 계산 기준(value · 합산 안 함 · 요청 창 기준 미확인)과 행별 구매 관찰값
+  assert.match(NEW_FN_SRC, /metric_basis: \{ field: "value", windows_summed: false, matches_requested_windows: "unconfirmed" \}/);
+  assert.match(NEW_FN_SRC, /attribution_purchase: purchaseWindowValues\(row, attribution\.windows\)/);
+  const grouped = m.groupAdsetsByCampaign([{ campaign_id: 'c', adset_id: 'a', metrics: {}, attribution_purchase: p }, { campaign_id: 'c', adset_id: 'b', metrics: {} }]);
+  assert.deepEqual(grouped[0].adsets[0].attribution_purchase, p);
+  assert.equal('attribution_purchase' in grouped[0].adsets[1], false, '명시 귀속이 아니면 필드 없음(다른 화면 응답 그대로)');
+});
+
 test('ads 요청은 level=ad를 쓴다', async () => {
   const m = await modPromise;
   const url = new URL(m.buildInsightsUrl({ accountId: 'act_1', level: 'ad', since: '2026-09-01', until: '2026-09-21', filteringAdsetId: '12345' }));

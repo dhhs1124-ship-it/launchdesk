@@ -2,20 +2,26 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
 import { normalizeCafe24ExpiresAt } from "../_shared/cafe24-token.ts";
 
+import { allowedReturnOrigin as allowListedOrigin } from "../_shared/return-origin.ts";
+
+const allowedReturnOrigin = (value: unknown) =>
+  allowListedOrigin(value, Deno.env.get("LAUNCHROAS_RETURN_ORIGIN"));
+
 const REDIRECT_URI =
   "https://zzhvckikonnalqnyatgn.supabase.co/functions/v1/cafe24-oauth-callback";
 
 const APP_URL = "https://launchdesk.co.kr";
 
-function goBack(status: string) {
+function goBack(status: string, returnOrigin: string | null) {
   return Response.redirect(
-    `${APP_URL}/?cafe24=${encodeURIComponent(status)}#/account`,
+    returnOrigin ? `${returnOrigin}/?cafe24=${encodeURIComponent(status)}` : `${APP_URL}/?cafe24=${encodeURIComponent(status)}#/account`,
     302
   );
 }
 
 export default {
   fetch: withSupabase({ auth: "none" }, async (req, ctx) => {
+    let returnOrigin: string | null = null;
     try {
       const url = new URL(req.url);
 
@@ -25,7 +31,11 @@ export default {
 
       // 사용자가 Cafe24 권한 승인을 취소한 경우
       if (oauthError) {
-        return goBack("denied");
+        if (state) {
+          const lookup = await ctx.supabaseAdmin.from("oauth_states").select("return_origin").eq("state", state).eq("provider", "cafe24").maybeSingle();
+          returnOrigin = allowedReturnOrigin(lookup.data?.return_origin);
+        }
+        return goBack("denied", returnOrigin);
       }
 
       if (!code || !state) {
@@ -56,12 +66,12 @@ export default {
           .eq("provider", "cafe24")
           .is("used_at", null)
           .gt("expires_at", nowIso)
-          .select("store_id,mall_id")
+          .select("store_id,mall_id,return_origin")
           .maybeSingle();
 
       if (claimError) {
         console.error("Cafe24 OAuth state claim error:", claimError.message);
-        return goBack("server_error");
+        return goBack("server_error", returnOrigin);
       }
 
       if (!oauthState) {
@@ -75,6 +85,8 @@ export default {
           { status: 400 }
         );
       }
+
+      returnOrigin = allowedReturnOrigin(oauthState.return_origin);
 
       // claim에 성공한 이 요청만 아래로 진행한다. 이후 token exchange가
       // 실패해도 state를 다시 쓸 수 있게 되돌리지 않는다 — 사용자는 Cafe24
@@ -93,7 +105,7 @@ export default {
 
       if (!clientId || !clientSecret) {
         console.error("Cafe24 credentials are not configured.");
-        return goBack("server_error");
+        return goBack("server_error", returnOrigin);
       }
 
       // 2. Cafe24 Authorization Code → Token 교환
@@ -129,7 +141,7 @@ export default {
           tokenResponse.status
         );
 
-        return goBack("token_error");
+        return goBack("token_error", returnOrigin);
       }
 
       // 3. 기존 Cafe24 연결이 있는지 확인
@@ -225,14 +237,14 @@ export default {
       // state는 위 1번 claim 시점에 이미 used 처리됐으므로 여기서 다시
       // 건드리지 않는다(meta-oauth-callback과 동일). 토큰은 절대 브라우저로
       // 반환하지 않음.
-      return goBack("connected");
+      return goBack("connected", returnOrigin);
     } catch (error) {
       console.error(
         "Cafe24 OAuth callback error:",
         error instanceof Error ? error.message : "Unknown error"
       );
 
-      return goBack("server_error");
+      return goBack("server_error", returnOrigin);
     }
   }),
 };

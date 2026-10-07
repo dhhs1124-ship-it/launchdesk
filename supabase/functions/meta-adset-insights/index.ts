@@ -16,6 +16,9 @@ import {
   groupAdsetsByCampaign,
   fetchAllInsightsRows,
   buildInsightsUrl,
+  EXPLICIT_ATTRIBUTION,
+  attributionWindowsSeen,
+  purchaseWindowValues,
 } from "../_shared/meta-adset-normalize.mjs";
 
 // Meta 캠페인/광고 세트/광고 레벨 Insights — 진단 1단계(원본 성과 조회·정규화만).
@@ -120,13 +123,16 @@ export default {
           { status: validated.status }
         );
       }
-      const { store_id, scope, period, date, adset_id } = validated as {
+      const { store_id, scope, period, date, adset_id, attribution_mode } = validated as {
         store_id: string;
         scope: Scope;
         period: Period;
         date: string | undefined;
         adset_id: string | undefined;
+        attribution_mode: "explicit" | undefined;
       };
+      // 명시 귀속은 요청한 화면(광고 기록 결과 비교)에만 — 다른 요청은 Meta 기본 귀속 그대로
+      const attribution = attribution_mode === "explicit" ? EXPLICIT_ATTRIBUTION : undefined;
 
       // 1. store_id 소유권 확인 — ctx.supabase는 RLS가 적용되므로 다른
       //    사용자의 store_id는 여기서 이미 걸러진다(meta-oauth-start.ts와
@@ -217,6 +223,7 @@ export default {
           preset,
           after,
           filteringAdsetId: scope === "ads" ? adset_id : undefined,
+          attribution,
         });
         const result = await fetchMetaJson(url, accessToken);
         if (!result.ok) return result;
@@ -244,7 +251,11 @@ export default {
         return errorResponse(cls.code as keyof typeof META_ERROR_MESSAGES, cls.status);
       }
 
-      const normalizedRows = pageResult.rows.map((row: any) => normalizeIdentityRow(row, level));
+      // 명시 귀속 요청에만: 화면 구매 수와 같은 구매 항목의 value · 요청 창별 값을 원본 그대로(합산하지 않음)
+      const normalizedRows = (pageResult.rows || []).map((row: any) => ({
+        ...normalizeIdentityRow(row, level),
+        ...(attribution ? { attribution_purchase: purchaseWindowValues(row, attribution.windows) } : {}),
+      }));
 
       const accountPayload = {
         id: externalAccountId,
@@ -257,6 +268,18 @@ export default {
         truncated: pageResult.truncated,
         fetched_rows: pageResult.fetchedRows,
         page_count: pageResult.pageCount,
+        // 명시 귀속 요청에만: 요청한 설정값(requested)과 응답에서 본 적용 근거(windows_seen)를 나눠 돌려준다.
+        // 요청값만으로는 적용 확인이 아니다 · 보고 시점은 응답 근거가 없어 항상 unconfirmed
+        ...(attribution
+          ? { attribution: {
+              source: "request",
+              requested: { windows: [...attribution.windows], action_report_time: attribution.action_report_time },
+              windows_seen: [...new Set((pageResult.rows || []).flatMap((row: any) => attributionWindowsSeen(row, attribution.windows)))],
+              action_report_time_applied: "unconfirmed",
+              // 지표(metrics.purchase 등)의 계산 기준 — Meta 응답 항목의 value(문서: 기본 귀속 창 값). 요청 창 기준이라는 근거가 없어 미확인 · 창별 값은 더하지 않음
+              metric_basis: { field: "value", windows_summed: false, matches_requested_windows: "unconfirmed" },
+            } }
+          : {}),
       };
 
       if (scope === "adsets") {
@@ -286,10 +309,13 @@ export default {
               adset_name: first.adset_name,
             }
           : { campaign_id: null, campaign_name: null, objective: null, adset_id, adset_name: null },
-        ads: normalizedRows.map((row: any) => ({
+        ads: normalizedRows.map((row: any, i: number) => ({
           ad_id: row.ad_id,
           ad_name: row.ad_name,
           metrics: row.metrics,
+          ...(attribution ? { attribution_purchase: row.attribution_purchase } : {}),
+          // 이 광고 행에서 실제로 보인 요청 창(명시 귀속 요청에만)
+          ...(attribution ? { attribution_windows_seen: attributionWindowsSeen((pageResult.rows || [])[i], attribution.windows) } : {}),
         })),
         ...pagingPayload,
       });
