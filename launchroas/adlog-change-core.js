@@ -16,7 +16,7 @@
   var ELEMENTS = ['문구', '이미지', '영상 첫 장면', '영상 자막', '타깃', '예산', '랜딩 페이지', '기타'];
   var CONCURRENT = ['예산', '할인', '상품', '타깃', '게재 위치', '기타'];
   // 결과 판정 버전 — 이 버전의 신호(improved · worse)만 '구매당 광고비 신호'로 집계한다. 버전이 없는 예전 결과는 이전 기준
-  var JUDGEMENT_VERSION = 'adlog-compare-v6: 정확 이항검정(단측 0.05) · 광고비당 구매 · 전후 같은 시점 재조회 · 같은 광고만 · 귀속 창 동안 잠정 · 보고 시점 미확인이면 신호 확정 안 함 · 매출 · ROAS는 구매 수와 같은 기준 · 구매 수는 전후 모두 같은 구매 항목의 7일 클릭 값이 있을 때 그 값(합산 없음), 아니면 value 계산 기준 확인 시에만';
+  var JUDGEMENT_VERSION = 'adlog-compare-v7: 정확 이항검정(단측 0.05) · 광고비당 구매 · 전후 같은 시점 재조회 · 같은 광고만 · 귀속 창 동안 잠정 · 보고 시점은 응답 확인 또는 노출일 명시 요청일 때만 신호 확정 · 매출 · ROAS는 구매 수와 같은 기준 · 구매 수는 전후 모두 같은 구매 항목의 7일 클릭 값이 있을 때 그 값(합산 없음), 아니면 value 계산 기준 확인 시에만';
   var PROFIT_FORMULA = 'ad-profit-reference-v1: 연결 상품 주문당 광고 전 잔액 × Meta 귀속 구매 수 − 광고비(원화) · 참고 계산';
   var DAY = 864e5;
 
@@ -223,10 +223,15 @@
       : '요청한 귀속 창이 Meta 응답에 실제로 적용된 근거가 없어(미확인) 개선 · 악화를 확정하지 않아요'); }
     else {
       res.final_from = finalFrom(after.until, win);
-      if(today < res.final_from){ res.provisional = true; res.blockers.push('provisional'); w.push('귀속 창(' + win + '일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정) 안이라 구매가 더 늘어날 수 있어 잠정 결과예요 — ' + res.final_from + '부터 확정 판단'); }
+      if(today < res.final_from){ res.provisional = true; res.blockers.push('provisional'); w.push('귀속 창(' + win + '일 · ' + (attr && attr.applied && attr.applied.action_report_time_basis === 'explicit_request' && attr.action_report_time === 'impression' ? '노출일 기준 요청' : '보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정') + ') 안이라 구매가 더 늘어날 수 있어 잠정 결과예요 — ' + res.final_from + '부터 확정 판단'); }
     }
     // 보고 시점은 Meta 응답에 드러나지 않는다 — 근거 없이 노출일로 가정한 결과는 개선 · 악화 신호로 확정하지 않는다(관찰값 · 검정만)
-    var reportOk = !!(attr && typeof attr === 'object' && attr.applied && attr.applied.action_report_time === 'response_evidence');
+    //   응답 확인(response_evidence)과 명시 요청(explicit_request: 전후 모든 조회에 action_report_time=impression 전달 · 오류 · 기본값 재조회 없음)을 구분한다.
+    //   노출일 명시 요청이면 '노출일 기준으로 요청한 비교'로 판정을 막지 않는다(응답 재확인 아님 · 귀속 대기 등 다른 제한은 그대로). 전환일 등은 응답 근거가 있을 때만
+    var reportByRequest = !!(attr && typeof attr === 'object' && attr.applied && attr.applied.action_report_time_basis === 'explicit_request' && attr.action_report_time === 'impression');
+    var reportOk = !!(attr && typeof attr === 'object' && attr.applied && attr.applied.action_report_time === 'response_evidence') || reportByRequest;
+    res.report_time_basis = !attr || typeof attr !== 'object' ? null : attr.applied && attr.applied.action_report_time === 'response_evidence' ? 'response_evidence' : reportByRequest ? 'explicit_request' : 'unconfirmed';
+    if(win !== null && reportByRequest && !(attr.applied.action_report_time === 'response_evidence')) w.push('노출일 기준으로 요청한 비교예요(전후 모든 조회에 action_report_time=impression 요청 · Meta 응답에서 재확인되지는 않음)');
     if(win !== null && !reportOk){ res.blockers.push('report_time_unverified'); w.push('보고 시점(노출일 · 전환일)이 Meta 응답으로 확인되지 않아 개선 · 악화 신호로 확정하지 않아요 — 관찰값과 검정 결과만 보여 줘요'); }
     if(click7) w.push('구매 수 · 구매당 광고비는 같은 구매 항목의 7일 클릭 값(' + k0.action_type + ')으로 비교해요 — 1일 조회 · 기본 값(value)은 더하지 않아요 · 매출 · ROAS도 같은 7일 클릭 값으로만(없으면 계산 보류)');
     // 저장 당시 기준값은 이후 귀속으로 늘어난 구매가 빠져 있어 변경 후와 같은 시점 값이 아니다 — 관찰만, 신호로 판정하지 않는다

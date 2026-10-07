@@ -404,3 +404,24 @@ git worktree remove ../main-parity-wt
 - 상태: **판단 보류** — 오늘(10-07): `provisional`(10-12부터 확정) · `report_time_unverified` · `sample_uncertain` / 10-12 가정: `report_time_unverified` · `sample_uncertain`(보고 시점 미확인으로 확정 신호 없음 확인).
 - 주간 AI 분석과 귀속 기준이 다르다는 안내 유지 확인.
 - 해석 한계: 실제 변경이 없는 두 주 비교라 효과 판단 대상이 아님 · 10-01 매출 499.68(4건)이 매출 · ROAS를 크게 끌어올림 · 광고 단위 1개 · 두 주 관찰.
+
+## 14. 2026-10-07 보고 시점 '명시 요청' 기준 (로컬 · 판정 버전 v7)
+- 공식 API 계약(Ad Account Insights): `action_report_time` = `enum{impression, conversion, mixed, lifetime}` — "Determines the report time of action stats" · 기본값 명시 없음 · **응답에 사용한 값을 되돌려 주는 필드 없음** → 응답으로는 확인 불가.
+- 구분: `applied.action_report_time` = 응답 확인(지금은 항상 `unconfirmed`) / `applied.action_report_time_basis` = `explicit_request` — 전후 모든 조회(하루 1회 · 서버에 기본값 재조회 경로 없음)가 정상 응답이고 서버가 돌려준 요청값이 모두 같고 `impression`일 때만. 조회 실패 · 페이지 누락이 있으면 비교 자체가 막히고, 하루라도 요청값이 다르면 귀속 기준을 쓰지 않는다(보류).
+- 판정: `impression` 명시 요청이면 보고 시점 때문에 막지 않음 — '노출일 기준으로 요청한 비교예요(… Meta 응답에서 재확인되지는 않음)'로 표시(`report_time_basis: explicit_request`). 응답에서 확인됐다고 표기하지 않음. 전환일 등은 요청만으로 인정하지 않음(`report_time_unverified`).
+- 유지되는 제한: 귀속 창 대기(잠정) · 표본 불확실 · 함께 바뀐 조건 · 변경 전 재조회 · 새 광고 · 기간 · 통화 · 구매 수 기준(7일 클릭 또는 value 근거).
+- 이번 사례(13장 데이터 재계산, 추가 조회 없음): 10-07 `provisional` · `sample_uncertain` / 10-12 가정 `sample_uncertain` → **판단 보류**. 변경 기록 · 결과를 저장하지 않았으므로 성과 집계(outcomeSummary)에 들어가지 않음 — 서비스 개선 성과 아님.
+- 테스트 795/795.
+
+## 15. 배포 범위 정리 (2026-10-07 · 배포 안 함 · 각각 승인 후)
+### A. 운영 메인 호환 — `compat/main-adlog-parity` = `d4d56c7`
+- 범위: `master`(`6695178` = `origin/master`) + 커밋 5개 · 파일 `adlog-core.js`(신규 · 미리보기 `launchroas/adlog-core.js`와 동일) · `index.html` · `store.js` · `tools.js` · 테스트 3개.
+- 내용: LaunchROAS 변경 · 결과 기록을 ₩NaN 없이 목록에만(합계 제외) · LaunchROAS와 같은 합계(공유 모듈 + 저장된 포함/제외 선택) · 선택 조회 실패 시 '미확정' · 기록 조회 실패를 '기록 없음'과 구분 + 다시 불러오기.
+- 오늘 바뀐 판정(v5~v7 · `adlog-change-core.js` · `adlog.js`)은 **미리보기 전용** — 운영 메인은 판정 상태를 표시하지 않아(라벨 '변경 기록 · 합계 제외 · 결과 N건'만) 호환 브랜치 수정 불필요.
+- 방식: `master` 병합 · 푸시 → Vercel 운영 배포(빌드에서 테스트 실행). 배포 전: 호환 브랜치 테스트 재실행(임시 작업 트리) · 배포 후 `#/dashboard` ₩NaN 없음 · 선택 조회 상태 확인.
+### B. 미리보기 저장 기능 — `preview/launchroas-apple`
+- 범위: 원격보다 앞선 로컬 커밋 전부(광고 기록 비교 v7 · AI 주간 점검 화면 · 정책 · 비용 예약 등) · 저장 스위치 `launchroas/index.html`에 `window.LAUNCHROAS_FLAGS = { adlogChangeRecords: true }`(지금 없음 = 꺼짐).
+- 서버 선행 조건: `ai-weekly-review` v16 · `meta-adset-insights` v14(광고 단위 `attribution_purchase` · 명시 귀속) 배포 완료. DB 스키마 변경 없음 — 저장 시 `tool_records`(ad_log · ad_log_decision)에 행 추가만.
+- 순서: A 배포 → 운영 메인에서 실제 저장 · 재조회 · 실패 · 재시도 확인 → 저장 스위치 켜고 미리보기 푸시(브랜치 배포 방식 확인 필요) → 실제 광고 변경 기록 1건(결과는 약 2주 뒤).
+### C. 이번 범위 밖
+- `ad-video-source` 배포(영상 광고가 생겼을 때만) · `AI_WEEKLY_ENABLED` 재활성(별도 승인 · 지금 false) · `migration repair`(별도 결정) · `db push` 금지 유지 · 유료 AI 호출.

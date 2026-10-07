@@ -18,12 +18,13 @@ const byClass = (n, cls) => all(n).filter((x) => String(x.className || '').split
 // 서버 응답: 요청한 설정값(requested)과 광고 행별로 실제 보인 요청 창(attribution_windows_seen)
 const REQ = { windows: ['7d_click', '1d_view'], action_report_time: 'impression' };
 // 화면이 만든 귀속 기준 — 두 기간 모두 대상 광고 행에서 요청 창을 봤을 때만 response_evidence
-const ATTR = { source: 'request', ...REQ, applied: { windows: 'response_evidence', windows_seen: REQ.windows, action_report_time: 'unconfirmed', metric_basis: 'response_evidence' } };
+// 보고 시점: 응답 확인은 없음(unconfirmed) · 전후 모든 조회에 impression을 요청 → explicit_request
+const ATTR = { source: 'request', ...REQ, applied: { windows: 'response_evidence', windows_seen: REQ.windows, action_report_time: 'unconfirmed', action_report_time_basis: 'explicit_request', metric_basis: 'response_evidence' } };
 // basisConfirmed: 서버가 구매 수 계산 기준(value)이 요청 창 기준이라는 근거를 준다고 가정(판정 경로 검사용 — 실제 서버는 아직 항상 unconfirmed)
 function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezone, basisConfirmed }){
   // failDates: 조회 실패할 날짜 · truncDates: 페이지 누락(광고 없음) 날짜 · noAttribution: 재배포 전 서버(귀속 기준 응답 없음) · noEvidence: 요청값은 오지만 광고 행에 창별 값이 없음
   // now: 화면의 현재 시각 고정(ms · 없으면 실제 시각) · timezone: 응답 광고계정 시간대
-  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false, noEvidence: false, basisConfirmed: !!basisConfirmed, noClick7: false };
+  const control = { failDecisions: !!failDecisions, failRecords: !!failRecords, failDates: [], truncDates: [], noAttribution: false, noEvidence: false, basisConfirmed: !!basisConfirmed, noClick7: false, reportTimeByDate: {} };
   const account = { currency: 'KRW', ...(timezone ? { timezone } : {}) };
   const db = { ad_log: rows.map((data) => ({ data })), ad_log_decision: (decisions || []).map((data) => ({ data })) }, inserts = [], calls = [];
   const ids = {};
@@ -48,7 +49,7 @@ function setup({ flag, rows, decisions, failDecisions, failRecords, now, timezon
   const client = { from, functions: { invoke: async (name, { body }) => {
     calls.push(body);
     if (control.failDates.includes(body.date)) return { data: null, error: { message: '조회 실패(테스트)' } };
-    const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: { source: 'request', requested: REQ, windows_seen: control.noEvidence ? [] : REQ.windows, action_report_time_applied: 'unconfirmed',
+    const attribution = body.attribution_mode === 'explicit' && !control.noAttribution ? { attribution: { source: 'request', requested: control.reportTimeByDate[body.date] ? { ...REQ, action_report_time: control.reportTimeByDate[body.date] } : REQ, windows_seen: control.noEvidence ? [] : REQ.windows, action_report_time_applied: 'unconfirmed',
       metric_basis: { field: 'value', windows_summed: false, matches_requested_windows: control.basisConfirmed ? 'response_evidence' : 'unconfirmed' } } } : {};
     if (control.truncDates.includes(body.date)) return { data: { ok: true, account, ads: [], truncated: true, ...attribution } };
     const buy = body.date < '2026-09-01' ? 1 : 2;
@@ -154,7 +155,7 @@ test('스위치를 켠 로컬 테스트: 변경 전 7일 지표 · 계산 기준
   assert.equal(result.result.attribution.observed.after.purchase_count.value, 14);
   const t2 = text(s.ids.adlogChanges);
   assert.match(t2, /변경 전 지표\(비교 시점 재조회\) 광고비 ₩70,000 · 구매 7건/, '통화가 null로 바뀌지 않는다');
-  assert.match(t2, /귀속 기준 요청한 설정 · 7d_click, 1d_view · 보고 기준 노출일 \/ 응답 관찰 · 귀속 창별 값 있음 · 보고 기준 미확인\(응답에 드러나지 않음\) \/ 계산 기준 · 구매 수는 Meta 기본 값\(value\) · 창별 값 합산 안 함 · 요청 창 기준 확인/);
+  assert.match(t2, /귀속 기준 요청한 설정 · 7d_click, 1d_view · 보고 기준 노출일 \/ 응답 관찰 · 귀속 창별 값 있음 · 보고 기준 노출일 기준으로 요청한 비교\(응답에서 재확인되지는 않음\) \/ 계산 기준 · 구매 수는 Meta 기본 값\(value\) · 창별 값 합산 안 함 · 요청 창 기준 확인/);
   assert.match(t2, /주간 분석과 기준 주간 분석 · 광고 세트 귀속 설정 기준/);
   assert.equal(result.result.attribution_vs_weekly.same, false, '저장 기록에 주간 분석과의 기준 차이');
 });
@@ -205,8 +206,17 @@ test('결과 비교: 페이지 누락은 비교하지 않고 · 귀속 기준 �
   assert.match(k, /구매당 광고비 \(7일 클릭 기준\) ₩10,000 → ₩5,000/);
   assert.match(k, /ROAS \(7일 클릭 기준\) 7일 클릭 기준 매출 값이 없어 ROAS 계산 보류 — 기본 값\(value\) ROAS와 섞지 않아요/);
   assert.match(k, /변경 후 지표 광고비 ₩70,000 · 구매 14건 · ROAS 600% · 클릭률 1\.00% \(구매 · ROAS는 Meta 기본 값 기준\)/);
-  assert.match(k, /보고 시점\(노출일 · 전환일\)이 Meta 응답으로 확인되지 않아 개선 · 악화 신호로 확정하지 않아요/);
+  // 보고 시점: 전후 모든 조회에 impression 요청 → '노출일 기준으로 요청한 비교'(응답 재확인이라고 표기하지 않음) · 판정을 막지 않음
+  assert.match(k, /노출일 기준으로 요청한 비교예요\(전후 모든 조회에 action_report_time=impression 요청 · Meta 응답에서 재확인되지는 않음\)/);
+  assert.doesNotMatch(k, /Meta 응답으로 확인되지 않아 개선 · 악화 신호로 확정하지 않아요/);
+  assert.doesNotMatch(k, /보고 기준 (응답에서 확인|Meta 응답에서 확인)/);
   assert.match(k, /주간 분석은 광고 세트 귀속 설정 기준이고/);
+  // 하루라도 다른 보고 시점이 요청됐으면(전후 요청이 같지 않음) — 노출일 명시 요청 비교로 보지 않는다(귀속 기준 자체를 쓰지 않아 보류)
+  s.control.reportTimeByDate = { '2026-09-03': 'conversion' };
+  const rt = await press();
+  assert.match(rt, /판단 보류/); assert.match(rt, /귀속 기준을 확인하지 못해 개선 여부를 확정하지 않아요/);
+  assert.doesNotMatch(rt, /노출일 기준으로 요청한 비교예요/);
+  s.control.reportTimeByDate = {};
   // 광고 행의 구매 항목에 7d_click이 없으면(광고 단위 응답에서 확인 못 함) — 판단 보류 · value 기준 관찰값만
   s.control.noClick7 = true;
   const m = await press();

@@ -376,6 +376,28 @@ test('7일 클릭 기준: 전후 모두 같은 구매 항목의 7d_click이 있�
   assert.match(early.warnings.join(' '), /귀속 창\(7일 · 보고 시점은 응답으로 확인되지 않아 노출일 기준으로 가정\).*2026-09-22부터 확정 판단/);
 });
 
+test('보고 시점: 전후 모든 조회에 impression을 명시 요청했으면(explicit_request) 노출일 기준으로 요청한 비교로 판정 — 응답 확인으로 표기하지 않고 · 다른 제한은 유지', () => {
+  const REQ_IMP = { ...SEEN_ONLY, applied: { ...SEEN_ONLY.applied, action_report_time_basis: 'explicit_request' } };
+  const x = k7Case([100000, 10, 10], [100000, 13, 30]);
+  const r = x.run('2026-09-30', REQ_IMP);
+  assert.equal(r.status, 'improved'); assert.equal(r.report_time_basis, 'explicit_request');
+  assert.ok(!r.blockers.includes('report_time_unverified'));
+  assert.match(r.warnings.join(' '), /노출일 기준으로 요청한 비교예요\(전후 모든 조회에 action_report_time=impression 요청 · Meta 응답에서 재확인되지는 않음\)/);
+  assert.equal(r.attribution.applied.action_report_time, 'unconfirmed', '보고 시점을 응답에서 확인했다고 남기지 않는다');
+  assert.doesNotMatch(r.warnings.join(' '), /보고 시점.{0,20}응답에서 확인/);
+  // 귀속 대기 · 표본 · 함께 바뀐 조건은 그대로 막는다
+  assert.ok(x.run('2026-09-21', REQ_IMP).blockers.includes('provisional'));
+  const small = k7Case([100000, 2, 2], [100000, 3, 3]).run('2026-09-30', REQ_IMP);
+  assert.equal(small.status, 'inconclusive'); assert.ok(small.blockers.includes('sample_uncertain'));
+  const conc = k7Case([100000, 10, 10], [100000, 13, 30], { concurrent: ['할인'] }).run('2026-09-30', REQ_IMP);
+  assert.equal(conc.status, 'inconclusive'); assert.ok(conc.blockers.includes('not_separable'));
+  // 전환일 등은 요청만으로 인정하지 않는다 · 근거 표시가 없으면 보류
+  const conv = x.run('2026-09-30', { ...REQ_IMP, action_report_time: 'conversion' });
+  assert.equal(conv.status, 'inconclusive'); assert.ok(conv.blockers.includes('report_time_unverified'));
+  const none = x.run('2026-09-30', SEEN_ONLY);
+  assert.equal(none.report_time_basis, 'unconfirmed'); assert.ok(none.blockers.includes('report_time_unverified'));
+});
+
 test('보고 시점 미확인(지금 실제 서버)이면 7일 클릭 값으로 차이가 커도 · 확정일이 지나도 개선 · 악화 신호로 확정하지 않는다', () => {
   const x = k7Case([100000, 10, 10], [100000, 13, 30]);
   for (const today of ['2026-09-30', '2026-12-31']) {
