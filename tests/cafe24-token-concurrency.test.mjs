@@ -74,3 +74,29 @@ test('Cafe24가 refresh_token을 거부하면 재연결이 필요하다고 알�
   assert.equal(r.ok, false); assert.equal(r.code, 'RECONNECT_REQUIRED');
   assert.equal(db.row.refresh_token, 'R0');
 });
+
+// 시차 요청: 첫 요청이 갱신 권한을 잡고(updated_at 변경) Cafe24 응답을 기다리는 동안 두 번째 요청이 와서
+// 바뀐 updated_at을 읽는 경우 — 두 번째 요청이 다시 권한을 잡아 같은 refresh_token으로 중복 갱신하면 안 된다.
+test('갱신 중에 늦게 온 요청은 다시 갱신하지 않고 기다렸다가 새 토큰을 쓴다(Cafe24 호출 1회 · 둘 다 성공)', async () => {
+  const db = fakeDb(expiredRow()), cafe24 = fakeCafe24('R0');
+  const real = globalThis.fetch; let release; const gate = new Promise((r) => { release = r; }); let started;
+  const firstCall = new Promise((r) => { started = r; });
+  globalThis.fetch = async (url, init) => { started(); await gate; return real(url, init); }; // 첫 갱신 응답을 붙잡아 둔다
+  const first = getValidCafe24AccessToken(db.client, 1, 'mall');
+  await firstCall; // 첫 요청이 권한을 잡고 Cafe24에 요청을 보낸 뒤
+  const second = getValidCafe24AccessToken(db.client, 1, 'mall'); // 두 번째 요청 시작(바뀐 updated_at을 읽는다)
+  await new Promise((r) => setTimeout(r, 50));
+  release();
+  const [a, b] = await Promise.all([first, second]);
+  assert.deepEqual([a.ok, b.ok], [true, true], JSON.stringify([a, b]));
+  assert.deepEqual([a.accessToken, b.accessToken], ['A1', 'A1']);
+  assert.equal(cafe24.calls, 1, 'Cafe24 refresh 호출은 한 번');
+  assert.equal(db.row.refresh_token, cafe24.valid);
+});
+
+test('갱신 권한을 잡은 요청이 끝내지 못하면(임대 시간 경과) 다음 요청이 권한을 다시 잡아 갱신한다', async () => {
+  const row = expiredRow(); row.updated_at = new Date(Date.now() - 60e3).toISOString(); // 1분 전에 잡힌 뒤 끝나지 않은 권한
+  const db = fakeDb(row), cafe24 = fakeCafe24('R0');
+  const r = await getValidCafe24AccessToken(db.client, 1, 'mall');
+  assert.equal(r.ok, true); assert.equal(cafe24.calls, 1);
+});

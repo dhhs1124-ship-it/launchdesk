@@ -23,6 +23,11 @@
 // 토큰이 DB에 남아 연결이 끊길 수 있다. 이를 막으려고 Cafe24에 갱신을 요청하기 전에
 // integration_credentials.updated_at을 읽은 값과 비교·교체(CAS)해 한 요청만 갱신 권한을
 // 갖는다. 나머지 요청은 갱신된 토큰이 저장될 때까지 기다렸다가 그 토큰을 쓴다.
+// 시차 요청: 권한을 잡은 요청이 Cafe24 응답을 기다리는 동안 온 요청은 바뀐 updated_at을 읽는다 —
+// 그 값으로 CAS하면 다시 성공해 같은 refresh_token으로 중복 갱신된다. 그래서 토큰이 만료됐는데
+// updated_at이 CLAIM_LEASE_MS 안의 값이면 '갱신 중'으로 보고 CAS하지 않고 기다린다(임대 시간이
+// 지나도 새 토큰이 없으면 권한을 잡은 요청이 끝내지 못한 것으로 보고 다시 잡는다). 갱신 요청은
+// REFRESH_TIMEOUT_MS로 끊어 임대 시간 안에 끝나게 한다. 스키마 변경 없음.
 
 // supabaseAdmin의 정확한 타입은 "jsr:@supabase/server" 내부 타입이라 여기서
 // 다시 끌어오지 않고, 이 모듈이 실제로 쓰는 모양(.from(...).select/update)만
@@ -49,6 +54,15 @@ const CREDENTIAL_COLUMNS =
 // 중간에 죽었으면(이 시간 동안 토큰이 바뀌지 않으면) 한 번 더 권한을 얻어 직접 갱신한다.
 const REFRESH_WAIT_MS = 12000;
 const REFRESH_POLL_MS = 400;
+// 갱신 권한 임대 시간 — Cafe24 갱신 요청 시간 제한 + 저장 여유보다 길어야 한다.
+const CLAIM_LEASE_MS = 30000;
+const REFRESH_TIMEOUT_MS = 10000;
+// 토큰이 만료됐는데 최근(임대 시간 안)에 updated_at이 바뀌었으면 다른 요청이 갱신 중이다.
+const refreshInProgress = (updatedAt: string | null): boolean => {
+  if (!updatedAt) return false;
+  const at = new Date(updatedAt).getTime();
+  return !Number.isNaN(at) && Date.now() - at < CLAIM_LEASE_MS;
+};
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface Cafe24TokenRefreshResponse {
@@ -169,6 +183,7 @@ async function requestCafe24TokenRefresh(
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body: body.toString(),
+        signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
       }
     );
   } catch (err) {
@@ -241,16 +256,19 @@ export async function getValidCafe24AccessToken(
   //    실패했으면 다른 요청이 갱신 중이거나 이미 갱신했으니 저장될 새 토큰을 기다린다.
   let claimed = false;
   for (let attempt = 0; attempt < 2 && !claimed; attempt++) {
-    let claim = supabaseAdmin
-      .from("integration_credentials")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("connected_account_id", connectedAccountId);
-    claim = row.updated_at ? claim.eq("updated_at", row.updated_at) : claim.is("updated_at", null);
-    const { data: won } = await claim.select(CREDENTIAL_COLUMNS).maybeSingle();
-    if (won) {
-      row = won as IntegrationCredentialRow;
-      claimed = true;
-      break;
+    // 다른 요청이 방금 권한을 잡고 갱신 중이면 CAS하지 않고 새 토큰을 기다린다(시차 요청 중복 갱신 방지).
+    if (!refreshInProgress(row.updated_at)) {
+      let claim = supabaseAdmin
+        .from("integration_credentials")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("connected_account_id", connectedAccountId);
+      claim = row.updated_at ? claim.eq("updated_at", row.updated_at) : claim.is("updated_at", null);
+      const { data: won } = await claim.select(CREDENTIAL_COLUMNS).maybeSingle();
+      if (won) {
+        row = won as IntegrationCredentialRow;
+        claimed = true;
+        break;
+      }
     }
     for (let waited = 0; waited < REFRESH_WAIT_MS; waited += REFRESH_POLL_MS) {
       await sleep(REFRESH_POLL_MS);
@@ -259,6 +277,8 @@ export async function getValidCafe24AccessToken(
         return { ok: true, accessToken: latest.access_token };
       }
       if (latest) row = latest;
+      // 권한을 잡은 요청이 끝내지 못하고 임대 시간이 지났으면 더 기다리지 않고 다시 권한을 잡으러 간다.
+      if (latest && !refreshInProgress(latest.updated_at)) break;
     }
   }
   if (!claimed) {
