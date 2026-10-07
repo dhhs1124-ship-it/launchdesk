@@ -30,20 +30,28 @@
 | 공유 파일 | 오래된 묶음 | 최신 묶음(동기화 기준) |
 |---|---|---|
 | `_shared/meta-adset-normalize.mjs` | ai-weekly-review(10-07 00:01, 명시 귀속 추가 전) | meta-adset-insights v14 |
-| `_shared/cafe24-token.ts` | cafe24-oauth-callback(10-04) | orders-sync · store-info · order-items(10-05, 동시 갱신 경쟁 처리) |
+| `_shared/cafe24-token.ts` | cafe24-oauth-callback(10-04) | orders-sync · store-info · order-items(10-05, 동시 요청 CAS — 시차 요청은 미해결이었음, 8장) |
 | `_shared/meta-token.ts` | meta-adaccounts · meta-account-select(09-14) | 나머지 Meta 함수 · ai-weekly-review |
 - 오래된 묶음의 함수를 다시 배포하면 최신 공유 파일을 쓰게 된다 — 새 버전은 기능을 추가만 했고 `deno check`로 import 해석 확인.
 
 ## 5. 미리보기 브랜치의 미배포 변경 (동기화하지 않음)
 - `supabase/functions/ad-video-source/index.ts` — 배포된 적 없음.
 - `launchroas/video-frames.js` · `video-verify.html` — 운영자 영상 도구(운영 LaunchROAS에 공개하지 않음).
-- 마이그레이션 5개(`20260929164500_launchroas_oauth_return_origin` · `20261006100000_ai_weekly_reviews` · `20261006120000_ai_weekly_verifications` · `20261007090000_ai_budget_reservations` · `20261007100000_ai_budget_run_reservations`) · `supabase/verify/ai_budget_reservations_readonly.sql` — 원격에는 적용돼 있으나(예약 2개는 SQL 편집기) 원격 마이그레이션 기록이 비어 있다. 저장소에 넣는 것 자체는 SQL 실행이 아니지만 `db push` 위험과 기록 정리(`migration repair`)를 함께 정해야 하므로 **별도 결정**.
+- 마이그레이션 5개는 소스 동기화(`67db9ce`)에서 빼고, 별도 커밋(`e2beae6`)으로 **`supabase/migrations-applied-manually/`에 보존**(CLI 적용 대상 아님 · README에 원격 확인 상태) · 읽기 전용 확인 SQL은 `supabase/verify/`에 보존. 원격 기록 정리(`migration repair`)와 `db push` 금지는 그대로.
 - 그 외 미리보기 함수 소스는 모두 배포본과 같다(= 이번 동기화 대상).
 
 ## 6. 테스트
 - 미리보기에서 가져옴(함수 관련만): `ai-insights-core` · `ai-policy` · `ai-video-core` · `ai-weekly-core` · `cafe24-token-concurrency` · `return-origin`(.mjs) · `cafe24-oauth-state-claim` · `meta-adset-insights`(.js).
+- (갱신) 예약 SQL 대조 테스트는 보존 파일(`migrations-applied-manually/`)을 읽어 **실행 · 통과**. 남은 건너뜀은 영상 프레임 일치 1개(아래)뿐.
 - 두 테스트는 저장소에 없는 파일이 필요해 **없으면 이유를 표시하고 건너뜀**으로 바꿨다(미리보기처럼 파일이 있으면 그대로 실행 — 미리보기에서 12/12 · 18/18 통과 확인): 영상 프레임 일치(`launchroas/video-frames.js`) · 주간 실행 예약 SQL 대조(마이그레이션 `20261007100000`).
 - 결과: 루트 `tests/**/*.test.js` 654/654 · `.mjs` 50 통과 · 2 건너뜀 · LaunchROAS 114/114 · 공개 전 점검 · 빌드(결과물에 supabase · tests 없음).
+
+## 8. Cafe24 토큰 시차 요청 중복 갱신 — 버그 수정(`b1fc72d`, 동기화와 별도 커밋)
+- 문제(배포본에도 있음): 첫 요청이 갱신 권한을 잡으며 `updated_at`을 바꾸고 Cafe24 응답을 기다리는 동안 온 요청이 바뀐 `updated_at`을 읽어 다시 CAS에 성공 → 같은 refresh_token으로 갱신을 두 번 요청 → 한쪽 `RECONNECT_REQUIRED`(재현: 호출 2회 · 첫 성공 · 두 번째 실패).
+- 수정(스키마 변경 없음): 토큰이 만료됐는데 `updated_at`이 임대 시간(30초) 안이면 '갱신 중'으로 보고 CAS하지 않고 새 토큰을 기다림 · 임대 시간이 지나도 새 토큰이 없으면 다시 권한을 잡음 · Cafe24 갱신 요청 시간 제한 10초(임대 시간 안에 끝나게).
+- 회귀 테스트: 시차 요청(Cafe24 호출 1회 · 둘 다 성공) — 수정 전 실패 확인 · 임대 시간 경과 후 재획득. 기존 동시 요청 3개 · 갱신 직후 · 거부 테스트 유지.
+- 한계: 원격 `integration_credentials`에 `updated_at`을 덮어쓰는 트리거가 있어도 동작(쓰는 값이 현재 시각이므로). 함수 시계와 DB 시각이 크게 어긋나면 임대 판정이 흔들릴 수 있음(임대 30초로 여유). 더 엄격한 대안은 잠금 전용 컬럼(`refresh_claimed_until`) 추가 — 원격 스키마 변경이 필요해 이번에는 제안만.
+- 반영하려면 `cafe24-orders-sync` · `cafe24-store-info` · `cafe24-order-items` 재배포 필요(콜백은 갱신 경로를 쓰지 않음) — 승인 후.
 
 ## 7. 다음 (각각 승인 후)
 1. 이 브랜치 검토 → master 병합(소스만 · 배포 없음).

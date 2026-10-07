@@ -46,7 +46,7 @@
 | Meta 오류 중 `type: OAuthException`이면 모두 '재연결 필요'로 보고 연결을 `pending`으로 내림(요청 한도 17 · 권한 200 등도 포함) | **남아 있음**(`_shared/meta-adset-normalize.mjs` · `meta-insights`) |
 | 토큰 조회의 일시적 DB 오류를 '자격 없음'으로 보고 연결을 `pending`으로 내림(`meta-token.ts` `.single()`) | **남아 있음** |
 | `meta-adaccounts` · `meta-account-select`가 Meta 오류를 코드 없이 그대로 전달(재연결 안내 불가) | 확인 필요 |
-| Cafe24 토큰 동시 갱신 경쟁 | 배포본에서 **이미 해결**(최신 토큰 재조회) |
+| Cafe24 토큰 동시 갱신 경쟁 | 배포본은 **동시에 온 요청만** 처리(CAS) — **시차 요청(첫 요청이 갱신 중일 때 온 요청)은 중복 갱신 · 재연결 오류가 남아 있음**(정정 2026-10-07). 수정은 `sync/deployed-functions` `b1fc72d`(로컬 · 재배포 전) |
 | Cafe24 OAuth 콜백이 자격 저장 전에 `connected` 표시 · 주문 동기화가 커서 저장 실패에도 성공 응답 · Cafe24 401을 재연결 안내로 바꾸지 않음 · `meta-disconnect` 2단계 삭제 | 배포본 소스로 재확인 필요 |
 | `meta-insights`가 공유 모듈과 같은 함수를 다시 구현(중복) | 정리 시 오류 분류 수정이 한 곳으로 |
 | `master`에서 `meta-adset-insights`를 재배포하면 귀속 정보가 빠짐 | **주의** — 반드시 배포본 소스로 배포 |
