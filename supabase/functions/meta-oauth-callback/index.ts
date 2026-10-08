@@ -12,7 +12,7 @@ const REDIRECT_URI =
 
 const APP_URL = "https://launchdesk.co.kr";
 
-const GRAPH_API_VERSION = "v21.0";
+const GRAPH_API_VERSION = "v26.0";
 
 function goBack(status: string, returnOrigin: string | null) {
   return Response.redirect(

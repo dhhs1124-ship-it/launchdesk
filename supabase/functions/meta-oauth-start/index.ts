@@ -12,7 +12,7 @@ const REDIRECT_URI =
 // Meta Graph API 버전 — Meta가 주기적으로 구버전을 폐기하므로(대략 2년
 // 주기) 나중에 여기 한 곳만 올리면 된다(cafe24-orders-sync의 API_VERSION과
 // 같은 이유).
-const GRAPH_API_VERSION = "v21.0";
+const GRAPH_API_VERSION = "v26.0";
 
 // MVP 최소 권한 — 광고계정 정보/성과 "읽기"만. 광고 생성·수정 권한
 // (ads_management)은 요청하지 않는다(요구사항 3).

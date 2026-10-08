@@ -103,7 +103,7 @@ export function metaTokenErrorStatus(
 // 놓치는 것은 물론, meta-account-select의 재검증에서도 뒤 페이지에만 있는
 // 정상 계정이 "접근 권한 없음"으로 잘못 거부될 수 있었다(코드리뷰 지적 4).
 
-const GRAPH_API_VERSION = "v21.0";
+const GRAPH_API_VERSION = "v26.0";
 const AD_ACCOUNT_FIELDS = "id,name,account_status,currency,timezone_name";
 
 // 한 번의 조회에서 따라갈 최대 페이지 수 — Meta가 비정상적인 paging 응답을

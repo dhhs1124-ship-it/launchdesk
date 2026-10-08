@@ -94,46 +94,81 @@
 
 **코드 쪽 정리(심사 전)**
 - `mall.read_product` 제거: Cafe24 앱 권한도 함께 바꾸고 재인증해야 합니다.
-- Meta API 버전 올리기(2장): 녹화 전에 하는 것을 권합니다.
+- Meta API 버전: v26.0으로 코드 반영(2장). 배포는 승인 후, 심사 녹화 전에 하는 것을 권합니다.
 
-## 2. Meta API 버전
+## 2. Meta API 버전 (2026-10-08 정정 · v26.0으로 코드 반영 · 배포 보류)
 
-### 2-1. 코드 전수 [확인]
-| 위치 | 값 | 쓰는 함수 | 호출 종류 |
+> **정정:** 처음 판(커밋 93dda06)의 "v25.0만 Marketing 만료일이 미정", "v26.0은 Graph에만 있다"는 **틀렸습니다.**
+> Meta의 Marketing 버전 표(버전 페이지의 Marketing 섹션, Marketing changelog 목록)가 갱신되지 않아 맨 위가 v25.0이고 v26.0 행이 없었는데, 그 표만 보고 판단했습니다.
+> Marketing v26.0 changelog 머리말은 "July 29, 2026 | Available until TBD"이고, 공식 블로그 제목도 "Introducing Graph API v26.0 and Marketing API v26.0"(2026-07-29)입니다. [원문]
+
+### 2-1. 코드 (v21.0 → v26.0, 이 커밋)
+| 위치 | 쓰는 함수 | 호출 종류 |
+|---|---|---|
+| `_shared/meta-adset-normalize.mjs` | meta-adset-insights, ai-weekly-review | 광고 성과(Marketing) |
+| `_shared/meta-token.ts` | meta-adaccounts, meta-account-select | `/me/adaccounts`(Marketing) |
+| `meta-insights/index.ts` | meta-insights | 계정 성과(Marketing) |
+| `meta-oauth-start/index.ts` | meta-oauth-start | 로그인 대화상자(Graph) |
+| `meta-oauth-callback/index.ts` | meta-oauth-callback | 토큰 교환(Graph) |
+
+- 테스트
+  - `tests/meta-adset-insights.test.js`는 다섯 곳이 모두 같은 v26.0인지 확인합니다.
+  - 같은 테스트가 버전을 직접 적은 Meta 주소가 없는지도 확인합니다.
+  - 광고 성과 주소 테스트와 OAuth 복귀 테스트의 가짜 주소도 v26.0으로 바꿨습니다.
+- 이전의 v21.0 통일은 의도한 것이었습니다(고정 테스트가 있었음). 이번 변경도 같은 방식으로 한 버전에 고정합니다.
+
+### 2-2. 공식 지원 기간 [원문, 2026-10-08 열람]
+| 버전 | 출시 | Graph 만료 | Marketing 만료 |
 |---|---|---|---|
-| `_shared/meta-adset-normalize.mjs:25` | v21.0 | meta-adset-insights, ai-weekly-review | 광고 성과(Marketing) |
-| `_shared/meta-token.ts:106` | v21.0 | meta-adaccounts, meta-account-select | `/me/adaccounts`(Marketing) |
-| `meta-insights/index.ts:21` | v21.0 | meta-insights | 계정 성과(Marketing) |
-| `meta-oauth-start/index.ts:15` | v21.0 | meta-oauth-start | 로그인 대화상자(Graph) |
-| `meta-oauth-callback/index.ts:15` | v21.0 | meta-oauth-callback | 토큰 교환(Graph) |
-| `tests/meta-adset-insights.test.js:757` | v21.0 고정 테스트 | — | 버전이 임의로 바뀌지 않게 막는 테스트 |
-| `launchroas/oauth-return.test.js:38` | v21.0 | — | 테스트용 가짜 URL(바꿀 필요 없음) |
+| v21.0 | 2024-10-02 | 2027-01-21 | **2025-09-09(만료)** |
+| v22.0 | 2025-01-21 | 2027-05-20 | 2026-02-19(만료) |
+| v23.0 | 2025-05-29 | 2027-10-08 | 2026-06-09(만료) |
+| v24.0 | 2025-10-08 | 2028-02-18 | 2026-10-06(만료) |
+| v25.0 | 2026-02-18 | 2028-07-29 | 미정(TBD) |
+| v26.0 | 2026-07-29 | 미정(TBD) | 미정(TBD) — 버전 표에는 행이 없고, v26.0 changelog 기준 |
 
-모두 v21.0으로 같습니다. 고정 테스트까지 있으므로 의도적으로 한 버전에 맞춘 것입니다.
+- 공식 문서끼리 맞지 않는 곳이 남아 있습니다.
+  - "The latest Graph API version is: v25.0", "The current version of the Marketing API is v25.0." 같은 갱신 안 된 문구 [원문]
+- v27.0은 아직 없습니다. 어느 표에도 없고, changelog 주소도 404입니다. [추론]
 
-### 2-2. 공식 지원 기간 [원문, developers.facebook.com 버전 표]
-- Marketing API
-  - v21.0은 **2025-09-09에 만료**됐습니다.
-  - v22.0은 2026-02-19, v23.0은 2026-06-09, v24.0은 2026-10-06에 만료됐습니다.
-  - **v25.0(2026-02-18 출시)만 만료일이 '미정'**입니다.
-- Graph API: v21.0은 2027-01-21까지, v25.0은 2028-07-29까지 지원됩니다.
-- 만료된 버전 호출은 "may fail or be upgraded to the next available version"입니다. 다음 버전에서 바뀐 엔드포인트에는 자동 업그레이드가 적용되지 않습니다.
-- Marketing API 자동 업그레이드 시작일은 문서에 "will release on July 29, 2026"으로 적혀 있습니다(문서 문구 그대로).
+### 2-3. 자동 업그레이드와 실제 동작
+- 문서 규칙 [원문]
+  - 만료된 Marketing 버전 호출은 다음 버전에서 바뀌지 않은 엔드포인트만 "next available version"으로 올려 처리하고, 바뀐 엔드포인트는 실패합니다.
+  - 이 규칙대로면 v24.0이 2026-10-06에 만료됐으므로 지금은 v25.0으로 처리돼야 합니다. [추론]
+- 운영에서 본 실제 동작 [확인]
+  - 2026-10-06 운영 응답에 "The ids query parameter is deprecated in v26.0+"가 나왔습니다(코드 주석으로 기록됨).
+  - 이 오류는 v26.0+에서만 나고, 모든 버전에 적용되는 날은 2026-10-27입니다. 그래서 v21.0 호출이 **v26.0 기준으로 처리되고 있다**는 정황입니다. 문서 규칙과는 다릅니다.
+  - 어느 버전으로 처리됐는지는 응답 헤더 `X-Ad-Api-Version-Warning`으로 확정할 수 있습니다. 이번에는 운영 호출을 하지 않았습니다.
+- Graph(OAuth)는 v21.0이 2027-01-21까지 유효하므로 지금은 v21.0으로 처리됩니다. [추론]
 
-### 2-3. 판단 · 제안(코드 변경은 하지 않음)
-- **변경이 필요합니다.**
-  - Marketing 호출 3곳(위 표 1~3행)은 만료된 버전으로 호출하고 있습니다. 지금은 자동 업그레이드 덕에 동작합니다. 2026-10-08 운영 조회도 정상이었습니다.
-  - 하지만 다음 버전에서 바뀐 엔드포인트가 생기면 경고 없이 실패할 수 있습니다.
-  - Graph 2곳(OAuth)은 2027-01-21까지 안전합니다.
-- 제안: 5곳을 함께 **v25.0**으로 올립니다. v25.0은 Marketing 만료일이 미정인 유일한 버전이고, Graph 지원은 2028-07-29까지입니다.
-  - v26.0은 Graph에만 있고 Marketing 표에는 없어서 고르지 않았습니다.
-  - 고정 테스트도 v25.0으로 바꿉니다.
-- 올리기 전에 확인할 것: v22~v25 변경 기록에서 우리가 쓰는 필드가 바뀌었는지 봅니다.
-  - insights: `actions`, `action_values`, `inline_link_clicks`, `use_unified_attribution_setting`, 귀속 창
-  - 광고 세트: `attribution_spec`, `optimization_goal`
-  - 소재: `object_story_spec`, `asset_feed_spec`, `thumbnail_url`
-- 반영하려면 함수 5개를 재배포해야 합니다(meta-adset-insights, ai-weekly-review, meta-insights, meta-adaccounts, meta-account-select). OAuth를 함께 올리면 2개가 더 늘어납니다. 그다음 운영에서 읽기 전용 확인을 합니다.
-  - 배포 승인이 필요하므로 이번에는 하지 않았습니다.
+### 2-4. 판단: v26.0
+- 고른 이유
+  - Marketing 만료일이 미정이라 수명이 가장 깁니다.
+  - v22~v26 변경 중 우리 호출을 깨는 것은 `?ids=` 하나인데, 2026-10-06에 이미 광고별 조회로 바꿨습니다.
+  - 실제 동작이 이미 v26 기준인 정황이 있어, 고정해도 운영 동작이 바뀔 여지가 가장 작습니다.
+  - 고정하면 "바뀐 엔드포인트는 업그레이드 대신 실패" 같은 자동 업그레이드의 모호함이 없어집니다.
+  - OAuth 공식 예시도 v26.0입니다.
+- v25.0이 아닌 이유 [추론]
+  - 과거 Marketing 버전은 출시 후 11~13개월에 만료됐습니다. 이 패턴이면 v25.0은 v26.0보다 먼저 만료됩니다.
+  - v26.0의 레거시 프로토콜 변경(`?ids=` · `date_format` 오류 등)도 2026-10-27부터 모든 버전에 적용되므로, v25로 고정해서 얻는 보호 기간이 3주도 안 됩니다.
+- 버전과 무관하게 이미 모든 버전에 적용된 변경(참고)
+  - `use_unified_attribution_setting` · `action_report_time`은 2025-06-10부터 무시되고, 응답은 광고 관리자 설정을 따릅니다. [원문]
+  - 7일 · 28일 조회(7d_view · 28d_view) 데이터는 2026-01-12부터 비어서 옵니다. [원문]
+  - 우리 코드는 7d_view · 28d_view를 쓰지 않습니다. 결과 비교의 `action_report_time`은 응답 근거가 있을 때만 확인된 것으로 다룹니다(`adlog-change-core.js`). [코드]
+- 다른 변경은 영향이 없습니다. [추론]
+  - v22 `instagram_actor_id` 지원 중단, asset feed 세그먼트 맞춤 중단: 우리는 쓰지 않습니다.
+  - targeting · 소재에 필드가 추가된 것: 우리는 읽기만 합니다.
+  - `date_format` · `pretty` · `debug`: 쓰지 않습니다.
+
+### 2-5. 반영 (보류 · 승인 필요)
+1. 함수 7개를 재배포합니다. 바뀐 상수를 묶는 함수가 모두 대상입니다.
+   - meta-adset-insights, ai-weekly-review, meta-insights, meta-adaccounts, meta-account-select, meta-oauth-start, meta-oauth-callback
+   - ai-weekly-review는 AI 변경과 함께 배포되므로, AI를 꺼 둔 채로 배포 순서를 정합니다.
+2. 배포 뒤 읽기 전용으로 확인합니다.
+   - 호출별 1회씩 `X-Ad-Api-Version-Warning` 헤더가 없는지
+   - 광고 성과 · 계정 목록 · 주간 점검 입력이 정상인지
+   - 테스터 계정으로 Meta 연결을 1회 다시 해 OAuth가 정상인지
+3. 문제가 생기면 이 커밋만 되돌려 재배포합니다(상수 다섯 줄).
 
 ## 3. AI 컨설턴트 최소 흐름
 
@@ -225,7 +260,13 @@
   - M13 …/app-review/submission-guide
   - M14 …/app-dashboard/basic-settings
   - M16 …/development/release · app-modes
-  - 버전 표: developers.facebook.com/docs/graph-api/changelog/versions · Marketing API versioning
+  - 버전 표: developers.facebook.com/docs/graph-api/changelog/versions (한국어판 ?locale=ko_KR 같은 값)
+  - 자동 업그레이드: developers.facebook.com/docs/marketing-api/overview/versioning
+  - Marketing changelog v22.0~v26.0: developers.facebook.com/documentation/ads-commerce/marketing-api/marketing-api-changelog/version26.0 등
+  - Graph changelog v22.0~v26.0: developers.facebook.com/docs/graph-api/changelog/version26.0 등
+  - v26.0 출시 공지: developers.facebook.com/blog/post/2026/07/29/introducing-graph-api-v26-and-marketing-api-v26
+  - 버전 무관 변경: …/marketing-api/out-of-cycle-changes/occ-2025 · occ-2026, …/marketing-api/insights/best-practices
+  - OAuth 예시: …/facebook-login/guides/advanced/manual-flow · …/access-tokens/get-long-lived
 - Cafe24
   - C1 developers.cafe24.com/cs/front/faq
   - C4 …/app/front/app/launch/test

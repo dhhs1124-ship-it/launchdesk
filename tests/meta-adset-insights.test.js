@@ -92,7 +92,7 @@ test('광고 목록 조회는 광고계정 노드(act_*)를 통해 요청한 ads
   const m = await modPromise;
   const url = new URL(m.buildInsightsUrl({ accountId: 'act_999', level: 'ad', since: '2026-09-01', until: '2026-09-21', filteringAdsetId: '555666777' }));
   assert.equal(url.hostname, 'graph.facebook.com');
-  assert.match(url.pathname, /^\/v21\.0\/act_999\/insights$/, '광고계정 노드를 통해 조회하지 않음');
+  assert.match(url.pathname, /^\/v26\.0\/act_999\/insights$/, '광고계정 노드를 통해 조회하지 않음');
   const filtering = JSON.parse(url.searchParams.get('filtering'));
   assert.deepEqual(filtering, [{ field: 'adset.id', operator: 'IN', value: ['555666777'] }]);
 });
@@ -754,10 +754,17 @@ test('DB 저장 금지 — insert/upsert가 connected_accounts 상태 되돌림 
   assert.doesNotMatch(NEW_FN_SRC, /\.upsert\(/, '예상치 못한 upsert 호출이 있음(성과 저장 의심)');
 });
 
-test('Meta API 버전은 기존과 동일한 v21.0이다(임의 변경 없음)', () => {
+// 2026-10-08 v21.0 → v26.0: Marketing API v21.0은 2025-09-09 만료(자동 업그레이드로만 동작), v26.0은 2026-07-29 출시 · 만료 미정.
+// Meta 호출 다섯 곳이 한 버전을 쓰고, 버전을 직접 적은 Meta 주소는 없다(바꿀 때 한 곳이라도 빠지지 않게).
+test('Meta API 버전은 모든 호출이 같은 v26.0이다(임의 변경 없음)', () => {
   assert.match(NEW_FN_SRC, /GRAPH_API_VERSION/);
-  const modText = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', '_shared', 'meta-adset-normalize.mjs'), 'utf8');
-  assert.match(modText, /GRAPH_API_VERSION = "v21\.0"/);
+  const fnDir = path.join(__dirname, '..', 'supabase', 'functions');
+  for (const f of ['_shared/meta-adset-normalize.mjs', '_shared/meta-token.ts', 'meta-insights/index.ts', 'meta-oauth-start/index.ts', 'meta-oauth-callback/index.ts']) {
+    assert.match(fs.readFileSync(path.join(fnDir, f), 'utf8'), /const GRAPH_API_VERSION = "v26\.0";/, f);
+  }
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+  const pinned = walk(fnDir).filter((f) => /\.(ts|mjs|js)$/.test(f) && /facebook\.com\/v\d+\.\d/.test(fs.readFileSync(f, 'utf8')));
+  assert.deepEqual(pinned, [], '버전을 직접 적은 Meta 주소');
 });
 
 test('기존 meta-insights/index.ts는 새 함수를 참조하지 않고, 공유 모듈은 오류 분류 · 요청 시간 제한만 가져온다', () => {

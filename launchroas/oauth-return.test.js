@@ -35,7 +35,7 @@ async function boot({search='',stored,user=USER,storage=new Map()}){
     from(table){return query({user_policy_consents:[{id:1}],stores:[{id:4,name:'운영 쇼핑몰',platform:'cafe24'},{id:5,name:'[TEST] 쇼핑몰',platform:'cafe24'}],
       connected_accounts:[],orders:[]}[table]||[]);},
     functions:{invoke:async(name,opt)=>{invoked.push({name,body:opt&&opt.body});
-      if(name==='meta-oauth-start')return {data:{authorization_url:'https://www.facebook.com/v21.0/dialog/oauth?state=x'},error:null};
+      if(name==='meta-oauth-start')return {data:{authorization_url:'https://www.facebook.com/v26.0/dialog/oauth?state=x'},error:null};
       return {data:{ok:true,ad_accounts:[]},error:null};}}
   };
   const sandbox={document,URLSearchParams,URL,Intl,Date,Math,Number,String,JSON,Promise,Object,Array,Error,setTimeout,console,

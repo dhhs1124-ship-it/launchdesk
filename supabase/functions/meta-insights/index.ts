@@ -18,7 +18,7 @@ import {
 // - integration_credentials는 getValidMetaAccessToken()을 통해서만 접근한다.
 // - Meta 원문 에러 메시지는 console.error에만 남기고, 응답에는 고정된
 //   code + 한국어 메시지만 내려준다.
-const GRAPH_API_VERSION = "v21.0";
+const GRAPH_API_VERSION = "v26.0";
 
 // 구매 전환 action_type 우선순위 — 세 후보가 같은 구매의 중복 표현이므로
 // 절대 합산하지 않는다. count(actions)와 value(action_values) 양쪽에서

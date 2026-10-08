@@ -22,7 +22,7 @@
 // 값만으로 좋음/나쁨·정상/오류를 판정하는 코드를 이 파일 어디에도 넣지
 // 않는다(그런 진단은 이번 단계 범위 밖 — 아직 원본 데이터만 반환한다).
 
-export const GRAPH_API_VERSION = "v21.0";
+export const GRAPH_API_VERSION = "v26.0";
 
 // 한 페이지당 행 수 — 기존 _shared/meta-token.ts의 fetchMetaAdAccountsPage와
 // 동일한 값(100)을 재사용한다.
