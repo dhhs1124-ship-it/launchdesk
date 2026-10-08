@@ -300,7 +300,7 @@ const UNKNOWN_GOAL = "판단 불가(목표 입력 없음)", UNKNOWN_PROFIT = "�
 const needOf = (x) => (x && typeof x === "object" ? { budget: t(x.budget, 12), discount_price: x.discount_price, new_shoot: x.new_shoot } : null);
 function requiresOf(x) {
   if (!x || typeof x !== "object") return null;
-  return { next_action: needOf(x.next_action), recommendation: needOf(x.recommendation), budget_note: typeof x.budget_note === "string" ? t(x.budget_note, 12) : null };
+  return { next_action: needOf(x.next_action), recommendation: needOf(x.recommendation), budget_note: needOf(x.budget_note) };
 }
 
 export function parseBatch(raw, batch, adsById, peers, casesById, opts) {

@@ -109,7 +109,7 @@ const req = (next_action, recommendation, budget_note = null) => ({ next_action,
 
 test("증액 금지: recommendation이 없어도 next_action · budget_note의 증액 권고를 막는다(조건 선언 기준)", () => {
   const out = guardResults({ 3: analysis("3", { recommendation: null, next_action: "예산을 20% 늘려 1주 비교", budget_note: "예산 증액 검토",
-    requires: req(NEED("increase"), null, "increase") }) }, [], P(["예산 늘리기"]))[3];
+    requires: req(NEED("increase"), null, NEED("increase")) }) }, [], P(["예산 늘리기"]))[3];
   assert.equal(out.recommendation, null);
   assert.equal(out.next_action, "사업 정보 제약(예산 늘리기)에 맞지 않아 이번 주 변경안 없음");
   assert.equal(out.budget_note, null);
@@ -153,7 +153,7 @@ test("변경 요소가 '기타' · 누락이거나 조건 선언이 없으면 �
 test("증액 금지는 감액을 막지 않는다 — 예산 변경안은 방향 선언으로 판단, 방향이 '그대로'면 어긋남으로 보류", () => {
   const out = guardResults({
     1: analysis("1", { recommendation: { element: "예산", proposed: "하루 예산 20% 줄이기", test: {} }, next_action: "예산을 줄여 1주 비교",
-      budget_note: "구매당 광고비가 높아 감액 검토", requires: req(NEED("decrease"), NEED("decrease"), "decrease") }),
+      budget_note: "구매당 광고비가 높아 감액 검토", requires: req(NEED("decrease"), NEED("decrease"), NEED("decrease")) }),
     2: analysis("2", { recommendation: { element: "예산", proposed: "예산 조정", test: {} }, requires: req(NEED(), NEED("none")) }),
   }, [], P(["예산 늘리기"]));
   assert.equal(out[1].consult_held, null);
@@ -163,11 +163,59 @@ test("증액 금지는 감액을 막지 않는다 — 예산 변경안은 방향
 });
 
 test("예산 의견만 증액이면 그 의견만 뺀다 — 변경안 · 행동은 그대로라 서로 어긋나지 않는다", () => {
-  const out = guardResults({ 1: analysis("1", { budget_note: "예산 증액 검토", requires: req(NEED(), NEED(), "increase") }) }, [], P(["예산 늘리기"]))[1];
+  const out = guardResults({ 1: analysis("1", { budget_note: "예산 증액 검토", requires: req(NEED(), NEED(), NEED("increase")) }) }, [], P(["예산 늘리기"]))[1];
   assert.equal(out.budget_note, null);
   assert.equal(out.consult_held, null);
   assert.equal(out.recommendation.element, "문구");
-  assert.deepEqual(out.consult_adjusted, ["사업 정보 제약(예산 늘리기) — 예산 증액 의견 제외"]);
+  assert.deepEqual(out.consult_adjusted, ["사업 정보 제약(예산 늘리기) — 예산 의견 제외"]);
+});
+
+// ---- 2026-10-08 4차 보완: 예산 의견(budget_note)도 모든 제약 · 진행 중 실행 규칙으로 검사 ----
+test("할인 금지: 행동 · 변경안이 정상이어도 예산 의견의 쿠폰 발행 요구는 뺀다(선언 · 문장 모두)", () => {
+  const coupon = "10% 쿠폰을 발행하고 광고비를 유지하세요";
+  const out = guardResults({
+    1: analysis("1", { budget_note: coupon, requires: req(NEED(), NEED(), NEED("none", true)) }), // 선언: 할인 필요
+    2: analysis("2", { budget_note: coupon, requires: req(NEED(), NEED(), NEED()) }),             // 선언은 '필요 없음'인데 문장은 쿠폰
+  }, [], P(["할인 · 가격"]));
+  assert.equal(out[1].budget_note, null);
+  assert.deepEqual(out[1].consult_adjusted, ["사업 정보 제약(할인 · 가격) — 예산 의견 제외"]);
+  assert.equal(out[2].budget_note, null);
+  assert.deepEqual(out[2].consult_adjusted, ["예산 의견에 필요한 조건(할인 · 가격)을 확인하지 못해 제외"]);
+  for (const id of ["1", "2"]) {
+    assert.equal(out[id].consult_held, null, "행동 · 변경안은 그대로");
+    assert.equal(out[id].recommendation.element, "문구");
+  }
+});
+
+test("새 촬영 금지 · 예산 의견 선언 없음도 검사한다", () => {
+  const out = guardResults({
+    1: analysis("1", { budget_note: "새 영상을 촬영하고 예산은 유지", requires: req(NEED(), NEED(), NEED("none", false, true)) }),
+    2: analysis("2", { budget_note: "예산 유지", requires: req(NEED(), NEED(), null) }),
+  }, [], P(["새 사진 · 영상 촬영"]));
+  assert.equal(out[1].budget_note, null);
+  assert.deepEqual(out[1].consult_adjusted, ["사업 정보 제약(새 사진 · 영상 촬영) — 예산 의견 제외"]);
+  assert.equal(out[2].budget_note, null);
+  assert.deepEqual(out[2].consult_adjusted, ["예산 의견에 필요한 조건(새 사진 · 영상 촬영)을 확인하지 못해 제외"]);
+});
+
+test("진행 중 실행이 있어도 사용자 제약 검사를 건너뛰지 않는다 — 예산 의견의 증액 권장을 뺀다", () => {
+  const acts = previousActions([change("A", "1", "2026-10-10")], 4, "2026-10-08");
+  const out = guardResults({ 1: analysis("1", { budget_note: "예산 20% 증액 권장", requires: req(NEED(), NEED(), NEED("increase")) }) }, acts, P(["예산 늘리기"]))[1];
+  assert.equal(out.recommendation, null);
+  assert.equal(out.budget_note, null);
+  assert.deepEqual(out.consult_held, { reason: "in_progress", labels: [] });
+  assert.deepEqual(out.consult_adjusted, ["진행 중인 실행 기록이 있어 새 변경안을 내지 않음(비교가 깨지지 않게)", "사업 정보 제약(예산 늘리기) — 예산 의견 제외"]);
+});
+
+test("진행 중 실행이 있으면 제약이 없어도 예산을 바꾸는 의견은 보류하고, 바꾸지 않는 의견만 남긴다", () => {
+  const acts = previousActions([change("A", "1", "2026-10-10"), change("B", "2", "2026-10-10")], 4, "2026-10-08");
+  const out = guardResults({
+    1: analysis("1", { budget_note: "예산 20% 증액 권장", requires: req(NEED(), NEED(), NEED("increase")) }),
+    2: analysis("2", { budget_note: "비교가 끝날 때까지 예산 유지", requires: req(NEED(), NEED(), NEED()) }),
+  }, acts, null);
+  assert.equal(out[1].budget_note, null);
+  assert.deepEqual(out[1].consult_adjusted, ["진행 중인 실행 기록이 있어 새 변경안을 내지 않음(비교가 깨지지 않게)", "진행 중인 실행 기록이 있어 예산 변경 의견도 보류(비교가 깨지지 않게)"]);
+  assert.equal(out[2].budget_note, "비교가 끝날 때까지 예산 유지", "바꾸지 않는 의견은 그대로");
 });
 
 const BASE = {
@@ -229,6 +277,7 @@ test("지시문: 사업 정보 · 지난 실행 규칙을 기존 지시문 뒤�
   assert.match(s, /cannot_change/);
   assert.match(s, /"requires"/, "행동에 필요한 조건을 구조로 선언하게 한다");
   assert.match(s, /증액만 막는다/);
+  assert.match(s, /"budget_note":같은 형식/, "예산 의견도 행동과 같은 조건 선언");
 });
 
 test("요약: 제약 · 확인 불가로 보류한 광고는 할 일로 올리지 않고 지금 상태에 이유와 함께 한 줄씩", () => {

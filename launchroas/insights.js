@@ -476,12 +476,14 @@
     p.saving=true;p.note='저장하고 있어요.';render();
     var data=Object.assign({store_id:String(ctx.storeId),saved_at:new Date().toISOString()},v.data);
     try{
-      var ins=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:'business_profile',data:data}).select('id').single();
+      var ins=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:'business_profile',data:data}).select('id,created_at').single();
       if(wk!==mine)return;
       if(ins.error||!ins.data||ins.data.id==null){p.saving=false;p.note='사업 정보를 저장하지 못했어요.';render();return;}
-      await deleteProfiles(ctx).neq('id',ins.data.id);
+      // 이 저장보다 먼저 만든 기록만 정리 — 다른 탭 · 요청이 더 나중에 저장한 기록은 지우지 않는다(조회 상한 밖 예전 기록은 그대로 정리)
+      var del=ins.data.created_at?await deleteProfiles(ctx).lt('created_at',ins.data.created_at):{error:{message:'created_at 없음'}};
       if(wk!==mine)return;
-      wk.profile={status:'ok',id:ins.data.id,data:data,saving:false,note:'저장했어요 · 다음 점검부터 반영돼요.'};ui.draft=null;render();
+      wk.profile={status:'ok',id:ins.data.id,data:data,saving:false,
+        note:del&&del.error?'저장했어요 · 예전 기록 정리는 실패했어요(다음 저장 · 지우기 때 다시 정리해요).':'저장했어요 · 다음 점검부터 반영돼요.'};ui.draft=null;render();
     }catch(e){if(wk===mine){p.saving=false;p.note='사업 정보를 저장하지 못했어요.';render();}}
   }
   // 지우기 — 이 쇼핑몰의 점검 기준 기록 전부(조회 상한 밖 예전 기록까지). 이미 끝난 점검 결과는 바뀌지 않는다

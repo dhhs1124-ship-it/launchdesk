@@ -317,12 +317,18 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
       if (parsed) Object.assign(results, parsed);
       failed.push(...b.ad_ids.filter((id: string) => !parsed || !parsed[id]));
     }
+    // 원본 파싱(ads_by_id)은 그대로 두고, 주간 실행과 같은 최종 처리(guardResults — 진행 중 실행 · 사업 정보 제약)를 따로 남긴다
+    const consult = snap.consult || null;
+    const finalById = guardResults(results, consult?.actions || [], consult?.profile || null);
     const row = { user_id: userId, store_id: storeId, reservation_id: reservationId, label: comparePolicy ? label + ":" + v.key : label, effort, model: cfg.model, status: failed.length ? "failed" : "completed",
       usage, cost_usd: Math.round(cost * 10000) / 10000, duration_ms: Date.now() - t0,
       result: { ...v.meta, variant: v.key, shared_input_fingerprint: sharedFingerprint, full_input_fingerprint: await sha256(v.system + JSON.stringify(sent)),
         target_ad_id: targetAd, case_selection: !v.withCases ? "none" : forced ? "operator_forced" : "auto",
         case_ids: casesById ? Object.fromEntries(batches.flatMap((b: any) => b.ad_ids).map((id: string) => [id, (casesById as Record<string, string[]>)[id] || []])) : {},
         truncated: usage.stop_reasons.includes("max_tokens"), ads_by_id: results, failed_ads: failed, period: snap.period,
+        ads_by_id_final: finalById,
+        final_basis: consult ? `guardResults ${consult.version} — 주간 실행과 같은 최종 처리(진행 중 실행 · 사업 정보 제약). ads_by_id는 처리 전 원본 파싱` : "연결 전 스냅샷 — 최종 처리 없음",
+        consult: consult ? { version: consult.version, profile: consult.profile, actions: consult.actions } : null,
         inputs: snap.ads.map((a: any) => ({ ad_id: a.ad_id, placement: a.placement, title: a.creative?.title ?? null, images_sent: (a.imagePlan || []).filter((im: any) => im.sent).length })) } };
     const ins = await admin.from("ai_weekly_verifications").insert(row).select("id").single();
     if (ins.error) console.error("ai-weekly-review verify save:", ins.error.message);

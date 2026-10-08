@@ -20,13 +20,17 @@ const get = (r, col) => (col.includes('->>') ? (r[col.split('->>')[0]] || {})[co
 function exec(db, q){
   const rows = db.tool_records;
   const hit = rows.filter((r) => q.filters.every(([k, col, v]) => k === 'eq' ? String(get(r, col)) === String(v)
-    : k === 'neq' ? String(get(r, col)) !== String(v) : k === 'in' ? v.map(String).includes(String(get(r, col))) : true));
+    : k === 'neq' ? String(get(r, col)) !== String(v) : k === 'in' ? v.map(String).includes(String(get(r, col)))
+    : k === 'lt' ? String(get(r, col)) < String(v) : k === 'gt' ? String(get(r, col)) > String(v) : true));
   if(q.op === 'insert'){
     const row = { id: ++db.seq, created_at: new Date(Date.parse('2026-10-08T00:00:00Z') + db.seq).toISOString(), ...q.values };
     rows.push(row);
-    return { data: q.mode === 'single' ? { id: row.id } : [row], error: null };
+    return { data: q.mode === 'single' ? { id: row.id, created_at: row.created_at } : [row], error: null };
   }
-  if(q.op === 'delete'){ db.tool_records = rows.filter((r) => !hit.includes(r)); return { data: null, error: null }; }
+  if(q.op === 'delete'){
+    if(db.failDelete) return { data: null, error: { message: '모의 삭제 실패' } };
+    db.tool_records = db.tool_records.filter((r) => !hit.includes(r)); return { data: null, error: null };
+  }
   let out = hit.slice().sort((a, b) => { for(const [col, asc] of q.orders){ const c = String(a[col]).localeCompare(String(b[col])); if(c) return asc ? c : -c; } return 0; });
   if(q.limit != null) out = out.slice(0, q.limit);
   return { data: out, error: null };
@@ -38,7 +42,7 @@ function client(db, invoke){
       const run = async () => exec(db, q);
       const f = (k) => (col, val) => { q.filters.push([k, col, val]); return b; };
       // supabase-js처럼: from() 다음에는 select · insert · delete만, 조건은 그 뒤에만 붙는다(순서가 틀리면 실제 화면에서 오류)
-      const b = { select(){ return b; }, eq: f('eq'), neq: f('neq'), in: f('in'), order(col, opt){ q.orders.push([col, !(opt && opt.ascending === false)]); return b; },
+      const b = { select(){ return b; }, eq: f('eq'), neq: f('neq'), in: f('in'), lt: f('lt'), gt: f('gt'), order(col, opt){ q.orders.push([col, !(opt && opt.ascending === false)]); return b; },
         limit(n){ q.limit = n; return b; }, single(){ q.mode = 'single'; return run(); }, then(ok, bad){ return run().then(ok, bad); } };
       return { select(){ return b; }, insert(v){ q.op = 'insert'; q.values = v; return b; }, delete(){ q.op = 'delete'; return b; } };
     },
@@ -70,6 +74,7 @@ async function open(db, storeId = '4', invoke){
     hidden: () => ids.insights.hidden,
     text: () => all(body).map((n) => (n && n.textContent) || '').join(' '),
     click: async (label) => { find(body, (n) => n.tagName === 'BUTTON' && n.textContent === label).events.click(); await settle(); },
+    press: (label) => find(body, (n) => n.tagName === 'BUTTON' && n.textContent === label).events.click(), // 기다리지 않음(동시 요청 재현)
     choose: (value) => { const s = find(body, (n) => n.tagName === 'SELECT'); s.value = value; s.events.change(); },
   };
 }
@@ -111,4 +116,26 @@ test('점검을 멈춘 이유가 보인다 — 사업 정보 · 실행 기록 �
   assert.equal(ui.hidden(), false, '주간 칸이 보여야 이유를 안다');
   assert.match(ui.text(), /사업 정보 · 실행 기록을 불러오지 못해 점검하지 않았어요/);
   assert.match(ui.text(), /이번 주 점검하기/, '다시 시도할 수 있다(이용 횟수 차감 없음)');
+});
+
+// ---- 2026-10-08 4차 보완: 두 탭 동시 저장 · 정리 실패 안내 ----
+test('두 탭 동시 저장: 서로의 새 기록을 지우지 않는다 — 더 늦게 저장한 기록이 남고, 조회 상한 밖 예전 기록은 정리', async () => {
+  const db = { seq: 100, tool_records: Array.from({ length: 25 }, (_, i) => profile(10 + i, '4', '재구매', stamp(i))) };
+  const a = await open(db), b = await open(db);
+  a.choose('판매'); b.choose('브랜드 인지');
+  a.press('점검 기준 저장'); b.press('점검 기준 저장'); // 두 저장이 겹친다: 삽입 A · 삽입 B → 정리 A · 정리 B
+  await settle();
+  const left = mine(db, '4');
+  assert.equal(left.length, 1, '0건이 되면 안 된다(예전에는 서로의 새 기록을 지워 0건): ' + JSON.stringify(left.map((r) => r.data.objective)));
+  assert.equal(left[0].data.objective, '브랜드 인지', '더 늦게 저장한 기록이 남는다');
+});
+
+test('저장 뒤 예전 기록 정리가 실패하면 알린다 — 새 기록은 저장됐고 다음 저장 때 다시 정리', async () => {
+  const db = { seq: 100, failDelete: true, tool_records: [profile(10, '4', '재구매', stamp(0))] };
+  const ui = await open(db);
+  ui.choose('판매');
+  await ui.click('점검 기준 저장');
+  assert.match(ui.text(), /저장했어요 · 예전 기록 정리는 실패했어요/);
+  assert.equal(mine(db, '4').length, 2, '새 기록 + 정리 못 한 예전 기록');
+  assert.match(ui.summary(), /저장됨 · 판매/);
 });

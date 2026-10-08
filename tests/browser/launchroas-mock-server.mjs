@@ -235,9 +235,9 @@ function modelOut(ad_id) {
         requires: { next_action: { ...NONE, discount_price: true }, recommendation: { ...NONE, discount_price: true }, budget_note: null } }
     : FLAGS.budgetDecrease
     ? { headline: "구매당 광고비가 높아짐", next_action: "예산을 20% 줄여 1주 비교", priority: 3, recommendation: null, budget_note: "구매당 광고비가 높아 감액 검토",
-        requires: { next_action: { ...NONE, budget: "decrease" }, recommendation: null, budget_note: "decrease" } }
+        requires: { next_action: { ...NONE, budget: "decrease" }, recommendation: null, budget_note: { ...NONE, budget: "decrease" } } }
     : { headline: "구매가 늘어 예산을 늘려 볼 만함", next_action: "예산을 20% 늘려 1주 비교", priority: 3, recommendation: null, budget_note: "구매가 늘어 예산 증액 검토",
-        requires: { next_action: { ...NONE, budget: "increase" }, recommendation: null, budget_note: "increase" } };
+        requires: { next_action: { ...NONE, budget: "increase" }, recommendation: null, budget_note: { ...NONE, budget: "increase" } } };
   const out = { ad_id, verdict: "개선 필요", evidence: [{ metric: "metrics_current.link_ctr_pct", note: "클릭률" }], hypotheses: [], limits: [], ...o };
   if (FLAGS.omitRequires) delete out.requires;
   return out;

@@ -13,7 +13,7 @@ import * as consult from "../supabase/functions/_shared/ai-consult-core.mjs";
 import { POLICY_VERSION, PLAYBOOK_VERSION } from "../supabase/functions/_shared/ai-policy.mjs";
 
 const { CONSULT_VERSION } = consult;
-const ENV = { LAUNCHROAS_ANTHROPIC_API_KEY: "sk-test", AI_WEEKLY_ENABLED: "true", AI_MAX_ADS: "5", AI_MONTHLY_BUDGET_USD: "30" };
+const ENV = { LAUNCHROAS_ANTHROPIC_API_KEY: "sk-test", AI_WEEKLY_ENABLED: "true", AI_MAX_ADS: "5", AI_MONTHLY_BUDGET_USD: "30", AI_VERIFY_USER_IDS: "user-1" };
 setEnv(ENV);
 const aiWeekly = await loadFunction("ai-weekly-review");
 // 정책을 켠 같은 함수(시크릿 AI_POLICY_VERSION은 모듈을 불러올 때 읽는다) — 운영 시크릿과 무관한 테스트 환경 값
@@ -25,8 +25,8 @@ const FUTURE = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
 
 let seq = 0;
 const row = (tool_type, data, created_at) => ({ id: ++seq, user_id: "user-1", tool_type, created_at, data });
-const profileRow = (store, at = "2026-10-07T00:00:00Z") => row("business_profile",
-  { store_id: String(store), objective: "판매", target_roas_pct: 300, monthly_budget_cap_krw: null, cannot_change: ["예산 늘리기"], saved_at: at }, at);
+const profileRow = (store, at = "2026-10-07T00:00:00Z", cannot_change = ["예산 늘리기"]) => row("business_profile",
+  { store_id: String(store), objective: "판매", target_roas_pct: 300, monthly_budget_cap_krw: null, cannot_change, saved_at: at }, at);
 const changeData = (action, ad, name, until, store = "4") => ({ source: "change", action_id: action, store_id: store, date: "2026-09-20",
   ad: { ad_id: ad, adset_id: "s" + ad, ad_name: name, new_ad_id: null }, entry: "ai_suggestion",
   change: { element: "문구", before: "예전", after: "새 문구", method: "edit", applied_confirmed: true },
@@ -55,7 +55,8 @@ const DEFAULT_OUT = (id) => ({ ad_id: id, verdict: "개선 필요", headline: "�
   recommendation: { element: "문구", basis: "첫 줄이 할인 안내뿐", current: "가을 니트 할인", proposed: "첫 줄을 소재 강점으로", example: "울 50% 니트", test: { method: "새 광고", compare_metrics: [], decision_rule: "", sample_note: "" } },
   budget_note: null, requires: { next_action: NONE, recommendation: NONE, budget_note: null } });
 
-function setup({ toolRecordsError = null, records = RECORDS(), out = DEFAULT_OUT } = {}) {
+// ads: 지난주 광고비가 있는 광고 ID(111 · 222는 기존 값 그대로, 그 뒤는 3만원 · 클릭률 2%)
+function setup({ toolRecordsError = null, records = RECORDS(), out = DEFAULT_OUT, ads = ["111", "222"] } = {}) {
   const seqLog = [], graphCalls = [];
   const rowState = { current: null };
   const user = fakeSupabase({
@@ -64,6 +65,7 @@ function setup({ toolRecordsError = null, records = RECORDS(), out = DEFAULT_OUT
     tool_records: (q) => (toolRecordsError ? { error: toolRecordsError } : { data: applyQuery(records, q) }),
   });
   const admin = fakeSupabase({
+    ai_weekly_verifications: (q) => ({ data: q.op === "insert" ? { id: 501 } : null }),
     ai_weekly_reviews: (q) => {
       if (q.op === "select") return { data: rowState.current };
       if (q.op === "insert") { rowState.current = { id: 11, retry_count: 0, usage: {}, cost_usd: 0, reserved_cost_usd: 0, batches: [], result: null, ...q.values }; return { data: rowState.current }; }
@@ -90,7 +92,8 @@ function setup({ toolRecordsError = null, records = RECORDS(), out = DEFAULT_OUT
       const u = new URL(url);
       if (u.pathname.endsWith("/act_1/insights")) {
         const since = JSON.parse(u.searchParams.get("time_range")).since;
-        return jsonResponse(200, { data: since === weeks.current.since ? [insightRow("111", 50000, 2), insightRow("222", 40000, 1)] : [insightRow("111", 45000, 2)] });
+        const current = ads.map((id) => (id === "111" ? insightRow("111", 50000, 2) : id === "222" ? insightRow("222", 40000, 1) : insightRow(id, 30000, 2)));
+        return jsonResponse(200, { data: since === weeks.current.since ? current : [insightRow("111", 45000, 2)] });
       }
       if (u.pathname.endsWith("/act_1")) return jsonResponse(200, { currency: "KRW", timezone_name: "Asia/Seoul" });
       const id = u.pathname.split("/").pop();
@@ -200,7 +203,7 @@ test("실행 기록이 조회 상한을 넘어 완전성을 확인할 수 없으
 test("사용자 제약: recommendation이 null이어도 next_action · budget_note의 증액 권고를 막고, 요약 할 일과 맞춘다", async () => {
   const out = (id) => id === "222"
     ? { ...DEFAULT_OUT(id), recommendation: null, next_action: "예산을 20% 늘려 1주 비교", budget_note: "구매가 늘어 예산 증액을 검토",
-        requires: { next_action: { budget: "increase", discount_price: false, new_shoot: false }, recommendation: null, budget_note: "increase" } }
+        requires: { next_action: { budget: "increase", discount_price: false, new_shoot: false }, recommendation: null, budget_note: { budget: "increase", discount_price: false, new_shoot: false } } }
     : DEFAULT_OUT(id);
   setup({ out });
   const r = (await (await run()).json()).result;
@@ -211,6 +214,43 @@ test("사용자 제약: recommendation이 null이어도 next_action · budget_no
   assert.deepEqual(a.consult_held, { reason: "constraint", labels: ["예산 늘리기"] });
   assert.ok(!r.brief.todos.some((t) => /예산|222/.test(t.what)), JSON.stringify(r.brief.todos));
   assert.ok(r.brief.status.includes("사업 정보 제약으로 변경안을 보류한 광고 1개(예산 늘리기)"));
+});
+
+// ---- 2026-10-08 4차 보완: 운영자 verify도 주간 실행과 같은 최종 처리 ----
+test("운영자 verify: 모델 원본 파싱은 그대로 두고, 주간 실행과 같은 최종 처리(guardResults) 결과를 따로 반환 · 기록한다", async () => {
+  // 제약: 예산 늘리기 · 할인 · 가격 / 111 진행 중 실행 / 222 requires 누락 / 333 할인이 필요한 변경안 + 쿠폰 예산 의견
+  const out = (id) => {
+    const o = DEFAULT_OUT(id);
+    if (id === "222") { delete o.requires; return o; }
+    if (id === "333") return { ...o, recommendation: { ...o.recommendation, proposed: "첫 줄에 '이번 주 20% 할인'" }, budget_note: "10% 쿠폰을 발행하고 광고비를 유지하세요",
+      requires: { next_action: NONE, recommendation: { ...NONE, discount_price: true }, budget_note: { ...NONE, discount_price: true } } };
+    return o;
+  };
+  const records = () => [profileRow(4, "2026-10-07T00:00:00Z", ["예산 늘리기", "할인 · 가격"]),
+    row("ad_log", changeData("A1", "111", "가을 니트 A", FUTURE), "2026-10-01T00:00:00Z")];
+  const ads = ["111", "222", "333"];
+  // 운영자 검증 상한($0.5) 안에 들게 출력 상한만 낮춘다(두 실행 같은 값 · 가짜 모델이라 비용 없음)
+  setEnv({ ...ENV, AI_MAX_OUTPUT_TOKENS: "4000" });
+  let weekly, s, v;
+  try {
+    setup({ out, records: records(), ads });
+    weekly = (await (await run()).json()).result;
+    s = setup({ out, records: records(), ads });
+    v = await (await aiWeekly(jsonRequest({ store_id: 4, action: "verify", efforts: ["medium"], label: "consult-check" }))).json();
+  } finally { setEnv(ENV); }
+  assert.equal(v.ok, true, JSON.stringify(v).slice(0, 300));
+  const res = v.runs[0].result;
+  for (const id of ads) assert.deepEqual(res.ads_by_id_final[id], weekly.ads.find((a) => a.ad_id === id).analysis, "주간 실행과 같은 최종 결과: " + id);
+  assert.ok(res.ads_by_id["111"].recommendation, "원본 파싱은 보존(서버 처리 전)");
+  assert.equal(res.ads_by_id_final["111"].recommendation, null);
+  assert.deepEqual(res.ads_by_id_final["111"].consult_held, { reason: "in_progress", labels: [] });
+  assert.deepEqual(res.ads_by_id_final["222"].consult_held, { reason: "unverifiable", labels: ["예산 늘리기", "할인 · 가격"] });
+  assert.deepEqual(res.ads_by_id_final["333"].consult_held, { reason: "constraint", labels: ["할인 · 가격"] });
+  assert.equal(res.ads_by_id_final["333"].budget_note, null);
+  assert.equal(res.ads_by_id["333"].budget_note, "10% 쿠폰을 발행하고 광고비를 유지하세요");
+  assert.match(res.final_basis, new RegExp(CONSULT_VERSION));
+  const saved = s.admin.calls.find((q) => q.table === "ai_weekly_verifications" && q.op === "insert").values.result;
+  assert.ok(saved.ads_by_id && saved.ads_by_id_final, "기록에도 원본 · 최종을 따로 남긴다");
 });
 
 // 정책 · 플레이북(docs/ai → ai-policy.mjs 압축본)은 문서가 있다고 쓰이는 게 아니다 — 시크릿이 POLICY_VERSION과 같을 때만 실제 모델 요청에 들어간다

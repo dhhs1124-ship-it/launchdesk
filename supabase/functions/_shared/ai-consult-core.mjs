@@ -6,7 +6,7 @@
 //   점검 자체를 하지 않는다(ai-weekly-review). 광고별 손익 근거는 광고별 주문 연결이 없어 계속 없음.
 import { DECISION_INPUTS } from "./ai-weekly-core.mjs";
 
-export const CONSULT_VERSION = "consult-2026-10-08.2";
+export const CONSULT_VERSION = "consult-2026-10-08.3";
 export const OBJECTIVES = ["판매", "신규 고객", "재구매", "브랜드 인지"];
 export const CANNOT_CHANGE = ["예산 늘리기", "할인 · 가격", "새 사진 · 영상 촬영"];
 
@@ -129,13 +129,16 @@ export function actionsForAd(actions, adId) {
 //    requires(행동에 필요한 조건: 예산 방향 · 할인 · 가격 · 새 촬영)로 한다 — 선언이 없거나 형식이 틀리거나, 예산 변경안인데 방향이 '그대로'이거나,
 //    문장이 선언과 어긋나면(단어 확인은 보조) '확인 불가'로 본다. 막히거나 확인 불가면 변경안 · 행동 · 예산 의견을 함께 보류해 서로 어긋나지 않게 한다.
 //    '예산 늘리기'는 증액만 막는다(감액 · 유지는 그대로).
+// 3) 예산 의견(budget_note)은 행동 · 변경안이 정상이거나 진행 중 실행이 있어도 따로 검사한다 — 같은 형식의 선언으로 모든 제약을 보고,
+//    진행 중 실행이 있으면 예산을 바꾸자는 의견도 보류한다(바꾸지 않는 의견만 남김).
 const LIMITS = { "예산 늘리기": "budget_increase", "할인 · 가격": "discount_price", "새 사진 · 영상 촬영": "new_shoot" };
 const LABELS = Object.fromEntries(Object.entries(LIMITS).map(([label, key]) => [key, label]));
-const BUDGET_DIRS = ["increase", "decrease", "none"], NOTE_DIRS = ["increase", "decrease", "hold", "none"];
+const BUDGET_DIRS = ["increase", "decrease", "none"];
 const SAYS = { // 보조 확인 — 선언은 '필요 없음'인데 문장이 그 행동을 말하면 어긋남. 단어만으로 허용하지는 않는다
   budget_increase: /(예산|광고비)[^.!?\n]{0,15}(늘리|늘려|올리|올려|증액|확대|높이|높여)|증액/,
   discount_price: /할인|세일|쿠폰|특가|가격\s*(인하|조정|변경|내리|내려|낮추|낮춰)|\d+\s*%\s*(off|OFF|할인)/,
   new_shoot: /촬영|새\s*(사진|이미지|영상|컷)/,
+  budget_change: /(예산|광고비)[^.!?\n]{0,15}(늘리|늘려|올리|올려|증액|확대|높이|높여|줄이|줄여|낮추|낮춰|감액|축소)|증액|감액/,
 };
 function needOf(x) {
   return x && typeof x === "object" && BUDGET_DIRS.includes(x.budget) && typeof x.discount_price === "boolean" && typeof x.new_shoot === "boolean"
@@ -155,6 +158,7 @@ export function guardResults(results, actions, profile) {
   const keys = profile ? profile.cannot_change.map((c) => LIMITS[c]).filter(Boolean) : [];
   for (const [id, r0] of Object.entries(results || {})) {
     const r = { ...r0, hold_scope: Array.isArray(r0.hold_scope) ? r0.hold_scope.slice() : [], consult_held: null }, notes = [];
+    const req = r0.requires && typeof r0.requires === "object" ? r0.requires : {};
     const blocking = (actions || []).filter((a) => a.blocks_new_change && (a.ad_id === id || a.new_ad_id === id));
     if (blocking.length) {
       r.recommendation = null;
@@ -163,7 +167,6 @@ export function guardResults(results, actions, profile) {
       r.consult_held = { reason: "in_progress", labels: [] };
       notes.push("진행 중인 실행 기록이 있어 새 변경안을 내지 않음(비교가 깨지지 않게)");
     } else if (keys.length) {
-      const req = r0.requires && typeof r0.requires === "object" ? r0.requires : {};
       const checks = [checkAction(req.next_action, keys, r.next_action, null)];
       if (r.recommendation) checks.push(checkAction(req.recommendation, keys, [r.recommendation.proposed, r.recommendation.example].join(" "), r.recommendation.element));
       const violated = [...new Set(checks.flatMap((c) => c.violated))], unknown = [...new Set(checks.flatMap((c) => c.unknown))];
@@ -175,14 +178,18 @@ export function guardResults(results, actions, profile) {
         r.consult_held = held;
         notes.push(held.reason === "constraint" ? `사업 정보 제약(${held.labels.join(", ")}) — 이번 주 변경안 · 행동 · 예산 의견 보류`
           : `변경에 필요한 조건(${held.labels.join(", ")})을 AI 답에서 확인하지 못해 보류`);
-      } else if (r.budget_note && keys.includes("budget_increase")) {
-        const dir = NOTE_DIRS.includes(req.budget_note) ? req.budget_note : null;
-        const fine = ["decrease", "hold", "none"].includes(dir) && !SAYS.budget_increase.test(r.budget_note);
-        if (!fine) {
-          r.budget_note = null;
-          notes.push(dir === "increase" ? "사업 정보 제약(예산 늘리기) — 예산 증액 의견 제외" : "예산 의견의 방향을 확인하지 못해 제외(사업 정보 제약: 예산 늘리기)");
-        }
       }
+    }
+    // 예산 의견 — 위에서 지워지지 않았으면 따로 검사(진행 중 실행이 있어도 제약 검사를 건너뛰지 않는다)
+    if (r.budget_note) {
+      const c = keys.length ? checkAction(req.budget_note, keys, r.budget_note, null) : { violated: [], unknown: [] };
+      const need = needOf(req.budget_note), text = r.budget_note;
+      const changes = !need || need.budget !== "none" || need.discount_price || need.new_shoot
+        || SAYS.budget_change.test(text) || SAYS.discount_price.test(text) || SAYS.new_shoot.test(text);
+      const why = c.violated.length ? `사업 정보 제약(${c.violated.join(", ")}) — 예산 의견 제외`
+        : c.unknown.length ? `예산 의견에 필요한 조건(${c.unknown.join(", ")})을 확인하지 못해 제외`
+        : blocking.length && changes ? "진행 중인 실행 기록이 있어 예산 변경 의견도 보류(비교가 깨지지 않게)" : null;
+      if (why) { r.budget_note = null; notes.push(why); }
     }
     r.consult_adjusted = notes;
     out[id] = r;
@@ -250,7 +257,8 @@ export const CONSULT_ADDENDUM = `
 [사업 정보 · 지난 실행 ${CONSULT_VERSION}]
 - 기간 · 계산 기준의 decision_inputs.goal은 사용자가 입력한 광고 목표다. null이면 목표 달성 여부를 말하지 마라. goal.target_roas_pct는 Meta 귀속 ROAS 기준 비교값이다(Cafe24 실제 매출 아님).
 - decision_inputs.user_constraints.cannot_change에 있는 것(예산 늘리기 · 할인 · 가격 · 새 사진 · 영상 촬영)이 필요한 변경안 · 행동 · 예산 의견은 내지 마라. '예산 늘리기'는 증액만 막는다(감액 · 유지는 가능). '할인 · 가격'은 할인 · 쿠폰 · 가격 변경이 필요한 것, '새 사진 · 영상 촬영'은 새로 찍어야 하는 소재를 막는다(있는 사진 · 영상으로 하는 변경은 가능).
-- 광고마다 "requires"를 반드시 넣어라(서버가 구조로 검증하고, 없거나 문장과 어긋나면 변경안을 보류한다): "requires":{"next_action":{"budget":"increase|decrease|none","discount_price":true|false,"new_shoot":true|false},"recommendation":같은 형식(recommendation이 null이면 null),"budget_note":"increase|decrease|hold|none"(budget_note가 null이면 null)}. budget은 그 행동이 예산을 늘리는지 · 줄이는지 · 그대로인지, discount_price는 할인 · 가격 변경이 필요한지, new_shoot은 새 사진 · 영상 촬영이 필요한지다. 확실하지 않으면 필요한 쪽(increase · true)으로 적어라.
+- 광고마다 "requires"를 반드시 넣어라(서버가 구조로 검증하고, 없거나 문장과 어긋나면 변경안을 보류한다): "requires":{"next_action":{"budget":"increase|decrease|none","discount_price":true|false,"new_shoot":true|false},"recommendation":같은 형식(recommendation이 null이면 null),"budget_note":같은 형식(budget_note가 null이면 null)}. budget은 그 행동 · 의견이 예산을 늘리는지 · 줄이는지 · 그대로인지, discount_price는 할인 · 쿠폰 · 가격 변경이 필요한지, new_shoot은 새 사진 · 영상 촬영이 필요한지다. 예산 의견에 할인 · 쿠폰이나 새 촬영이 들어가면 그 조건도 true로 적어라. 확실하지 않으면 필요한 쪽(increase · true)으로 적어라.
+- blocks_new_change가 true인 실행이 있는 광고는 예산을 바꾸자는 의견(budget_note)도 내지 마라.
 - ad_data.previous_actions는 이 광고에 사용자가 이미 실행한 변경과 서버가 계산한 결과다. 결과를 다시 판정하지 말고 적힌 상태만 언급한다. blocks_new_change가 true인 실행이 있으면 recommendation은 null로 두고 next_action은 그 실행의 결과 확인으로 쓴다.`;
 export function consultSystemPrompt(base) {
   return base + CONSULT_ADDENDUM;
