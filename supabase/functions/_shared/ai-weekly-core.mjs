@@ -297,6 +297,12 @@ export const DECISION_INPUTS = Object.freeze({ goal: null, ad_profit_basis: null
 const UNKNOWN_GOAL = "판단 불가(목표 입력 없음)", UNKNOWN_PROFIT = "판단 불가(광고별 손익 근거 없음)";
 // opts.policy=true(분석 기준 켜짐)일 때 서버가 강제하는 규칙: 유지는 목표 · 손익 근거(keep_basis + 실제 입력) 필수,
 // 예산 의견은 목표 · 손익 · 제약 모두 필수, 근거가 없는 목표 · 손익 판단은 '판단 불가'로. 고친 내용은 server_adjusted에 남긴다.
+const needOf = (x) => (x && typeof x === "object" ? { budget: t(x.budget, 12), discount_price: x.discount_price, new_shoot: x.new_shoot } : null);
+function requiresOf(x) {
+  if (!x || typeof x !== "object") return null;
+  return { next_action: needOf(x.next_action), recommendation: needOf(x.recommendation), budget_note: typeof x.budget_note === "string" ? t(x.budget_note, 12) : null };
+}
+
 export function parseBatch(raw, batch, adsById, peers, casesById, opts) {
   const policy = !!(opts && opts.policy), di = (opts && opts.decisionInputs) || DECISION_INPUTS;
   if (typeof raw !== "string") return null;
@@ -353,6 +359,8 @@ export function parseBatch(raw, batch, adsById, peers, casesById, opts) {
         test: { method: t(test.method, 400), compare_metrics: list(test.compare_metrics, 6, 80), decision_rule: t(test.decision_rule, 300), sample_note: t(test.sample_note, 300) },
       } : null,
       budget_note: budget,
+      // 행동에 필요한 조건(사업 정보 제약 검증용 — ai-consult-core.mjs guardResults가 형식까지 검사). 모양만 옮기고 길이를 제한한다
+      requires: requiresOf(r.requires),
       case_ids: casesById && casesById[id] ? casesById[id].slice() : [],
       limits: list(r.limits, 6, 300),
     };

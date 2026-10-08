@@ -6,6 +6,7 @@ import {
   CONSULT_VERSION, OBJECTIVES, CANNOT_CHANGE, businessProfileOf, decisionInputsFrom, previousActions, actionsForAd,
   guardResults, consultBrief, consultSystemPrompt, conservativeToday,
 } from "../supabase/functions/_shared/ai-consult-core.mjs";
+import * as core from "../supabase/functions/_shared/ai-consult-core.mjs";
 import { DECISION_INPUTS, SYSTEM_PROMPT } from "../supabase/functions/_shared/ai-weekly-core.mjs";
 
 const profileRow = (store, data, at = "2026-10-07T00:00:00Z") => ({ tool_type: "business_profile", created_at: at, data: { store_id: String(store), saved_at: at, ...data } });
@@ -28,9 +29,6 @@ test("사업 정보: 이 쇼핑몰의 가장 최근 기록만 쓰고, 허용 값
 
 test("판단 입력: 사업 정보가 없으면 기존 값 그대로, 있으면 목표 · 제약만 채우고 광고별 손익 근거는 계속 없음", () => {
   assert.equal(decisionInputsFrom(null), DECISION_INPUTS, "없으면 기존 상수 그대로(지시문 · 입력 변화 없음)");
-  const failed = decisionInputsFrom(null, "failed");
-  assert.equal(failed.goal, null); assert.equal(failed.user_constraints, null); assert.equal(failed.ad_profit_basis, null);
-  assert.match(failed.note, /불러오지 못/);
   const di = decisionInputsFrom({ objective: "판매", target_roas_pct: 300, monthly_budget_cap_krw: null, cannot_change: [], saved_at: null });
   assert.deepEqual(di.goal, { objective: "판매", target_roas_pct: 300, basis: "목표 ROAS는 Meta 귀속 구매금액 ÷ 광고비 기준 — Cafe24 실제 매출 기준이 아님" });
   assert.equal(di.ad_profit_basis, null);
@@ -89,20 +87,87 @@ test("광고별 지난 실행(AI 입력): 대상 광고 · 새 광고 ID로 찾�
 const analysis = (id, extra = {}) => ({ ad_id: id, verdict: "개선 필요", headline: "클릭률 하락", next_action: "첫 줄을 바꾼 새 광고 추가", priority: 1,
   hold_scope: [], recommendation: { scope: "change", element: "문구", proposed: "첫 줄 변경", example: "울 50%", test: {} }, budget_note: null, ...extra });
 
-test("겹침 방지: 진행 중인 실행이 있는 광고는 새 변경안을 서버가 빼고, 예산을 못 늘리면 예산 변경안도 뺀다", () => {
+test("겹침 방지: 진행 중인 실행이 있는 광고는 새 변경안을 서버가 뺀다(제약 없음)", () => {
   const acts = previousActions([change("A", "1", "2026-10-10")], 4, "2026-10-08");
-  const input = { 1: analysis("1"), 2: analysis("2"), 3: analysis("3", { recommendation: { scope: "change", element: "예산", proposed: "예산 20% 증액", test: {} } }) };
-  const out = guardResults(input, acts, { objective: "판매", target_roas_pct: null, monthly_budget_cap_krw: null, cannot_change: ["예산 늘리기"], saved_at: null });
+  const input = { 1: analysis("1"), 2: analysis("2") };
+  const out = guardResults(input, acts, null);
   assert.equal(out[1].recommendation, null);
   assert.equal(out[1].next_action, "진행 중인 ‘문구’ 변경의 결과를 먼저 확인");
   assert.deepEqual(out[1].hold_scope, ["진행 중인 실행 기록"]);
   assert.deepEqual(out[1].consult_adjusted, ["진행 중인 실행 기록이 있어 새 변경안을 내지 않음(비교가 깨지지 않게)"]);
-  assert.ok(out[2].recommendation, "다른 광고는 그대로");
+  assert.deepEqual(out[1].consult_held, { reason: "in_progress", labels: [] });
+  assert.ok(out[2].recommendation, "다른 광고는 그대로(제약이 없으면 조건 선언이 없어도 막지 않는다)");
   assert.deepEqual(out[2].consult_adjusted, []);
-  assert.equal(out[3].recommendation, null);
-  assert.deepEqual(out[3].consult_adjusted, ["사업 정보: 예산을 늘릴 수 없음 — 예산 변경안 제외"]);
-  assert.equal(out[3].next_action, "예산은 늘릴 수 없어(사업 정보) 이번 주 변경안 없음", "AI의 예산 행동 문장도 남기지 않는다(2026-10-08 브라우저 확인에서 발견)");
+  assert.equal(out[2].consult_held, null);
   assert.ok(input[1].recommendation, "입력은 바꾸지 않는다");
+});
+
+// ---- 2026-10-08 검토 보완: 사용자 제약을 최종 출력 전체(변경안 · 행동 · 예산 의견 · 요약)에 구조로 강제 ----
+const P = (cannot_change) => ({ objective: "판매", target_roas_pct: null, monthly_budget_cap_krw: null, cannot_change, saved_at: null });
+const NEED = (budget = "none", discount_price = false, new_shoot = false) => ({ budget, discount_price, new_shoot });
+const req = (next_action, recommendation, budget_note = null) => ({ next_action, recommendation, budget_note });
+
+test("증액 금지: recommendation이 없어도 next_action · budget_note의 증액 권고를 막는다(조건 선언 기준)", () => {
+  const out = guardResults({ 3: analysis("3", { recommendation: null, next_action: "예산을 20% 늘려 1주 비교", budget_note: "예산 증액 검토",
+    requires: req(NEED("increase"), null, "increase") }) }, [], P(["예산 늘리기"]))[3];
+  assert.equal(out.recommendation, null);
+  assert.equal(out.next_action, "사업 정보 제약(예산 늘리기)에 맞지 않아 이번 주 변경안 없음");
+  assert.equal(out.budget_note, null);
+  assert.deepEqual(out.consult_held, { reason: "constraint", labels: ["예산 늘리기"] });
+  assert.deepEqual(out.consult_adjusted, ["사업 정보 제약(예산 늘리기) — 이번 주 변경안 · 행동 · 예산 의견 보류"]);
+});
+
+test("선언과 문장이 어긋나면(증액 문장인데 budget:none) 확인 불가로 보류 — 단어 검색은 선언을 검증하는 보조 장치", () => {
+  const out = guardResults({ 3: analysis("3", { recommendation: null, next_action: "하루 예산을 6,000원으로 올려 비교", requires: req(NEED("none"), null) }) }, [], P(["예산 늘리기"]))[3];
+  assert.equal(out.next_action, "변경에 필요한 조건을 확인하지 못해 이번 주 변경안 없음");
+  assert.deepEqual(out.consult_held, { reason: "unverifiable", labels: ["예산 늘리기"] });
+});
+
+test("할인 · 가격 금지 · 새 촬영 금지도 적용 — 필요 없다고 선언한 변경안은 그대로", () => {
+  const out = guardResults({
+    1: analysis("1", { recommendation: { element: "문구", proposed: "첫 줄에 '이번 주 20% 할인'", example: "니트 20% 할인", test: {} }, requires: req(NEED(), NEED("none", true)) }),
+    2: analysis("2", { recommendation: { element: "이미지", proposed: "모델 착용 컷을 새로 촬영", example: "", test: {} }, requires: req(NEED(), NEED("none", false, true)) }),
+    4: analysis("4", { recommendation: { element: "이미지", proposed: "지금 있는 3컬러 사진을 한 장에 배치", example: "", test: {} }, requires: req(NEED(), NEED()) }),
+  }, [], P(["할인 · 가격", "새 사진 · 영상 촬영"]));
+  assert.deepEqual(out[1].consult_held, { reason: "constraint", labels: ["할인 · 가격"] });
+  assert.equal(out[1].recommendation, null);
+  assert.deepEqual(out[2].consult_held, { reason: "constraint", labels: ["새 사진 · 영상 촬영"] });
+  assert.equal(out[4].consult_held, null, "있는 사진으로 하는 변경은 그대로");
+  assert.equal(out[4].recommendation.element, "이미지");
+});
+
+test("변경 요소가 '기타' · 누락이거나 조건 선언이 없으면 제약이 있을 때 보류한다(제약이 없으면 그대로)", () => {
+  const input = {
+    1: analysis("1", { recommendation: { element: "기타", proposed: "행사 안내 추가", test: {} } }),
+    2: analysis("2", { recommendation: { proposed: "구성 변경", test: {} }, requires: req(NEED(), null) }),
+  };
+  const held = guardResults(input, [], P(["할인 · 가격"]));
+  for (const id of ["1", "2"]) {
+    assert.equal(held[id].recommendation, null, id);
+    assert.deepEqual(held[id].consult_held, { reason: "unverifiable", labels: ["할인 · 가격"] }, id);
+  }
+  const free = guardResults(input, [], P([]));
+  assert.ok(free[1].recommendation && free[2].recommendation, "제약이 없으면 막을 것도 없다");
+});
+
+test("증액 금지는 감액을 막지 않는다 — 예산 변경안은 방향 선언으로 판단, 방향이 '그대로'면 어긋남으로 보류", () => {
+  const out = guardResults({
+    1: analysis("1", { recommendation: { element: "예산", proposed: "하루 예산 20% 줄이기", test: {} }, next_action: "예산을 줄여 1주 비교",
+      budget_note: "구매당 광고비가 높아 감액 검토", requires: req(NEED("decrease"), NEED("decrease"), "decrease") }),
+    2: analysis("2", { recommendation: { element: "예산", proposed: "예산 조정", test: {} }, requires: req(NEED(), NEED("none")) }),
+  }, [], P(["예산 늘리기"]));
+  assert.equal(out[1].consult_held, null);
+  assert.equal(out[1].recommendation.element, "예산");
+  assert.equal(out[1].budget_note, "구매당 광고비가 높아 감액 검토");
+  assert.deepEqual(out[2].consult_held, { reason: "unverifiable", labels: ["예산 늘리기"] });
+});
+
+test("예산 의견만 증액이면 그 의견만 뺀다 — 변경안 · 행동은 그대로라 서로 어긋나지 않는다", () => {
+  const out = guardResults({ 1: analysis("1", { budget_note: "예산 증액 검토", requires: req(NEED(), NEED(), "increase") }) }, [], P(["예산 늘리기"]))[1];
+  assert.equal(out.budget_note, null);
+  assert.equal(out.consult_held, null);
+  assert.equal(out.recommendation.element, "문구");
+  assert.deepEqual(out.consult_adjusted, ["사업 정보 제약(예산 늘리기) — 예산 증액 의견 제외"]);
 });
 
 const BASE = {
@@ -151,10 +216,7 @@ test("요약: 목표가 있으면 Meta ROAS와 나란히 · 환율이 없으면 
   assert.equal(noSales.status[0], "지난주 예상 이익 계산 불가 — Cafe24 판매 집계를 받지 못함");
 });
 
-test("요약: 사업 정보 · 실행 기록을 못 불러왔으면 '없음'이 아니라 '확인 불가'로, 이전 방식 점검(입력 없음)도 구분", () => {
-  const failed = consultBrief({ ...BASE, consult: { load: "failed", profile: null, decision_inputs: decisionInputsFrom(null, "failed"), actions: [] } });
-  assert.ok(failed.unknowns.includes("사업 정보 · 실행 기록을 불러오지 못해 이번 점검에 반영하지 않았어요"));
-  assert.ok(!failed.todos.some((t) => t.what === "사업 정보(광고 목표) 입력"), "불러오기 실패를 '미입력'으로 보지 않는다");
+test("요약: 사업 정보 · 실행 기록 연결 전 점검(이전 스냅샷)은 따로 표시", () => {
   const legacy = consultBrief({ ...BASE, consult: null });
   assert.ok(legacy.unknowns.includes("사업 정보 · 실행 기록 연결 전 점검이에요"));
 });
@@ -165,12 +227,35 @@ test("지시문: 사업 정보 · 지난 실행 규칙을 기존 지시문 뒤�
   assert.ok(s.includes(CONSULT_VERSION));
   assert.match(s, /blocks_new_change/);
   assert.match(s, /cannot_change/);
+  assert.match(s, /"requires"/, "행동에 필요한 조건을 구조로 선언하게 한다");
+  assert.match(s, /증액만 막는다/);
 });
 
-test("요약: 사업 정보 때문에 예산 변경안을 뺀 광고는 할 일로 올리지 않고 지금 상태에 한 줄로 남긴다", () => {
-  const b = consultBrief({ ...BASE, priorities: [
-    { ad_id: "3", ad_name: "데님", action: "예산은 늘릴 수 없어(사업 정보) 이번 주 변경안 없음", headline: "구매가 늘어 예산을 늘려 볼 만함" },
+test("요약: 제약 · 확인 불가로 보류한 광고는 할 일로 올리지 않고 지금 상태에 이유와 함께 한 줄씩", () => {
+  const results = {
+    3: { ad_id: "3", consult_held: { reason: "constraint", labels: ["예산 늘리기"] } },
+    5: { ad_id: "5", consult_held: { reason: "unverifiable", labels: ["할인 · 가격"] } },
+    2: { ad_id: "2", consult_held: null },
+  };
+  const b = consultBrief({ ...BASE, results, priorities: [
+    { ad_id: "3", ad_name: "데님", action: "사업 정보 제약(예산 늘리기)에 맞지 않아 이번 주 변경안 없음", headline: "구매가 늘어 예산을 늘려 볼 만함" },
+    { ad_id: "5", ad_name: "셔츠", action: "변경에 필요한 조건을 확인하지 못해 이번 주 변경안 없음", headline: "클릭률 낮음" },
     ...BASE.priorities] });
   assert.deepEqual(b.todos.map((t) => t.what), ["가을 니트: 첫 줄을 바꾼 새 광고 추가", "사업 정보(광고 목표) 입력", "비용 미입력 상품 입력"]);
-  assert.ok(b.status.includes("예산 변경안을 뺀 광고 1개 — 사업 정보: 예산을 늘릴 수 없음"));
+  assert.ok(b.status.includes("사업 정보 제약으로 변경안을 보류한 광고 1개(예산 늘리기)"));
+  assert.ok(b.status.includes("변경 조건을 확인하지 못해 변경안을 보류한 광고 1개"));
+});
+
+test("실행 기록 읽기: 짧은 페이지가 나올 때까지 끝까지 읽고, 중복은 한 번만, 상한을 넘거나 실패하면 '완전하지 않음'", async () => {
+  const pages = (rows, pageSize) => async (from, to) => ({ data: rows.slice(from, Math.min(to + 1, from + pageSize)), error: null });
+  const rows = Array.from({ length: 450 }, (_, i) => ({ id: i + 1 }));
+  const all = await core.collectPages(pages(rows, 200), { page: 200, maxRows: 2000 });
+  assert.deepEqual([all.complete, all.error, all.rows.length], [true, null, 450]);
+  const dup = await core.collectPages(async (from) => ({ data: from === 0 ? [{ id: 1 }, { id: 2 }] : [{ id: 2 }], error: null }), { page: 2, maxRows: 10 });
+  assert.deepEqual(dup.rows.map((r) => r.id), [1, 2]);
+  const capped = await core.collectPages(pages(Array.from({ length: 30 }, (_, i) => ({ id: i + 1 })), 10), { page: 10, maxRows: 20 });
+  assert.equal(capped.complete, false, "상한까지 꽉 찬 페이지만 나왔으면 더 있는지 알 수 없다");
+  const broken = await core.collectPages(async (from) => (from === 0 ? { data: [{ id: 1 }, { id: 2 }], error: null } : { data: null, error: { message: "timeout" } }), { page: 2, maxRows: 10 });
+  assert.equal(broken.complete, false);
+  assert.equal(broken.error.message, "timeout");
 });

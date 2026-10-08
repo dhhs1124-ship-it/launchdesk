@@ -5,7 +5,7 @@
   var USER={id:'u-demo',email:'demo@launchroas.test'};
   function post(path,body){return fetch(path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});}
   function from(table){
-    var q={table:table,op:'select',columns:null,values:null,options:null,filters:[],mode:'many',order:null,limit:null,range:null,returning:null};
+    var q={table:table,op:'select',columns:null,values:null,options:null,filters:[],mode:'many',orders:[],limit:null,range:null,returning:null};
     function f(kind){return function(col,val){q.filters.push([kind,col,val]);return b;};}
     function run(){return post('/__mock__/db',q).then(function(r){return r.json();}).catch(function(e){return {data:null,error:{message:String(e)}};});}
     var b={
@@ -15,7 +15,7 @@
       upsert:function(v,o){q.op='upsert';q.values=v;q.options=o||null;return b;},
       delete:function(){q.op='delete';return b;},
       eq:f('eq'),neq:f('neq'),in:f('in'),is:f('is'),gt:f('gt'),gte:f('gte'),lt:f('lt'),lte:f('lte'),
-      order:function(col,opt){q.order=[col,!(opt&&opt.ascending===false)];return b;},
+      order:function(col,opt){q.orders.push([col,!(opt&&opt.ascending===false)]);return b;},
       limit:function(n){q.limit=n;return b;},
       range:function(a,z){q.range=[a,z];return b;},
       single:function(){q.mode='single';return run();},

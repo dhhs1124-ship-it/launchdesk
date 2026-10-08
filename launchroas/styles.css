@@ -285,6 +285,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .wk-cannot legend{width:100%;margin-bottom:4px;padding:0;color:#a9b2b4;font-size:12px}
 .wk-cannot label{display:flex;align-items:center;gap:6px;color:#e3e8e6;font-size:12.5px}
 .wk-cannot input{width:16px;height:16px;accent-color:#ff9458}
+.wk-cannot-note{width:100%;margin:-2px 0 2px;color:#9aa4a6;font-size:11px}
 .wk-profile .secondary{height:36px;margin:10px 0 0}
 .wk-clear{margin:10px 0 0 10px;padding:4px 2px;border:0;background:none;color:#b3bcbc;font-size:12px;text-decoration:underline;text-underline-offset:3px}.wk-clear:hover{color:#ffbd92}
 @media(max-width:760px){.wk-profile-form{grid-template-columns:1fr}}

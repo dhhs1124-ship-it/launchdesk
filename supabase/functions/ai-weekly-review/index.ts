@@ -8,7 +8,7 @@ import {
 } from "../_shared/ai-weekly-core.mjs";
 import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases, policyVariants, casesForAds, forcedCases } from "../_shared/ai-policy.mjs";
 import { VIDEO_SYSTEM_PROMPT, VIDEO_PROMPT_VERSION, VIDEO_LIMITS, prepareVideoVerify, finishVideoVerify } from "../_shared/ai-video-core.mjs";
-import { CONSULT_VERSION, businessProfileOf, decisionInputsFrom, previousActions, actionsForAd, guardResults, consultBrief, consultSystemPrompt, conservativeToday } from "../_shared/ai-consult-core.mjs";
+import { CONSULT_VERSION, businessProfileOf, decisionInputsFrom, previousActions, actionsForAd, guardResults, consultBrief, consultSystemPrompt, conservativeToday, collectPages } from "../_shared/ai-consult-core.mjs";
 
 // LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
 // 계정당 주 1회(한국 시간 월요일 00시 갱신) · 여러 광고를 묶어 전체 점검 1회로 계산.
@@ -108,25 +108,34 @@ function publicView(row: any, weeks: ReturnType<typeof weekRanges>) {
 
 
 // 사업 정보 · 지난 실행 기록(tool_records) — 사용자 권한(RLS)으로 읽는다(service_role에는 tool_records 조회 권한이 없다).
-// 조회 오류면 '없음'으로 보지 않고 load: "failed"로 남긴다(목표 · 지난 실행을 반영하지 않았다는 표시)
+// 이 쇼핑몰 것만 쿼리에서 먼저 거른다. 실행 · 결과 기록은 변경 원본과 최신 결과를 함께 확보하려고 끝까지 페이지로 읽는다.
+// 조회 실패는 "failed", 상한을 넘어 완전성을 확인할 수 없으면 "incomplete" — 둘 다 빈 입력으로 바꾸지 않고 점검을 멈춘다(buildSnapshot)
 async function loadConsult(ctx: any, storeId: unknown) {
   const userId = ctx.userClaims?.id ?? "";
-  const rows = (type: string) => ctx.supabase.from("tool_records").select("tool_type, data, created_at").eq("user_id", userId).eq("tool_type", type);
-  const [prof, logs] = await Promise.all([
-    rows("business_profile").order("created_at", { ascending: false }).limit(20),
-    rows("ad_log").in("data->>source", ["change", "change_result"]).order("created_at", { ascending: false }).limit(500),
-  ]);
-  if (prof.error || logs.error) {
-    console.error("ai-weekly-review consult:", prof.error?.message || logs.error?.message);
-    return { version: CONSULT_VERSION, load: "failed", profile: null, decision_inputs: decisionInputsFrom(null, "failed"), actions: [] };
+  const rows = (type: string) => ctx.supabase.from("tool_records").select("id, tool_type, data, created_at")
+    .eq("user_id", userId).eq("tool_type", type).eq("data->>store_id", String(storeId));
+  const prof = await rows("business_profile").order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1);
+  const logs = prof.error ? null : await collectPages((from: number, to: number) => rows("ad_log").in("data->>source", ["change", "change_result"])
+    .order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, to));
+  if (prof.error || !logs || logs.error) {
+    console.error("ai-weekly-review consult:", prof.error?.message || logs?.error?.message);
+    return { version: CONSULT_VERSION, load: "failed" as const };
   }
+  if (!logs.complete) return { version: CONSULT_VERSION, load: "incomplete" as const };
   const profile = businessProfileOf(prof.data || [], storeId);
-  return { version: CONSULT_VERSION, load: "ok", profile, decision_inputs: decisionInputsFrom(profile),
-    actions: previousActions((logs.data || []).map((r: any) => r.data), storeId, conservativeToday(Date.now())) };
+  return { version: CONSULT_VERSION, load: "ok" as const, profile, decision_inputs: decisionInputsFrom(profile),
+    actions: previousActions(logs.rows.map((r: any) => r.data), storeId, conservativeToday(Date.now())) };
 }
+const CONSULT_STOP = {
+  failed: "사업 정보 · 실행 기록을 불러오지 못해 점검하지 않았어요(제약 · 진행 중인 변경을 확인하지 못한 채 새 변경안을 낼 수 없어요). 이용 횟수는 차감되지 않았어요. 잠시 후 다시 시도해 주세요.",
+  incomplete: "실행 기록이 조회 한도를 넘어 모두 확인하지 못해 점검하지 않았어요(진행 중인 변경과 겹치는 새 변경안을 낼 수 있어서예요). 이용 횟수는 차감되지 않았어요.",
+};
 
 // Meta에서 광고 · 지표 · 소재 · 게재 위치를 모아 분석 입력(스냅샷)을 만든다 — 주간 실행과 운영자 검증이 같은 입력을 쓴다
 async function buildSnapshot(ctx: any, admin: Admin, storeId: unknown, body: any, weeks: ReturnType<typeof weekRanges>, cfg: ReturnType<typeof config>) {
+    // 사업 정보 · 실행 기록부터 — 확인하지 못하면 Meta · AI를 부르지 않고 멈춘다(유료 호출 · 이용 횟수 차감 없음)
+    const consult = await loadConsult(ctx, storeId);
+    if (consult.load !== "ok") return { ok: false as const, status: "failed", error: CONSULT_STOP[consult.load] };
     const { data: account }: { data: any } = await ctx.supabase.from("connected_accounts").select("id, status, external_account_id").eq("provider", "meta").eq("store_id", storeId).maybeSingle();
     if (!account || account.status !== "connected" || !account.external_account_id) return { ok: false as const, status: "failed", error: "Meta 광고계정이 연결되어 있지 않아요." };
     const tok = await getValidMetaAccessToken(admin, account.id);
@@ -152,7 +161,6 @@ async function buildSnapshot(ctx: any, admin: Admin, storeId: unknown, body: any
         attribution: Array.isArray(set.attribution_spec) ? set.attribution_spec.map((a: any) => `${a.event_type} ${a.window_days}일`).join(", ") : null,
         current: adMetrics(r), previous: prevById[String(r.ad_id)] || null };
     });
-    const consult = await loadConsult(ctx, storeId);
     for (const a of ads) { const done = actionsForAd(consult.actions, a.ad_id); if (done.length) a.previous_actions = done; }
     const plan = planBatches(ads, cfg);
     const creativeFields = "creative.thumbnail_width(800).thumbnail_height(800){title,body,call_to_action_type,object_type,image_url,thumbnail_url,video_id,link_url,object_story_spec,asset_feed_spec}";
@@ -173,7 +181,6 @@ async function buildSnapshot(ctx: any, admin: Admin, storeId: unknown, body: any
     if (adsets.failed.length) notes.push(`광고 세트 설정(최적화 목표 · 귀속 기간)을 불러오지 못한 광고 세트 ${adsets.failed.length}개`);
     notes.push("귀속: 광고 세트 귀속 설정 기준(use_unified_attribution_setting). 최근 날짜의 구매는 귀속 지연으로 늘어날 수 있어요");
     notes.push("상세페이지 내용은 가져오지 않았어요 — 페이지 수정안은 제공하지 않아요");
-    if (consult.load !== "ok") notes.push("사업 정보 · 실행 기록을 불러오지 못했어요 — 이번 점검에 반영하지 않았어요");
 
     const sales = { current: salesBlock(body?.sales?.current), previous: salesBlock(body?.sales?.previous) };
     const fx = num(body?.fx_krw_per_unit);
@@ -555,7 +562,7 @@ export default {
         },
         // 사장님용 요약(현재 상태 → 할 일 → 이유) · 이번 점검에 쓴 사업 정보와 지난 실행(연결 전 스냅샷이면 null)
         brief: consultBrief({ sales: snap.sales, meta: { current: cur, currency: snap.period.currency, fx_krw_per_unit: snap.fx }, expected_profit: expected,
-          priorities: prio, consult, coverage: { analyzed: Object.keys(guarded).length } }),
+          priorities: prio, consult, coverage: { analyzed: Object.keys(guarded).length }, results: guarded }),
         consult: consult ? { version: consult.version, load: consult.load, profile: consult.profile, actions: consult.actions } : null,
         priorities: prio,
         ads: snap.ads.map((a: any) => ({ ad_id: a.ad_id, ad_name: a.ad_name, campaign_name: a.campaign_name, scope: a.scope,

@@ -4,7 +4,9 @@
 //   (tests/helpers/edge-function-harness.mjs). 외부 API는 이 프로세스 안의 가짜 응답, DB는 메모리(서버를 끄면 사라짐).
 // - AI는 이 프로세스 안에서만 켠다(AI_WEEKLY_ENABLED=true · 가짜 키) — 운영 시크릿과 무관하고 모델 응답도 가짜다.
 // 실행: node tests/browser/launchroas-mock-server.mjs [포트=5178] [기록 폴더]
-//   화면 http://127.0.0.1:5178/ · 시나리오 POST /__mock__/control {"failProfileInsert":true} · 주간 점검 초기화 POST /__mock__/reset-review
+//   화면 http://127.0.0.1:5178/ · 주간 점검 초기화 POST /__mock__/reset-review · 전체 초기화 POST /__mock__/reset
+//   시나리오 POST /__mock__/control {"failProfileInsert"|"failConsultLoad"|"omitRequires"|"budgetDecrease": true}
+//   데이터 추가 POST /__mock__/seed {"oldProfiles": 30} (조회 상한 밖 예전 점검 기준) · {"bulkLogs": 2001} (실행 기록 조회 상한 초과)
 //   상태 GET /__mock__/state · 모델 요청 요약 GET /__mock__/anthropic (기록 폴더를 주면 파일로도 남긴다)
 import http from "node:http";
 import fs from "node:fs";
@@ -88,7 +90,8 @@ function seed() {
   };
 }
 let DB = seed();
-const FLAGS = { failProfileInsert: false };
+const FLAG_DEFAULTS = { failProfileInsert: false, failConsultLoad: false, omitRequires: false, budgetDecrease: false };
+const FLAGS = { ...FLAG_DEFAULTS };
 
 function field(row, col) {
   if (col.includes("->>")) { const [base, key] = col.split("->>"); return row[base] == null ? null : row[base][key] ?? null; }
@@ -125,6 +128,8 @@ function runQuery(q, { browser }) {
   const t = DB[q.table] || (DB[q.table] = []);
   if (q.table === "user_policy_consents" && q.op === "select") return { data: [{ id: 1 }], error: null };
   const rls = browser && q.table === "tool_records";
+  // 서버 함수의 사업 정보 · 실행 기록 조회 실패(시나리오) — 화면 자체 조회는 그대로
+  if (!browser && FLAGS.failConsultLoad && q.table === "tool_records" && q.op === "select") return { data: null, error: { code: "MOCK", message: "모의 조회 실패(시나리오)" } };
   const hit = () => t.filter((r) => (!rls || r.user_id === USER) && (q.filters || []).every((f) => match(r, f)));
   if (q.op === "insert" || q.op === "upsert") {
     const vals = (Array.isArray(q.values) ? q.values : [q.values]).map((v) => ({ id: v.id ?? ++seq, created_at: nowIso(), ...v }));
@@ -139,8 +144,8 @@ function runQuery(q, { browser }) {
   if (q.op === "update") { for (const r of rows) Object.assign(r, structuredClone(q.values)); return shape(rows, q.mode); }
   if (q.op === "delete") { DB[q.table] = t.filter((r) => !rows.includes(r)); return { data: q.returning ? structuredClone(rows) : null, error: null }; }
   // 정렬: 요청한 순서, 없으면 최신순(tool_records — 실제 함수 코드가 created_at 내림차순으로 요청한다)
-  const [col, asc] = q.order || (q.table === "tool_records" ? ["created_at", false] : [null]);
-  if (col) rows = rows.slice().sort((a, b) => (asc ? 1 : -1) * (cmp(a[col], b[col]) || cmp(a.id, b.id)));
+  const orders = q.orders && q.orders.length ? q.orders : q.table === "tool_records" ? [["created_at", false], ["id", false]] : [];
+  if (orders.length) rows = rows.slice().sort((a, b) => { for (const [col, asc] of orders) { const c = cmp(a[col], b[col]); if (c) return asc ? c : -c; } return 0; });
   if (q.range) rows = rows.slice(q.range[0], q.range[1] + 1);
   if (q.limit != null) rows = rows.slice(0, q.limit);
   return shape(rows, q.mode);
@@ -214,12 +219,29 @@ function cafe24(u) {
   if (u.pathname === "/api/v2/admin/store") return jsonResponse(200, { store: { shop_name: "데모 의류몰(모의)", mall_id: MALL } });
   return jsonResponse(404, { error: { code: 404, message: "모의 Cafe24: 없음" } });
 }
-// 가짜 모델 응답 — 광고마다 고정 판단. 333은 '예산' 변경안(사업 정보에 '예산 늘리기'가 막혀 있으면 서버가 뺀다)
-const OUTS = {
-  111: ["클릭률은 비슷하지만 구매당 광고비가 늘었음", "첫 줄을 바꾼 새 광고 추가", 2, { element: "문구", basis: "첫 줄이 할인 안내뿐", current: "가을 니트 20% 할인 — 이번 주만", proposed: "첫 줄에 소재(울 50%)를 먼저", example: "울 50%라 따갑지 않은 니트 — 이번 주 20%" }],
-  222: ["클릭률이 같은 목적 광고 중앙값보다 낮음", "첫 줄에 핏 · 소재를 넣은 새 광고 추가", 1, { element: "문구", basis: "문구가 '신상 입고'뿐", current: "셔츠 신상 입고", proposed: "핏과 소재를 첫 줄에", example: "어깨가 편한 오버핏 · 면 100% 셔츠" }],
-  333: ["구매가 늘어 예산을 늘려 볼 만함", "예산을 20% 늘려 1주 비교", 3, { element: "예산", basis: "구매당 광고비가 낮아짐", current: "하루 5,000원", proposed: "하루 6,000원(+20%)", example: "" }],
-};
+// 가짜 모델 응답 — 광고마다 고정 판단 + requires(행동에 필요한 조건) 선언.
+//   111 문구(조건 없음 — 진행 중 실행으로 막힘) · 222 할인 문구(할인 · 가격 필요) · 333 변경안 없이 '예산 20% 늘리기' 행동 + 증액 의견
+//   budgetDecrease: 333을 감액으로 · omitRequires: 선언을 빼서 '확인 불가' 경로
+const NONE = { budget: "none", discount_price: false, new_shoot: false };
+function modelOut(ad_id) {
+  const test = { method: "새 광고", compare_metrics: [], decision_rule: "", sample_note: "" };
+  const o = ad_id === "111"
+    ? { headline: "클릭률은 비슷하지만 구매당 광고비가 늘었음", next_action: "첫 줄을 바꾼 새 광고 추가", priority: 2, budget_note: null,
+        recommendation: { element: "문구", basis: "첫 줄이 할인 안내뿐", current: "가을 니트 20% 할인 — 이번 주만", proposed: "첫 줄에 소재(울 50%)를 먼저", example: "울 50%라 따갑지 않은 니트", test },
+        requires: { next_action: NONE, recommendation: NONE, budget_note: null } }
+    : ad_id === "222"
+    ? { headline: "클릭률이 같은 목적 광고 중앙값보다 낮음", next_action: "첫 줄에 할인 문구를 넣은 새 광고 추가", priority: 1, budget_note: null,
+        recommendation: { element: "문구", basis: "문구가 '신상 입고'뿐", current: "셔츠 신상 입고", proposed: "첫 줄에 '이번 주 20% 할인'", example: "오버핏 셔츠 이번 주 20% 할인", test },
+        requires: { next_action: { ...NONE, discount_price: true }, recommendation: { ...NONE, discount_price: true }, budget_note: null } }
+    : FLAGS.budgetDecrease
+    ? { headline: "구매당 광고비가 높아짐", next_action: "예산을 20% 줄여 1주 비교", priority: 3, recommendation: null, budget_note: "구매당 광고비가 높아 감액 검토",
+        requires: { next_action: { ...NONE, budget: "decrease" }, recommendation: null, budget_note: "decrease" } }
+    : { headline: "구매가 늘어 예산을 늘려 볼 만함", next_action: "예산을 20% 늘려 1주 비교", priority: 3, recommendation: null, budget_note: "구매가 늘어 예산 증액 검토",
+        requires: { next_action: { ...NONE, budget: "increase" }, recommendation: null, budget_note: "increase" } };
+  const out = { ad_id, verdict: "개선 필요", evidence: [{ metric: "metrics_current.link_ctr_pct", note: "클릭률" }], hypotheses: [], limits: [], ...o };
+  if (FLAGS.omitRequires) delete out.requires;
+  return out;
+}
 function summarize(body) {
   const blocks = body.messages[0].content, text = (b) => b.text || "";
   const ctx = JSON.parse(text(blocks[0]).slice(text(blocks[0]).indexOf("\n") + 1));
@@ -234,11 +256,7 @@ function anthropic(body) {
   const s = summarize(body);
   ANTHROPIC.push(s);
   if (OUT) fs.writeFileSync(path.join(OUT, "anthropic-requests.json"), JSON.stringify(ANTHROPIC, null, 2));
-  const out = s.ads.map(({ ad_id }) => {
-    const [headline, next_action, priority, rec] = OUTS[ad_id] || OUTS[222];
-    return { ad_id, verdict: "개선 필요", headline, next_action, priority, evidence: [{ metric: "metrics_current.link_ctr_pct", note: "클릭률" }], hypotheses: [], limits: [],
-      recommendation: { ...rec, test: { method: "새 광고", compare_metrics: [], decision_rule: "", sample_note: "" } }, budget_note: null };
-  });
+  const out = s.ads.map(({ ad_id }) => modelOut(ad_id));
   return jsonResponse(200, { content: [{ type: "text", text: JSON.stringify(out) }], usage: { input_tokens: 1200, output_tokens: 600 }, stop_reason: "end_turn" });
 }
 fakeFetch(async (url, init) => {
@@ -285,6 +303,20 @@ async function mock(req, res, u) {
   }
   if (kind === "control") { if (req.method === "POST") Object.assign(FLAGS, await json()); return send(res, 200, FLAGS); }
   if (kind === "reset-review") { DB.ai_weekly_reviews = []; return send(res, 200, { ok: true }); }
+  if (kind === "reset") { DB = seed(); Object.assign(FLAGS, FLAG_DEFAULTS); ANTHROPIC.length = 0; return send(res, 200, { ok: true }); }
+  if (kind === "seed") {
+    const b = await json(), base = Date.parse(W.previous.since + "T00:00:00Z") - 30 * DAY;
+    for (let i = 0; i < (b.oldProfiles || 0); i++) {
+      const at = new Date(base + i * 60000).toISOString();
+      DB.tool_records.push(record("business_profile", { store_id: String(STORE), objective: "재구매", target_roas_pct: 250, monthly_budget_cap_krw: null, cannot_change: [], saved_at: at }, at));
+    }
+    for (let i = 0; i < (b.bulkLogs || 0); i++) {
+      const at = new Date(base + i * 1000).toISOString();
+      DB.tool_records.push(record("ad_log", { source: "change", action_id: "BULK" + i, store_id: String(STORE), date: W.previous.since, ad: { ad_id: "9" + i, adset_id: "s9" + i, ad_name: "예전 광고 " + i },
+        change: { element: "문구", after: "예전 변경", method: "edit" }, compare: { days: 7, after: { since: W.previous.since, until: W.previous.until } } }, at));
+    }
+    return send(res, 200, { business_profile: DB.tool_records.filter((r) => r.tool_type === "business_profile").length, ad_log: DB.tool_records.filter((r) => r.tool_type === "ad_log").length });
+  }
   if (kind === "state") { const s = state(); if (OUT) fs.writeFileSync(path.join(OUT, "mock-state.json"), JSON.stringify(s, null, 2)); return send(res, 200, s); }
   if (kind === "anthropic") return send(res, 200, ANTHROPIC);
   return send(res, 404, { error: "모의 경로 없음" });

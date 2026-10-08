@@ -125,13 +125,14 @@ test('사업 정보 선택지는 서버(ai-consult-core.mjs)와 같고, 화면�
   assert.deepEqual(S.businessProfileOf([row],4),Object.assign({saved_at:'2026-10-08T00:00:00.000Z'},saved));
 });
 
-test('이 쇼핑몰의 최신 사업 정보와 정리할 예전 기록(수정 권한이 없어 새로 저장 후 지운다)',()=>{
+test('이 쇼핑몰의 최신 사업 정보(예전 기록은 저장 · 지우기 때 조건으로 지운다 — insights-profile.test.js)',()=>{
   const rows=[{id:9,data:{store_id:'5',objective:'판매'}},{id:8,data:{store_id:'4',objective:'재구매'}},{id:7,data:{store_id:'4',objective:'판매'}}];
-  assert.deepEqual(I.latestProfile(rows,4),{id:8,data:{store_id:'4',objective:'재구매'},stale:[7]});
-  assert.deepEqual(I.latestProfile([],4),{id:null,data:null,stale:[]});
+  assert.deepEqual(I.latestProfile(rows,4),{id:8,data:{store_id:'4',objective:'재구매'}});
+  assert.deepEqual(I.latestProfile([],4),{id:null,data:null});
 });
 
 test('진행 중인 실행 기록 때문에 변경안을 뺀 광고는 권장 행동에 결과 확인을 그대로 보여 준다',()=>{
   assert.equal(I.actionLine({verdict:'판단 보류',next_action:'진행 중인 ‘문구’ 변경의 결과를 먼저 확인',hold_scope:['진행 중인 실행 기록']}),'진행 중인 ‘문구’ 변경의 결과를 먼저 확인');
   assert.equal(I.actionLine({verdict:'판단 보류',next_action:'x',hold_scope:[]}),'데이터를 더 쌓은 뒤 판단');
+  assert.equal(I.actionLine({verdict:'개선 필요',next_action:'사업 정보 제약(예산 늘리기)에 맞지 않아 이번 주 변경안 없음. 다른 문장',consult_held:{reason:'constraint',labels:['예산 늘리기']}}),'사업 정보 제약(예산 늘리기)에 맞지 않아 이번 주 변경안 없음. 다른 문장','서버가 보류한 광고는 행동 문장을 그대로(줄이지 않음)');
 });

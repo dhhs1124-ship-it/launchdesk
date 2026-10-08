@@ -93,7 +93,7 @@
   //   진행 중인 실행 기록 때문에 서버가 변경안을 뺀 광고는 판정과 관계없이 '결과 확인'을 그대로
   function actionLine(an){
     if(!an)return 'AI 분석 결과 없음';
-    if((an.hold_scope||[]).indexOf('진행 중인 실행 기록')>=0)return koText(an.next_action);
+    if(an.consult_held||(an.hold_scope||[]).indexOf('진행 중인 실행 기록')>=0)return koText(an.next_action);
     if(an.verdict==='유지')return '현재 광고 유지';
     if(an.verdict==='판단 보류')return '데이터를 더 쌓은 뒤 판단';
     return koText(String(an.next_action||'').split(/(?<=[.!?])\s+/)[0]);
@@ -167,10 +167,10 @@
     var cc=(v.cannot_change||[]).filter(function(x,i,a){return CANNOT_CHANGE.indexOf(x)>=0&&a.indexOf(x)===i;});
     return {ok:true,data:{objective:objective,target_roas_pct:roas===null?null:Math.round(roas),monthly_budget_cap_krw:cap===null?null:Math.round(cap),cannot_change:cc}};
   }
-  // 이 쇼핑몰의 최신 기록(목록은 최신순) · 지울 예전 기록 — tool_records는 수정 권한이 없어 새로 저장한 뒤 예전 기록을 지운다
+  // 이 쇼핑몰의 최신 기록(목록은 최신순). 쿼리에서 쇼핑몰을 이미 거르지만 받은 목록이 섞여 있어도 이 쇼핑몰 것만 본다
   function latestProfile(rows,storeId){
-    var mine=(rows||[]).filter(function(r){return r&&r.data&&String(r.data.store_id)===String(storeId);});
-    return mine.length?{id:mine[0].id,data:mine[0].data,stale:mine.slice(1).map(function(r){return r.id;})}:{id:null,data:null,stale:[]};
+    var r=(rows||[]).filter(function(x){return x&&x.data&&String(x.data.store_id)===String(storeId);})[0];
+    return r?{id:r.id,data:r.data}:{id:null,data:null};
   }
   return {OBJECTIVES:OBJECTIVES,CANNOT_CHANGE:CANNOT_CHANGE,profileInput:profileInput,latestProfile:latestProfile,weeklyVisible:weeklyVisible,ruleSignals:ruleSignals,recUsable:recUsable,trimNote:trimNote,keyLine:keyLine,actionLine:actionLine,checkLine:checkLine,metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
 });
@@ -394,7 +394,7 @@
     var num=function(key,min,step,ph){var x=el('input');x.type='number';x.min=String(min);x.step=String(step);x.placeholder=ph;x.value=dr[key];x.addEventListener('input',function(){dr[key]=x.value;});return x;};
     field('목표 ROAS (%, 선택)',num('target_roas_pct',50,10,'예: 300'),'Meta 귀속 ROAS 기준 · Cafe24 실제 매출 기준 아님');
     field('월 광고 예산 상한 (원, 선택)',num('monthly_budget_cap_krw',10000,10000,'예: 1000000'));
-    var fs=el('fieldset','wk-cannot');fs.appendChild(el('legend','','바꿀 수 없는 것 (선택)'));
+    var fs=el('fieldset','wk-cannot');fs.append(el('legend','','바꿀 수 없는 것 (선택)'),el('small','wk-cannot-note','‘예산 늘리기’는 증액만 막아요 · 줄이는 제안은 받을 수 있어요'));
     I.CANNOT_CHANGE.forEach(function(c){var l=el('label'),cb=el('input');cb.type='checkbox';cb.checked=dr.cannot_change.indexOf(c)>=0;
       cb.addEventListener('change',function(){dr.cannot_change=dr.cannot_change.filter(function(x){return x!==c;});if(cb.checked)dr.cannot_change.push(c);});
       l.append(cb,el('span','',c));fs.appendChild(l);});
@@ -455,40 +455,44 @@
     if(wk.state==='ready')loadProfile(ctx); // AI가 꺼져 있으면 사업 정보도 읽지 않는다(칸이 숨겨져 있음)
   }
   // 사업 정보(tool_records business_profile) — 쇼핑몰별 최신 기록. 조회 실패는 '미입력'과 구분해 표시
-  async function loadProfile(ctx){
-    var mine=wk;wk.profile={status:'loading',id:null,data:null,stale:[],saving:false,note:''};render();
-    var res=await ctx.client.from('tool_records').select('id,data,created_at').eq('user_id',ctx.userId).eq('tool_type','business_profile').order('created_at',{ascending:false}).limit(20);
-    if(wk!==mine)return;
-    if(res.error){wk.profile={status:'error',id:null,data:null,stale:[],saving:false,note:'사업 정보를 불러오지 못했어요. 새로고침해 주세요.'};render();return;}
-    var p=I.latestProfile(res.data||[],ctx.storeId);
-    wk.profile={status:'ok',id:p.id,data:p.data,stale:p.stale,saving:false,note:''};render();
+  // 이 쇼핑몰의 점검 기준 기록을 조건으로 지운다(목록 id가 아니라 조건 — 조회 상한 밖 예전 기록까지). supabase-js는 delete() 다음에 조건을 붙인다
+  function deleteProfiles(ctx){
+    return ctx.client.from('tool_records').delete().eq('user_id',ctx.userId).eq('tool_type','business_profile').eq('data->>store_id',String(ctx.storeId));
   }
-  // 저장 — 수정 권한이 없어 새로 저장한 뒤 이 쇼핑몰의 예전 기록을 지운다(지우기 실패면 다음 저장 때 다시). 쇼핑몰을 바꾸면 결과를 버린다
+  async function loadProfile(ctx){
+    var mine=wk;wk.profile={status:'loading',id:null,data:null,saving:false,note:''};render();
+    var res=await ctx.client.from('tool_records').select('id,data,created_at').eq('user_id',ctx.userId).eq('tool_type','business_profile')
+      .eq('data->>store_id',String(ctx.storeId)).order('created_at',{ascending:false}).limit(20);
+    if(wk!==mine)return;
+    if(res.error){wk.profile={status:'error',id:null,data:null,saving:false,note:'사업 정보를 불러오지 못했어요. 새로고침해 주세요.'};render();return;}
+    var p=I.latestProfile(res.data||[],ctx.storeId);
+    wk.profile={status:'ok',id:p.id,data:p.data,saving:false,note:''};render();
+  }
+  // 저장 — 수정 권한이 없어 새로 저장한 뒤 이 쇼핑몰의 예전 기록을 조건으로 지운다(조회 상한 밖 기록까지). 지우기 실패면 다음 저장 · 지우기 때 다시
   async function saveProfile(){
     var ctx=app.getContext(),mine=wk,p=wk.profile;if(!ctx.userId||!ctx.storeId||!p||p.status!=='ok'||p.saving)return;
     var v=I.profileInput(ui.draft||{});
     if(!v.ok){p.note=v.errors.join(' ');render();return;}
     p.saving=true;p.note='저장하고 있어요.';render();
-    var data=Object.assign({store_id:String(ctx.storeId),saved_at:new Date().toISOString()},v.data),old=[p.id].concat(p.stale||[]).filter(function(x){return x!=null;});
+    var data=Object.assign({store_id:String(ctx.storeId),saved_at:new Date().toISOString()},v.data);
     try{
       var ins=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:'business_profile',data:data}).select('id').single();
       if(wk!==mine)return;
-      if(ins.error){p.saving=false;p.note='사업 정보를 저장하지 못했어요.';render();return;}
-      var del=old.length?await ctx.client.from('tool_records').delete().in('id',old).eq('user_id',ctx.userId).eq('tool_type','business_profile'):{error:null};
+      if(ins.error||!ins.data||ins.data.id==null){p.saving=false;p.note='사업 정보를 저장하지 못했어요.';render();return;}
+      await deleteProfiles(ctx).neq('id',ins.data.id);
       if(wk!==mine)return;
-      wk.profile={status:'ok',id:ins.data&&ins.data.id,data:data,stale:del&&del.error?old:[],saving:false,note:'저장했어요 · 다음 점검부터 반영돼요.'};ui.draft=null;render();
+      wk.profile={status:'ok',id:ins.data.id,data:data,saving:false,note:'저장했어요 · 다음 점검부터 반영돼요.'};ui.draft=null;render();
     }catch(e){if(wk===mine){p.saving=false;p.note='사업 정보를 저장하지 못했어요.';render();}}
   }
-  // 지우기 — 이 쇼핑몰의 점검 기준 기록만(최신 + 지우지 못하고 남은 예전 기록). 이미 끝난 점검 결과는 바뀌지 않는다
+  // 지우기 — 이 쇼핑몰의 점검 기준 기록 전부(조회 상한 밖 예전 기록까지). 이미 끝난 점검 결과는 바뀌지 않는다
   async function clearProfile(){
     var ctx=app.getContext(),mine=wk,p=wk.profile;if(!ctx.userId||!ctx.storeId||!p||p.status!=='ok'||p.saving)return;
-    var ids=[p.id].concat(p.stale||[]).filter(function(x){return x!=null;});if(!ids.length)return;
     p.saving=true;p.note='지우고 있어요.';render();
     try{
-      var del=await ctx.client.from('tool_records').delete().in('id',ids).eq('user_id',ctx.userId).eq('tool_type','business_profile');
+      var del=await deleteProfiles(ctx);
       if(wk!==mine)return;
       if(del.error){p.saving=false;p.note='사업 정보를 지우지 못했어요.';render();return;}
-      wk.profile={status:'ok',id:null,data:null,stale:[],saving:false,note:'지웠어요 · 다음 점검부터 목표 없이 판단해요.'};ui.draft=null;render();
+      wk.profile={status:'ok',id:null,data:null,saving:false,note:'지웠어요 · 다음 점검부터 목표 없이 판단해요.'};ui.draft=null;render();
     }catch(e){if(wk===mine){p.saving=false;p.note='사업 정보를 지우지 못했어요.';render();}}
   }
   async function run(){
@@ -507,6 +511,8 @@
         if(d.quota)wk.data=d;
         if(d.ok){wk.state='ready';wk.message='';if(window.LaunchRoasMotion)window.LaunchRoasMotion.toast(d.status==='partial'?'일부 광고만 분석했어요':'주간 점검 완료');}
         // 서버 오류 코드는 보이지 않고 서버가 준 한국어 안내만
+        // 서버가 정상 응답으로 점검을 멈췄으면(이용 횟수 포함 — AI 켜짐) 칸을 숨기지 않고 이유를 보여 준다(사업 정보 · 실행 기록 확인 실패 등)
+        else if(d.quota&&d.code!=='AI_NOT_CONFIGURED'){wk.state='ready';wk.message='';if(!d.error)wk.message=d.message||'점검에 실패했어요. 이용 횟수는 차감되지 않았어요.';}
         else{wk.state=d.code==='AI_NOT_CONFIGURED'?'off':'error';wk.message=d.message||d.error||'점검에 실패했어요. 이용 횟수는 차감되지 않았어요.';}
       }
     }catch(e){if(wk!==mine)return;wk.state='error';wk.message='점검 요청에 실패했어요. 이용 횟수는 차감되지 않았어요.';}

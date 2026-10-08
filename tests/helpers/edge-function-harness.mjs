@@ -40,7 +40,7 @@ export function jsonRequest(body, url = 'https://fn.local/') {
 }
 
 // 가짜 Supabase 클라이언트. 모든 쿼리는 log에 남고, handlers[table](q)가 { data, error }를 돌려준다.
-// q: { table, op: 'select'|'insert'|'update'|'upsert'|'delete', values, options, filters: [[kind, col, val]], mode, columns }
+// q: { table, op: 'select'|'insert'|'update'|'upsert'|'delete', values, options, filters: [[kind, col, val]], mode, columns, orders?: [[col, asc]], limit?, range?: [from, to] }
 export function fakeSupabase(handlers, log) {
   const calls = log || [];
   return {
@@ -69,7 +69,9 @@ export function fakeSupabase(handlers, log) {
         delete() { q.op = 'delete'; return b; },
         eq: filter('eq'), neq: filter('neq'), is: filter('is'), gt: filter('gt'), gte: filter('gte'),
         lt: filter('lt'), lte: filter('lte'), in: filter('in'),
-        order() { return b; }, limit() { return b; }, range() { return b; }, returns() { return b; },
+        // 정렬 · 상한 · 범위도 남긴다 — 가짜 DB가 실제처럼 잘라 내야 '조회 상한 밖 기록 누락'을 재현할 수 있다
+        order(col, opt) { (q.orders = q.orders || []).push([col, !(opt && opt.ascending === false)]); return b; },
+        limit(n) { q.limit = n; return b; }, range(from, to) { q.range = [from, to]; return b; }, returns() { return b; },
         single() { q.mode = 'single'; return run(); },
         maybeSingle() { q.mode = 'maybeSingle'; return run(); },
         then(ok, fail) { return run().then(ok, fail); },
