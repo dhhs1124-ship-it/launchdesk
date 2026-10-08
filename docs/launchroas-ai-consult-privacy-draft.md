@@ -44,7 +44,9 @@
   - 국외 이전(미국)으로 보고 7번에 적어야 하는지, 별도 동의가 필요한지 확인이 필요하다.
 - **저장** [코드] Supabase `ai_weekly_reviews`에 분석 입력 스냅샷(위 항목 전체, 이미지는 주소만)과 결과(요약 · 광고별 판단 · 사용량 · 비용)를 저장한다.
   - [확인 필요] 보유 기간 정책이 없다.
-  - [확인 필요] 쇼핑몰 · 회원 삭제 때 함께 지워지는지 확인해야 한다. 이 테이블의 마이그레이션이 저장소에 없다.
+  - (정정) 테이블 정의는 저장소에 있다: `supabase/migrations-applied-manually/20261006100000_ai_weekly_reviews.sql`(같은 폴더 README에 '원격 객체 확인'으로 기록).
+    - `store_id` → stores, `user_id` → auth.users 모두 `on delete cascade`라 쇼핑몰이나 회원을 지우면 점검 기록도 함께 지워진다. [코드]
+    - 원격 스키마가 이 파일과 같은지는 이번에 다시 조회하지 않았다. [확인 필요]
 
 ### 1-3. 같이 고칠 기존 문구 — Cafe24 주문 데이터
 - 현행 3번 표의 'Cafe24 주문 데이터'는 "주문자·수령인 정보가 포함될 수 있음"이라고 적혀 있다.
@@ -92,7 +94,7 @@
 2. 원격 확인(읽기 전용)
    - tool_records 행 단위 정책
    - auth.users FK cascade
-   - `ai_weekly_reviews`의 FK · 보관
+   - `ai_weekly_reviews` 원격 FK가 파일(cascade)과 같은지, 보관 기간 결정
 3. 트리거 마이그레이션 원격 적용
 4. 방침 v1.7 게시
 5. AI 켜기(`AI_WEEKLY_ENABLED`)
