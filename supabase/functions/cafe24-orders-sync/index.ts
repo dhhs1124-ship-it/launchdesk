@@ -6,6 +6,7 @@ import {
   cafe24ApiFailure,
 } from "../_shared/cafe24-token.ts";
 import { nextOrdersSyncedFrom } from "../_shared/orders-sync-range.mjs";
+import { slimOrder } from "../_shared/cafe24-order-items.mjs";
 
 const API_VERSION = "2026-09-01";
 const PAGE_LIMIT = 1000;
@@ -324,7 +325,9 @@ export default {
 
             payment_amount: toNumber(order.payment_amount),
 
-            raw_data: order,
+            // 주문 원본 전체가 아니라 허용 목록(_shared/cafe24-order-items.mjs slimOrder)만 — 결제 · 취소 여부,
+            // 주문 경로, 금액 구성. 주문자 · 결제자 · 회원 · 계좌 · 카드 거래 · 자유 입력 값은 저장하지 않는다.
+            raw_data: slimOrder(order),
 
             updated_at: new Date().toISOString(),
           }));
