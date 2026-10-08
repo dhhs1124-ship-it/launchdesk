@@ -19,14 +19,18 @@
     if(!iso||!Number.isFinite(Date.parse(iso)))return '저장 시점 확인 불가';
     return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',dateStyle:'medium',timeStyle:'short'}).format(new Date(iso))+' 저장';
   }
-  // 같은 상품명의 가장 최근 저장 계산이 연결 시점 이후의 것이고 주문당 광고 전 잔액이 다를 때만 갱신 필요로 본다.
+  // 같은 상품명의 가장 최근 저장 계산(목록 순서가 아니라 저장 시각 기준)이 연결 시점 이후의 것이고 주문당 광고 전 잔액이 다를 때만 갱신 필요로 본다.
+  // 연결한 상품 기록(상품·옵션별 현재 기록)이 그대로 있으면 그 기록하고만 비교한다 — 같은 이름의 다른 옵션 · 예전 계산 기록과 섞지 않는다.
   // 기록을 못 읽었거나, 연결 시점·비교할 기록이 없으면 판단하지 않는다(경과 시간은 보지 않는다).
+  function savedAt(r){var t=Date.parse(r.saved_at||'');return Number.isFinite(t)?t:-Infinity;}
   function newerMargin(link){
     var linkedAt=Date.parse(link.source_saved_at||'');
     if(!marginRecords||!Number.isFinite(linkedAt))return null;
     var label=String(link.product_label||'').trim();
-    var latest=marginRecords.find(function(r){return r&&r.calc_version===2&&r.result&&Number.isFinite(Number(r.result.preAd))&&String(r.product_name||'').trim().slice(0,40)===label;});
-    if(!latest||!(Date.parse(latest.saved_at||'')>=linkedAt))return null;
+    var same=marginRecords.filter(function(r){return r&&r.calc_version===2&&r.result&&Number.isFinite(Number(r.result.preAd))&&String(r.product_name||'').trim().slice(0,40)===label;});
+    var latest=same.find(function(r){return r.current&&savedAt(r)===linkedAt;})
+      ||same.reduce(function(a,r){return !a||savedAt(r)>savedAt(a)?r:a;},null);
+    if(!latest||!(savedAt(latest)>=linkedAt))return null;
     return Math.round(Number(latest.result.preAd))!==Math.round(Number(link.pre_ad))?latest:null;
   }
   function marginSummary(adset,m){
@@ -173,9 +177,9 @@
       if(!loaded[1].error){
         var recs=loaded[1].data||[];
         productLinks=window.LaunchRoasSales.latestLinks(recs.filter(function(r){return r.tool_type==='product_margin_link'&&r.data&&String(r.data.store_id)===String(ctx.storeId)&&r.data.input;}).map(function(r){return r.data;}));
-        // 갱신 필요 판단: 예전 계산 기록 + 상품별 마진 설정(같은 이름 · 더 최근 저장)
+        // 갱신 필요 판단: 예전 계산 기록 + 상품별 마진 설정(같은 이름 · 더 최근 저장). 상품별 설정은 상품·옵션마다 현재 기록 하나뿐이다(current).
         marginRecords=recs.filter(function(r){return r.tool_type==='margin_calc';}).map(function(r){return r.data;})
-          .concat(productLinks.map(function(l){var r=preAdOf(l);return r?{calc_version:2,product_name:l.product_label,saved_at:l.linked_at,result:{preAd:r.preAd}}:null;}).filter(Boolean));
+          .concat(productLinks.map(function(l){var r=preAdOf(l);return r?{calc_version:2,product_name:l.product_label,saved_at:l.linked_at,result:{preAd:r.preAd},current:true}:null;}).filter(Boolean));
       }
       var rows=[];(data.campaigns||[]).forEach(function(campaign){(campaign.adsets||[]).forEach(function(adset){rows.push({adset:adset,campaign:campaign});});});
       rows.sort(function(a,b){return Number(b.adset.metrics&&b.adset.metrics.spend||0)-Number(a.adset.metrics&&a.adset.metrics.spend||0);});
