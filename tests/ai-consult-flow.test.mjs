@@ -8,9 +8,15 @@ import assert from "node:assert/strict";
 import { loadFunction, jsonRequest, fakeSupabase, setCtx, setEnv, fakeFetch, jsonResponse } from "./helpers/edge-function-harness.mjs";
 import { weekRanges } from "../supabase/functions/_shared/ai-weekly-core.mjs";
 import { CONSULT_VERSION } from "../supabase/functions/_shared/ai-consult-core.mjs";
+import { POLICY_VERSION, PLAYBOOK_VERSION } from "../supabase/functions/_shared/ai-policy.mjs";
 
-setEnv({ LAUNCHROAS_ANTHROPIC_API_KEY: "sk-test", AI_WEEKLY_ENABLED: "true", AI_MAX_ADS: "5", AI_MONTHLY_BUDGET_USD: "30" });
+const ENV = { LAUNCHROAS_ANTHROPIC_API_KEY: "sk-test", AI_WEEKLY_ENABLED: "true", AI_MAX_ADS: "5", AI_MONTHLY_BUDGET_USD: "30" };
+setEnv(ENV);
 const aiWeekly = await loadFunction("ai-weekly-review");
+// 정책을 켠 같은 함수(시크릿 AI_POLICY_VERSION은 모듈을 불러올 때 읽는다) — 운영 시크릿과 무관한 테스트 환경 값
+setEnv({ ...ENV, AI_POLICY_VERSION: POLICY_VERSION });
+const aiWeeklyPolicy = await loadFunction("ai-weekly-review", "policy-on");
+setEnv(ENV);
 const weeks = weekRanges(new Date());
 const FUTURE = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
 
@@ -81,7 +87,7 @@ function setup({ toolRecordsError = null } = {}) {
   return { seq, anthropic, admin, row, user };
 }
 const SALES = { current: { gross_sales_krw: 900000, sold_qty: 20, linked_qty: 20, margin_total_krw: 300000, partial: false, estimated_orders: 0 }, previous: null };
-const run = () => aiWeekly(jsonRequest({ store_id: 4, action: "run", sales: SALES, fx_krw_per_unit: null }));
+const run = (fn = aiWeekly) => fn(jsonRequest({ store_id: 4, action: "run", sales: SALES, fx_krw_per_unit: null }));
 
 test("실행: 사업 정보 · 지난 실행 기록을 AI 입력에 넣고, 예약 → 호출 → 정산 순서는 그대로", async () => {
   const s = setup();
@@ -135,4 +141,32 @@ test("사업 정보 · 실행 기록을 못 불러와도 점검은 진행하고,
   assert.ok(body.result.brief.unknowns.includes("사업 정보 · 실행 기록을 불러오지 못해 이번 점검에 반영하지 않았어요"));
   assert.ok(body.result.notes.some((n) => n.includes("사업 정보 · 실행 기록을 불러오지 못했어요")));
   assert.equal(body.result.consult.load, "failed");
+});
+
+// 정책 · 플레이북(docs/ai → ai-policy.mjs 압축본)은 문서가 있다고 쓰이는 게 아니다 — 시크릿이 POLICY_VERSION과 같을 때만 실제 모델 요청에 들어간다
+test("정책 꺼짐(기본): 모델 요청에 분석 기준 · 참고 사례가 없고, 결과에 정책 버전 없음", async () => {
+  const s = setup();
+  const body = await (await run()).json();
+  assert.equal(body.status, "completed");
+  for (const req of s.anthropic) {
+    assert.ok(!req.system.includes("[분석 기준 "), "정책 지시문 없음");
+    assert.ok(req.system.includes(CONSULT_VERSION), "사업 정보 · 지난 실행 규칙은 정책과 무관하게 붙는다");
+    assert.ok(!req.messages[0].content.some((c) => (c.text || "").includes("<reference_cases")), "참고 사례 없음");
+  }
+  assert.equal(body.result.policy_version, null);
+  assert.equal(body.result.playbook_version, null);
+});
+
+test("정책 켜짐: 모델 요청에 분석 기준(버전 포함) · 서버가 고른 참고 사례가 들어가고, 결과에 정책 · 플레이북 버전이 남는다", async () => {
+  const s = setup();
+  const body = await (await run(aiWeeklyPolicy)).json();
+  assert.equal(body.status, "completed");
+  for (const req of s.anthropic) {
+    assert.ok(req.system.includes(`[분석 기준 ${POLICY_VERSION}]`), "정책 지시문");
+    assert.ok(req.system.includes(CONSULT_VERSION), "사업 정보 · 지난 실행 규칙도 함께");
+  }
+  const texts = s.anthropic.map((r) => r.messages[0].content.map((c) => c.text || "").join("\n"));
+  assert.ok(texts.some((t) => t.includes('<reference_cases ad_id="222">')), "클릭률이 낮은 광고에 참고 사례");
+  assert.equal(body.result.policy_version, POLICY_VERSION);
+  assert.equal(body.result.playbook_version, PLAYBOOK_VERSION);
 });

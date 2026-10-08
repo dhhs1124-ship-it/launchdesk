@@ -286,6 +286,7 @@ button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visi
 .wk-cannot label{display:flex;align-items:center;gap:6px;color:#e3e8e6;font-size:12.5px}
 .wk-cannot input{width:16px;height:16px;accent-color:#ff9458}
 .wk-profile .secondary{height:36px;margin:10px 0 0}
+.wk-clear{margin:10px 0 0 10px;padding:4px 2px;border:0;background:none;color:#b3bcbc;font-size:12px;text-decoration:underline;text-underline-offset:3px}.wk-clear:hover{color:#ffbd92}
 @media(max-width:760px){.wk-profile-form{grid-template-columns:1fr}}
 .ad-signal{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:12px 0 0;color:#e3e8e6;font-size:13px;line-height:1.5;word-break:keep-all}
 .wk-improve .wk-rec dt{color:#ffbd92}

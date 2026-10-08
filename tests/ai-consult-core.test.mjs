@@ -101,6 +101,7 @@ test("겹침 방지: 진행 중인 실행이 있는 광고는 새 변경안을 �
   assert.deepEqual(out[2].consult_adjusted, []);
   assert.equal(out[3].recommendation, null);
   assert.deepEqual(out[3].consult_adjusted, ["사업 정보: 예산을 늘릴 수 없음 — 예산 변경안 제외"]);
+  assert.equal(out[3].next_action, "예산은 늘릴 수 없어(사업 정보) 이번 주 변경안 없음", "AI의 예산 행동 문장도 남기지 않는다(2026-10-08 브라우저 확인에서 발견)");
   assert.ok(input[1].recommendation, "입력은 바꾸지 않는다");
 });
 
@@ -164,4 +165,12 @@ test("지시문: 사업 정보 · 지난 실행 규칙을 기존 지시문 뒤�
   assert.ok(s.includes(CONSULT_VERSION));
   assert.match(s, /blocks_new_change/);
   assert.match(s, /cannot_change/);
+});
+
+test("요약: 사업 정보 때문에 예산 변경안을 뺀 광고는 할 일로 올리지 않고 지금 상태에 한 줄로 남긴다", () => {
+  const b = consultBrief({ ...BASE, priorities: [
+    { ad_id: "3", ad_name: "데님", action: "예산은 늘릴 수 없어(사업 정보) 이번 주 변경안 없음", headline: "구매가 늘어 예산을 늘려 볼 만함" },
+    ...BASE.priorities] });
+  assert.deepEqual(b.todos.map((t) => t.what), ["가을 니트: 첫 줄을 바꾼 새 광고 추가", "사업 정보(광고 목표) 입력", "비용 미입력 상품 입력"]);
+  assert.ok(b.status.includes("예산 변경안을 뺀 광고 1개 — 사업 정보: 예산을 늘릴 수 없음"));
 });

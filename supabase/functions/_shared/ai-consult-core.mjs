@@ -110,6 +110,8 @@ export function actionsForAd(actions, adId) {
 }
 
 // ---- 서버가 강제하는 규칙: 진행 중인 실행이 있는 광고는 새 변경안 제외 · 예산을 못 늘리면 예산 변경안 제외. 입력은 바꾸지 않는다 ----
+// 예산 변경안을 뺀 광고의 행동 문장 — 요약(consultBrief)이 같은 문장으로 알아보고 할 일에서 뺀다
+const BUDGET_HELD_ACTION = "예산은 늘릴 수 없어(사업 정보) 이번 주 변경안 없음";
 export function guardResults(results, actions, profile) {
   const out = {};
   const noBudget = !!(profile && profile.cannot_change.includes("예산 늘리기"));
@@ -122,8 +124,10 @@ export function guardResults(results, actions, profile) {
       r.hold_scope = ["진행 중인 실행 기록"].concat(r.hold_scope.filter((h) => h !== "진행 중인 실행 기록")).slice(0, 4);
       notes.push("진행 중인 실행 기록이 있어 새 변경안을 내지 않음(비교가 깨지지 않게)");
     }
+    // ponytail: 변경안에 방향(늘리기 · 줄이기) 필드가 없어 예산 변경안 전체를 뺀다 — 방향 필드가 생기면 늘리기만 제외
     if (noBudget && r.recommendation && r.recommendation.element === "예산") {
       r.recommendation = null;
+      r.next_action = BUDGET_HELD_ACTION; // AI의 '예산 늘리기' 행동 문장이 할 일 · 권장 행동에 남지 않게
       notes.push("사업 정보: 예산을 늘릴 수 없음 — 예산 변경안 제외");
     }
     r.consult_adjusted = notes;
@@ -164,13 +168,16 @@ export function consultBrief({ sales, meta, expected_profit, priorities, consult
       why: `비교 기간(${a.compare_after.since}~${a.compare_after.until})이 끝났어요 — 결과를 먼저 확인해야 다음 변경과 겹치지 않아요` });
   }
   const blocked = new Set(actions.filter((a) => a.blocks_new_change).flatMap((a) => [a.ad_id, a.new_ad_id]).filter(Boolean));
+  let budgetHeld = 0;
   for (const p of priorities || []) {
     if (blocked.has(String(p.ad_id))) continue; // 결과 확인이 먼저인 광고는 위 항목 · 진행 중 상태로 대신한다
+    if (p.action === BUDGET_HELD_ACTION) { budgetHeld++; continue; } // 할 일이 아니라 지금 상태 한 줄로
     todos.push({ what: `${p.ad_name || "광고"}: ${p.action}`, why: p.headline || "AI 점검에서 우선 확인으로 분류", source: "AI 점검" });
   }
   if (loadOk && !consult.profile) todos.push({ what: "사업 정보(광고 목표) 입력", why: "목표가 없어 목표 달성 · 유지 판단을 하지 못했어요 — 다음 점검부터 반영돼요", source: "데이터" });
   if (cur && cur.partial) todos.push({ what: "비용 미입력 상품 입력", why: `지난주 판매 ${cur.sold_qty ?? "?"}개 중 ${cur.linked_qty ?? "?"}개만 이익에 들어갔어요`, source: "데이터" });
   if (fxMissing) todos.push({ what: "광고비 환율 입력", why: "광고비를 원화로 바꾸지 못해 예상 이익을 계산하지 못했어요", source: "데이터" });
+  if (budgetHeld) status.push(`예산 변경안을 뺀 광고 ${budgetHeld}개 — 사업 정보: 예산을 늘릴 수 없음`);
   const top = todos.slice(0, 3);
   if (!top.length) top.push({ what: "이번 주 바꿀 것 없음 · 데이터 더 쌓기", why: coverage && coverage.analyzed ? "우선 확인할 광고가 없어요" : "분석한 광고가 없어요", source: "AI 점검" });
 

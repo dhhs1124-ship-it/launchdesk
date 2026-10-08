@@ -29,8 +29,9 @@ export function setEnv(values) {
 }
 setEnv({});
 
-export async function loadFunction(name) {
-  const mod = await import(pathToFileURL(path.join(FUNCTIONS_DIR, name, 'index.ts')).href);
+// tag: 같은 함수를 다른 환경 변수로 한 번 더 불러올 때(모듈 최상위에서 읽는 값 — 예: AI_POLICY_VERSION). 같은 tag는 캐시된다.
+export async function loadFunction(name, tag = '') {
+  const mod = await import(pathToFileURL(path.join(FUNCTIONS_DIR, name, 'index.ts')).href + (tag ? '?' + encodeURIComponent(tag) : ''));
   return mod.default.fetch;
 }
 

@@ -401,6 +401,8 @@
     form.appendChild(fs);
     var save=el('button','secondary',p.saving?'저장 중…':'점검 기준 저장');save.type='button';save.disabled=!!p.saving;save.addEventListener('click',saveProfile);
     box.append(el('p','wk-sub','목표가 있어야 목표 대비 판단을 해요. 광고별 이익은 판단하지 않아요(광고별 주문 연결 없음). 개인정보는 받지 않아요.'),form,save);
+    // 저장한 기준은 언제든 지울 수 있다(이 쇼핑몰 것만). 쇼핑몰을 삭제하면 DB 트리거가 함께 지운다
+    if(d){var clr=el('button','wk-clear','점검 기준 지우기');clr.type='button';clr.disabled=!!p.saving;clr.addEventListener('click',clearProfile);box.appendChild(clr);}
     if(p.note)box.appendChild(el('p','wk-sub',p.note));
     return box;
   }
@@ -476,6 +478,18 @@
       if(wk!==mine)return;
       wk.profile={status:'ok',id:ins.data&&ins.data.id,data:data,stale:del&&del.error?old:[],saving:false,note:'저장했어요 · 다음 점검부터 반영돼요.'};ui.draft=null;render();
     }catch(e){if(wk===mine){p.saving=false;p.note='사업 정보를 저장하지 못했어요.';render();}}
+  }
+  // 지우기 — 이 쇼핑몰의 점검 기준 기록만(최신 + 지우지 못하고 남은 예전 기록). 이미 끝난 점검 결과는 바뀌지 않는다
+  async function clearProfile(){
+    var ctx=app.getContext(),mine=wk,p=wk.profile;if(!ctx.userId||!ctx.storeId||!p||p.status!=='ok'||p.saving)return;
+    var ids=[p.id].concat(p.stale||[]).filter(function(x){return x!=null;});if(!ids.length)return;
+    p.saving=true;p.note='지우고 있어요.';render();
+    try{
+      var del=await ctx.client.from('tool_records').delete().in('id',ids).eq('user_id',ctx.userId).eq('tool_type','business_profile');
+      if(wk!==mine)return;
+      if(del.error){p.saving=false;p.note='사업 정보를 지우지 못했어요.';render();return;}
+      wk.profile={status:'ok',id:null,data:null,stale:[],saving:false,note:'지웠어요 · 다음 점검부터 목표 없이 판단해요.'};ui.draft=null;render();
+    }catch(e){if(wk===mine){p.saving=false;p.note='사업 정보를 지우지 못했어요.';render();}}
   }
   async function run(){
     if(wk.busy)return; // 연속 클릭 방지(서버도 동시 요청을 막는다)
