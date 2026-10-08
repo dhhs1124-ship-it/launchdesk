@@ -251,6 +251,8 @@ export function adPayload(a, peers) {
     objective: a.objective || null, optimization_goal: a.optimization_goal || null, attribution: a.attribution || null,
     metrics_current: a.current, metrics_previous: a.previous || null, change: changes(a.current, a.previous),
     peers: peers[(a.objective || "?") + "|" + (a.optimization_goal || "?")] || null,
+    // 이 광고에 이미 실행한 변경과 결과(ai-consult-core.mjs actionsForAd) — 없으면 넣지 않는다(기존 입력 그대로)
+    previous_actions: a.previous_actions && a.previous_actions.length ? a.previous_actions : undefined,
     creative: { format: c.format, title: c.title, body: c.body, description: c.description, cta: c.cta,
       link_domain: c.link_url ? safeHost(c.link_url) : null, cards: c.cards, variants: c.variants, notes: (c.notes || []).concat(a.imageNote ? [a.imageNote] : []),
       placements: a.placement ? a.placement.label : "확인 못 함", headline_display: HEADLINE_TEXT[a.placement ? a.placement.headline : "unknown"] },

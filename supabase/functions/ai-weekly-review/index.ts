@@ -8,6 +8,7 @@ import {
 } from "../_shared/ai-weekly-core.mjs";
 import { POLICY_VERSION, PLAYBOOK_VERSION, policySystemPrompt, policyOn, selectCases, policyVariants, casesForAds, forcedCases } from "../_shared/ai-policy.mjs";
 import { VIDEO_SYSTEM_PROMPT, VIDEO_PROMPT_VERSION, VIDEO_LIMITS, prepareVideoVerify, finishVideoVerify } from "../_shared/ai-video-core.mjs";
+import { CONSULT_VERSION, businessProfileOf, decisionInputsFrom, previousActions, actionsForAd, guardResults, consultBrief, consultSystemPrompt, conservativeToday } from "../_shared/ai-consult-core.mjs";
 
 // LaunchROAS 주간 AI 광고 점검 — 사용자가 버튼을 눌렀을 때만 실행(자동 실행 없음).
 // 계정당 주 1회(한국 시간 월요일 00시 갱신) · 여러 광고를 묶어 전체 점검 1회로 계산.
@@ -72,7 +73,8 @@ async function downloadImage(url: string) {
 
 // 분석 기준(정책 MD · 사례) — 시크릿 AI_POLICY_VERSION=${POLICY_VERSION}일 때만 켜진다. 기본은 기존 지시문 그대로.
 const POLICY = policyOn(env);
-const SYSTEM = POLICY ? policySystemPrompt(SYSTEM_PROMPT) : SYSTEM_PROMPT;
+// 사업 정보 · 지난 실행 규칙(ai-consult-core.mjs)을 정책 켜짐 · 꺼짐 모두 뒤에 붙인다 — 같은 규칙을 서버가 다시 강제한다(guardResults)
+const SYSTEM = consultSystemPrompt(POLICY ? policySystemPrompt(SYSTEM_PROMPT) : SYSTEM_PROMPT);
 const policyMeta = () => POLICY ? { policy_version: POLICY_VERSION, playbook_version: PLAYBOOK_VERSION } : { policy_version: null, playbook_version: null };
 const casesFor = (ads: any[], peers: any) => { if (!POLICY) return null; const m: Record<string, string[]> = {}; for (const a of ads) m[a.ad_id] = selectCases(a, peers); return m; };
 
@@ -105,6 +107,24 @@ function publicView(row: any, weeks: ReturnType<typeof weekRanges>) {
 }
 
 
+// 사업 정보 · 지난 실행 기록(tool_records) — 사용자 권한(RLS)으로 읽는다(service_role에는 tool_records 조회 권한이 없다).
+// 조회 오류면 '없음'으로 보지 않고 load: "failed"로 남긴다(목표 · 지난 실행을 반영하지 않았다는 표시)
+async function loadConsult(ctx: any, storeId: unknown) {
+  const userId = ctx.userClaims?.id ?? "";
+  const rows = (type: string) => ctx.supabase.from("tool_records").select("tool_type, data, created_at").eq("user_id", userId).eq("tool_type", type);
+  const [prof, logs] = await Promise.all([
+    rows("business_profile").order("created_at", { ascending: false }).limit(20),
+    rows("ad_log").in("data->>source", ["change", "change_result"]).order("created_at", { ascending: false }).limit(500),
+  ]);
+  if (prof.error || logs.error) {
+    console.error("ai-weekly-review consult:", prof.error?.message || logs.error?.message);
+    return { version: CONSULT_VERSION, load: "failed", profile: null, decision_inputs: decisionInputsFrom(null, "failed"), actions: [] };
+  }
+  const profile = businessProfileOf(prof.data || [], storeId);
+  return { version: CONSULT_VERSION, load: "ok", profile, decision_inputs: decisionInputsFrom(profile),
+    actions: previousActions((logs.data || []).map((r: any) => r.data), storeId, conservativeToday(Date.now())) };
+}
+
 // Meta에서 광고 · 지표 · 소재 · 게재 위치를 모아 분석 입력(스냅샷)을 만든다 — 주간 실행과 운영자 검증이 같은 입력을 쓴다
 async function buildSnapshot(ctx: any, admin: Admin, storeId: unknown, body: any, weeks: ReturnType<typeof weekRanges>, cfg: ReturnType<typeof config>) {
     const { data: account }: { data: any } = await ctx.supabase.from("connected_accounts").select("id, status, external_account_id").eq("provider", "meta").eq("store_id", storeId).maybeSingle();
@@ -132,6 +152,8 @@ async function buildSnapshot(ctx: any, admin: Admin, storeId: unknown, body: any
         attribution: Array.isArray(set.attribution_spec) ? set.attribution_spec.map((a: any) => `${a.event_type} ${a.window_days}일`).join(", ") : null,
         current: adMetrics(r), previous: prevById[String(r.ad_id)] || null };
     });
+    const consult = await loadConsult(ctx, storeId);
+    for (const a of ads) { const done = actionsForAd(consult.actions, a.ad_id); if (done.length) a.previous_actions = done; }
     const plan = planBatches(ads, cfg);
     const creativeFields = "creative.thumbnail_width(800).thumbnail_height(800){title,body,call_to_action_type,object_type,image_url,thumbnail_url,video_id,link_url,object_story_spec,asset_feed_spec}";
     let cr = await byIds(plan.analyzed.map((a: any) => a.ad_id), creativeFields, token);
@@ -151,12 +173,13 @@ async function buildSnapshot(ctx: any, admin: Admin, storeId: unknown, body: any
     if (adsets.failed.length) notes.push(`광고 세트 설정(최적화 목표 · 귀속 기간)을 불러오지 못한 광고 세트 ${adsets.failed.length}개`);
     notes.push("귀속: 광고 세트 귀속 설정 기준(use_unified_attribution_setting). 최근 날짜의 구매는 귀속 지연으로 늘어날 수 있어요");
     notes.push("상세페이지 내용은 가져오지 않았어요 — 페이지 수정안은 제공하지 않아요");
+    if (consult.load !== "ok") notes.push("사업 정보 · 실행 기록을 불러오지 못했어요 — 이번 점검에 반영하지 않았어요");
 
     const sales = { current: salesBlock(body?.sales?.current), previous: salesBlock(body?.sales?.previous) };
     const fx = num(body?.fx_krw_per_unit);
     const snap = {
       period: { current: weeks.current, previous: weeks.previous, timezone_meta: timezone, timezone_cafe24: "Asia/Seoul", currency },
-      ads: replanned.analyzed, skipped: replanned.skipped.concat(plan.skipped), notes, sales, fx,
+      ads: replanned.analyzed, skipped: replanned.skipped.concat(plan.skipped), notes, sales, fx, consult,
       counts: { total: rows.length, analyzed: replanned.analyzed.length, skipped: plan.skipped.length },
     };
     return { ok: true as const, snap, batches: replanned.batches };
@@ -204,7 +227,7 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
     ? [["low", "medium", "high"].includes(body?.effort) ? body.effort : "medium"]
     : (Array.isArray(body?.efforts) ? body.efforts : ["high", "medium"]).filter((e: string) => ["low", "medium", "high"].includes(e)).slice(0, 2);
   if (!efforts.length) return json({ ok: false, code: "BAD_REQUEST" }, 400);
-  const variants = comparePolicy ? policyVariants(SYSTEM_PROMPT)
+  const variants = comparePolicy ? policyVariants(SYSTEM_PROMPT).map((v: any) => ({ ...v, system: consultSystemPrompt(v.system) }))
     : [{ key: POLICY ? "policy_on" : "policy_off", system: SYSTEM, withCases: POLICY, meta: policyMeta() }];
   // 기간 고정(선택): 같은 주로 다시 돌릴 수 있게 — 없으면 지난주
   let useWeeks = weeks;
@@ -239,7 +262,8 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
   const adsById: Record<string, any> = {};
   for (const a of snap.ads) adsById[a.ad_id] = a;
   const peers = peerGroups(snap.ads);
-  const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency, decision_inputs: DECISION_INPUTS };
+  const di = snap.consult?.decision_inputs || DECISION_INPUTS;
+  const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency, decision_inputs: di };
   const autoCases = casesForAds(snap.ads, peers);
   const casesOf = (v: any) => !v.withCases ? null : forced ? Object.fromEntries(batches.flatMap((b: any) => b.ad_ids).map((id: string) => [id, forced as string[]])) : autoCases;
   // 이미지(무료 다운로드)를 먼저 받아 실제로 보낼 내용으로 최악 비용을 잡는다 — 고정 입력 가정(예전 20,000토큰)은 이미지 · 광고 수가 많으면 예약이 실제보다 작았다
@@ -282,7 +306,7 @@ async function verify(ctx: any, admin: Admin, userId: string, storeId: unknown, 
       if (res.usage) { usage.input_tokens += res.usage.input_tokens || 0; usage.output_tokens += res.usage.output_tokens || 0; cost += costUsd(cfg.model, res.usage) || 0; }
       if (res.ok) usage.stop_reasons.push(res.stop);
       // 잘림(max_tokens)은 해석하지 않고 실패로(자동 재시도 없음)
-      const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: v.key === "policy_on", decisionInputs: DECISION_INPUTS }) : null;
+      const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: v.key === "policy_on", decisionInputs: di }) : null;
       if (parsed) Object.assign(results, parsed);
       failed.push(...b.ad_ids.filter((id: string) => !parsed || !parsed[id]));
     }
@@ -445,7 +469,9 @@ export default {
       const adsById: Record<string, any> = {};
       for (const a of snap.ads) adsById[a.ad_id] = a;
       const peers = peerGroups(snap.ads);
-      const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency, decision_inputs: DECISION_INPUTS };
+      // 사업 정보로 만든 판단 입력 — 이어서 하기의 예전 스냅샷(연결 전)에는 없어 기존 값 그대로
+      const di = snap.consult?.decision_inputs || DECISION_INPUTS;
+      const context = { period: snap.period, notes: snap.notes, currency: snap.period.currency, decision_inputs: di };
       const casesById = casesFor(snap.ads, peers);
       const results: Record<string, any> = { ...(row?.result?.ads_by_id || {}) };
       const usage = { ...(row?.usage || {}) } as any;
@@ -495,7 +521,7 @@ export default {
             runCost = cost; runReserved = reservedCost;
             usage.images += Object.values(images).reduce((t: number, l: any) => t + l.length, 0);
             if (res.ok && res.stop !== "end_turn") (usage.stop_reasons = usage.stop_reasons || []).push(res.stop); // max_tokens = 답변 잘림 · refusal = 거절
-            const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: POLICY, decisionInputs: DECISION_INPUTS }) : null;
+            const parsed: Record<string, any> | null = res.ok && res.stop !== "max_tokens" ? parseBatch(res.text, b, adsById, peers, casesById, { policy: POLICY, decisionInputs: di }) : null;
             const missing = b.ad_ids.filter((id: string) => !parsed || !parsed[id]);
             if (parsed) Object.assign(results, parsed);
             b.status = !parsed || missing.length === b.ad_ids.length ? "failed" : "done";
@@ -514,17 +540,26 @@ export default {
       const cur = totals(snap.ads, "current"), prv = totals(snap.ads.filter((a: any) => a.previous), "previous");
       const spendKrw = (v: number | null) => (v == null || !snap.fx ? (snap.period.currency === "KRW" ? v : null) : Math.round(v * snap.fx));
       const profit = (s: any, spend: number | null) => (s && s.margin_total_krw != null && spendKrw(spend) != null ? s.margin_total_krw - (spendKrw(spend) as number) : null);
+      // 서버가 다시 강제하는 규칙(진행 중인 실행이 있는 광고의 새 변경안 · 예산을 못 늘릴 때 예산 변경안 제외) — ads_by_id(이어서 하기용)는 원본 그대로
+      const consult = snap.consult || null;
+      const guarded = guardResults(results, consult?.actions || [], consult?.profile || null);
+      const expected = { current: profit(snap.sales.current, cur.spend), previous: profit(snap.sales.previous, prv.spend),
+        partial: !!(snap.sales.current?.partial || snap.sales.previous?.partial) };
+      const prio = priorities(guarded, adsById);
       const result = {
         snapshot: snap, ads_by_id: results,
         summary: {
           cafe24: snap.sales, meta: { current: cur, previous: prv, currency: snap.period.currency, fx_krw_per_unit: snap.fx },
-          expected_profit: { current: profit(snap.sales.current, cur.spend), previous: profit(snap.sales.previous, prv.spend),
-            partial: !!(snap.sales.current?.partial || snap.sales.previous?.partial) },
+          expected_profit: expected,
           note: "Meta 귀속 구매값은 Cafe24 실제 매출과 다른 값이에요. 예상 이익은 입력한 상품 비용 기준이에요.",
         },
-        priorities: priorities(results, adsById),
+        // 사장님용 요약(현재 상태 → 할 일 → 이유) · 이번 점검에 쓴 사업 정보와 지난 실행(연결 전 스냅샷이면 null)
+        brief: consultBrief({ sales: snap.sales, meta: { current: cur, currency: snap.period.currency, fx_krw_per_unit: snap.fx }, expected_profit: expected,
+          priorities: prio, consult, coverage: { analyzed: Object.keys(guarded).length } }),
+        consult: consult ? { version: consult.version, load: consult.load, profile: consult.profile, actions: consult.actions } : null,
+        priorities: prio,
         ads: snap.ads.map((a: any) => ({ ad_id: a.ad_id, ad_name: a.ad_name, campaign_name: a.campaign_name, scope: a.scope,
-          current: a.current, previous: a.previous, new_ad: !a.previous, analysis: results[a.ad_id] || null,
+          current: a.current, previous: a.previous, new_ad: !a.previous, analysis: guarded[a.ad_id] || null,
           creative: { format: a.creative?.format, title: a.creative?.title, body: a.creative?.body, notes: a.creative?.notes, headline: a.placement?.headline || "unknown" } })),
         coverage: { total: snap.counts.total, analyzed: Object.keys(results).length, requested: snap.counts.analyzed,
           skipped: snap.skipped, failed_ads: batches.flatMap((b: any) => b.status === "done" ? b.missing || [] : b.ad_ids) },

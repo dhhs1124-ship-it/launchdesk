@@ -107,3 +107,31 @@ test('AI가 꺼져 있으면 주간 AI 점검 칸 전체를 숨긴다 — 켜짐
   assert.match(src, /sec\.hidden=!I\.weeklyVisible\(wk\.state,wk\.busy\)/);
   assert.match(tour, /\]\.filter\(shown\)/, '숨겨진 칸은 사용법 안내에서도 뺀다');
 });
+
+test('사업 정보 입력: 광고 목표는 필수, 목표 ROAS · 월 예산 상한은 선택이고 범위를 벗어나면 저장하지 않는다',()=>{
+  assert.deepEqual(I.profileInput({objective:'판매',target_roas_pct:'300',monthly_budget_cap_krw:'1,500,000',cannot_change:['예산 늘리기','없는 항목','예산 늘리기']}),
+    {ok:true,data:{objective:'판매',target_roas_pct:300,monthly_budget_cap_krw:1500000,cannot_change:['예산 늘리기']}});
+  assert.deepEqual(I.profileInput({objective:'',target_roas_pct:'',monthly_budget_cap_krw:'',cannot_change:[]}).errors,['광고 목표를 골라 주세요.']);
+  assert.deepEqual(I.profileInput({objective:'판매',target_roas_pct:'20',monthly_budget_cap_krw:'5000'}).errors,['목표 ROAS는 50~5000% 사이로 입력해 주세요.','월 광고 예산 상한은 10,000원 이상으로 입력해 주세요.']);
+  assert.deepEqual(I.profileInput({objective:'재구매',target_roas_pct:'',monthly_budget_cap_krw:''}).data,{objective:'재구매',target_roas_pct:null,monthly_budget_cap_krw:null,cannot_change:[]});
+});
+
+test('사업 정보 선택지는 서버(ai-consult-core.mjs)와 같고, 화면이 저장한 형식을 서버가 그대로 읽는다',async()=>{
+  const S=await import('../supabase/functions/_shared/ai-consult-core.mjs');
+  assert.deepEqual(I.OBJECTIVES,S.OBJECTIVES);
+  assert.deepEqual(I.CANNOT_CHANGE,S.CANNOT_CHANGE);
+  const saved=I.profileInput({objective:'판매',target_roas_pct:'300',monthly_budget_cap_krw:'',cannot_change:['할인 · 가격']}).data;
+  const row={tool_type:'business_profile',data:Object.assign({store_id:'4',saved_at:'2026-10-08T00:00:00.000Z'},saved)};
+  assert.deepEqual(S.businessProfileOf([row],4),Object.assign({saved_at:'2026-10-08T00:00:00.000Z'},saved));
+});
+
+test('이 쇼핑몰의 최신 사업 정보와 정리할 예전 기록(수정 권한이 없어 새로 저장 후 지운다)',()=>{
+  const rows=[{id:9,data:{store_id:'5',objective:'판매'}},{id:8,data:{store_id:'4',objective:'재구매'}},{id:7,data:{store_id:'4',objective:'판매'}}];
+  assert.deepEqual(I.latestProfile(rows,4),{id:8,data:{store_id:'4',objective:'재구매'},stale:[7]});
+  assert.deepEqual(I.latestProfile([],4),{id:null,data:null,stale:[]});
+});
+
+test('진행 중인 실행 기록 때문에 변경안을 뺀 광고는 권장 행동에 결과 확인을 그대로 보여 준다',()=>{
+  assert.equal(I.actionLine({verdict:'판단 보류',next_action:'진행 중인 ‘문구’ 변경의 결과를 먼저 확인',hold_scope:['진행 중인 실행 기록']}),'진행 중인 ‘문구’ 변경의 결과를 먼저 확인');
+  assert.equal(I.actionLine({verdict:'판단 보류',next_action:'x',hold_scope:[]}),'데이터를 더 쌓은 뒤 판단');
+});

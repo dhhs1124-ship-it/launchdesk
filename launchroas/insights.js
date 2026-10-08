@@ -90,8 +90,10 @@
     return parts.join(' / ');
   }
   // 권장 행동 한 줄 — 유지 · 판단 보류는 판정 그대로(수정안을 억지로 권하지 않음), 우선 확인은 AI 다음 행동의 첫 문장
+  //   진행 중인 실행 기록 때문에 서버가 변경안을 뺀 광고는 판정과 관계없이 '결과 확인'을 그대로
   function actionLine(an){
     if(!an)return 'AI 분석 결과 없음';
+    if((an.hold_scope||[]).indexOf('진행 중인 실행 기록')>=0)return koText(an.next_action);
     if(an.verdict==='유지')return '현재 광고 유지';
     if(an.verdict==='판단 보류')return '데이터를 더 쌓은 뒤 판단';
     return koText(String(an.next_action||'').split(/(?<=[.!?])\s+/)[0]);
@@ -153,14 +155,31 @@
   // 주간 AI 점검 칸 표시 — AI가 켜져 있다고 서버가 답했을 때(ready)나 점검 중일 때만. 꺼짐 · 준비 중 · 상태 조회 실패 · 확인 전이면 칸 전체를 숨긴다
   //   (‘AI 미설정’ 안내 · 쓸 수 없는 점검 버튼을 보이지 않게 — AI를 다시 켜면 그대로 나타난다)
   function weeklyVisible(state,busy){return state==='ready'||!!busy;}
-  return {weeklyVisible:weeklyVisible,ruleSignals:ruleSignals,recUsable:recUsable,trimNote:trimNote,keyLine:keyLine,actionLine:actionLine,checkLine:checkLine,metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
+  // 사업 정보(점검 기준) — 서버(supabase/functions/_shared/ai-consult-core.mjs)와 같은 선택지 · 범위. 개인정보 없이 선택 · 숫자만 받는다
+  var OBJECTIVES=['판매','신규 고객','재구매','브랜드 인지'],CANNOT_CHANGE=['예산 늘리기','할인 · 가격','새 사진 · 영상 촬영'];
+  function profileInput(v){
+    v=v||{};var errors=[],toNum=function(x){var s=String(x==null?'':x).replace(/[,\s원%]/g,'');return s===''?null:Number(s);};
+    var objective=OBJECTIVES.indexOf(v.objective)>=0?v.objective:null,roas=toNum(v.target_roas_pct),cap=toNum(v.monthly_budget_cap_krw);
+    if(!objective)errors.push('광고 목표를 골라 주세요.');
+    if(roas!==null&&!(Number.isFinite(roas)&&roas>=50&&roas<=5000))errors.push('목표 ROAS는 50~5000% 사이로 입력해 주세요.');
+    if(cap!==null&&!(Number.isFinite(cap)&&cap>=10000&&cap<=1e10))errors.push('월 광고 예산 상한은 10,000원 이상으로 입력해 주세요.');
+    if(errors.length)return {ok:false,errors:errors};
+    var cc=(v.cannot_change||[]).filter(function(x,i,a){return CANNOT_CHANGE.indexOf(x)>=0&&a.indexOf(x)===i;});
+    return {ok:true,data:{objective:objective,target_roas_pct:roas===null?null:Math.round(roas),monthly_budget_cap_krw:cap===null?null:Math.round(cap),cannot_change:cc}};
+  }
+  // 이 쇼핑몰의 최신 기록(목록은 최신순) · 지울 예전 기록 — tool_records는 수정 권한이 없어 새로 저장한 뒤 예전 기록을 지운다
+  function latestProfile(rows,storeId){
+    var mine=(rows||[]).filter(function(r){return r&&r.data&&String(r.data.store_id)===String(storeId);});
+    return mine.length?{id:mine[0].id,data:mine[0].data,stale:mine.slice(1).map(function(r){return r.id;})}:{id:null,data:null,stale:[]};
+  }
+  return {OBJECTIVES:OBJECTIVES,CANNOT_CHANGE:CANNOT_CHANGE,profileInput:profileInput,latestProfile:latestProfile,weeklyVisible:weeklyVisible,ruleSignals:ruleSignals,recUsable:recUsable,trimNote:trimNote,keyLine:keyLine,actionLine:actionLine,checkLine:checkLine,metricName:metricName,koText:koText,formatValue:formatValue,verdictView:verdictView,changeLine:changeLine,numbersLine:numbersLine,orderAds:orderAds,shortMoney:shortMoney,money:money};
 });
 
 
 (function(){
   if(typeof document==='undefined'||!window.LaunchRoasApp)return;
   var I=window.LaunchRoasInsights,app=window.LaunchRoasApp,S=window.LaunchRoasSales,sales=null,ads=null,lastSig='';
-  var wk={state:'idle',data:null,message:'',storeId:null,busy:false},ui={panel:{},all:false};
+  var wk={state:'idle',data:null,message:'',storeId:null,busy:false,profile:null},ui={panel:{},all:false,profileOpen:false,draft:null};
   function byId(id){return document.getElementById(id);}
   function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;}
   function won(v){return v==null?'—':(v<0?'−':'')+Math.abs(Math.round(v)).toLocaleString('ko-KR')+'원';}
@@ -194,7 +213,15 @@
     if(wk.message)wrap.appendChild(el('p','wk-message'+(wk.state==='error'?' is-error':''),wk.message));
     else if(d&&d.error&&!r)wrap.appendChild(el('p','wk-message is-error',I.koText(d.error)));
     if(r)wrap.appendChild(renderResult(r,d.status));
-    else if(!wk.busy){if(wk.state==='ready')wrap.appendChild(el('p','wk-empty','지난주 광고별 지표 · 문구 · 이미지를 보고 어떤 광고를 왜 확인할지, 무엇을 바꾸면 되는지 알려 드려요.'));wrap.appendChild(renderSignals());}
+    else if(!wk.busy){
+      if(wk.state==='ready'){
+        wrap.appendChild(el('p','wk-empty','지난주 광고별 지표 · 문구 · 이미지를 보고 어떤 광고를 왜 확인할지, 무엇을 바꾸면 되는지 알려 드려요.'));
+        // 점검은 주 1회라, 목표 없이 쓰기 전에 알려 준다
+        if(wk.profile&&wk.profile.status==='ok'&&!wk.profile.data)wrap.appendChild(el('p','wk-message','아래 점검 기준(광고 목표)을 먼저 저장하면 목표 기준 판단이 들어가요 · 점검은 주 1회예요.'));
+      }
+      wrap.appendChild(renderSignals());
+    }
+    if(wk.state==='ready')wrap.appendChild(renderProfile());
     wrap.appendChild(el('small','wk-foot','계정당 주 1회 · 한국 시간 월요일 00시 갱신(다음 '+day(w.next)+') · 위의 기간 선택과 관계없이 지난주 고정'));
     return wrap;
   }
@@ -213,10 +240,14 @@
   }
   function renderResult(r,status){
     var frag=el('div','wk-result'),s=r.summary||{},c=s.cafe24&&s.cafe24.current,m=s.meta||{},ep=s.expected_profit||{},cur=m.currency;
-    var last=el('p','wk-last');
-    last.append(el('span','wk-last-label','지난주'),el('span','','주문 '+(c?won(c.gross_sales_krw):'—')),el('span','','광고비 '+I.money(m.current&&m.current.spend,cur)),
-      el('span','','광고비 차감 후 예상 이익 '+won(ep.current)+(ep.partial?' (일부 상품 기준)':'')));
-    frag.appendChild(last);
+    // 사장님용 요약(현재 상태 → 할 일 → 이유)이 있으면 맨 위에. 연결 전 결과는 예전처럼 지난주 숫자 한 줄
+    if(r.brief)frag.appendChild(renderBrief(r.brief));
+    else{
+      var last=el('p','wk-last');
+      last.append(el('span','wk-last-label','지난주'),el('span','','주문 '+(c?won(c.gross_sales_krw):'—')),el('span','','광고비 '+I.money(m.current&&m.current.spend,cur)),
+        el('span','','광고비 차감 후 예상 이익 '+won(ep.current)+(ep.partial?' (일부 상품 기준)':'')));
+      frag.appendChild(last);
+    }
     var list=I.orderAds(r.ads),shown=ui.all?list:list.slice(0,3);
     var need=list.filter(function(a){return a.analysis&&a.analysis.verdict==='개선 필요';}).length;
     var h=el('div','wk-list-head');
@@ -243,6 +274,8 @@
     li.append(head,el('p','wk-key',I.keyLine(a,cur)));
     var act=el('p','wk-line');act.append(el('span','wk-k','권장 행동'),el('span','',I.actionLine(an)));li.appendChild(act);
     if(check){var ck=el('p','wk-line');ck.append(el('span','wk-k','확인 사항'),el('span','',check));li.appendChild(ck);}
+    // 서버가 규칙으로 뺀 변경안(진행 중인 실행 기록 · 예산을 못 늘림) — 왜 개선안이 없는지
+    if(an&&an.consult_adjusted&&an.consult_adjusted.length){var adj=el('p','wk-line');adj.append(el('span','wk-k','참고'),el('span','',an.consult_adjusted.join(' · ')));li.appendChild(adj);}
     if(an&&an.recommendation&&!usable){var hold=el('p','wk-line wk-held');hold.append(el('span','wk-k','개선안'),el('span','','보류 · 제목이 보이는 게재 위치인지 확인되지 않아 보여 주지 않아요(다음 점검부터 확인)'));li.appendChild(hold);}
     if(an){
       var tabs=el('div','wk-tabs');
@@ -330,6 +363,48 @@
     return box;
   }
 
+  // 사장님용 요약 — 지금 상태(확인한 숫자 · 기준) → 할 일(이유 · 출처) → 판단하지 않은 것(펼쳐서). 문장은 서버가 확인한 값으로만 만든다
+  function renderBrief(b){
+    var box=el('section','wk-brief');
+    box.appendChild(el('h3','','지금 상태'));
+    var st=el('ul','wk-brief-status');(b.status||[]).forEach(function(t){st.appendChild(el('li','',t));});box.appendChild(st);
+    box.appendChild(el('h3','','할 일'));
+    var ol=el('ol','wk-todos');
+    (b.todos||[]).forEach(function(t){var li=el('li');li.append(el('strong','',t.what),el('small','','이유: '+t.why+' · '+t.source));ol.appendChild(li);});
+    box.appendChild(ol);
+    if(b.unknowns&&b.unknowns.length){
+      var d=el('details','wk-unknowns');d.appendChild(el('summary','','판단하지 않은 것 · 기준 차이 '+b.unknowns.length+'개'));
+      var ul=el('ul');b.unknowns.forEach(function(t){ul.appendChild(el('li','',t));});d.appendChild(ul);box.appendChild(d);
+    }
+    return box;
+  }
+  // 점검 기준(사업 정보) — AI가 켜져 있을 때만 보인다(주간 점검 칸 안). 저장해도 이미 끝난 점검은 바뀌지 않고 다음 점검부터
+  function renderProfile(){
+    var p=wk.profile||{status:'loading'},d=p.data,box=el('details','wk-profile');box.open=!!ui.profileOpen;
+    box.addEventListener('toggle',function(){ui.profileOpen=box.open;});
+    var sum=p.status==='loading'?'불러오는 중':p.status==='error'?'불러오지 못함':d?'저장됨 · '+[d.objective,d.target_roas_pct!=null?'목표 ROAS '+d.target_roas_pct+'%':null].filter(Boolean).join(' · '):'미입력 · 목표 기준 판단 안 함';
+    box.appendChild(el('summary','','점검 기준 · 사업 정보 ('+sum+')'));
+    if(p.status!=='ok'){if(p.note)box.appendChild(el('p','wk-sub',p.note));return box;}
+    var dr=ui.draft||(ui.draft={objective:d&&d.objective||'',target_roas_pct:d&&d.target_roas_pct!=null?String(d.target_roas_pct):'',
+      monthly_budget_cap_krw:d&&d.monthly_budget_cap_krw!=null?String(d.monthly_budget_cap_krw):'',cannot_change:(d&&d.cannot_change||[]).slice()});
+    var form=el('div','wk-profile-form');
+    var field=function(label,input,note){var l=el('label');l.append(el('span','',label),input);if(note)l.appendChild(el('small','',note));form.appendChild(l);};
+    var sel=el('select');I.OBJECTIVES.forEach(function(o,i){if(!i)sel.appendChild(new Option('선택',''));sel.appendChild(new Option(o,o));});sel.value=dr.objective;
+    sel.addEventListener('change',function(){dr.objective=sel.value;});field('광고 목표 (필수)',sel);
+    var num=function(key,min,step,ph){var x=el('input');x.type='number';x.min=String(min);x.step=String(step);x.placeholder=ph;x.value=dr[key];x.addEventListener('input',function(){dr[key]=x.value;});return x;};
+    field('목표 ROAS (%, 선택)',num('target_roas_pct',50,10,'예: 300'),'Meta 귀속 ROAS 기준 · Cafe24 실제 매출 기준 아님');
+    field('월 광고 예산 상한 (원, 선택)',num('monthly_budget_cap_krw',10000,10000,'예: 1000000'));
+    var fs=el('fieldset','wk-cannot');fs.appendChild(el('legend','','바꿀 수 없는 것 (선택)'));
+    I.CANNOT_CHANGE.forEach(function(c){var l=el('label'),cb=el('input');cb.type='checkbox';cb.checked=dr.cannot_change.indexOf(c)>=0;
+      cb.addEventListener('change',function(){dr.cannot_change=dr.cannot_change.filter(function(x){return x!==c;});if(cb.checked)dr.cannot_change.push(c);});
+      l.append(cb,el('span','',c));fs.appendChild(l);});
+    form.appendChild(fs);
+    var save=el('button','secondary',p.saving?'저장 중…':'점검 기준 저장');save.type='button';save.disabled=!!p.saving;save.addEventListener('click',saveProfile);
+    box.append(el('p','wk-sub','목표가 있어야 목표 대비 판단을 해요. 광고별 이익은 판단하지 않아요(광고별 주문 연결 없음). 개인정보는 받지 않아요.'),form,save);
+    if(p.note)box.appendChild(el('p','wk-sub',p.note));
+    return box;
+  }
+
   // ---- 오른쪽 요약 ----
   function row(dl,k,v,tone){var dd=el('dd',tone||'',v);dl.append(el('dt','',k),dd);}
   function renderSide(){
@@ -368,13 +443,39 @@
   }
   async function loadStatus(){
     var ctx=app.getContext();if(!ctx.storeId||wk.storeId===ctx.storeId)return;
-    wk={state:'idle',data:null,message:'',storeId:ctx.storeId,busy:false};ui={panel:{},all:false};render();
+    wk={state:'idle',data:null,message:'',storeId:ctx.storeId,busy:false,profile:null};ui={panel:{},all:false,profileOpen:false,draft:null};render();
     var r=await call(ctx,{store_id:ctx.storeId,action:'status'});
     if(app.getContext().storeId!==ctx.storeId)return;
     if(r.unavailable)wk.state='unavailable',wk.message='주간 AI 점검을 준비하고 있어요.';
     else if(r.error)wk.state='error',wk.message='점검 상태를 불러오지 못했어요. 잠시 후 다시 열어 주세요.';
     else{wk.data=r.data;wk.state=r.data.enabled?'ready':'off';if(!r.data.enabled)wk.message='AI 연결 전이라 아직 실행할 수 없어요.';}
     render();
+    if(wk.state==='ready')loadProfile(ctx); // AI가 꺼져 있으면 사업 정보도 읽지 않는다(칸이 숨겨져 있음)
+  }
+  // 사업 정보(tool_records business_profile) — 쇼핑몰별 최신 기록. 조회 실패는 '미입력'과 구분해 표시
+  async function loadProfile(ctx){
+    var mine=wk;wk.profile={status:'loading',id:null,data:null,stale:[],saving:false,note:''};render();
+    var res=await ctx.client.from('tool_records').select('id,data,created_at').eq('user_id',ctx.userId).eq('tool_type','business_profile').order('created_at',{ascending:false}).limit(20);
+    if(wk!==mine)return;
+    if(res.error){wk.profile={status:'error',id:null,data:null,stale:[],saving:false,note:'사업 정보를 불러오지 못했어요. 새로고침해 주세요.'};render();return;}
+    var p=I.latestProfile(res.data||[],ctx.storeId);
+    wk.profile={status:'ok',id:p.id,data:p.data,stale:p.stale,saving:false,note:''};render();
+  }
+  // 저장 — 수정 권한이 없어 새로 저장한 뒤 이 쇼핑몰의 예전 기록을 지운다(지우기 실패면 다음 저장 때 다시). 쇼핑몰을 바꾸면 결과를 버린다
+  async function saveProfile(){
+    var ctx=app.getContext(),mine=wk,p=wk.profile;if(!ctx.userId||!ctx.storeId||!p||p.status!=='ok'||p.saving)return;
+    var v=I.profileInput(ui.draft||{});
+    if(!v.ok){p.note=v.errors.join(' ');render();return;}
+    p.saving=true;p.note='저장하고 있어요.';render();
+    var data=Object.assign({store_id:String(ctx.storeId),saved_at:new Date().toISOString()},v.data),old=[p.id].concat(p.stale||[]).filter(function(x){return x!=null;});
+    try{
+      var ins=await ctx.client.from('tool_records').insert({user_id:ctx.userId,tool_type:'business_profile',data:data}).select('id').single();
+      if(wk!==mine)return;
+      if(ins.error){p.saving=false;p.note='사업 정보를 저장하지 못했어요.';render();return;}
+      var del=old.length?await ctx.client.from('tool_records').delete().in('id',old).eq('user_id',ctx.userId).eq('tool_type','business_profile'):{error:null};
+      if(wk!==mine)return;
+      wk.profile={status:'ok',id:ins.data&&ins.data.id,data:data,stale:del&&del.error?old:[],saving:false,note:'저장했어요 · 다음 점검부터 반영돼요.'};ui.draft=null;render();
+    }catch(e){if(wk===mine){p.saving=false;p.note='사업 정보를 저장하지 못했어요.';render();}}
   }
   async function run(){
     if(wk.busy)return; // 연속 클릭 방지(서버도 동시 요청을 막는다)
