@@ -199,18 +199,19 @@ async function boot(opts){
   const doc = makeDocument();
   const timers = makeTimers();
   const supa = makeSupabase(opts);
-  const env = { doc, timers, supa, warns: [] };
+  const env = { doc, timers, supa, warns: [], ga: [] };
   const sandbox = {
     console: { log(){}, info(){}, warn(){ env.warns.push(Array.from(arguments).join(' ')); }, error(){} },
     setTimeout: timers.setTimeout, clearTimeout: timers.clearTimeout, setInterval(){ return 0; }, clearInterval(){},
     requestAnimationFrame(fn){ fn(0); return 1; }, cancelAnimationFrame(){},
     URLSearchParams, document: doc,
-    location: { hash: '', origin: 'http://localhost', pathname: '/', search: opts.locationSearch || '', href: 'http://localhost/' },
+    // locationHash: Google 로그인 · 이메일 인증 복귀(Supabase 기본 implicit 흐름은 #access_token=…로 돌아온다)
+    location: { hash: opts.locationHash || '', origin: 'http://localhost', pathname: '/', search: opts.locationSearch || '', href: 'http://localhost/' },
     history: { replaceState(){}, back(){}, forward(){} },
     localStorage: memStorage(), sessionStorage: memStorage(),
     matchMedia(){ return { matches: false }; }, scrollTo(){}, addEventListener(){}, removeEventListener(){},
     confirm(){ return true; }, alert(){},
-    gtag(){},
+    gtag(){ env.ga.push(JSON.parse(JSON.stringify(Array.from(arguments)))); }, // GA4 호출 기록(인증 복귀 page_view 검사)
     launchdeskSupabase: supa.sb
   };
   sandbox.window = sandbox; sandbox.self = sandbox; sandbox.globalThis = sandbox;
@@ -572,4 +573,24 @@ test('로그아웃 이벤트는 대기 중인 게이트를 정리하고 pending�
   await flush(env);
   assert.equal(gateOpen(env), false);
   assert.equal(env.sandbox.sessionStorage.getItem(env.core.PENDING_KEY), null);
+});
+
+// 2026-10-12 인증 복귀 주소의 GA4 page_view — app.js가 첫 화면 page_view의 page_path에 해시를 그대로 넣어
+// '#access_token=…&refresh_token=…'의 토큰이 GA4로 가던 경로(실제 gtag.js 로컬 관찰: dp 항목). 화면 경로(/…)가 아니면 '/'로 보낸다.
+test('인증 복귀(#access_token=…) 첫 화면의 GA4 page_view: page_path · page_location에 토큰이 없다(page_path는 /)', async () => {
+  const env = await boot({ session: null, locationHash: '#access_token=FAKEACCESS&expires_in=3600&provider_token=FAKEPROVIDER&refresh_token=FAKEREFRESH&token_type=bearer' });
+  const views = env.ga.filter((a) => a[0] === 'event' && a[1] === 'page_view');
+  assert.ok(views.length >= 1, '첫 화면 page_view');
+  for(const v of views){
+    assert.equal(v[2].page_path, '/');
+    assert.doesNotMatch(v[2].page_location, /FAKE|access_token|#/);
+  }
+  assert.doesNotMatch(JSON.stringify(env.ga), /FAKEACCESS|FAKEREFRESH|FAKEPROVIDER/, 'GA4 호출 어디에도 토큰이 없다');
+});
+
+test('일반 화면 경로의 GA4 page_view는 그대로 — page_path는 화면 경로', async () => {
+  const env = await boot({ session: null, locationHash: '#/tools' });
+  const views = env.ga.filter((a) => a[0] === 'event' && a[1] === 'page_view');
+  assert.ok(views.length >= 1);
+  assert.equal(views[0][2].page_path, '/tools');
 });

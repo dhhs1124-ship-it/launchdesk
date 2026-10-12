@@ -186,6 +186,9 @@
      tag) is replaced by this one manual event per render(), covering
      both the initial paint and every hashchange. No user input here —
      path/title are always one of the fixed strings in BUILT/TITLES.
+     2026-10-12: 인증 복귀 해시('#access_token=…&refresh_token=…')는 화면 경로가
+     아닌데 currentPath()가 그대로 돌려줘 page_path에 토큰이 실렸다(실제 gtag.js
+     로컬 관찰 — dp 항목). 화면 경로('/'로 시작)가 아니면 '/'로 보낸다.
      Guarded so a blocked/failed GA4 load never breaks navigation.
      Exposed as window.launchdeskSendPageView so the analytics-consent
      banner can fire exactly one page_view for the current route right
@@ -196,7 +199,7 @@
     gtag('event', 'page_view', {
       page_title: titleForPath(path) || '준비 중',
       page_location: safePageLocation(), // location.href 그대로 쓰지 않음 — 위 safePageLocation() 주석 참고(인증 콜백 토큰 해시 유출 방지)
-      page_path: path
+      page_path: path.charAt(0) === '/' ? path : '/'
     });
   }
   window.launchdeskSendPageView = function(){ sendPageViewEvent(currentPath()); };

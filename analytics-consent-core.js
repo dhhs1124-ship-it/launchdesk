@@ -40,6 +40,35 @@
     return JSON.stringify({ status: status, version: CURRENT_VERSION, updatedAt: new Date().toISOString() });
   }
 
+  // ── 인증 복귀 주소(2026-10-12) ─────────────────────────────────────────────
+  // Supabase 로그인 · 이메일 인증에서 돌아온 주소에는 토큰(#access_token=…&refresh_token=…)이나
+  // 인증 코드 · 오류(?code=… · ?error=…)가 실린다. GA4 자동 수집은 그때의 주소를 함께 보내므로
+  // (양식 이벤트의 form_destination에는 # 뒤까지 — 로컬 관찰) analytics-consent.js는 이 값이 주소에서
+  // 지워진 뒤에만 gtag.js를 불러오고, 이전 페이지 주소(page_referrer)에서도 이 값만 뺀다.
+  // 이름 목록은 clarity-consent-core.js · meta-pixel-core.js의 UNSAFE_QUERY_PARAMS에 SDK가 해시로 받는
+  // 토큰 이름(provider_token 등)을 더한 것이다.
+  var AUTH_PARAMS = ['code', 'state', 'error', 'error_code', 'error_description', 'access_token', 'refresh_token',
+    'provider_token', 'provider_refresh_token', 'token', 'token_hash', 'type', 'expires_in', 'expires_at', 'token_type'];
+  function decodeName(s){ try{ return decodeURIComponent(s); }catch(e){ return s; } }
+  function isAuthPair(pair){ return AUTH_PARAMS.indexOf(decodeName(pair.split('=')[0]).toLowerCase()) !== -1; }
+  function pairsOf(part){ return String(part || '').replace(/^[?#]/, '').split('&').filter(Boolean); }
+  function isRouteHash(hash){ return !hash || hash === '#' || hash.indexOf('#/') === 0; }
+  function isAuthHash(hash){ return !isRouteHash(hash) && pairsOf(hash).some(isAuthPair); }
+
+  // 주소에 인증 값이 남아 있는지 — 쿼리의 인증 이름, 또는 화면 경로(#/…)가 아닌 해시의 인증 이름
+  function hasAuthParams(search, hash){ return pairsOf(search).some(isAuthPair) || isAuthHash(hash); }
+  // 인증 값을 뺀 search · hash — 쿼리는 인증 이름만 빼고(utm 등은 남김), 인증 해시는 통째로 뺀다(화면 경로 해시는 그대로)
+  function withoutAuthParams(search, hash){
+    var kept = pairsOf(search).filter(function(pair){ return !isAuthPair(pair); });
+    return { search: kept.length ? '?' + kept.join('&') : '', hash: isAuthHash(hash) ? '' : (hash || '') };
+  }
+  // page_referrer — 이전 페이지 주소에서 인증 값만 뺀다(출처 · 경로 · utm은 남겨 유입 분석 유지). 해시는 보내지 않는다.
+  function safeReferrer(ref){
+    if(!ref) return '';
+    var m = /^([^?#]*)(\?[^#]*)?/.exec(String(ref));
+    return m[1] + withoutAuthParams(m[2] || '', '').search;
+  }
+
   function isGranted(parsed){ return !!parsed && parsed.status === STATUSES.GRANTED; }
   function isDenied(parsed){ return !!parsed && parsed.status === STATUSES.DENIED; }
 
@@ -49,6 +78,9 @@
     STATUSES: STATUSES,
     parse: parse,
     serialize: serialize,
+    hasAuthParams: hasAuthParams,
+    withoutAuthParams: withoutAuthParams,
+    safeReferrer: safeReferrer,
     isGranted: isGranted,
     isDenied: isDenied
   };

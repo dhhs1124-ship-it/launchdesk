@@ -48,7 +48,8 @@ function makeCookieJar(){
   };
 }
 
-function boot(){
+function boot(opts){
+  opts = opts || {}; // 2026-10-12 핫픽스: 저장된 선택 · 주소 · 이전 페이지 주소 · Supabase 클라이언트를 넣을 수 있게
   const scripts = []; // document.head.appendChild으로 삽입된 <script> 기록
   const cookieJar = makeCookieJar();
   const els = {
@@ -58,28 +59,46 @@ function boot(){
     analyticsConsentDeny: makeEl(),
     analyticsSettingsLink: makeEl()
   };
+  const order = []; // 주소 정리(replaceState)와 스크립트 삽입의 순서 기록
   const doc = {
     getElementById: id => els[id] || null,
     createElement: () => ({ async: false, src: '' }),
-    head: { appendChild(el){ scripts.push(el); } },
-    body: { style: {} }
+    head: { appendChild(el){ scripts.push(el); order.push('script'); } },
+    body: { style: {} },
+    referrer: opts.referrer || ''
+  };
+  // 주소 · history — replaceState는 진짜 브라우저처럼 location의 search · hash를 바꾼다
+  const location = Object.assign({ pathname: '/', search: '', hash: '' }, opts.location || {});
+  const replaced = [];
+  const history = {
+    state: null,
+    replaceState(state, title, url){
+      replaced.push(url); order.push('replaceState');
+      const m = /^([^?#]*)(\?[^#]*)?(#.*)?$/.exec(url);
+      location.pathname = m[1]; location.search = m[2] || ''; location.hash = m[3] || '';
+    }
   };
   Object.defineProperty(doc, 'cookie', { get(){ return cookieJar.value; }, set(v){ cookieJar.value = v; } });
 
   const pageViewCalls = [];
+  const storage = memStorage();
+  if(opts.stored) storage.setItem('ld-analytics-consent-v1', opts.stored); // 재방문(저장된 선택)
   const sandbox = {
     console,
-    localStorage: memStorage(),
+    localStorage: storage,
     document: doc,
     addEventListener(){}, // window.addEventListener('resize', ...)
-    launchdeskSendPageView(){ pageViewCalls.push(1); }
+    launchdeskSendPageView(){ pageViewCalls.push(1); },
+    location,
+    history
   };
+  if(opts.supabase) sandbox.launchdeskSupabase = opts.supabase; // supabase-client.js가 만든 클라이언트 자리
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(CORE_SRC, sandbox, { filename: 'analytics-consent-core.js' });
   vm.runInContext(UI_SRC, sandbox, { filename: 'analytics-consent.js' });
 
-  return { sandbox, els, scripts, cookieJar, pageViewCalls };
+  return { sandbox, els, scripts, cookieJar, pageViewCalls, location, replaced, order };
 }
 
 function dataLayerEvents(sandbox, name){
@@ -204,3 +223,125 @@ function document_click(sandbox, id){
 function localStorage_get(sandbox){
   return sandbox.localStorage.getItem(sandbox.launchdeskAnalyticsConsent.STORAGE_KEY);
 }
+
+// ------------------------------------------------------------------ 2026-10-12 핫픽스: 인증 복귀 주소에서 GA4 지연 로드
+// Supabase 로그인 · 이메일 인증에서 돌아온 주소에는 토큰(#access_token=…)이나 인증 코드(?code=…)가 있다. GA4 자동 수집은
+// 그때의 주소를 함께 보낸다(양식 이벤트의 form_destination에는 # 뒤까지 — 운영 gtag.js 로컬 관찰). 그래서 Supabase가 주소를
+// 처리한 뒤(auth.initialize 완료 — 성공 · 실패 모두) 남은 인증 값을 지우고 나서만 gtag.js를 불러온다. 처리 전에는 주소를 건드리지 않는다.
+const GRANTED_V1 = JSON.stringify({ status: 'granted', version: 1 }); // 운영 중인 GA4 동의 저장값(버전 1)
+const TOKEN_HASH = '#access_token=FAKEACCESS&expires_in=3600&refresh_token=FAKEREFRESH&token_type=bearer';
+function fakeSupabase(){
+  let resolve, reject;
+  const p = new Promise((res, rej) => { resolve = res; reject = rej; });
+  const auth = { calls: 0, initialize(){ auth.calls++; return p; } };
+  return { client: { auth }, resolve, reject };
+}
+const tick = () => new Promise((r) => setImmediate(r));
+function configParams(sandbox){
+  const c = (sandbox.dataLayer || []).find((a) => a[0] === 'config');
+  return c ? JSON.parse(JSON.stringify(c[2])) : null;
+}
+
+test('인증 복귀(토큰 해시) · 처리 중: 저장된 허용이어도 Supabase 처리가 끝나기 전에는 gtag.js를 불러오지 않고 주소도 건드리지 않는다', async () => {
+  const sb = fakeSupabase();
+  const { sandbox, scripts, replaced } = boot({ stored: GRANTED_V1, location: { hash: TOKEN_HASH }, supabase: sb.client });
+  await tick();
+  assert.equal(gaScriptCount(scripts), 0, '처리 전에는 GA4 미로드');
+  assert.equal(sb.client.auth.calls, 1, 'Supabase의 처리 완료(initialize)를 기다린다');
+  assert.deepEqual(replaced, [], '처리 전에는 주소를 지우지 않는다(로그인을 깨지 않게)');
+  assert.equal(typeof sandbox.gtag, 'function', '앱이 보내는 이벤트는 대기열에만 쌓인다(전송 없음)');
+});
+
+test('인증 복귀 · 처리 성공: SDK가 해시를 지운 뒤 처리가 끝나면 그때 gtag.js를 1회 불러온다(주소는 이미 깨끗해 다시 바꾸지 않음)', async () => {
+  const sb = fakeSupabase();
+  const { scripts, replaced, location } = boot({ stored: GRANTED_V1, location: { hash: TOKEN_HASH }, supabase: sb.client });
+  location.hash = ''; // SDK: 사용자 확인 뒤 window.location.hash = ''
+  sb.resolve({ error: null });
+  await tick();
+  assert.equal(gaScriptCount(scripts), 1);
+  assert.deepEqual(replaced, []);
+});
+
+test('인증 복귀 · 처리 실패: SDK가 남긴 토큰 해시를 처리가 끝난 뒤 지우고, 그다음에 gtag.js를 불러온다', async () => {
+  const sb = fakeSupabase();
+  const { scripts, replaced, location, order } = boot({ stored: GRANTED_V1, location: { hash: TOKEN_HASH }, supabase: sb.client });
+  sb.resolve({ error: { message: 'invalid JWT' } }); // 실패여도 initialize는 결과를 돌려준다(해시는 남아 있음)
+  await tick();
+  assert.deepEqual(replaced, ['/']);
+  assert.equal(location.hash, '');
+  assert.equal(gaScriptCount(scripts), 1);
+  assert.deepEqual(order, ['replaceState', 'script'], '주소를 먼저 지운 뒤에 불러온다');
+});
+
+test('인증 복귀 · 처리 예외(initialize rejection)도 처리 끝으로 보고 정리한 뒤 불러온다', async () => {
+  const sb = fakeSupabase();
+  const { scripts, replaced } = boot({ stored: GRANTED_V1, location: { hash: TOKEN_HASH }, supabase: sb.client });
+  sb.reject(new Error('network'));
+  await tick();
+  assert.deepEqual(replaced, ['/']);
+  assert.equal(gaScriptCount(scripts), 1);
+});
+
+test('?code= 복귀: 처리가 끝나면 인증 코드 · state만 지우고 utm과 화면 경로는 남긴다(유입 분석 유지) → 그다음 불러온다', async () => {
+  const sb = fakeSupabase();
+  const { scripts, replaced, location } = boot({ stored: GRANTED_V1, location: { search: '?code=FAKECODE&state=FAKESTATE&utm_source=meta&utm_campaign=beta', hash: '#/' }, supabase: sb.client });
+  await tick();
+  assert.equal(gaScriptCount(scripts), 0);
+  sb.resolve({ error: null });
+  await tick();
+  assert.deepEqual(replaced, ['/?utm_source=meta&utm_campaign=beta#/']);
+  assert.equal(location.search, '?utm_source=meta&utm_campaign=beta');
+  assert.equal(gaScriptCount(scripts), 1);
+});
+
+test('Supabase 클라이언트가 없으면 인증 값을 처리할 주체가 없으므로 이 문서에서는 GA4를 불러오지 않고 주소도 건드리지 않는다', async () => {
+  const { scripts, replaced } = boot({ stored: GRANTED_V1, location: { hash: TOKEN_HASH } });
+  await tick(); await tick();
+  assert.equal(gaScriptCount(scripts), 0);
+  assert.deepEqual(replaced, []);
+});
+
+test('일반 주소(인증 값 없음)는 지금처럼 바로 불러온다 — utm · 화면 경로 그대로, Supabase를 기다리지 않음', () => {
+  const sb = fakeSupabase();
+  const { scripts, replaced } = boot({ stored: GRANTED_V1, location: { search: '?utm_source=meta&utm_campaign=beta', hash: '#/tools' }, supabase: sb.client });
+  assert.equal(gaScriptCount(scripts), 1);
+  assert.equal(sb.client.auth.calls, 0);
+  assert.deepEqual(replaced, []);
+});
+
+test('처음 방문자가 인증 복귀 처리 중에 분석을 허용하면 허용은 저장하되 불러오기는 처리 · 정리 뒤로 미룬다', async () => {
+  const sb = fakeSupabase();
+  const { els, scripts, pageViewCalls } = boot({ location: { hash: TOKEN_HASH }, supabase: sb.client });
+  els.analyticsConsentAllow.click();
+  assert.equal(gaScriptCount(scripts), 0);
+  assert.equal(pageViewCalls.length, 1, '현재 화면 page_view는 대기열로(안전한 주소 · 경로는 app.js가 만든다)');
+  sb.resolve({ error: null });
+  await tick();
+  assert.equal(gaScriptCount(scripts), 1);
+});
+
+test('처리 중에 허용했다가 거부하면 처리가 끝나도 불러오지 않고, 다시 허용하면 그때 1회 불러온다', async () => {
+  const sb = fakeSupabase();
+  const { els, scripts } = boot({ location: { hash: TOKEN_HASH }, supabase: sb.client });
+  els.analyticsConsentAllow.click();
+  els.analyticsConsentDeny.click();
+  sb.resolve({ error: null });
+  await tick();
+  assert.equal(gaScriptCount(scripts), 0);
+  els.analyticsSettingsLink.click();
+  els.analyticsConsentAllow.click();
+  assert.equal(gaScriptCount(scripts), 1);
+  els.analyticsConsentAllow.click();
+  assert.equal(gaScriptCount(scripts), 1, '중복 삽입 없음');
+});
+
+test('page_referrer: 이전 페이지 주소에 인증 값이 있으면 그 값만 뺀 주소를 설정에 넣는다(이후 모든 요청의 page_referrer)', () => {
+  const { sandbox } = boot({ stored: GRANTED_V1, referrer: 'https://launchdesk.co.kr/?code=REFCODE&state=s&utm_source=ref' });
+  assert.equal(configParams(sandbox).page_referrer, 'https://launchdesk.co.kr/?utm_source=ref');
+  assert.equal(configParams(sandbox).send_page_view, false);
+});
+
+test('page_referrer: 인증 값이 없는 이전 페이지 주소는 그대로 둔다(설정에 넣지 않음 — gtag 기본값 = document.referrer)', () => {
+  const { sandbox } = boot({ stored: GRANTED_V1, referrer: 'https://l.instagram.com/' });
+  assert.equal('page_referrer' in configParams(sandbox), false);
+});

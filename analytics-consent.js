@@ -31,7 +31,18 @@
         currentStatus를 최종 게이트로 다시 한번 확인해 아예 dataLayer에
         올리지도 않는다.
    window.gtag 자체는 절대 destroy/재할당하지 않는다 — 그래야 같은
-   페이지에서 재허용했을 때 되살릴 방법이 남는다(요구사항). */
+   페이지에서 재허용했을 때 되살릴 방법이 남는다(요구사항).
+
+   ── 인증 복귀 주소(2026-10-12 핫픽스): Supabase 로그인 · 이메일 인증에서 돌아온 주소에는 토큰
+   (#access_token=…)이나 인증 코드(?code=…)가 실린다. GA4 자동 수집은 그때의 주소를 함께 보낸다 — 운영
+   gtag.js를 로컬에서 실행해 보니 양식 이벤트의 form_destination에 # 뒤 토큰까지, 스크롤 등의 페이지
+   주소에 ?code=가 실렸다. 그래서 이런 주소로 열린 문서에서는 Supabase가 주소를 처리한 뒤
+   (auth.initialize 완료 — 성공 · 실패 모두) 남은 인증 값을 주소에서 지우고 나서만 gtag.js를 불러온다.
+   처리 전에는 주소를 건드리지 않는다(로그인을 깨지 않게). 성공이면 SDK가 이미 지웠고, 실패면 SDK가
+   남겨 둔 값을 여기서 지운다. Supabase 클라이언트가 없으면 처리할 주체가 없으므로 이 문서에서는 불러오지
+   않는다. 그동안 앱이 보낸 이벤트(page_view는 app.js가 안전한 주소 · 경로로 만든다)는 dataLayer
+   대기열에만 있고, 불러온 뒤 깨끗한 주소 기준으로 전송된다. 이전 페이지 주소(page_referrer)에 인증
+   값이 있으면 그 값만 뺀 주소를 config에 넣는다(이후 모든 요청). */
 (function(){
   'use strict';
   var core = window.launchdeskAnalyticsConsent;
@@ -39,7 +50,8 @@
 
   var GA_ID = 'G-H3D0EDRZL5';
   var GA_DISABLE_KEY = 'ga-disable-' + GA_ID;
-  var gaReady = false;        // dataLayer/gtag 정의 + config + 스크립트 삽입까지 끝났는지(평생 1회만 true로)
+  var gaReady = false;        // dataLayer/gtag 정의 + config까지 끝났는지(평생 1회만 true로)
+  var scriptLoaded = false;   // gtag.js 삽입 여부 — 주소가 깨끗해진 뒤에만(아래 whenAddressReady)
   var realGtag = null;        // dataLayer.push 스텁 — GA4 런타임과 실제로 통신하는 유일한 통로
   var currentStatus = null;   // 'granted' | 'denied' | null — guardedGtag의 최종 게이트가 읽는 실시간 상태
 
@@ -65,6 +77,40 @@
     try{ localStorage.setItem(core.STORAGE_KEY, core.serialize(status)); }catch(e){ /* 저장 실패해도 이번 세션 동작은 계속 — 다음 방문에 다시 물어보게 됨 */ }
   }
 
+  // ── 인증 복귀 주소 — 위 설명. 주소가 깨끗해질 때까지 gtag.js 삽입만 미룬다.
+  var addressReady = !core.hasAuthParams(location.search, location.hash);
+  var afterAddress = [];
+  function whenAddressReady(fn){ if(addressReady) fn(); else afterAddress.push(fn); }
+  if(!addressReady){
+    var auth = window.launchdeskSupabase && window.launchdeskSupabase.auth;
+    if(auth && typeof auth.initialize === 'function'){
+      var finishAddress = function(){
+        var clean = core.withoutAuthParams(location.search, location.hash);
+        if(clean.search !== location.search || clean.hash !== location.hash){
+          try{ history.replaceState(history.state, '', location.pathname + clean.search + clean.hash); }
+          catch(e){ return; } // 지우지 못하면 이 문서에서는 불러오지 않는다
+        }
+        addressReady = true;
+        afterAddress.splice(0).forEach(function(fn){ fn(); });
+      };
+      // initialize()는 SDK가 생성 때 시작한 처리의 같은 promise를 돌려준다(새로 처리하지 않음)
+      Promise.resolve().then(function(){ return auth.initialize(); }).then(finishAddress, finishAddress);
+    }
+  }
+
+  function loadScript(){
+    whenAddressReady(function(){
+      if(scriptLoaded || currentStatus !== 'granted') return; // 기다리는 사이 거부했으면 불러오지 않는다
+      scriptLoaded = true;
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+      // 로드 실패해도 gtag는 이미 dataLayer.push 스텁이라 계속 조용히 쌓이기만 할 뿐,
+      // 서비스 기능에는 아무 영향이 없다.
+      document.head.appendChild(s);
+    });
+  }
+
   // 최초 허용이든(스크립트 없음) 거부 뒤 재허용이든(스크립트 이미 있음)
   // 이 한 함수로 처리한다 — 재허용 시 스크립트를 중복 삽입하지 않는다.
   function applyGranted(){
@@ -77,6 +123,7 @@
         ad_user_data: 'granted',
         ad_personalization: 'granted'
       });
+      loadScript(); // 인증 복귀 처리 중에 거부했다가 다시 허용한 경우 — 아직 안 불렀으면 불러온다
       return;
     }
     currentStatus = 'granted';
@@ -84,14 +131,13 @@
     realGtag = function(){ window.dataLayer.push(arguments); };
     window.gtag = guardedGtag; // 이후 다시는 재할당하지 않는다
     realGtag('js', new Date());
-    realGtag('config', GA_ID, { send_page_view: false }); // app.js render()가 hash 라우팅에 맞춰 수동으로 page_view를 보냄
+    var config = { send_page_view: false }; // app.js render()가 hash 라우팅에 맞춰 수동으로 page_view를 보냄
+    var referrer = document.referrer || '';
+    var safeRef = core.safeReferrer(referrer);
+    if(safeRef !== referrer) config.page_referrer = safeRef; // 인증 값이 있을 때만 — 없으면 gtag 기본값(document.referrer)
+    realGtag('config', GA_ID, config);
     gaReady = true;
-    var s = document.createElement('script');
-    s.async = true;
-    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
-    // 로드 실패해도 gtag는 이미 dataLayer.push 스텁이라 계속 조용히 쌓이기만 할 뿐,
-    // 서비스 기능에는 아무 영향이 없다.
-    document.head.appendChild(s);
+    loadScript();
   }
 
   function applyDenied(){
