@@ -63,8 +63,24 @@
   function guardedGtag(){
     var command = arguments[0];
     if(command === 'consent' || command === 'js' || command === 'config' || currentStatus === 'granted'){
-      realGtag.apply(null, arguments);
+      var args = Array.prototype.slice.call(arguments);
+      if(command === 'event' || command === 'config' || command === 'set') args[args.length - 1] = scrubUrlParams(args[args.length - 1]);
+      realGtag.apply(null, args);
     }
+  }
+  // 대기열(dataLayer)에 넣는 순간 주소 값의 인증 값을 뺀다(2026-10-12 핫픽스 보완). 인증 복귀 처리 중에 쌓인 이벤트는
+  // 나중에 실제 주소를 정리해도 값이 그대로라, 넣을 때 빼야 한다. 규칙은 core.safeUrl(app.js page_location과 같음).
+  // 호출한 쪽 객체는 바꾸지 않고 복사본을 넣는다.
+  var URL_PARAMS = ['page_location', 'page_referrer', 'page_path', 'link_url'];
+  function scrubUrlParams(params){
+    if(!params || typeof params !== 'object') return params;
+    var copy = {};
+    for(var key in params){
+      if(Object.prototype.hasOwnProperty.call(params, key)){
+        copy[key] = (URL_PARAMS.indexOf(key) !== -1 && typeof params[key] === 'string') ? core.safeUrl(params[key]) : params[key];
+      }
+    }
+    return copy;
   }
 
   function readConsent(){

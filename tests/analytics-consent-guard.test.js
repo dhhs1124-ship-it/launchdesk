@@ -345,3 +345,24 @@ test('page_referrer: 인증 값이 없는 이전 페이지 주소는 그대로 �
   const { sandbox } = boot({ stored: GRANTED_V1, referrer: 'https://l.instagram.com/' });
   assert.equal('page_referrer' in configParams(sandbox), false);
 });
+
+// 2026-10-12 핫픽스 보완(GPT 검토) — 처리 중에 대기열에 쌓인 이벤트는 나중에 실제 주소를 정리해도 값이 그대로다.
+// 그래서 대기열(dataLayer)에 넣는 순간 주소 값(page_location · page_referrer · page_path · link_url)의 인증 값을 같은 규칙으로 뺀다.
+test('대기열에 넣는 순간 주소 값의 인증 값을 뺀다(이름 대소문자 무관) — 주소를 정리한 뒤에도 이미 쌓인 이벤트에 값이 남지 않는다', async () => {
+  const sb = fakeSupabase();
+  const { sandbox, scripts } = boot({ stored: GRANTED_V1, location: { search: '?access_token=QA&Code=QC&utm_source=meta', hash: '' }, supabase: sb.client });
+  const params = { page_title: '홈', page_location: 'http://localhost/?access_token=QA&refresh_token=QR&token_hash=QH&type=signup&Code=QC&utm_source=meta#/tools',
+    page_referrer: 'https://ref.example/cb?code=RC&utm_source=ref', page_path: '/' };
+  sandbox.gtag('event', 'page_view', params);
+  sandbox.gtag('event', 'chapter_start', { chapter_path: '/start', chapter_title: '쇼핑몰 준비' });
+  const events = sandbox.dataLayer.filter((a) => a[0] === 'event').map((a) => JSON.parse(JSON.stringify(Array.from(a))));
+  assert.equal(events[0][2].page_location, 'http://localhost/?utm_source=meta#/tools', 'utm · 화면 경로는 남는다');
+  assert.equal(events[0][2].page_referrer, 'https://ref.example/cb?utm_source=ref');
+  assert.equal(events[0][2].page_path, '/');
+  assert.deepEqual(events[1][2], { chapter_path: '/start', chapter_title: '쇼핑몰 준비' }, '주소가 아닌 값은 그대로');
+  assert.equal(params.page_location.indexOf('access_token') !== -1, true, '호출한 쪽 객체는 바꾸지 않는다');
+  sb.resolve({ error: null });
+  await tick();
+  assert.equal(gaScriptCount(scripts), 1);
+  assert.doesNotMatch(JSON.stringify(sandbox.dataLayer.map((a) => Array.from(a))), /QA|QR|QH|QC|RC/, '불러온 뒤 처리될 대기열 어디에도 인증 값이 없다');
+});

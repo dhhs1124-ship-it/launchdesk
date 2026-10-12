@@ -62,6 +62,14 @@
     var kept = pairsOf(search).filter(function(pair){ return !isAuthPair(pair); });
     return { search: kept.length ? '?' + kept.join('&') : '', hash: isAuthHash(hash) ? '' : (hash || '') };
   }
+  // 주소 문자열에서 인증 값만 뺀다 — page_location 등 대기열에 넣을 주소 값과 app.js의 page_location이 같은 규칙을 쓴다
+  // (쿼리는 인증 이름만 대소문자 구분 없이 빼고 utm 등은 남김, 인증 해시는 통째로 빼고 화면 경로 해시는 그대로)
+  function safeUrl(url){
+    if(!url) return '';
+    var m = /^([^?#]*)(\?[^#]*)?(#.*)?$/.exec(String(url));
+    var clean = withoutAuthParams(m[2] || '', m[3] || '');
+    return m[1] + clean.search + clean.hash;
+  }
   // page_referrer — 이전 페이지 주소에서 인증 값만 뺀다(출처 · 경로 · utm은 남겨 유입 분석 유지). 해시는 보내지 않는다.
   function safeReferrer(ref){
     if(!ref) return '';
@@ -81,6 +89,7 @@
     hasAuthParams: hasAuthParams,
     withoutAuthParams: withoutAuthParams,
     safeReferrer: safeReferrer,
+    safeUrl: safeUrl,
     isGranted: isGranted,
     isDenied: isDenied
   };

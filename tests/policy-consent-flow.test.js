@@ -24,6 +24,7 @@ const STORE_SRC = fs.readFileSync(path.join(ROOT, 'store.js'), 'utf8');
 const POLICY_CORE_SRC = fs.readFileSync(path.join(ROOT, 'policy-consent-core.js'), 'utf8');
 const POLICY_UI_SRC = fs.readFileSync(path.join(ROOT, 'policy-consent.js'), 'utf8');
 const APP_SRC = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+const ANALYTICS_CORE_SRC = fs.readFileSync(path.join(ROOT, 'analytics-consent-core.js'), 'utf8'); // index.html처럼 app.js보다 먼저(page_location 인증 값 규칙)
 const INDEX_HTML = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 
 const TERMS_VERSION = '2026-09-18';
@@ -225,6 +226,7 @@ async function boot(opts){
     const c = sandbox.launchdeskPolicyConsentCore;
     sandbox.sessionStorage.setItem(c.PENDING_KEY, c.serializePending(opts.presetPendingSource));
   }
+  vm.runInContext(ANALYTICS_CORE_SRC, sandbox, { filename: 'analytics-consent-core.js' });
   vm.runInContext(APP_SRC, sandbox, { filename: 'app.js' });
   env.sandbox = sandbox;
   env.core = sandbox.launchdeskPolicyConsentCore;
@@ -593,4 +595,13 @@ test('일반 화면 경로의 GA4 page_view는 그대로 — page_path는 화면
   const views = env.ga.filter((a) => a[0] === 'event' && a[1] === 'page_view');
   assert.ok(views.length >= 1);
   assert.equal(views[0][2].page_path, '/tools');
+});
+
+// 2026-10-12 핫픽스 보완(GPT 검토) — app.js의 page_location도 GA4 동의 모듈과 같은 인증 값 제거 규칙(이름 · 대소문자)을 쓴다
+test('인증 쿼리(?access_token · token_hash · 대문자 Code) 첫 화면의 GA4 page_view: page_location에 인증 값이 없고 utm은 남는다', async () => {
+  const env = await boot({ session: null, locationSearch: '?access_token=FAKEQUERYACCESS&refresh_token=FAKEQUERYREFRESH&token_hash=FAKEEMAILHASH&type=signup&Code=FAKECAPITALCODE&utm_source=meta' });
+  const views = env.ga.filter((a) => a[0] === 'event' && a[1] === 'page_view');
+  assert.ok(views.length >= 1, '첫 화면 page_view');
+  for(const v of views) assert.equal(v[2].page_location, 'http://localhost/?utm_source=meta');
+  assert.doesNotMatch(JSON.stringify(env.ga), /FAKE/, 'GA4 호출 어디에도 인증 값이 없다');
 });

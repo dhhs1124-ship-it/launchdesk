@@ -83,3 +83,14 @@ test('safeReferrer: 이전 페이지 주소에서 인증 값만 뺀다 — 출�
   assert.equal(consent.safeReferrer(''), '');
   assert.equal(consent.safeReferrer(undefined), '');
 });
+
+// 2026-10-12 핫픽스 보완 — 대기열에 넣을 주소 값에 쓰는 같은 규칙(GPT 검토: ?access_token · token_hash · 대문자 Code가 대기열에 남던 경로)
+test('safeUrl: 주소의 인증 값만 뺀다 — 쿼리는 이름 대소문자 구분 없이, 인증 해시는 통째로, 화면 경로 해시 · utm은 그대로', () => {
+  assert.equal(consent.safeUrl('http://x/?access_token=A&refresh_token=R&utm_source=m'), 'http://x/?utm_source=m');
+  assert.equal(consent.safeUrl('http://x/?token_hash=H&type=signup&utm_source=m'), 'http://x/?utm_source=m');
+  assert.equal(consent.safeUrl('http://x/?Code=C&STATE=S&utm_source=m#/tools'), 'http://x/?utm_source=m#/tools');
+  assert.equal(consent.safeUrl('http://x/#access_token=A&refresh_token=R'), 'http://x/');
+  assert.equal(consent.safeUrl('http://x/?utm_source=m#/start'), 'http://x/?utm_source=m#/start');
+  assert.equal(consent.safeUrl('/start'), '/start');
+  assert.equal(consent.safeUrl(''), '');
+});

@@ -117,24 +117,14 @@
      Supabase 인증 흐름 자체는 전혀 건드리지 않는다(그 정리 로직은 그대로
      자기 타이밍에 실행된다 — 여기서는 GA4로 나가는 문자열만 방어적으로
      다시 만든다). */
-  var OAUTH_CALLBACK_PARAM_NAMES = ['code', 'error', 'error_code', 'error_description', 'state'];
+  // 2026-10-12 핫픽스 보완: 쿼리의 인증 값은 GA4 동의 모듈(analytics-consent-core.js)과 같은 규칙으로 뺀다 —
+  // 전에는 code · error · state 등 일부 이름만 대소문자를 가려 지워 ?access_token · token_hash · 대문자 Code가 남았다.
+  // 그 모듈이 없으면 GA4도 실행되지 않지만, 혹시 몰라 쿼리를 통째로 뺀다.
   function safePageLocation(){
     var hash = location.hash;
     var safeHash = (hash.indexOf('#/') === 0) ? hash : '';
-    var safeSearch = location.search;
-    if(safeSearch){
-      try{
-        var params = new URLSearchParams(safeSearch);
-        var hadOauthParam = false;
-        OAUTH_CALLBACK_PARAM_NAMES.forEach(function(name){
-          if(params.has(name)){ params.delete(name); hadOauthParam = true; }
-        });
-        if(hadOauthParam){
-          var remaining = params.toString();
-          safeSearch = remaining ? '?' + remaining : '';
-        }
-      }catch(e){ /* URLSearchParams 미지원 등 — 원본 쿼리스트링 그대로 사용 */ }
-    }
+    var core = window.launchdeskAnalyticsConsent;
+    var safeSearch = (core && typeof core.withoutAuthParams === 'function') ? core.withoutAuthParams(location.search, '').search : '';
     return location.origin + location.pathname + safeSearch + safeHash;
   }
 
