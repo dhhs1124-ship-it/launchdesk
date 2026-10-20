@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 계산은 브라우저 안에서만 한다. CSP로 입력값 전송(fetch · 폼 · 외부 연결)을 막는다 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#ffffff">
+<title>첫단추 마진 계산기</title>
+<meta name="description" content="판매가 · 원가 · 할인 · 수수료 · 배송비로 상품 1개 주문의 예상 남는 금액과 마진율을 계산해요. 로그인 없이, 입력한 금액은 서버에 전송하거나 저장하지 않습니다.">
+<meta property="og:title" content="첫단추 마진 계산기">
+<meta property="og:description" content="내 상품 1개 팔면 얼마 남는지, 할인 전후로 바로 계산해요.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <p class="brand"><img class="mark" src="logo.png" width="28" height="28" alt="">첫단추</p>
+    <h1>마진 계산기</h1>
+  </header>
+
+  <section class="result" id="result" aria-live="polite">
+    <div class="result-head">
+      <span>상품 1개 주문 · 예상 남는 금액</span>
+      <span class="badge" id="exampleBadge">가정한 예시값</span>
+    </div>
+    <p class="profit" id="profit">—</p>
+    <div class="kpis">
+      <div><span>마진율</span><strong id="ratio">—</strong></div>
+      <div><span>할인 후 판매금액</span><strong id="sale">—</strong></div>
+    </div>
+    <p class="err-summary" id="errSummary" hidden>입력값을 확인해주세요</p>
+  </section>
+
+  <section class="compare" aria-label="할인 전후 비교">
+    <table>
+      <thead><tr><th></th><th>할인 전</th><th>할인 후</th></tr></thead>
+      <tbody>
+        <tr><th>판매금액</th><td id="bSale">—</td><td id="aSale">—</td></tr>
+        <tr><th>남는 금액</th><td id="bProfit">—</td><td id="aProfit">—</td></tr>
+        <tr><th>마진율</th><td id="bRatio">—</td><td id="aRatio">—</td></tr>
+      </tbody>
+    </table>
+    <p class="diff" id="diff"></p>
+  </section>
+
+  <details class="breakdown">
+    <summary>빠지는 비용 보기</summary>
+    <dl id="costs"></dl>
+  </details>
+  <p class="excluded">계산에 포함되지 않은 항목: 부가세 · 소득세, 임대료 · 인건비 같은 고정비, 반품 · 교환 비용</p>
+
+  <form class="inputs" id="form" novalidate autocomplete="off">
+    <div class="form-head">
+      <h2>내 상품 넣기</h2>
+      <div class="actions">
+        <button type="button" id="fillExample">예시값</button>
+        <button type="button" id="clearAll">모두 지우기</button>
+      </div>
+    </div>
+    <label class="field"><span class="name">판매가</span>
+      <span class="box"><input id="price" inputmode="numeric" data-money><i>원</i></span><em class="msg" id="price-msg"></em></label>
+    <label class="field"><span class="name">사입 원가</span>
+      <span class="box"><input id="unitCost" inputmode="numeric" data-money><i>원</i></span><em class="msg" id="unitCost-msg"></em></label>
+    <label class="field"><span class="name">할인율</span>
+      <span class="box"><input id="discountRate" inputmode="decimal"><i>%</i></span><em class="msg" id="discountRate-msg"></em></label>
+    <label class="field"><span class="name">결제 · 플랫폼 수수료율</span><small id="feeHint">할인 후 판매금액에 적용</small>
+      <span class="box"><input id="feeRate" inputmode="decimal"><i>%</i></span><em class="msg" id="feeRate-msg"></em></label>
+    <label class="field"><span class="name">포장비</span>
+      <span class="box"><input id="packaging" inputmode="numeric" data-money><i>원</i></span><em class="msg" id="packaging-msg"></em></label>
+    <div class="field ship">
+      <label id="shipSimple"><span class="name">판매자 실제 부담 배송비</span><small>고객에게 받은 배송비를 뺀 금액</small>
+        <span class="box"><input id="shipping" inputmode="numeric" data-money><i>원</i></span><em class="msg" id="shipping-msg"></em></label>
+      <button type="button" class="ship-toggle" id="shipToggle" aria-expanded="false" aria-controls="shipPaid">고객에게 배송비를 받았어요</button>
+      <div id="shipPaid" hidden>
+        <label class="sub"><span class="name">고객에게 받은 배송비</span>
+          <span class="box"><input id="customerShipping" inputmode="numeric" data-money placeholder="0"><i>원</i></span><em class="msg" id="customerShipping-msg"></em></label>
+        <label class="sub"><span class="name">실제 택배비</span>
+          <span class="box"><input id="actualShipping" inputmode="numeric" data-money placeholder="0"><i>원</i></span><em class="msg" id="actualShipping-msg"></em></label>
+        <p class="ship-note">입력한 수수료율을 받은 배송비에도 적용하고, 마진율은 판매금액 + 받은 배송비 기준으로 계산해요. 실제 수수료 기준은 이용 플랫폼 · 계약에 따라 다를 수 있어요.</p>
+      </div>
+    </div>
+    <label class="field"><span class="name">주문당 광고비 <b>선택</b></span>
+      <span class="box"><input id="adCost" inputmode="numeric" data-money placeholder="0"><i>원</i></span><em class="msg" id="adCost-msg"></em></label>
+  </form>
+  <p class="privacy">입력한 금액은 서버에 전송하거나 저장하지 않습니다.</p>
+</main>
+
+<div class="dock" id="dock" hidden aria-hidden="true">
+  <span>남는 금액</span><strong id="dockProfit">—</strong><span id="dockRatio">—</span>
+</div>
+
+<script src="margin-calc.js"></script>
+<script src="chutdanchu-core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
