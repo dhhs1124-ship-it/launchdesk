@@ -1,3 +1,5 @@
 *.test.js
 README.md
 screenshots
+.env*
+.gitignore
